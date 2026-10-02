@@ -4143,6 +4143,83 @@ own `weak`/`silent`.
 **Session tally (2026-10-02, second session):** Bug fix 3 · Tooling 2 ·
 Docs 1 · New feature 0 · Refactor 0 · Optimization 0.
 
+## 2026-10-02 (second session) — `theories/`: `weak_bisimilar`, a single weak bisimulation (option A, part 1)
+
+**New feature** (theory only). On branch `theories/weak-bisimilar`, kept
+apart from plugin-code branches so that the change to `theories/` has its
+own history. Jonah's decision: the project's aim is to mechanise
+bisimilarities, and the intended notion is classical weak bisimilarity. To
+be reviewed with @dcastrop later; built to be easy to revert (below).
+
+**Why.** `theories/Bisimilarity.v`'s `weak_bisim s t` is
+`weak_sim s t /\ weak_sim t s`: two simulations, each free to pick its own
+relation. That is mutual similarity, strictly coarser than weak
+bisimilarity, which asks for *one* relation that is a simulation both ways.
+So every `PluginProofs.v` "bisimilarity" proof has so far established
+mutual similarity. The textbook separating pair is `a.b + a` and `a.b`.
+Each simulates the other, but after the `a` step into the stuck branch,
+`a.b` can only reach a state that still offers `b`. Mutual similarity does
+not preserve deadlock; bisimilarity does.
+
+**What.** Strictly additive. Nothing existing is edited, and the plugin
+does not refer to anything new.
+- `theories/Bisimilarity.v`, new section after `wk_bisim_sym`:
+  - `bisimF G m1 n1`: a record with `bisim_l` (as `simF`'s `sim_weak`) and
+    `bisim_r` (its mirror image);
+  - `CoInductive weak_bisimilar := In_bisim { out_bisim : bisimF … }`,
+    built the same way as `weak_sim`;
+  - lemmas: `weak_bisimilar_sim`, `weak_bisimilar_sym`,
+    `weak_bisimilar_weak_bisim` (so `weak_bisimilar` implies the old
+    statement), `weak_bisimilar_refl`, `weak_bisimilar_silent_clos`,
+    `weak_bisimilar_act_clos`, `weak_bisimilar_trans` (heterogeneous, like
+    `weak_sim_trans`).
+- `theories/Test.v`, new module `WeakBisimilarVsMutualSim` at the end: a
+  hand proof that the pair above is `weak_bisim` and
+  `~ weak_bisimilar`. This backs the claim "strictly coarser" with a
+  checked proof, rather than a comment.
+
+No new name clashes with `examples/`, `src/` or `lib/` (checked by grep;
+`loader.v` re-exports the theory). `dune build` and `make` on the plugin and
+`Test.v` are clean. The plugin's code is untouched, so no proof-suite run is
+needed.
+
+**Next (option A, part 2, a separate branch):** have the solver prove
+`weak_bisimilar` goals in one proof: both obligations under one cofix,
+with FSM a and FSM b swapping roles for `bisim_r`. That needs the
+`fix/weak-bisim-silent-closure` branch merged first, since it builds on
+`Product.respond ?silent`.
+
+### How to revert this, if @dcastrop disagrees
+
+The change is the commits on `theories/weak-bisimilar` from `f4d268e`
+onwards (this log entry included), touching only `theories/Bisimilarity.v`,
+`theories/Test.v` and this file.
+
+- **Before it is merged:** do not merge it. Delete it with
+  `git push fork --delete theories/weak-bisimilar` and
+  `git branch -D theories/weak-bisimilar`.
+- **After it is merged into `main` with a merge commit** (the intended
+  route; find the commit with
+  `git log --merges --oneline --grep weak-bisimilar main`):
+  ```
+  git switch main
+  git revert -m 1 <merge-commit>
+  dune build && dune exec test/tests.exe
+  git push fork main
+  ```
+  `-m 1` keeps `main`'s side and undoes everything the branch brought in,
+  as one new commit; history is not rewritten.
+- **If plugin code has since started using `weak_bisimilar`** (option A,
+  part 2): revert that branch's merge commit first, the same way, then this
+  one. Reverting this one alone would leave the plugin referring to
+  missing names, and `dune build` would fail on the first reference.
+- **To keep the theory but drop only the proof of strictness:** delete
+  module `WeakBisimilarVsMutualSim` from the end of `theories/Test.v`. It is
+  self-contained.
+
+**Session tally (2026-10-02, second session), cont.:** New feature 1
+(theory only).
+
 ---
 
 ## Outstanding

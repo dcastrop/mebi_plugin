@@ -1283,3 +1283,58 @@ MeBi Help Config Weak.
 MeBi Help Config FailIf.
 MeBi Help Config Solver.
 MeBi Help Config Output.
+
+(* [weak_bisimilar] is strictly finer than [weak_bisim] (mutual similarity),
+   proved by hand on the textbook pair [a.b + a] and [a.b]: each simulates
+   the other, but after [P -a-> Z] (the stuck branch) [Q] can only reach
+   [Q1], which can still do [b]. No plugin command involved. *)
+Module WeakBisimilarVsMutualSim.
+  Inductive st : Set := P | P1 | Q | Q1 | Z.
+  Inductive lab : Set := a | b.
+  Inductive step : st -> option lab -> st -> Prop :=
+  | p_a1 : step P (Some a) P1 | p_a2 : step P (Some a) Z
+  | p1_b : step P1 (Some b) Z
+  | q_a : step Q (Some a) Q1 | q1_b : step Q1 (Some b) Z.
+
+  Lemma no_silent : forall x y, silent step x y -> x = y.
+  Proof.
+    intros x y H; destruct H as [|y' z' T _]; [reflexivity|].
+    unfold tau in T; inversion T.
+  Qed.
+
+  Lemma z_sim : forall t, weak_sim step step Z t.
+  Proof. intros t; constructor; constructor; intros m2 a' T; inversion T. Qed.
+
+  Lemma p1_q1 : weak_sim step step P1 Q1.
+  Proof.
+    constructor; constructor; intros m2 a' T; inversion T; subst.
+    exists Z; split; [exact (inject_weak _ _ _ q1_b) | apply z_sim].
+  Qed.
+
+  Lemma q1_p1 : weak_sim step step Q1 P1.
+  Proof.
+    constructor; constructor; intros m2 a' T; inversion T; subst.
+    exists Z; split; [exact (inject_weak _ _ _ p1_b) | apply z_sim].
+  Qed.
+
+  Example mutually_similar : weak_bisim step step P Q.
+  Proof.
+    split; constructor; constructor; intros m2 a' T; inversion T; subst.
+    - exists Q1; split; [exact (inject_weak _ _ _ q_a) | exact p1_q1].
+    - exists Q1; split; [exact (inject_weak _ _ _ q_a) | apply z_sim].
+    - exists P1; split; [exact (inject_weak _ _ _ p_a1) | exact q1_p1].
+  Qed.
+
+  Example not_bisimilar : ~ weak_bisimilar step step P Q.
+  Proof.
+    intros H.
+    destruct (bisim_l (out_bisim H) p_a2) as [n2 [W B]].
+    inversion W as [a' z t S1 T S2|]; subst.
+    apply no_silent in S1; apply no_silent in S2; subst.
+    inversion T; subst.
+    destruct (bisim_r (out_bisim B) q1_b) as [m2 [W' _]].
+    inversion W' as [a'' z' t' S1' T' _|]; subst.
+    apply no_silent in S1'; subst.
+    inversion T'.
+  Qed.
+End WeakBisimilarVsMutualSim.
