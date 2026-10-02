@@ -18,12 +18,13 @@ module type S = sig
     type t =
       { bisim_states : partition
       ; non_bisim_states : partition
+      ; roots_related : bool option
       }
 
     include Json.S with type k = t
 
     val are_bisimilar : t -> bool
-    val split : partition -> states -> states -> t
+    val split : ?roots_related:bool -> partition -> states -> states -> t
   end
 
   type t =
@@ -101,6 +102,7 @@ module Make
     type t =
       { bisim_states : Partition.t
       ; non_bisim_states : Partition.t
+      ; roots_related : bool option
       }
 
     include Json.Thing.Make (struct
@@ -113,16 +115,33 @@ module Make
             [ "bisimilar states", Partition.json ~as_elt:true x.bisim_states
             ; ( "non-bisimilar states"
               , Partition.json ~as_elt:true x.non_bisim_states )
+            ; ( "initial states related"
+              , match x.roots_related with
+                | None -> `Null
+                | Some b -> `Bool b )
             ]
         ;;
       end)
 
-    let are_bisimilar ({ non_bisim_states; _ } : t) : bool =
+    (* Bisimilarity of two systems is bisimilarity of their initial states.
+       "Every block holds states of both systems" is not it: [a.b.x] against
+       [b.a.y] partitions into two shared blocks, {x, b.y} and {b.x, y}, with
+       the two initial states in different ones. It survives only as the
+       fallback when an FSM has no initial state. *)
+    let are_bisimilar ({ non_bisim_states; roots_related; _ } : t) : bool =
       Logger.trace __FUNCTION__;
-      Partition.is_empty non_bisim_states
+      match roots_related with
+      | Some related -> related
+      | None -> Partition.is_empty non_bisim_states
     ;;
 
-    let split (pi : Partition.t) (a : States.t) (b : States.t) : t =
+    let split
+          ?(roots_related : bool option)
+          (pi : Partition.t)
+          (a : States.t)
+          (b : States.t)
+      : t
+      =
       Logger.trace __FUNCTION__;
       let bisim_states, non_bisim_states =
         Partition.fold
@@ -133,7 +152,7 @@ module Make
           pi
           (Partition.empty, Partition.empty)
       in
-      { bisim_states; non_bisim_states }
+      { bisim_states; non_bisim_states; roots_related }
     ;;
   end
 
@@ -185,7 +204,22 @@ module Make
        left, so it reproduces the same structure, and the partition only
        reads that), roughly doubling the check's saturation memory. *)
     let pi : Partition.t = Minimization.partition_states merged in
-    let result = Result.split pi fsm_a.original.states fsm_b.original.states in
+    let roots_related : bool option =
+      match fsm_a.original.init, fsm_b.original.init with
+      | Some x, Some y ->
+        Some
+          (States.mem
+             y
+             (try Partition.get_bisimilar x pi with Not_found -> States.empty))
+      | _ -> None
+    in
+    let result =
+      Result.split
+        ?roots_related
+        pi
+        fsm_a.original.states
+        fsm_b.original.states
+    in
     { fsm_a; fsm_b; merged; result }
   ;;
 end

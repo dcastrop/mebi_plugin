@@ -157,14 +157,12 @@ let test_bisim_identical () : unit =
     (M.Bisimilarity.Result.are_bisimilar r.result)
 ;;
 
-(* [Result.are_bisimilar] is [non_bisim_states] being empty, where the merged
-   FSM's minimisation partition is split into blocks that contain states from
-   both systems and blocks that do not. It is therefore a statement about the
-   whole state space, and does not consult [init]: swapping the labels of the
-   two systems above yields a pair that is not bisimilar *as rooted systems*
-   but still reports true, because every block is still shared. That is sound
-   for the plugin, where each FSM is explored outwards from its initial term so
-   every state is reachable from the root. The case below distinguishes the two
+(* [Result.are_bisimilar] asks whether the two initial states share a block of
+   the merged FSM's partition. Until 2026-10-02 it asked instead whether every
+   block held states of both systems, and a comment here argued that this was
+   sound because every state is reachable from the root. It was not: the pair
+   in [test_bisim_not_rooted] is fully reachable, every block is shared, and
+   the two roots are not bisimilar. The case below distinguishes the two
    systems by giving one a behaviour the other cannot match at all. *)
 
 (** A two-state alternation against a one-state self-loop: no matching. *)
@@ -175,6 +173,20 @@ let test_bisim_different () : unit =
   let r = M.Bisimilarity.fsm x y in
   check
     "systems with unmatchable behaviour are not bisimilar"
+    false
+    (M.Bisimilarity.Result.are_bisimilar r.result)
+;;
+
+(** [a.b.x] against [b.a.y]: both blocks of the partition, {x, b.y} and
+    {b.x, y}, hold states of both systems, but the roots are in different
+    blocks. *)
+let test_bisim_not_rooted () : unit =
+  print_endline "bisimilarity: rooted";
+  let x = fsm 0 [ transition 0 a 1; transition 1 b 0 ] in
+  let y = fsm 10 [ transition 10 b 11; transition 11 a 10 ] in
+  let r = M.Bisimilarity.fsm x y in
+  check
+    "systems whose roots differ are not bisimilar"
     false
     (M.Bisimilarity.Result.are_bisimilar r.result)
 ;;
@@ -746,6 +758,7 @@ let () =
   test_minimize ();
   test_bisim_identical ();
   test_bisim_different ();
+  test_bisim_not_rooted ();
   test_product_loop ();
   test_product_diamond ();
   test_product_silent_stays_put ();

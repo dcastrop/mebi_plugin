@@ -1202,13 +1202,12 @@ End SilentResponse.
 
 MeBi Divider "Theories.Test.CheckerVerdicts".
 Module CheckerVerdicts.
-  (* KNOWN WRONG (found 2026-10-02): [MeBi Run Bisim] answers "bisimilar"
-     for both pairs below, and neither is bisimilar. With [FailIf] on a
-     negative result (the default), a correct checker makes each command
-     fail: when fixed, prefix each with [Fail]. *)
+  (* Neither pair below is bisimilar, and until 2026-10-02 [MeBi Run Bisim]
+     answered "bisimilar" for both. With [FailIf] on a negative result (the
+     default), a correct verdict makes the command fail. *)
 
-  (* 1. Not rooted. [x0 = a.b.x0] and [y0 = b.a.y0] differ in their first
-     step, so they are not even strongly bisimilar. The verdict asked only
+  (* 1. Rooted. [x0 = a.b.x0] and [y0 = b.a.y0] differ in their first step,
+     so they are not even strongly bisimilar. The verdict used to ask only
      whether every block of the partition holds states of both systems
      ({x0, y1} and {x1, y0} do), never whether [x0] and [y0] share one. *)
   Inductive rst : Set := x0 | x1 | y0 | y1.
@@ -1216,9 +1215,10 @@ Module CheckerVerdicts.
   Inductive rstep : rst -> rlab -> rst -> Prop :=
   | xa : rstep x0 ra x1 | xb : rstep x1 rb x0
   | yb : rstep y0 rb y1 | ya : rstep y1 ra y0.
-  MeBi Run Bisim x0 With rstep And y0 With rstep.
+  Fail MeBi Run Bisim x0 With rstep And y0 With rstep.
 
-  (* 2. No silent closure. [p = tau.p1 + b.z + c.p1], [p1 = a.z] against
+  (* 2. KNOWN WRONG, still: no silent closure. When fixed, prefix the
+     command with [Fail]. [p = tau.p1 + b.z + c.p1], [p1 = a.z] against
      [r = a.z + b.z + c.r1], [r1 = a.z]. After [p -tau-> p1], [r] cannot move
      silently and is not equivalent to [p1] ([r] can do [b]), so p and r are
      not weakly bisimilar (Milner's [tau.a + b] vs [a + b], plus a [c]-branch
