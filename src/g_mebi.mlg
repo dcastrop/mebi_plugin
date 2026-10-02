@@ -217,6 +217,8 @@ VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
   { Api.set_the_bounds_args (Api.Transitions x) }
 | ["MeBi" "Config" "Bounds" "Saturation" int(x)] -> 
   { Api.set_saturation_bound x }
+| ["MeBi" "Config" "Premise" "Depth" int(x)] -> 
+  { Api.set_premise_depth x }
 END
 
 (* Config -- weak_args for both *)

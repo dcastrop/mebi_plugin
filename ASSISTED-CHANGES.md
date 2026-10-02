@@ -3659,6 +3659,82 @@ Normal proofs are unaffected; proof suite 27 counts unchanged; `tests.exe`
 **Session tally (2026-10-01, this session, cumulative):** New feature 3 ·
 Bug fix 8 · Optimization 3 · Tooling 5 · Docs 3 · Refactor 1.
 
+## 2026-10-02 — I2 stage 1: general premises decided by bounded proof search
+
+Branch `main` (on `fork`). **New feature** (flagged in the sketch, built on
+the user's go-ahead), plus a **Bug fix** to yesterday's Anomaly guard.
+Design: `notes/9-general-premise-support.md`, stage 1.
+
+**Engine** (`lib/rocq_tools/premise_search.ml`, new module). `prove env
+sigma goal` → `Proved p` (with a closed proof term), `Refuted`, or `Unknown`,
+never a guess. It head-normalizes the goal, so `lt` (a definition) and `In`
+(a fixpoint) unfold, and decides equations as extraction does. For any other
+inductive proposition it tries each constructor: fresh evars for its
+binders, unify its conclusion, search its `Prop` premises left to right,
+depth − 1. The result typechecks before `Proved`. Two soundness rules,
+both found by working cases, not by tests failing:
+
+- A failed match refutes only if nothing opaque could hide a proof:
+  **parameters** must be *evaluated* (no opaque constant, axiom, free
+  variable or stuck match after normalization), and **indices** must be
+  ground constructor terms. My first version demanded every argument be a
+  constructor term, which wrongly made `Forall (fun k => k <= 1) [2; 2]`
+  undecidable (its predicate is a parameter). `le (f x) 3` with an opaque
+  `f` correctly stays undecidable: its parameter is stuck, and it could be
+  provable by rewriting.
+- Only the *first* proof of each premise is kept. So once a premise with
+  open variables has been solved, a later failure in the same constructor
+  is not a refutation (`R x y -> R y z -> R x z` with `y` free).
+
+**Extraction**: `decide_premise` sends every non-equation proposition to
+the engine. Open premises stay `Unknown` and are deferred, like open
+equations.
+
+**Proof solver**:
+
+- A *premise goal* (a `Prop` headed by an inductive that is not `eq`, a
+  MeBi theory constant, either FSM's LTS, or a `clos_*` relation) is closed by
+  `exact` of the engine's proof.
+- `invertibility` now inverts only LTS hypotheses. A premise hypothesis
+  that the engine refutes gets the top grade (4) and is handled by `simpl
+  in H; inversion_clear H`: `simpl` so a fixpoint like `In` unfolds,
+  `_clear` so it cannot be re-picked forever (the Step 0 loop).
+- **A mistake on the way:** my first version graded every non-LTS
+  hypothesis 0. That broke the proofs at the first state whose guard is
+  false (`3 <= 2`), where the branch closes only by refuting the premise.
+  The old shape-based grading had inverted such `le` hypotheses by
+  accident.
+
+`MeBi Config Premise Depth <n>` (default 16, reset by `Reset Bounds`);
+`Help Premises`/`Config Bounds` and the README updated.
+
+**Verification.** Proof suite identical to the per-mode baselines under
+`Auto`, forced `True` and forced `False` (temporary override). Before
+relying on the inversion change, I measured that every non-LTS hypothesis
+in the existing proofs is a data binder that already graded 0.
+`theories/Test.v` gains `GeneralPremises`: size pins for `<=`, `<`, `In`,
+`Forall`, `/\`, `\/` (`n <= 2` hand-counted: 4 states), the depth bound
+(`Premise Depth 2` cannot settle `le 0 2`), `weak_sim` proofs through `<=`,
+`In`, `Forall`, `\/`, and known-wrong cases for an opaque function and a
+negation. Each of the nine `Fail`s was checked for its reason. `make`
+builds; `tests.exe` 61/61; module lists agree (59). Two `make`-only
+warning-50 errors (my new definitions split a doc comment from its
+definition) were fixed before the run that counts.
+
+**Guard fix** (separate commit). Yesterday's `Proof_solver.guard`
+tested only the outer exception's name. The step logic runs inside
+`Proofview.Goal.enter`, and the tactic engine wraps exceptions raised there
+in `Logic_monad.TacticFailure`, so a `CannotGetTransition` hit during this
+work still came out as an Anomaly. The guard now unwraps; checked by
+injection inside the step logic.
+
+**Not in stage 1:** premises that compute outputs (a premise producing what
+an LTS premise needs, `In q l -> lts q a q'`), negation, the user tactic
+hook. See note 9, stages 2 and 4.
+
+**Session tally (2026-10-02):** New feature 1 · Bug fix 1 · Optimization 0 ·
+Tooling 0 · Docs 0 · Refactor 0.
+
 ---
 
 ## Outstanding

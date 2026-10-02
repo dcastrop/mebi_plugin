@@ -1176,10 +1176,11 @@ module Make (Enc : Encoding.S) :
 
     (** Decides a premise that is not over an LTS, where that can be done
         soundly (backlog item I2): [Some b] if it is known to hold ([true])
-        or not ([false]), [None] if not decided -- never a guess. Only
-        equations [l = r] whose sides are {e closed} once fully normalized
-        (no evars: typically guards on the source state, which matching
-        has already instantiated) are decided:
+        or not ([false]), [None] if not decided -- never a guess. Any other
+        closed proposition goes to [Premise_search] (bounded proof search over
+        its inductive's constructors). Equations [l = r] whose sides are
+        {e closed} once fully normalized (no evars: typically guards on the
+        source state, which matching has already instantiated) are decided:
 
         - convertible sides hold;
         - sides that differ in a constructor, at the head or under matching
@@ -1198,7 +1199,14 @@ module Make (Enc : Encoding.S) :
         | _ -> false
       in
       if Bool.not is_eq || Array.length args <> 3
-      then None
+      then (
+        (* Any other proposition: bounded proof search, once it is closed
+           ([Premise_search]; I2 stage 1). An open premise is [Unknown] and
+           gets deferred like an open equation. *)
+        match Premise_search.prove env sigma (EConstr.mkApp (name, args)) with
+        | Premise_search.Proved _ -> Some true
+        | Premise_search.Refuted -> Some false
+        | Premise_search.Unknown -> None)
       else (
         let l = Reductionops.nf_all env sigma args.(1) in
         let r = Reductionops.nf_all env sigma args.(2) in

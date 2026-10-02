@@ -126,6 +126,8 @@ lib/rocq_tools/rocq_monad.ml
 lib/rocq_tools/rocq_monad.mli
 lib/rocq_tools/rocq_monad_strfy.ml
 lib/rocq_tools/rocq_monad_strfy.mli
+lib/rocq_tools/premise_search.ml
+lib/rocq_tools/premise_search.mli
 lib/rocq_tools/rocq_monad_utils.ml
 lib/rocq_tools/rocq_monad_utils.mli
 lib/rocq_tools/theories.ml

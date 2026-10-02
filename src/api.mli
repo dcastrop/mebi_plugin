@@ -64,6 +64,7 @@ val set_the_bounds_args : bounds_args -> unit
 val default_saturation_bound : int
 val the_saturation_bound : int ref
 val set_saturation_bound : int -> unit
+val set_premise_depth : int -> unit
 
 (** Measured heap per weak action of a saturated FSM, in bytes (low, high). *)
 val bytes_per_weak_action : int * int

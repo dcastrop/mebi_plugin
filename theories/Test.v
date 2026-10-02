@@ -966,6 +966,92 @@ Module TwoPremises.
   MeBi Config Reset Weak.
 End TwoPremises.
 
+MeBi Divider "Theories.Test.GeneralPremises".
+Module GeneralPremises.
+  (* Premises that are neither over an LTS nor equations are decided by a
+     bounded proof search over their inductive's constructors (backlog item
+     I2, stage 1; notes/9). Each counter steps from 0 while its guard holds,
+     so the LTS size pins the guard's verdict for every n; the proofs check
+     the solver closes true premises (by the proof found) and refutes false
+     ones in hypotheses. Counts hand-checked: [n <= 2] holds for 0..2, so
+     states 0..3. *)
+  From Stdlib Require Import List PeanoNat. Import ListNotations.
+  MeBi Config Reset Weak.
+
+  Inductive le_c : nat -> option bool -> nat -> Prop :=
+  | le_go n : n <= 2 -> le_c n (Some true) (S n).
+  Inductive le_c' : nat -> option bool -> nat -> Prop :=
+  | le_go' n : n <= 2 -> le_c' n (Some true) (S n).
+  (* [lt] is a definition over [le]: unfolded before the search *)
+  Inductive lt_c : nat -> option bool -> nat -> Prop :=
+  | lt_go n : n < 2 -> lt_c n (Some true) (S n).
+  (* [In] is a fixpoint: reduces to [or]/[eq]/[False] once the list is known *)
+  Inductive in_c : nat -> option bool -> nat -> Prop :=
+  | in_go n : In n [0; 1] -> in_c n (Some true) (S n).
+  Inductive in_c' : nat -> option bool -> nat -> Prop :=
+  | in_go' n : In n [0; 1] -> in_c' n (Some true) (S n).
+  (* [Forall]'s predicate is a parameter: refutable although it is a lambda *)
+  Inductive fa_c : nat -> option bool -> nat -> Prop :=
+  | fa_go n : Forall (fun k => k <= 1) [n; n] -> fa_c n (Some true) (S n).
+  Inductive fa_c' : nat -> option bool -> nat -> Prop :=
+  | fa_go' n : Forall (fun k => k <= 1) [n; n] -> fa_c' n (Some true) (S n).
+  Inductive and_c : nat -> option bool -> nat -> Prop :=
+  | and_go n : n <= 3 /\ 1 <= S n -> and_c n (Some true) (S n).
+  Inductive or_c : nat -> option bool -> nat -> Prop :=
+  | or_go n : n = 0 \/ n = 1 -> or_c n (Some true) (S n).
+  Inductive or_c' : nat -> option bool -> nat -> Prop :=
+  | or_go' n : n = 0 \/ n = 1 -> or_c' n (Some true) (S n).
+
+  MeBi Config Bounds As Num States 4.
+  MeBi Run LTS 0 Using le_c.
+  MeBi Config Bounds As Num States 3.
+  Fail MeBi Run LTS 0 Using le_c.
+  MeBi Run LTS 0 Using lt_c.
+  MeBi Run LTS 0 Using in_c.
+  MeBi Run LTS 0 Using fa_c.
+  MeBi Run LTS 0 Using or_c.
+  MeBi Config Bounds As Num States 2.
+  Fail MeBi Run LTS 0 Using lt_c.
+  Fail MeBi Run LTS 0 Using in_c.
+  Fail MeBi Run LTS 0 Using fa_c.
+  Fail MeBi Run LTS 0 Using or_c.
+  MeBi Config Bounds As Num States 5.
+  MeBi Run LTS 0 Using and_c.
+  MeBi Config Bounds As Num States 4.
+  Fail MeBi Run LTS 0 Using and_c.
+
+  (* The depth bound: [le 0 2] needs 3 constructor applications. *)
+  MeBi Config Premise Depth 2.
+  MeBi Config Bounds As Num States 20.
+  Fail MeBi Run LTS 0 Using le_c.
+  MeBi Config Reset Bounds.
+
+  MeBi Config Weak As Option bool.
+  Example w_le : weak_sim le_c le_c' 0 0.
+  Proof. MeBi Sim Begin le_c 0 And le_c' 0 Using le_c. MeBi Sim Solve 100. Qed.
+  Example w_in : weak_sim in_c in_c' 0 0.
+  Proof. MeBi Sim Begin in_c 0 And in_c' 0 Using in_c. MeBi Sim Solve 100. Qed.
+  Example w_fa : weak_sim fa_c fa_c' 0 0.
+  Proof. MeBi Sim Begin fa_c 0 And fa_c' 0 Using fa_c. MeBi Sim Solve 100. Qed.
+  Example w_or : weak_sim or_c or_c' 0 0.
+  Proof. MeBi Sim Begin or_c 0 And or_c' 0 Using or_c. MeBi Sim Solve 100. Qed.
+  MeBi Config Reset Weak.
+
+  (* KNOWN WRONG (stage 1): undecidable premises still over-approximate --
+     an opaque function, and a negation (deciding ~P needs a complete search
+     of P and a proof of the negation, not built). When supported, these
+     Fails start failing: make them positive. *)
+  Parameter f : nat -> nat.
+  Inductive op_c : nat -> option bool -> nat -> Prop :=
+  | op_go n : f n <= 2 -> op_c n (Some true) (S n).
+  Inductive not_c : nat -> option bool -> nat -> Prop :=
+  | not_go n : ~ (3 <= n) -> not_c n (Some true) (S n).
+  MeBi Config Bounds As Num States 20.
+  Fail MeBi Run LTS 0 Using op_c.
+  Fail MeBi Run LTS 0 Using not_c.
+  MeBi Config Reset Bounds.
+End GeneralPremises.
+
 (* [MeBi Help]: every topic parses and prints (backlog item F). *)
 MeBi Divider "Theories.Test.Help".
 MeBi Help.

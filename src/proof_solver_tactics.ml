@@ -11,6 +11,11 @@ module type S = sig
   type econstrset
 
   val inversion : Rocq_utils.hyp -> tactic mm
+
+  (** [refute_premise h]: [simpl in h; inversion_clear h], for a premise
+      hypothesis known to be false (backlog I2). *)
+  val refute_premise : Rocq_utils.hyp -> tactic mm
+
   val subst_all : unit -> tactic mm
   val simplify : unit -> tactic mm
   val simplify_concl : unit -> tactic mm
@@ -21,6 +26,9 @@ module type S = sig
 
   (** [reflexivity ()] closes an equation premise goal (up to reduction). *)
   val reflexivity : unit -> tactic mm
+
+  (** [exact_term p] closes the goal with proof term [p]. *)
+  val exact_term : EConstr.t -> tactic mm
 
   val cofix : unit -> tactic mm
   val mutual_cofix : Names.Id.t -> (Names.Id.t * Evd.econstr) list -> tactic mm
@@ -163,6 +171,23 @@ module Make
     |> return
   ;;
 
+  (* [simpl] first: a fixpoint premise such as [In] only inverts once
+     unfolded to [or]/[eq]/[False]. [inversion_clear], so the hypothesis
+     cannot be picked again (the Step 0 loop: [inversion] keeps it). *)
+  let refute_premise (x : Rocq_utils.hyp) : Tactic.t mm =
+    let id = Context.Named.Declaration.get_id x in
+    Proofview.tclTHEN
+      (Tactics.simpl_in_hyp (id, Locus.InHyp))
+      (Inv.inv_clear_tac id)
+    |> Tactic.create
+         ~msg:
+           (Printf.sprintf
+              "simpl in %s; inversion_clear %s"
+              (Strfy.hyp_name x)
+              (Strfy.hyp_name x))
+    |> return
+  ;;
+
   let subst_all () : Tactic.t mm =
     Equality.subst_all ()
     |> Tactic.create ~kind:Info ~msg:(Printf.sprintf "(subst all)")
@@ -205,6 +230,13 @@ module Make
     let* concl : Tactic.t = simplify_concl () in
     let* hyps : Tactic.t = simplify_hyps () in
     Tactic.seq concl hyps |> return
+  ;;
+
+  let exact_term (p : EConstr.t) : Tactic.t mm =
+    Logger.trace __FUNCTION__;
+    Tactics.exact_check p
+    |> Tactic.create ~msg:"exact (premise proof)"
+    |> return
   ;;
 
   let reflexivity () : Tactic.t mm =

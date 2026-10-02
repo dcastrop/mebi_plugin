@@ -75,18 +75,25 @@ let text : string list -> string option = function
        Times repeated LTS construction over a range of sizes."
   | [ "Premises" ] ->
     Some
-      "Which constructor shapes are supported. An LTS is an inductive relation \
-       [term -> label -> term -> Prop]. For each constructor, the source term \
-       is matched, then its premises are handled:\n\
-      \  - premises over an LTS given in Using (the same one, or another: \
-       layered LTSs) are explored; several are allowed;\n\
-      \  - equations [l = r] are decided once both sides are closed: \
-       convertible holds, differing constructors fails (the transition is \
-       dropped); in a proof they are closed by reflexivity;\n\
-      \  - anything else cannot be decided: the constructor is applied as if \
-       it held, with a warning, so the LTS may contain transitions that do not \
-       exist. A Run Bisim verdict on it may be wrong; a proof cannot be, since \
-       Qed checks the premise."
+      (Printf.sprintf
+         "Which constructor shapes are supported. An LTS is an inductive \
+          relation [term -> label -> term -> Prop]. For each constructor, the \
+          source term is matched, then its premises are handled:\n\
+         \  - premises over an LTS given in Using (the same one, or another: \
+          layered LTSs) are explored; several are allowed;\n\
+         \  - any other premise is decided once it is closed (immediately, or \
+          after the LTS premises fix what it mentions): an equation by \
+          comparing its sides, any other inductive proposition (<=, <, In, \
+          Forall, /\\, \\/, ...) by a proof search over its constructors, at \
+          most %i deep (MeBi Config Premise Depth <n>). A false premise drops \
+          the transition; in a proof, a true one is closed with the proof \
+          found, and a false one in a hypothesis is refuted;\n\
+         \  - anything else cannot be decided -- negations, opaque functions \
+          or axioms, a search cut off by the depth: the constructor is applied \
+          as if the premise held, with a warning, so the LTS may contain \
+          transitions that do not exist. A Run Bisim verdict on it may be \
+          wrong; a proof cannot be, since Qed checks the premise."
+         !Premise_search.max_depth)
   | [ "Config" ] ->
     Some
       "MeBi Config Reset [Bounds | Weak | FailIf | Output].\n\n\
@@ -104,6 +111,7 @@ let text : string list -> string option = function
          "MeBi Config Bounds As Num States <n>.\n\
           MeBi Config Bounds As Num Transitions <n>.\n\
           MeBi Config Bounds Saturation <n>.\n\
+          MeBi Config Premise Depth <n>.\n\
           MeBi Config Reset Bounds.\n\n\
           Exploration stops after <n> states (default %s) or transitions; an \
           LTS cut short is an error unless [MeBi Config FailIf Incomplete \
@@ -111,7 +119,8 @@ let text : string list -> string option = function
           fixed 0.1-0.3GB, so a state bound past ~%i prints a memory notice. \
           Logging the result (Output \"Result\" / \"DecodeResults\" / \
           \"DumpResults\") costs far more, ~0.65MB per state. For the \
-          saturation bound see MeBi Help Config Bounds Saturation."
+          saturation bound see MeBi Help Config Bounds Saturation; for the \
+          premise search depth, MeBi Help Premises."
          (match Api.default_bounds with
           | Api.States n -> Printf.sprintf "%i states" n
           | Api.Transitions n -> Printf.sprintf "%i transitions" n)

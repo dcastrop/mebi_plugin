@@ -256,6 +256,10 @@ struct
       Rocq_utils.hyp_to_atomic sigma x |> return
     ;;
 
+    (** Grade of a premise hypothesis that is closed and provably false:
+        above any LTS step's (at most 3). *)
+    let refutable_grade : int = 4
+
     (** [invertibility x] returns an integer denoting whether [x] need be inverted, with the higher numbers being of more importance to invert and [0] denoting [x] does not need to be inverted.
     *)
     let invertibility (x : t) : int mm =
@@ -274,8 +278,28 @@ struct
         | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
         | _ -> false
       in
-      if is_eq
-      then return 0
+      (* Only LTS steps are inverted. Any other premise hypothesis -- an
+         [In], a [<=], an equation -- comes from a constructor premise; the
+         shape-based grading below assumes [term label goto] and could pick
+         it, and inverting it (e.g. [In], a fixpoint) is meaningless. *)
+      let is_lts : bool =
+        let lts_of (m : Model.FSM.t) : bool =
+          try Theory.is_fsm_constructor ty m with _ -> false
+        in
+        lts_of (W.get_fsm_a ()) || lts_of (W.get_fsm_b ())
+      in
+      if is_eq || Bool.not is_lts
+      then
+        (* A premise hypothesis. If it is closed and provably false, refuting
+           it closes the goal outright -- the best move there is, so it gets
+           the top grade, [refutable_grade], and [try_invert_any] uses
+           [Tacs.refute_premise]. This is what a branch whose constructor has a
+           false guard ([3 <= 2]) needs. Anything else: leave it alone. *)
+        let* env = get_env in
+        let t = Context.Named.Declaration.get_type x in
+        match Premise_search.prove env sigma t with
+        | Premise_search.Refuted -> return refutable_grade
+        | Premise_search.Proved _ | Premise_search.Unknown -> return 0
       else (
         (* NOTE: returns true if can be inverted *)
         let rec f (x : EConstr.t) : bool =
@@ -402,6 +426,32 @@ struct
     let is_weak_sim () : bool mm = get_concl () |> Theory.is_weak_sim
     let is_exists () : bool mm = get_concl () |> Theory.is_exists
     let is_tau () : bool mm = get_concl () |> Theory.is_tau
+
+    (** [is_premise ()] if the conclusion is a constructor premise that is
+        neither an LTS step nor one of the solver's own goals: a [Prop]
+        headed by an inductive that is not [eq] (see [is_eq]), not a MeBi
+        theory constant, not one of either FSM's LTSs, and not a [clos_*]
+        relation (backlog I2, stage 1). *)
+    let is_premise () : bool mm =
+      let open Syntax in
+      let* sigma = get_sigma in
+      let* env = get_env in
+      let concl = get_concl () in
+      let h, _ = EConstr.decompose_app sigma concl in
+      let lts_of (m : Model.FSM.t) : bool =
+        try Theory.is_fsm_constructor h m with _ -> false
+      in
+      return
+        (match EConstr.kind sigma h with
+         | Ind ((mind, _), _) ->
+           let name = Names.Id.to_string (Names.MutInd.label mind) in
+           Premise_search.is_prop env sigma concl
+           && Bool.not (String.starts_with ~prefix:"clos_" name)
+           && Bool.not (Theory.is_any_theory h)
+           && Bool.not (lts_of (W.get_fsm_a ()))
+           && Bool.not (lts_of (W.get_fsm_b ()))
+         | _ -> false)
+    ;;
 
     (** [is_eq ()] if the conclusion is an equation [_ = _]: an equation
         premise of a constructor just applied (backlog I2). *)
@@ -597,6 +647,9 @@ struct
       | None -> return None
       | Some (0, x) -> return None
       (* NOTE: we only want to invert hyps with non-zero grades. *)
+      | Some (grade, x) when Int.equal grade Hyp.refutable_grade ->
+        let* y = Tacs.refute_premise x in
+        return (Some y)
       | Some (grade, x) ->
         let* y = Hyp.invert x in
         return (Some y)
@@ -1063,7 +1116,26 @@ struct
     ProofState.ApplicableConstructors.log ~__FUNCTION__ ~s:"args" args;
     let open Syntax in
     let* is_eq = Concl.is_eq () in
-    if is_eq
+    let* is_premise = if is_eq then return false else Concl.is_premise () in
+    if is_premise
+    then
+      (* Any other premise: extraction kept this constructor because the
+         bounded search proved the premise, so the same search yields a proof
+         term for it here (backlog I2, stage 1). *)
+      let* env = get_env in
+      let* sigma = get_sigma in
+      match Premise_search.prove env sigma (get_concl ()) with
+      | Premise_search.Proved p -> Tacs.exact_term p
+      | Premise_search.Refuted | Premise_search.Unknown ->
+        CErrors.user_err
+          (Pp.str
+             (Printf.sprintf
+                "MeBi: cannot prove the constructor premise\n\
+                \  %s\n\
+                 It is not closed, or not decidable by MeBi's bounded search \
+                 (see [MeBi Help Premises])."
+                (Strfy.econstr (get_concl ()))))
+    else if is_eq
     then
       (* An equation premise has the focus. Extraction only keeps a
          constructor whose equation premises it decided hold, i.e. whose sides

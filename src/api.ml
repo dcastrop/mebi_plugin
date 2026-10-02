@@ -146,7 +146,16 @@ let human_bytes (b : int) : string =
 
 let reset_bounds_args () : unit =
   the_bounds_args := default_bounds;
-  the_saturation_bound := default_saturation_bound
+  the_saturation_bound := default_saturation_bound;
+  Premise_search.max_depth := Premise_search.default_depth
+;;
+
+(** How deep the bounded proof search for constructor premises may go
+    ([Premise_search]; backlog I2). Reset by [Reset Bounds]. *)
+let set_premise_depth (x : int) : unit =
+  Premise_search.max_depth := x;
+  Printf.sprintf "(MeBi Config: Set Premise search depth to: %i.)" x
+  |> Logger.show
 ;;
 
 let set_saturation_bound (x : int) : unit =
