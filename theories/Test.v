@@ -1453,3 +1453,22 @@ Module ProductPremises.
   Fail MeBi Run LTS 0 Using univ.
   MeBi Config Reset Bounds.
 End ProductPremises.
+
+(* A premise over a constructor whose index is computed ([e k : ev k (dbl k)]).
+   Until 2026-10-02 the bounded search could fail to match [ev 2 4] against
+   [ev ?k (dbl ?k)] and counted that as a refutation: the true premise was
+   "refuted" and the transitions silently dropped (one state, not three). A
+   failed match now refutes only when the constructor's indices are patterns,
+   and the match is retried argument by argument, so [ev 2 4] is proved. *)
+MeBi Divider "Theories.Test.ComputedIndex".
+Module ComputedIndex.
+  Fixpoint dbl (n : nat) : nat := match n with 0 => 0 | S k => S (S (dbl k)) end.
+  Inductive ev : nat -> nat -> Prop := e k : ev k (dbl k).
+  Inductive st : nat -> bool -> nat -> Prop :=
+  | go n : ev 2 4 -> n < 2 -> st n true (S n).
+  MeBi Config Bounds As Num States 3.
+  MeBi Run LTS 0 Using st.
+  MeBi Config Bounds As Num States 2.
+  Fail MeBi Run LTS 0 Using st.
+  MeBi Config Reset Bounds.
+End ComputedIndex.

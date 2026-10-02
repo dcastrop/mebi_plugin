@@ -307,6 +307,47 @@ struct
         else return 0
     ;;
 
+    (* Closed LTS steps already decided by [closed_step_refuted], by term. *)
+    module ConstrTbl = Hashtbl.Make (struct
+        type t = Constr.t
+
+        let equal = Constr.equal
+        let hash = Constr.hash
+      end)
+
+    let refuted_steps : bool ConstrTbl.t = ConstrTbl.create 64
+
+    (** [closed_step_refuted ty]: [ty] is a closed LTS step that the bounded
+        search refutes, i.e. a transition that does not exist. Inverting a
+        constructor such as a handshake ([p -!n-> p'], [q -?n-> q'] gives
+        [p | q -tau-> p' | q']) splits into one branch per way it could have
+        been derived, and the impossible ones carry such steps, fully closed
+        (e.g. [step S0 (Some (Out s0)) S0] for a sender that only inputs).
+        [invertibility]'s shape-based grade gives a closed step 0, so the
+        branch was never closed, and the search went on to look its
+        transition up in the model, which (not existing) it is not:
+        [CannotGetTransition]. Found 2026-10-02 on the CCS Alternating Bit
+        Protocol, whose one [step] relation is used at every layer; the
+        [Proc]/[CADP] examples use a relation per layer. Asked only then, by
+        [Hyps.refutable_step] -- a proof search per closed hypothesis is too
+        dear to run at every step -- and memoised. *)
+    let closed_step_refuted (env : Environ.env) (sigma : Evd.evar_map) ty : bool
+      =
+      match EConstr.to_constr_opt sigma ty with
+      | None -> false
+      | Some c ->
+        (match ConstrTbl.find_opt refuted_steps c with
+         | Some r -> r
+         | None ->
+           let r =
+             match Premise_search.prove env sigma ty with
+             | Premise_search.Refuted -> true
+             | Premise_search.Proved _ | Premise_search.Unknown -> false
+           in
+           ConstrTbl.add refuted_steps c r;
+           r)
+    ;;
+
     (** [invertibility x] returns an integer denoting whether [x] need be inverted, with the higher numbers being of more importance to invert and [0] denoting [x] does not need to be inverted.
     *)
     let invertibility (x : t) : int mm =
@@ -775,6 +816,43 @@ struct
       iterate 0 (List.length hyps - 1) None f
     ;;
 
+    (* Number of nodes in a term: a smaller refutable step needs fewer
+       inversions to refute. *)
+    let rec term_size (sigma : Evd.evar_map) (t : EConstr.t) : int =
+      EConstr.fold sigma (fun n c -> n + term_size sigma c) 1 t
+    ;;
+
+    (** [refutable_step ()] is the smallest closed LTS-step hypothesis that
+        cannot hold ({!Hyp.closed_step_refuted}), if any: in a branch that
+        inversion opened for a derivation that does not exist, refuting it
+        closes the branch. The smallest, because refuting a step inverts it
+        down to the impossible part, and a large one ([res s0 (res s1 ...)])
+        can need more inversions than the refutation's depth allows. *)
+    let refutable_step () : Rocq_utils.hyp option mm =
+      Logger.trace __FUNCTION__;
+      let open Syntax in
+      let* env = get_env in
+      let* sigma = get_sigma in
+      let is_step (h : Rocq_utils.hyp) : bool =
+        match Rocq_utils.hyp_to_atomic sigma h with
+        | exception _ -> false
+        | ty, _ ->
+          let lts_of (m : Model.FSM.t) : bool =
+            try Theory.is_fsm_constructor ty m with _ -> false
+          in
+          lts_of (W.get_fsm_a ()) || lts_of (W.get_fsm_b ())
+      in
+      get_non_cofixes ()
+      |> List.filter is_step
+      |> List.map (fun h ->
+        term_size sigma (Context.Named.Declaration.get_type h), h)
+      |> List.sort (fun (a, _) (b, _) -> Int.compare a b)
+      |> List.find_opt (fun (_, h) ->
+        Hyp.closed_step_refuted env sigma (Context.Named.Declaration.get_type h))
+      |> Stdlib.Option.map snd
+      |> return
+    ;;
+
     exception CannotGetTransition of Model.FSM.t
 
     let get_transition (m : Model.FSM.t) : Model.Transition.t mm =
@@ -1041,15 +1119,27 @@ struct
   let handle_hyp_transition () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
-    let* hyp : Model.Transition.t = Hyps.get_transition (W.get_fsm_a ()) in
-    Model.Transition.log ~__FUNCTION__ ~s:"hyp" hyp;
-    ProofState.update_statem (Exists (Some hyp));
-    let* { wk_trans; wk_sim } = Concl.get_wk_conj () in
-    Logger.trace ~__FUNCTION__ "wk_trans; wk_sim";
-    let* unfold_opt = Tacs.try_unfold_any_of [ wk_trans; wk_sim ] in
-    match unfold_opt with
-    | Some x -> return x
-    | None -> handle_wk_concl hyp { wk_trans; wk_sim }
+    match run (Hyps.get_transition (W.get_fsm_a ())) with
+    | exception (Hyps.CannotGetTransition _ as e) ->
+      (* No hypothesis is a transition of the model. In a branch inversion
+         opened for a derivation that does not exist, some step hypothesis
+         cannot hold: refute it and the branch closes. Back to [WeakSim],
+         which handles whatever goal comes next. Otherwise, a real failure. *)
+      let* h = Hyps.refutable_step () in
+      (match h with
+       | Some h ->
+         ProofState.update_statem WeakSim;
+         Tacs.refute_premise h
+       | None -> raise e)
+    | hyp ->
+      Model.Transition.log ~__FUNCTION__ ~s:"hyp" hyp;
+      ProofState.update_statem (Exists (Some hyp));
+      let* { wk_trans; wk_sim } = Concl.get_wk_conj () in
+      Logger.trace ~__FUNCTION__ "wk_trans; wk_sim";
+      let* unfold_opt = Tacs.try_unfold_any_of [ wk_trans; wk_sim ] in
+      (match unfold_opt with
+       | Some x -> return x
+       | None -> handle_wk_concl hyp { wk_trans; wk_sim })
   ;;
 
   (** [handle_appconstrs_entry_point args] ... *)

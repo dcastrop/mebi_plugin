@@ -4677,6 +4677,74 @@ premise of this shape. `tests.exe` 79/79, `make` clean.
 merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 `git log --merges --oneline --grep fix/product-premises main`).
 
+## 2026-10-02 (second session) — What a CCS example exposed: two unsound search answers, a crash, and a non-terminating proof
+
+**Bug fix** ×3. On branch `fix/refute-closed-steps`. Found while writing the
+CCS examples (section 2 of the evaluation plan). CCS uses one `step`
+relation at every layer (prefix, choice, parallel, restriction,
+definitions), where `Proc` and `CADP` use one relation per layer. That
+exercised paths the corpus never had.
+
+**1. `Premise_search` "refuted" true premises (soundness).** When a
+constructor's conclusion failed to unify with the goal, the search counted
+that as a complete refutation. That is right when the conclusion's indices
+are patterns (constructors and variables), and wrong when one is computed
+by a function of the binders: `e k : ev k (dbl k)` against `ev 2 4`, or
+`do_fix : termLTS (tfix t) None (subst (tfix t) t)`. `w_unify` on the whole
+application can fail although the goal holds.
+- *Consequence on `main`:* a true constructor premise like `ev 2 4` was
+  "refuted", and extraction **silently dropped** its transitions (1 state
+  instead of 3, no warning).
+- *Fix:* a failed match counts only when the conclusion's indices are
+  patterns (the check the search already made for the goal's own indices).
+  Before giving up, the match is retried argument by argument, normalizing
+  each constructor argument once earlier ones have fixed its variables. So
+  `ev 2 4` is now *proved*, not just left undecided.
+- *Test:* `Test.v` `ComputedIndex` pins the 3-state LTS; on `main` it
+  fails (checked by stashing the fix).
+
+**2. Absurd branches crashed the solver (`CannotGetTransition`).**
+Inverting a step such as a handshake opens a branch per way it could have
+been derived. The impossible branches carry fully closed false steps
+(`step S0 (Some (Out s0)) S0` for a sender that only inputs). The
+inversion grade, being shape-based, gives closed steps 0, so nothing
+refuted them. The solver went on to look the branch's top-level
+transition up in the model, which (not existing) it isn't.
+- *Fix:* lazily, only when `get_transition` fails (until now, the crash),
+  `Hyps.refutable_step` finds the *smallest* closed step the search
+  refutes, memoised by term, and `refute_premise` closes the branch. The
+  smallest, because a large one (eight `res` layers) can need more
+  inversions than the refutation's depth allows. Trying this eagerly
+  first, in the inversion grade, ran the search on every closed
+  hypothesis at every step: far too slow. That is also how bug 1 was
+  found: it "refuted" a true step in `Test.v`'s `MultipleDerivations`.
+  Healthy proofs never reach the lazy path, so their counts cannot move.
+
+**3. Not fixed, documented: the Alternating Bit Protocol does not
+terminate one way.**
+- *What works:* `MeBi Run Bisim` finds ABP weakly bisimilar to a one-place
+  buffer (the textbook result), and `Buf ≤ ABP` proves (331 iterations).
+- *What doesn't:* `ABP ≤ Buf`, and so `weak_bisimilar`, runs until memory
+  runs out. Inverting a top-level ABP step while its label is still a
+  variable gives a goal in which the solver re-inverts the same kept
+  `step (def 8) a q'` forever: each round spawns a branch that is refuted
+  and one that keeps the hypothesis.
+- *Diagnosis:* this is backlog **Step 0** (note 7: inversion keeps the
+  hypothesis and the tie-break re-picks it), which on `Proc`/`CADP` costs
+  7–14% and here never ends.
+- *Status:* the earlier attempts to fix Step 0 were rejected because they
+  broke other proofs, so this needs design, not a patch. It is recorded in
+  the CCS examples and in the backlog.
+
+**Verification:** all 41 counts identical under `Auto` and forced `True`;
+forced `False` matches its documented baseline. `Test.v` builds (with
+`MultipleDerivations` at its recorded 38 iterations), `tests.exe` 79/79,
+`make` clean.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep fix/refute-closed-steps main`).
+
 ---
 
 ## Outstanding
