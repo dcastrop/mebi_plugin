@@ -217,8 +217,8 @@ struct
              [(from, label, goto)] when weak-transition saturation finds
              more than one witness for it (different [Annotation.t]s over
              the same visible label/destination). Pick the one with the
-             shortest annotation, same as [try_get_visible_transition]
-             above does for the analogous "several candidates" case --
+             shortest annotation, same as [Model.Product.respond]
+             does for the analogous "several candidates" case --
              fewer silent steps to justify means less proof work later. A
              single candidate is just the degenerate case of this fold
              ([tl = []]), so this also covers what used to be handled as a
@@ -953,45 +953,6 @@ struct
     Tactic.chain [ cofix; clear; apply_In; apply_Pack; intros_all ] |> return
   ;;
 
-  exception CouldNotFindGotoState
-
-  (** [try_get_visible_transition bisimilar tys] resolves the goal's own terms
-      to a state and a label, and then asks {!Model.Product.respond} which
-      transition FSM "b" must make in reply.
-
-      The choice itself used to be inline here. It is pure model code -- it
-      reads only the FSM, the state, the label and the bisimilar set -- and
-      having it inline meant it could only run one proof step at a time and
-      could not be tested without a Rocq runtime. It now lives in
-      [lib/model/algorithms/product.ml] so that anything else needing the same
-      decision {b calls} it rather than reproducing it; the tie-breaks run
-      through [Action.Pair.Set]'s own ordering, and a re-implementation
-      measurably disagrees. See [ASSISTED-CHANGES.md], 2026-09-29. *)
-  let try_get_visible_transition
-        ?(saturated : bool = false)
-        ?(hyp_label : Model.Label.t option)
-        (bisimilar : Model.State.Set.t)
-        (tys : EConstr.t array)
-    : Model.Transition.t
-    =
-    Logger.trace __FUNCTION__;
-    let m : Model.FSM.t = W.get_fsm_b ~saturated () in
-    let silent : Model.EdgeMap.t' = (W.get_fsm_b ()).edges in
-    let from : Model.State.t = M.run (ReModel.state tys.(3) m.states) in
-    (* The answer carries the move's own label. Resolved against the
-       answering FSM's alphabet, which lacks it when that FSM never makes
-       such a move -- a silent one, typically: [tau.a + b <= a + b] is answered
-       by [a + b] standing still. Then the move's label, [hyp_label], is the
-       label. *)
-    let label : Model.Label.t =
-      try M.run (ReModel.label tys.(5) m.alphabet) with
-      | e when CErrors.noncritical e && Stdlib.Option.is_some hyp_label ->
-        Stdlib.Option.get hyp_label
-    in
-    try Model.Product.respond ~silent m from label bisimilar with
-    | Model.Product.NoBisimilarResponse _ -> raise CouldNotFindGotoState
-  ;;
-
   exception MisMatchedStates of (Model.State.t * Model.State.t)
 
   let ensure_matching_states (x : Model.State.t) (y : Model.State.t) : unit =
@@ -1005,55 +966,18 @@ struct
       ; wk_trans : EConstr.t
       }
 
-  (** [handle_visible_transition hyp b wk_trans] ... introduces *)
-  let handle_visible_transition
-        (hyp : Model.Transition.t)
-        (b : Model.State.t)
-        (wk_trans : EConstr.t)
-    : Tactic.t mm
-    =
-    Logger.trace __FUNCTION__;
-    (* log_econstr ~__FUNCTION__ ~s:"wk_trans" wk_trans; *)
-    let bisimilar : Model.State.Set.t = W.get_bisimilar_states hyp.goto in
-    (* log_states ~__FUNCTION__ "bisimilar" bisimilar; *)
-    let open Syntax in
-    let* ty, tys = to_atomic wk_trans in
-    let respond_with (goal : Model.Transition.t) : Tactic.t mm =
-      Model.Transition.log ~__FUNCTION__ ~s:"goal" goal;
-      ensure_matching_states goal.from b;
-      ProofState.update_statem
-        (ApplyConstructors (ProofState.ApplicableConstructors.init goal));
-      Tacs.ex_intro_split goal.goto
-    in
-    let hyp_label : Model.Label.t = hyp.label in
-    match
-      try_get_visible_transition ~saturated:true ~hyp_label bisimilar tys
-    with
-    | goal -> respond_with goal
-    | exception CouldNotFindGotoState ->
-      (* No bisimilar answer. For a [weak_sim] goal between states that are
-         similar but not bisimilar, any state simulating [hyp.goto] will do:
-         stand still if [b] is one (a silent move), else move to one. The
-         same fallback, in the same order, as [Model.Product.successors]. *)
-      (match !W.simulators with
-       | None -> raise (CouldNotGetGoalTransition { b; wk_trans })
-       | Some sim ->
-         let simulating : Model.State.Set.t = sim hyp.goto in
-         if Model.Transition.is_silent hyp && Model.State.Set.mem b simulating
-         then Tacs.ex_intro_split b
-         else (
-           match
-             try_get_visible_transition
-               ~saturated:true
-               ~hyp_label
-               simulating
-               tys
-           with
-           | goal -> respond_with goal
-           | exception CouldNotFindGotoState ->
-             raise (CouldNotGetGoalTransition { b; wk_trans })))
-  ;;
+  (** [handle_wk_concl hyp conj] answers the move [hyp] (FSM "a" went to
+      [a']) from FSM "b"'s state [b], as {!Model.Product.answer} decides --
+      the same function the mutual block's product is computed with
+      ([Model.Product.successors]), on the same inputs: [b], the move's label
+      and its target. Standing still introduces [b] and leaves the reflexive
+      weak step to [handle_exists]; a transition introduces its target and
+      hands its annotation to [ApplyConstructors].
 
+      Until 2026-10-02 this decision was written out here a second time
+      (a stay check, then [try_get_visible_transition] re-resolving [b] and
+      the label from the goal, then the simulators fallback), kept in step
+      with [Product.successors] by hand. *)
   let handle_wk_concl
         (hyp : Model.Transition.t)
         ({ wk_trans; wk_sim } : Concl.wk_conj)
@@ -1063,13 +987,26 @@ struct
     let open Syntax in
     let* { a'; b } = Concl.get_conj { wk_trans; wk_sim } in
     ensure_matching_states hyp.goto a';
-    if Model.Transition.is_silent hyp && W.are_states_bisimilar a' b
-    then (
-      Logger.trace ~__FUNCTION__ "is_exists, silent";
-      Tacs.ex_intro_split b)
-    else (
-      Logger.trace ~__FUNCTION__ "is_exists, trans";
-      handle_visible_transition hyp b wk_trans)
+    match
+      Model.Product.answer
+        ~silent:(W.get_fsm_b ()).edges
+        ?sim:!W.simulators
+        (W.get_fsm_b ~saturated:true ())
+        (W.get_bisimilar_partition ())
+        b
+        hyp.label
+        hyp.goto
+    with
+    | Some Model.Product.Stay ->
+      Logger.trace ~__FUNCTION__ "stay";
+      Tacs.ex_intro_split b
+    | Some (Model.Product.Move goal) ->
+      Model.Transition.log ~__FUNCTION__ ~s:"goal" goal;
+      ensure_matching_states goal.from b;
+      ProofState.update_statem
+        (ApplyConstructors (ProofState.ApplicableConstructors.init goal));
+      Tacs.ex_intro_split goal.goto
+    | None -> raise (CouldNotGetGoalTransition { b; wk_trans })
   ;;
 
   (* * [handle_hyp_transition ()] determines which term to introduce for [exists b'], checking whether we can do this via a silent/tau transition, and sets up the information we will need for the next state. *)
