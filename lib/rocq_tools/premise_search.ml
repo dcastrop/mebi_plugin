@@ -387,6 +387,78 @@ let enumerate (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
     List.map fst sols, complete
 ;;
 
+(** [abstract_vars env sigma t]: [t] with every local variable it mentions
+    (a hypothesis of the proof, such as an inverted step's label [n] or
+    target [q']) replaced by a fresh evar of the same type. The search treats
+    a variable as opaque, so it decides nothing about [step p (Some (Out n))
+    q']; over evars it asks whether {e any} [n], [q'] would do. *)
+let abstract_vars (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t)
+  : Evd.evar_map * EConstr.t
+  =
+  let sigma, subs =
+    Names.Id.Set.fold
+      (fun id (sigma, subs) ->
+        match EConstr.lookup_named id env with
+        | decl ->
+          let sigma, e =
+            Evarutil.new_evar env sigma (Context.Named.Declaration.get_type decl)
+          in
+          sigma, (id, e) :: subs
+        | exception Not_found -> sigma, subs)
+      (Termops.global_vars_set env sigma t)
+      (sigma, [])
+  in
+  sigma, EConstr.Vars.replace_vars sigma subs t
+;;
+
+(** [dead env sigma t]: the proposition [t] has no instance for any value of
+    the local variables it mentions -- the search over [abstract_vars] found
+    no solution and was complete. A hypothesis of this type is false in every
+    context, whatever else is known about its variables. Not for negations,
+    whose search would need a proof of the negated proposition. Memoised. *)
+(* [dead]'s verdicts, keyed by the proposition with its local variables
+   numbered in order of occurrence -- so [step (var 18) (Some (Out n)) q']
+   and the same with [n0] and [q'1] share an entry -- and by the depth. *)
+module ConstrTbl = Hashtbl.Make (struct
+    type t = Constr.t
+
+    let equal = Constr.equal
+    let hash = Constr.hash
+  end)
+
+let dead_memo : (int * bool) ConstrTbl.t = ConstrTbl.create 64
+
+let dead (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t) : bool =
+  let decide () =
+    is_prop env sigma t
+    && Option.is_empty (negated env sigma t)
+    &&
+    let sigma, t = abstract_vars env sigma t in
+    (* one solution is enough to be alive, so no need to enumerate them all;
+       when there is none, completeness is meaningful either way *)
+    match search ~all:false env sigma !max_depth t with
+    | [], true -> true
+    | _ -> false
+  in
+  let rec occurring acc x =
+    match EConstr.kind sigma x with
+    | Var id -> if List.exists (Names.Id.equal id) acc then acc else id :: acc
+    | _ -> EConstr.fold sigma occurring acc x
+  in
+  match
+    EConstr.Vars.subst_vars sigma (List.rev (occurring [] t)) t
+    |> EConstr.to_constr_opt sigma
+  with
+  | None -> decide ()
+  | Some c ->
+    (match ConstrTbl.find_opt dead_memo c with
+     | Some (d, r) when Int.equal d !max_depth -> r
+     | _ ->
+       let r = decide () in
+       ConstrTbl.replace dead_memo c (!max_depth, r);
+       r)
+;;
+
 (** Run the user tactic, if any, on [typ]: its closed proof term. *)
 let by_tactic (env : Environ.env) (sigma : Evd.evar_map) (typ : EConstr.t)
   : EConstr.t option
@@ -450,14 +522,28 @@ let prove (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t) : result
     match decided with Unknown -> by_user_tactic env sigma goal | r -> r)
 ;;
 
-(** [refute_hyp_tac id]: close the goal from hypothesis [id], a closed
-    premise that [prove] refutes. An inductive one is unfolded ([simpl in],
-    so a fixpoint like [In] becomes [or]/[eq]/[False]) and cleared by
-    [inversion_clear], and every goal that leaves is refuted the same way
-    from a new refutable hypothesis; a negation [~ P] is applied to the
-    proof of [P]. [inversion_clear], not [inversion]: a kept hypothesis is
-    picked again forever (the Step 0 loop). *)
+(** [refute_hyp_tac id]: close the goal from hypothesis [id], which cannot
+    hold: a closed premise that [prove] refutes, or an open one that is
+    {!dead}. An inductive one is unfolded ([simpl in], so a fixpoint like
+    [In] becomes [or]/[eq]/[False]) and cleared by [inversion_clear], and
+    every goal that leaves is refuted the same way ({!refute_goal}); a
+    negation [~ P] is applied to the proof of [P]. [inversion_clear], not
+    [inversion]: a kept hypothesis is picked again forever (the Step 0
+    loop). *)
 let rec refute_hyp_tac ?(depth : int = !max_depth) (id : Names.Id.t)
+  : unit Proofview.tactic
+  =
+  refute_hyp_from ~depth ~before:None id
+
+(* [before]: the hypotheses (name and type) in scope when the outermost
+   refutation started, so that {!refute_goal} can tell those it introduced.
+   Not names alone: [inversion_clear] frees a name and Rocq hands it to the
+   next premise it introduces, which then looked old and was never checked
+   (measured on the CCS ABP: a quarter of the refutations failed so). *)
+and refute_hyp_from
+      ~(depth : int)
+      ~(before : (Names.Id.t * EConstr.t) list option)
+      (id : Names.Id.t)
   : unit Proofview.tactic
   =
   let open Proofview.Notations in
@@ -474,7 +560,9 @@ let rec refute_hyp_tac ?(depth : int = !max_depth) (id : Names.Id.t)
        | _ ->
          Tacticals.tclZEROMSG (Pp.str "MeBi: cannot refute a negated premise"))
     | None
-      when match search_closed env sigma ty with
+      when Bool.not (dead env sigma ty)
+           &&
+           match search_closed env sigma ty with
            | Refuted -> false
            | Proved _ | Unknown -> true ->
       (* refuted by the user tactic, not by search: use its proof of [~ ty] *)
@@ -486,28 +574,92 @@ let rec refute_hyp_tac ?(depth : int = !max_depth) (id : Names.Id.t)
     | None ->
       if depth <= 0
       then Tacticals.tclZEROMSG (Pp.str "MeBi: premise refutation too deep")
-      else
+      else (
+        let before =
+          match before with
+          | Some b -> b
+          | None ->
+            List.map
+              (fun d ->
+                ( Context.Named.Declaration.get_id d
+                , Context.Named.Declaration.get_type d ))
+              (Proofview.Goal.hyps gl)
+        in
         Tactics.simpl_in_hyp (id, Locus.InHyp)
         <*> Inv.inv_clear_tac id
-        <*> Proofview.Goal.enter (fun gl ->
-          let env = Proofview.Goal.env gl in
-          let sigma = Proofview.Goal.sigma gl in
-          let refutable =
-            List.find_opt
-              (fun d ->
-                let t = Context.Named.Declaration.get_type d in
-                is_prop env sigma t
-                && closed sigma t
-                && match prove env sigma t with Refuted -> true | _ -> false)
-              (Proofview.Goal.hyps gl)
-          in
-          match refutable with
-          | Some d ->
-            refute_hyp_tac
-              ~depth:(depth - 1)
-              (Context.Named.Declaration.get_id d)
-          | None ->
-            Tacticals.tclZEROMSG (Pp.str "MeBi: no refutable premise left")))
+        <*> refute_goal ~depth:(depth - 1) ~before))
+
+(** [refute_goal ~depth ~before]: close the goal in focus, which an
+    inversion of a hypothesis that cannot hold left behind. In order: a
+    {!dead} hypothesis the refutation introduced (memoised, and where the
+    falsity usually is); a closed one [prove] refutes, anywhere in the
+    context (the only case before 2026-10-02's dead-hypothesis refutation,
+    and dear: [prove] is not memoised and runs on every hypothesis); else,
+    when the premises are only false {e together} -- a handshake's
+    [p -!n-> p'] and [q -?n-> q'], each possible for some [n], never for
+    the same one -- [inversion_clear] the newest one it introduced, which
+    fixes the shared variable in each branch, and go on. *)
+and refute_goal ~(depth : int) ~(before : (Names.Id.t * EConstr.t) list)
+  : unit Proofview.tactic
+  =
+  let open Proofview.Notations in
+  Proofview.Goal.enter (fun gl ->
+    let env = Proofview.Goal.env gl in
+    let sigma = Proofview.Goal.sigma gl in
+    let hyps = Proofview.Goal.hyps gl in
+    let id_of = Context.Named.Declaration.get_id in
+    let ty_of = Context.Named.Declaration.get_type in
+    (* newest first, as [Proofview.Goal.hyps] lists them *)
+    let introduced =
+      List.filter
+        (fun d ->
+          Bool.not
+            (List.exists
+               (fun (id, t) ->
+                 Names.Id.equal id (id_of d)
+                 && EConstr.eq_constr sigma t (ty_of d))
+               before))
+        hyps
+    in
+    let refute (d : EConstr.named_declaration) =
+      refute_hyp_from ~depth ~before:(Some before) (id_of d)
+    in
+    match List.find_opt (fun d -> dead env sigma (ty_of d)) introduced with
+    | Some d -> refute d
+    | None ->
+      let refutable =
+        List.find_opt
+          (fun d ->
+            let t = ty_of d in
+            is_prop env sigma t
+            && closed sigma t
+            && match prove env sigma t with Refuted -> true | _ -> false)
+          hyps
+      in
+      (match refutable with
+       | Some d -> refute d
+       | None ->
+         let splittable (d : EConstr.named_declaration) : bool =
+           let t = ty_of d in
+           is_prop env sigma t
+           && Option.is_empty (negated env sigma t)
+           &&
+           match
+             EConstr.kind
+               sigma
+               (fst
+                  (EConstr.decompose_app sigma (Reductionops.whd_all env sigma t)))
+           with
+           | Ind (ind, _) -> Bool.not (is_eq_ind ind)
+           | _ -> false
+         in
+         (match List.find_opt splittable introduced with
+          | Some d when depth > 0 ->
+            Tactics.simpl_in_hyp (id_of d, Locus.InHyp)
+            <*> Inv.inv_clear_tac (id_of d)
+            <*> refute_goal ~depth:(depth - 1) ~before
+          | _ ->
+            Tacticals.tclZEROMSG (Pp.str "MeBi: no refutable premise left"))))
 ;;
 
 (** [negation_tac]: prove a goal [~ P] whose [P] [prove] refutes:

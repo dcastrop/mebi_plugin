@@ -36,7 +36,8 @@ val prove : Environ.env -> Evd.evar_map -> EConstr.t -> result
 *)
 val user_tactic : unit Proofview.tactic option ref
 
-(** Close the goal from hypothesis [id], a closed premise [prove] refutes. *)
+(** Close the goal from hypothesis [id], which cannot hold: a closed
+    premise [prove] refutes, or an open one that is {!dead}. *)
 val refute_hyp_tac : ?depth:int -> Names.Id.t -> unit Proofview.tactic
 
 (** Prove a goal [~ P] whose [P] [prove] refutes. *)
@@ -51,3 +52,16 @@ val enumerate
   -> Evd.evar_map
   -> EConstr.t
   -> Evd.evar_map list * bool
+
+(** [abstract_vars env sigma t]: [t] with each local variable it mentions
+    replaced by a fresh evar of the same type. *)
+val abstract_vars
+  :  Environ.env
+  -> Evd.evar_map
+  -> EConstr.t
+  -> Evd.evar_map * EConstr.t
+
+(** [dead env sigma t]: the proposition [t] holds for no value of the local
+    variables it mentions (a complete search over {!abstract_vars} found no
+    instance), so a hypothesis of type [t] is false in any context. *)
+val dead : Environ.env -> Evd.evar_map -> EConstr.t -> bool
