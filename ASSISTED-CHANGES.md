@@ -4220,6 +4220,104 @@ onwards (this log entry included), touching only `theories/Bisimilarity.v`,
 **Session tally (2026-10-02, second session), cont.:** New feature 1
 (theory only).
 
+## 2026-10-02 (second session) — The solver proves `weak_bisimilar` (option A, part 2)
+
+**New feature.** On branch `solver/weak-bisimilar`, after `theories/`'s
+`weak_bisimilar` (part 1, merged as PR #2). Agreed with Jonah in advance
+(option A, "additively"). `MeBi Sim` now proves `weak_bisimilar` goals:
+weak bisimilarity, both directions in one proof. Before, a "bisimilarity"
+proof meant two `weak_sim` examples, which establish only mutual
+similarity.
+
+**Design: one solver, read both ways.** `In_bisim; Pack_bisim; intros`
+leaves two goals per pair:
+- `bisim_l`: `H : ltsM m1 a m2 ⊢ ∃ n2, weak ltsN n1 n2 a ∧ weak_bisimilar m2 n2`
+- `bisim_r`: `H : ltsN n1 a n2 ⊢ ∃ m2, weak ltsM m1 m2 a ∧ weak_bisimilar m2 n2`
+
+`bisim_r` is `bisim_l` with the systems exchanged. So instead of a mirrored
+copy of the solver, there is a flag: `Results.swapped`, which
+`get_fsm_a`/`get_fsm_b` follow. `Concl.orientation` sets it at the top of
+every step from the goal's shape: in an `∃`-goal, the witness is the
+relation's *left* argument exactly when the *right* system moved. Goals
+that do not say (an LTS step or premise, part-way through an answer) keep
+the last setting. The one place the solver read a fixed argument position,
+`get_a'_from_wk_sim`, now reads 6 rather than 5 when swapped. Everything
+else (hypothesis lookup, `Product.respond`, constructor application) works
+unchanged through the swapped FSMs. The rest is goal-kind dispatch:
+- `is_weak_goal` accepts either goal kind;
+- `In_bisim`/`Pack_bisim` and `weak_bisimilar_refl` are used for
+  `weak_bisimilar` goals;
+- the mutual block and `Auto`'s estimate use `Product.successors_bisim`,
+  which gives each pair both sides' obligations, built from `successors`
+  applied once each way;
+- the new theory names are registered in `Mebi_theories`.
+
+**Results.**
+- `weak_sim` proofs are unchanged: all 27 counts identical under `Auto`,
+  forced `MutualCofix True`, and forced `False` (Test3 stops at 1127, as
+  before).
+- New `examples/Bisimilarity/**/BisimProofs.v`: one `weak_bisimilar` proof
+  per pair, beside each of the six passing `PluginProofs.v`. All 14 prove
+  under `Auto` and forced `True`, with identical counts:
+  ```
+  Proc/Test1   709, 709, 51
+  Proc/Test2   702, 852, 852
+  Proc/Test3   14427, 6787, 10243, 4467, 6755
+  CADP/Size1   2875, 2875, 185
+  ```
+- Forced `False` (nested) leaves all but `Glued/MutualExclusion` (3859)
+  unfinished at 20000 steps. `Auto` picks the mutual cofix for every
+  `weak_bisimilar` proof, because its estimate already shows the nested walk
+  exploding ("over 692 goals" for Test1's 45 pairs).
+- `Test.v` `WeakBisimilarProofs` (built in CI): `τ.a + b` against a renamed
+  copy (silent answers on both sides), reflexivity, `rocq-sims`' pair, and
+  `MeBi Sim Begin` refusing `a.b + a` vs `a.b` (`Not_Bisimilar`, checked
+  to be the reason).
+- `tests.exe` 70/70 (a bisimulation-game test).
+- `satdiff` identical; `make` and the module-list check clean.
+
+**Cost, and where it comes from.** A `weak_bisimilar` proof costs far more
+than the two `weak_sim` proofs together (Test1 `pq`: 709 against
+114 + 105; Test3 `p3`: 14427 against 1073). Per pair it is not worse:
+about 47 iterations against 27.5, for twice the obligations. The relation
+is larger: Test3 `p3` has 306 pairs against 39. Each answer is chosen
+independently (the least state in the target class), so `bisim_r`'s
+answers make pairs that `bisim_l` never visits, and the relation must be
+closed under both. **A likely optimization, not done:** prefer answers that
+land on a pair already in the relation. That changes the solver's choices
+and its counts, so it should be raised before it is built.
+
+**Not changed:** `weak_sim` keeps its meaning and its proofs, and
+`weak_bisim` is untouched. Whether the `PluginProofs.v` files should move to
+`weak_bisimilar`, and the cost question above, are for later.
+
+### How to revert this, if @dcastrop disagrees
+
+The change is the commits on `solver/weak-bisimilar` from `a4a7fda`
+(this log entry included). It touches `lib/model/algorithms/product.*`,
+`lib/rocq_tools/{mebi_theories,theories}.*`, `src/{proof_solver,
+proof_solver_step,proof_solver_tactics,results,help}.*`, `test/tests.ml`,
+`theories/Test.v`, `README.md`, `CLAUDE.md`, `_CoqProject`, the six
+`BisimProofs.v` and this file.
+- **Before it is merged:** delete the branch
+  (`git push fork --delete solver/weak-bisimilar`,
+  `git branch -D solver/weak-bisimilar`).
+- **After merging with a merge commit:**
+  ```
+  git switch main
+  git log --merges --oneline --grep solver/weak-bisimilar main   # find it
+  git revert -m 1 <merge-commit>
+  dune build && dune exec test/tests.exe     # expect 67/67
+  git push fork main
+  ```
+  Revert this **before** part 1 (`theories/weak-bisimilar`) if both are to
+  go. `Mebi_theories` loads every registered name at once, so reverting the
+  theory alone would leave the plugin failing on the first `MeBi Sim` of
+  any kind.
+
+**Session tally (2026-10-02, second session), cont.:** New feature 2
+(1 theory, 1 solver).
+
 ---
 
 ## Outstanding

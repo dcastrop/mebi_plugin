@@ -55,6 +55,17 @@ To run them:
    Proc/Test3   1073, 387, 519, 519, 603, 211, 331, 603, 331   (mutual)
    CADP/Size1   268, 396, 268, 396, 81, 63        (nested)
    ```
+   Each of those six files has a sibling `BisimProofs.v` (also commented
+   out of `_CoqProject`) proving `weak_bisimilar`, one proof per pair, 14
+   total. Under `Auto` and forced `MutualCofix True`:
+   ```
+   Proc/Test1   709, 709, 51
+   Proc/Test2   702, 852, 852
+   Proc/Test3   14427, 6787, 10243, 4467, 6755
+   CADP/Size1   2875, 2875, 185
+   ```
+   Forced `False` is not expected to finish them (only
+   `Glued/MutualExclusion` does, at 3859).
    A change to *classification* (Solved/Unsolved) is a regression. A change
    to iteration *count* needs an explanation (fewer is fine if it fixes a
    real miss; more needs justifying).
@@ -93,7 +104,7 @@ To run them:
    next `dune build`.
 
 For pure-OCaml model changes with no Rocq/proof-solver involvement,
-`dune exec test/tests.exe` (expect 67/67) is a much faster first signal, but
+`dune exec test/tests.exe` (expect 70/70) is a much faster first signal, but
 does not substitute for the proof-suite run above when the change touches
 anything the proof solver reads.
 
