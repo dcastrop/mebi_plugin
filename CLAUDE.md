@@ -110,6 +110,17 @@ anything the proof solver reads.
   dune `(modules ...)`. `python3 scripts/check_module_lists.py` checks all
   three against the source tree (CI runs it first); run it before
   committing such a change.
+- `make` rejects warnings `dune build` accepts, notably **warning 50**: a
+  doc comment separated from its definition, which inserting new code
+  between the two causes. Run `make -j$(nproc) src/mebi_plugin.cmxs
+  theories/Test.vo` (then `make dune`) *before* starting a proof-suite run,
+  or a failed build costs the whole run.
+- `theories/Test.v` contains deliberate **known-wrong** tests (a `Fail`, or
+  a pin that succeeds only while a limitation lasts), each with a comment
+  saying so. When behaviour improves one of them starts failing, which is
+  intended: turn it into a positive test. Check every `Fail` fails for the
+  intended *reason*: cut the file at that line, drop the `Fail`, and read the
+  error.
 - `lib/utils`, `lib/terms`, `lib/model` and `lib/showable` must never gain a
   `rocq-runtime` dependency — they need to stay linkable from
   `test/tests.exe` without a Rocq runtime. That test binary failing to build
