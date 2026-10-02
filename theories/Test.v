@@ -1338,3 +1338,31 @@ Module WeakBisimilarVsMutualSim.
     inversion T'.
   Qed.
 End WeakBisimilarVsMutualSim.
+
+(* [MeBi Sim] proves [weak_bisimilar] goals: both obligations ([bisim_l],
+   [bisim_r]) in one proof, the second by answering with the left system. *)
+MeBi Divider "Theories.Test.WeakBisimilarProofs".
+Module WeakBisimilarProofs.
+  Import SilentResponse.
+  MeBi Config Weak As Option lab.
+  (* [tau.a + b] against a renamed copy: a silent answer on each side. *)
+  Example bis_p_q : weak_bisimilar step step p q.
+  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 100. Qed.
+  Example bis_p_p : weak_bisimilar step step p p.
+  Proof. MeBi Sim Begin step p And step p Using step. MeBi Sim Solve 100. Qed.
+  MeBi Config Reset Weak.
+
+  MeBi Config Weak As Option sobs.
+  (* rocq-sims' [SimExample] pair (see [SilentResponse]). *)
+  Example bis_t0_u0 : weak_bisimilar strans strans t0 u0.
+  Proof. MeBi Sim Begin strans t0 And strans u0 Using strans. MeBi Sim Solve 200. Qed.
+  MeBi Config Reset Weak.
+
+  (* [a.b + a] and [a.b] are mutually similar but not bisimilar, so [Begin]
+     refuses: the check it runs first decides weak bisimilarity. *)
+  Import WeakBisimilarVsMutualSim.
+  MeBi Config Weak As Option lab.
+  Example bis_P_Q : weak_bisimilar step step P Q.
+  Proof. Fail MeBi Sim Begin step P And step Q Using step. Abort.
+  MeBi Config Reset Weak.
+End WeakBisimilarProofs.

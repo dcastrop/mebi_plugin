@@ -237,6 +237,18 @@ let init
   let c : t ref = make (module Enc) () in
   let module Solver : S = (val !c.solver) in
   Solver.W.check_bisimilarity refs a b;
+  Solver.W.swapped := false;
+  (* Is the goal [weak_bisimilar], rather than [weak_sim]? Its product then
+     has both systems' obligations ([Model.Product.successors_bisim]). *)
+  let goal_is_bisimilar : bool =
+    let { Proof.goals; sigma; _ } = Proof.data (Declare.Proof.get pstate) in
+    match goals with
+    | g :: _ ->
+      let concl = Evd.evar_concl (Evd.find_undefined sigma g) in
+      let h, _ = EConstr.decompose_app sigma concl in
+      EConstr.eq_constr sigma h (Mebi_theories.get "weak_bisimilar")
+    | [] -> false
+  in
   (* [Auto] decides here, once, before any proof step runs. The product is
      already known at this point, so both strategies can simply be measured:
      a mutual cofix visits each game state once and each move once, while a
@@ -260,7 +272,18 @@ let init
         let refl = Libnames.qualid_eq (snd a) (snd b) in
         let silent = (S.W.get_fsm_b ()).edges in
         let c =
-          S.W.Model.Product.estimate ~silent ~refl fsm_a fsm_b pi (ra, rb)
+          if goal_is_bisimilar
+          then
+            S.W.Model.Product.estimate_bisim
+              ~refl
+              { a = fsm_a
+              ; a_saturated = S.W.get_fsm_a ~saturated:true ()
+              ; b = S.W.get_fsm_b ()
+              ; b_saturated = fsm_b
+              }
+              pi
+              (ra, rb)
+          else S.W.Model.Product.estimate ~silent ~refl fsm_a fsm_b pi (ra, rb)
         in
         let use_mutual = S.W.Model.Product.prefer_mutual c in
         Api.set_mutual_cofix use_mutual;
