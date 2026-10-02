@@ -128,7 +128,9 @@ let unify_conclusion
     let sigma = ref sigma in
     Array.iteri
       (fun i x ->
-        let x = Reductionops.nf_all env !sigma (Reductionops.nf_evar !sigma x) in
+        let x =
+          Reductionops.nf_all env !sigma (Reductionops.nf_evar !sigma x)
+        in
         sigma := unify env !sigma x a2.(i))
       a1;
     !sigma
@@ -390,8 +392,9 @@ let enumerate (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
 (** [abstract_vars env sigma t]: [t] with every local variable it mentions
     (a hypothesis of the proof, such as an inverted step's label [n] or
     target [q']) replaced by a fresh evar of the same type. The search treats
-    a variable as opaque, so it decides nothing about [step p (Some (Out n))
-    q']; over evars it asks whether {e any} [n], [q'] would do. *)
+    a variable as opaque, so it decides nothing about
+    [step p (Some (Out n)) q']; over evars it asks whether {e any} [n] and
+    [q'] would do. *)
 let abstract_vars (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t)
   : Evd.evar_map * EConstr.t
   =
@@ -401,7 +404,10 @@ let abstract_vars (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t)
         match EConstr.lookup_named id env with
         | decl ->
           let sigma, e =
-            Evarutil.new_evar env sigma (Context.Named.Declaration.get_type decl)
+            Evarutil.new_evar
+              env
+              sigma
+              (Context.Named.Declaration.get_type decl)
           in
           sigma, (id, e) :: subs
         | exception Not_found -> sigma, subs)
@@ -411,11 +417,6 @@ let abstract_vars (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t)
   sigma, EConstr.Vars.replace_vars sigma subs t
 ;;
 
-(** [dead env sigma t]: the proposition [t] has no instance for any value of
-    the local variables it mentions -- the search over [abstract_vars] found
-    no solution and was complete. A hypothesis of this type is false in every
-    context, whatever else is known about its variables. Not for negations,
-    whose search would need a proof of the negated proposition. Memoised. *)
 (* [dead]'s verdicts, keyed by the proposition with its local variables
    numbered in order of occurrence -- so [step (var 18) (Some (Out n)) q']
    and the same with [n0] and [q'1] share an entry -- and by the depth. *)
@@ -428,6 +429,11 @@ module ConstrTbl = Hashtbl.Make (struct
 
 let dead_memo : (int * bool) ConstrTbl.t = ConstrTbl.create 64
 
+(** [dead env sigma t]: the proposition [t] has no instance for any value of
+    the local variables it mentions -- the search over [abstract_vars] found
+    no solution and was complete. A hypothesis of this type is false in every
+    context, whatever else is known about its variables. Not for negations,
+    whose search would need a proof of the negated proposition. Memoised. *)
 let dead (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t) : bool =
   let decide () =
     is_prop env sigma t
@@ -648,7 +654,9 @@ and refute_goal ~(depth : int) ~(before : (Names.Id.t * EConstr.t) list)
              EConstr.kind
                sigma
                (fst
-                  (EConstr.decompose_app sigma (Reductionops.whd_all env sigma t)))
+                  (EConstr.decompose_app
+                     sigma
+                     (Reductionops.whd_all env sigma t)))
            with
            | Ind (ind, _) -> Bool.not (is_eq_ind ind)
            | _ -> false
@@ -658,8 +666,7 @@ and refute_goal ~(depth : int) ~(before : (Names.Id.t * EConstr.t) list)
             Tactics.simpl_in_hyp (id_of d, Locus.InHyp)
             <*> Inv.inv_clear_tac (id_of d)
             <*> refute_goal ~depth:(depth - 1) ~before
-          | _ ->
-            Tacticals.tclZEROMSG (Pp.str "MeBi: no refutable premise left"))))
+          | _ -> Tacticals.tclZEROMSG (Pp.str "MeBi: no refutable premise left"))))
 ;;
 
 (** [negation_tac]: prove a goal [~ P] whose [P] [prove] refutes:
