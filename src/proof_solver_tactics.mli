@@ -16,6 +16,12 @@ module type S = sig
       known to be false ({!Premise_search.refute_hyp_tac}; backlog I2). *)
   val refute_premise : Rocq_utils.hyp -> tactic mm
 
+  (** [refute_dead h]: close the goal from [h], an LTS step that
+      [Premise_search.dead] says has no instance, by refuting it; if that
+      fails, [inversion h], so a wrong verdict costs one step, never the
+      proof. *)
+  val refute_dead : Rocq_utils.hyp -> tactic mm
+
   val subst_all : unit -> tactic mm
   val simplify : unit -> tactic mm
   val simplify_concl : unit -> tactic mm

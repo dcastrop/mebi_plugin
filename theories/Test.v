@@ -1494,7 +1494,8 @@ End ComputedIndex.
 MeBi Divider "Theories.Test.InversionShapes".
 Module InversionShapes.
   Import Stdlib.Lists.List.
-  (* sync_sim: 29 iterations; sync_bis: 105. *)
+  (* sync_sim: 26 iterations; sync_bis: 81 (29 and 105 before dead LTS
+     steps were refuted instead of inverted, 2026-10-02, note 11 option D'). *)
   Module Sync.
     Inductive lab : Set := A | B.
     Inductive st : Set := s0 | s1 | s2 | t0 | t1.
@@ -1510,9 +1511,14 @@ Module InversionShapes.
     Example sync_sim : weak_sim sys sys' (s0, t0) (s0, t0).
     Proof. MeBi Sim Begin sys (s0, t0) And sys' (s0, t0) Using sys sys' comp.
       MeBi Sim Solve 500. Qed.
+    (* A pin: [Solve 80] permits 81 steps, the least that closes it. The
+       pair [(s2, t0)] has no move ([s2] has none), so each obligation from
+       it starts from a step that cannot happen, [sys (s2, t0) a m2];
+       refuting that at once, rather than inverting it down to [comp], is
+       what brings 105 down to 81, so without it this runs out of steps. *)
     Example sync_bis : weak_bisimilar sys sys' (s0, t0) (s0, t0).
     Proof. MeBi Sim Begin sys (s0, t0) And sys' (s0, t0) Using sys sys' comp.
-      MeBi Sim Solve 500. Qed.
+      MeBi Sim Solve 80. Qed.
     MeBi Config Reset Weak.
   End Sync.
 
@@ -1531,7 +1537,12 @@ Module InversionShapes.
     MeBi Config Reset Weak.
   End Source.
 
-  (* deep_bis: 120 iterations. *)
+  (* deep_bis: 120 iterations, unchanged by refuting dead steps: a
+     constructor-headed source ([pre], [sum], [par]) lets [inversion] itself
+     discard the impossible rules. It is a source that needs computing --
+     CCS's [var k], unfolding to [def k] -- that inversion cannot see
+     through, and there dead steps are common (61% of all inversions on the
+     Alternating Bit Protocol). *)
   Module Deep.
     Inductive name : Set := x | y.
     Inductive pr : Set :=

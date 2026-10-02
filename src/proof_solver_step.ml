@@ -348,6 +348,22 @@ struct
            r)
     ;;
 
+    (** [is_dead x]: the LTS step [x] has no instance whatever its local
+        variables are ({!Premise_search.dead}), so inverting it can only open
+        branches that are all refuted later, one layer at a time. On the CCS
+        Alternating Bit Protocol 61% of all LTS inversions were of such
+        steps -- a sender asked for an output it does not make, a medium for
+        a handshake on a name it does not use. Asked only of the step
+        [try_invert_any] has already chosen to invert: asking of every
+        hypothesis at every step was too slow (2026-10-02, PR #11). *)
+    let is_dead (x : t) : bool mm =
+      let open Syntax in
+      let* env = get_env in
+      let* sigma = get_sigma in
+      let ty = Context.Named.Declaration.get_type x in
+      return (Premise_search.dead env sigma ty)
+    ;;
+
     (** [invertibility x] returns an integer denoting whether [x] need be inverted, with the higher numbers being of more importance to invert and [0] denoting [x] does not need to be inverted.
     *)
     let invertibility (x : t) : int mm =
@@ -806,7 +822,11 @@ struct
         let* y = Tacs.invert_premise x in
         return (Some y)
       | Some (grade, x) ->
-        let* y = Hyp.invert x in
+        (* An LTS step with no instance closes the goal by refutation: one
+           step instead of the inversions of every layer beneath it
+           (note 11, option D′). *)
+        let* dead = Hyp.is_dead x in
+        let* y = if dead then Tacs.refute_dead x else Hyp.invert x in
         return (Some y)
     ;;
 
