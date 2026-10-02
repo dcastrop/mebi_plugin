@@ -1217,13 +1217,15 @@ Module CheckerVerdicts.
   | yb : rstep y0 rb y1 | ya : rstep y1 ra y0.
   Fail MeBi Run Bisim x0 With rstep And y0 With rstep.
 
-  (* 2. KNOWN WRONG, still: no silent closure. When fixed, prefix the
-     command with [Fail]. [p = tau.p1 + b.z + c.p1], [p1 = a.z] against
+  (* 2. Silent closure. [p = tau.p1 + b.z + c.p1], [p1 = a.z] against
      [r = a.z + b.z + c.r1], [r1 = a.z]. After [p -tau-> p1], [r] cannot move
      silently and is not equivalent to [p1] ([r] can do [b]), so p and r are
      not weakly bisimilar (Milner's [tau.a + b] vs [a + b], plus a [c]-branch
      giving every state a partner). Partition refinement splits on visible
-     weak moves only, which do not tell them apart. *)
+     weak moves only, which do not tell them apart; it now also splits by
+     [=ε=>], the blocks each state reaches by zero or more silent steps.
+     [a.z] against [τ.a.z] checks the other way: they are weakly bisimilar,
+     and stay so only because [=ε=>] includes zero steps. *)
   Inductive wst : Set := p | p1 | r | r1 | z.
   Inductive wlab : Set := a | b | c.
   Inductive wstep : wst -> option wlab -> wst -> Prop :=
@@ -1232,7 +1234,12 @@ Module CheckerVerdicts.
   | r_a : wstep r (Some a) z | r_b : wstep r (Some b) z
   | r_c : wstep r (Some c) r1 | r1_a : wstep r1 (Some a) z.
   MeBi Config Weak As Option wlab.
-  MeBi Run Bisim p With wstep And r With wstep.
+  Fail MeBi Run Bisim p With wstep And r With wstep.
+  MeBi Run Bisim p1 With wstep And r1 With wstep.
+  Inductive tst : Set := u | v | v1 | w.
+  Inductive tstep : tst -> option wlab -> tst -> Prop :=
+  | u_a : tstep u (Some a) w | v_tau : tstep v None v1 | v1_a : tstep v1 (Some a) w.
+  MeBi Run Bisim u With tstep And v With tstep.
   MeBi Config Reset Weak.
 End CheckerVerdicts.
 

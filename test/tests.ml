@@ -191,6 +191,48 @@ let test_bisim_not_rooted () : unit =
     (M.Bisimilarity.Result.are_bisimilar r.result)
 ;;
 
+(** Milner's [τ.a + b] against [a + b], with a [c]-branch to [a] on each side
+    so that every state has a partner. Their visible weak moves coincide, so
+    only the [=ε=>] split separates them. *)
+let test_bisim_silent_closure () : unit =
+  print_endline "bisimilarity: silent closure";
+  let c = label 3 in
+  let weak_labels = M.Label.Set.singleton tau in
+  let x =
+    fsm
+      ~weak_labels
+      0
+      [ transition 0 tau 1
+      ; transition 0 b 2
+      ; transition 0 c 1
+      ; transition 1 a 2
+      ]
+  in
+  let y =
+    fsm
+      ~weak_labels
+      10
+      [ transition 10 a 12
+      ; transition 10 b 12
+      ; transition 10 c 11
+      ; transition 11 a 12
+      ]
+  in
+  check
+    "tau.a + b + c.a and a + b + c.a are not weakly bisimilar"
+    false
+    (M.Bisimilarity.Result.are_bisimilar (M.Bisimilarity.fsm x y).result);
+  (* [a] against [τ.a]: weakly bisimilar. Without the reflexive step in
+     [=ε=>], [τ.a] would reach a block by silence and [a] none, and the split
+     would separate them. *)
+  let u = fsm ~weak_labels 20 [ transition 20 a 21 ] in
+  let v = fsm ~weak_labels 30 [ transition 30 tau 31; transition 31 a 32 ] in
+  check
+    "a and tau.a are weakly bisimilar"
+    true
+    (M.Bisimilarity.Result.are_bisimilar (M.Bisimilarity.fsm u v).result)
+;;
+
 (** Converting an LTS to an FSM must preserve the state set. *)
 let test_of_lts_preserves_states () : unit =
   print_endline "FSM.of_lts";
@@ -759,6 +801,7 @@ let () =
   test_bisim_identical ();
   test_bisim_different ();
   test_bisim_not_rooted ();
+  test_bisim_silent_closure ();
   test_product_loop ();
   test_product_diamond ();
   test_product_silent_stays_put ();

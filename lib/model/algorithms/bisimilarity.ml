@@ -116,9 +116,7 @@ module Make
             ; ( "non-bisimilar states"
               , Partition.json ~as_elt:true x.non_bisim_states )
             ; ( "initial states related"
-              , match x.roots_related with
-                | None -> `Null
-                | Some b -> `Bool b )
+              , match x.roots_related with None -> `Null | Some b -> `Bool b )
             ]
         ;;
       end)
@@ -203,7 +201,15 @@ module Make
        every weak action of both FSMs (the merged FSM has no silent edges
        left, so it reproduces the same structure, and the partition only
        reads that), roughly doubling the check's saturation memory. *)
-    let pi : Partition.t = Minimization.partition_states merged in
+    (* The silent steps live only in the originals: saturation drops them.
+       [partition_states] needs them for the [=ε=>] split, without which this
+       is not weak bisimilarity (see [Minimization.for_each_block]). *)
+    let silent : C.EdgeMap.t' option =
+      if FSM.is_weak_mode fsm_a.original || FSM.is_weak_mode fsm_b.original
+      then Some (FSM.merge fsm_a.original fsm_b.original).edges
+      else None
+    in
+    let pi : Partition.t = Minimization.partition_states ?silent merged in
     let roots_related : bool option =
       match fsm_a.original.init, fsm_b.original.init with
       | Some x, Some y ->
@@ -214,11 +220,7 @@ module Make
       | _ -> None
     in
     let result =
-      Result.split
-        ?roots_related
-        pi
-        fsm_a.original.states
-        fsm_b.original.states
+      Result.split ?roots_related pi fsm_a.original.states fsm_b.original.states
     in
     { fsm_a; fsm_b; merged; result }
   ;;

@@ -25,8 +25,8 @@ module type S = sig
       { bisim_states : partition
       ; non_bisim_states : partition
       ; roots_related : bool option
-          (** whether the two FSMs' initial states share a block; [None] when
-              either FSM has no initial state *)
+        (** whether the two FSMs' initial states share a block; [None] when
+            either FSM has no initial state *)
       }
 
     include Json.S with type k = t (** @closed *)

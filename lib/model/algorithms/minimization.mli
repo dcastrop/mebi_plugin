@@ -21,6 +21,15 @@ module type S = sig
   (** @raise CannotSplitEmptyBlock on an empty block. *)
   val ensure_nonempty : states -> unit
 
+  (** [split_block_by reach s block] splits [block] by [s]: the states that
+      [reach] maps to the same set of blocks as [s], and ([Some]) the rest,
+      if any. *)
+  val split_block_by
+    :  (state -> partition)
+    -> state
+    -> states
+    -> states * states option
+
   (** [split_block pi s edges block] splits [block] by [s]: the states that
       reach, by [edges], the same blocks of [pi] as [s] does, and
       ([Some]) the rest, if any. *)
@@ -48,24 +57,34 @@ module type S = sig
     -> label
     -> unit
 
-  (** Refine one block of [pi] by every visible label of the alphabet. *)
+  (** [silent_closures edges] maps a state to the states it reaches by zero
+      or more silent steps of [edges] (Milner's [=ε=>], so it always contains
+      the state itself). Memoised; reads only silent edges. *)
+  val silent_closures : edgemap -> state -> states
+
+  (** Refine one block of [pi] by every visible label of the alphabet and,
+      given [closure], by the blocks each state reaches by [=ε=>]. *)
   val for_each_block
-    :  partition ref
+    :  ?closure:(state -> states)
+    -> partition ref
     -> bool ref
     -> labels
     -> edgemap
     -> states
     -> unit
 
-  (** [partition_states x] refines the one-block partition of [x]'s states
-      until no block splits (naive partition refinement): the coarsest
+  (** [partition_states ?silent x] refines the one-block partition of [x]'s
+      states until no block splits (naive partition refinement): the coarsest
       partition in which states of a block reach the same blocks by each
-      visible label. On a {e saturated} FSM that is weak bisimilarity. The
-      FSM is used as given, not saturated here. *)
-  val partition_states : fsm -> partition
+      visible label and, given [silent], by [=ε=>] computed from [silent]'s
+      silent edges. Weak bisimilarity needs both: on a saturated FSM without
+      [silent] the result is coarser, and cannot tell [τ.a + b] from [a + b].
+      [silent] is normally the {e unsaturated} FSM's edges, since saturation
+      drops silent steps. The FSM is used as given, not saturated here. *)
+  val partition_states : ?silent:edgemap -> fsm -> partition
 
   (** [fsm x] saturates [x] ({!FSM.saturate}, a no-op without silent labels)
-      and partitions it. *)
+      and partitions it, splitting by [=ε=>] from [x]'s own silent steps. *)
   val fsm : fsm -> t
 end
 
