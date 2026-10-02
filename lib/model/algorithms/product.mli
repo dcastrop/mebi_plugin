@@ -121,6 +121,29 @@ module type S = sig
     -> Pair.t
     -> Pair.Set.t
 
+  (** The four FSMs of a {e bisimulation} game: each system as given (its
+      transitions are the obligations it sets) and saturated (its weak
+      transitions answer the other's). *)
+  type game =
+    { a : fsm
+    ; a_saturated : fsm
+    ; b : fsm
+    ; b_saturated : fsm
+    }
+
+  (** [successors_bisim ~refl g pi p] is {!val:successors} for a
+      [weak_bisimilar] goal, which has two obligations ([bisim_l] and
+      [bisim_r]): [p]'s left state's moves answered by [b], as in
+      {!val:successors}, and its right state's moves answered by [a], which is
+      the same game with the systems swapped, its pairs swapped back. Silent
+      moves can be answered by moving silently on either side. *)
+  val successors_bisim : refl:bool -> game -> partition -> Pair.t -> Pair.t list
+
+  (** [reachable_bisim ~refl g pi root]: {!val:reachable} over
+      {!val:successors_bisim}, the relation a mutual cofix for a
+      [weak_bisimilar] goal needs. *)
+  val reachable_bisim : refl:bool -> game -> partition -> Pair.t -> Pair.Set.t
+
   (** What a proof of this product costs, in [weak_sim] goals, under each of
       the two strategies. *)
   type cost =
@@ -154,6 +177,16 @@ module type S = sig
     -> refl:bool
     -> fsm
     -> fsm
+    -> partition
+    -> Pair.t
+    -> cost
+
+  (** [estimate_bisim ?cap_factor ~refl g pi root]: {!val:estimate} over
+      {!val:successors_bisim}. *)
+  val estimate_bisim
+    :  ?cap_factor:int
+    -> refl:bool
+    -> game
     -> partition
     -> Pair.t
     -> cost

@@ -43,6 +43,16 @@ module type S = sig
     -> Pair.t
     -> Pair.Set.t
 
+  type game =
+    { a : fsm
+    ; a_saturated : fsm
+    ; b : fsm
+    ; b_saturated : fsm
+    }
+
+  val successors_bisim : refl:bool -> game -> partition -> Pair.t -> Pair.t list
+  val reachable_bisim : refl:bool -> game -> partition -> Pair.t -> Pair.Set.t
+
   type cost =
     { pairs : int
     ; moves : int
@@ -55,6 +65,14 @@ module type S = sig
     -> refl:bool
     -> fsm
     -> fsm
+    -> partition
+    -> Pair.t
+    -> cost
+
+  val estimate_bisim
+    :  ?cap_factor:int
+    -> refl:bool
+    -> game
     -> partition
     -> Pair.t
     -> cost
@@ -239,6 +257,21 @@ struct
         (obligations a x)
   ;;
 
+  (* Breadth-first closure of [root] under [step]. *)
+  let reachable_by (step : Pair.t -> Pair.t list) (root : Pair.t) : Pair.Set.t =
+    let rec go (seen : Pair.Set.t) : Pair.t list -> Pair.Set.t = function
+      | [] -> seen
+      | p :: rest ->
+        let next : Pair.t list =
+          step p |> List.filter (fun q -> not (Pair.Set.mem q seen))
+        in
+        go
+          (List.fold_left (fun acc q -> Pair.Set.add q acc) seen next)
+          (List.rev_append next rest)
+    in
+    go (Pair.Set.singleton root) [ root ]
+  ;;
+
   let reachable
         ?(silent : C.EdgeMap.t' option)
         ~(refl : bool)
@@ -249,18 +282,48 @@ struct
     : Pair.Set.t
     =
     Logger.trace __FUNCTION__;
-    let rec go (seen : Pair.Set.t) : Pair.t list -> Pair.Set.t = function
-      | [] -> seen
-      | p :: rest ->
-        let next : Pair.t list =
-          successors ?silent ~refl a b pi p
-          |> List.filter (fun q -> not (Pair.Set.mem q seen))
-        in
-        go
-          (List.fold_left (fun acc q -> Pair.Set.add q acc) seen next)
-          (List.rev_append next rest)
+    reachable_by (successors ?silent ~refl a b pi) root
+  ;;
+
+  type game =
+    { a : FSM.t
+    ; a_saturated : FSM.t
+    ; b : FSM.t
+    ; b_saturated : FSM.t
+    }
+
+  (* A bisimulation game state [(x, y)] has the obligations of both sides:
+     [x]'s moves answered by [b] (as in [successors]), and [y]'s moves answered
+     by [a] -- the same game with the two systems swapped, its pairs swapped
+     back. Mirrors the two goals [Pack_bisim] leaves, [bisim_l] and
+     [bisim_r]. *)
+  let successors_bisim
+        ~(refl : bool)
+        (g : game)
+        (pi : C.Partition.t)
+        ((x, y) : Pair.t)
+    : Pair.t list
+    =
+    Logger.trace __FUNCTION__;
+    let left : Pair.t list =
+      successors ~silent:g.b.edges ~refl g.a g.b_saturated pi (x, y)
     in
-    go (Pair.Set.singleton root) [ root ]
+    let right : Pair.t list =
+      successors ~silent:g.a.edges ~refl g.b g.a_saturated pi (y, x)
+      |> List.map (fun ((y', x') : Pair.t) -> x', y')
+    in
+    left @ right
+  ;;
+
+  let reachable_bisim
+        ~(refl : bool)
+        (g : game)
+        (pi : C.Partition.t)
+        (root : Pair.t)
+    : Pair.Set.t
+    =
+    Logger.trace __FUNCTION__;
+    reachable_by (successors_bisim ~refl g pi) root
   ;;
 
   type cost =
@@ -271,23 +334,17 @@ struct
 
   exception Capped
 
-  let estimate
+  (* The cost of a proof of the game reachable from [root] under [step]; see
+     [estimate]. *)
+  let estimate_by
         ?(cap_factor : int = 4)
-        ?(silent : C.EdgeMap.t' option)
-        ~(refl : bool)
-        (a : FSM.t)
-        (b : FSM.t)
-        (pi : C.Partition.t)
+        (step : Pair.t -> Pair.t list)
         (root : Pair.t)
     : cost
     =
-    Logger.trace __FUNCTION__;
-    let pairs : Pair.Set.t = reachable ?silent ~refl a b pi root in
+    let pairs : Pair.Set.t = reachable_by step root in
     let moves : int =
-      Pair.Set.fold
-        (fun p acc -> acc + List.length (successors ?silent ~refl a b pi p))
-        pairs
-        0
+      Pair.Set.fold (fun p acc -> acc + List.length (step p)) pairs 0
     in
     (* The nested walk, simulated. [path] is the set of coinduction hypotheses
        a nested cofix would have in scope at this point -- the ancestors, and
@@ -303,7 +360,7 @@ struct
       then () (* closes against an ancestor *)
       else (
         let path = Pair.Set.add p path in
-        List.iter (walk path) (successors ?silent ~refl a b pi p))
+        List.iter (walk path) (step p))
     in
     let nested : int option =
       try
@@ -313,6 +370,32 @@ struct
       | Capped -> None
     in
     { pairs = Pair.Set.cardinal pairs; moves; nested }
+  ;;
+
+  let estimate
+        ?(cap_factor : int = 4)
+        ?(silent : C.EdgeMap.t' option)
+        ~(refl : bool)
+        (a : FSM.t)
+        (b : FSM.t)
+        (pi : C.Partition.t)
+        (root : Pair.t)
+    : cost
+    =
+    Logger.trace __FUNCTION__;
+    estimate_by ~cap_factor (successors ?silent ~refl a b pi) root
+  ;;
+
+  let estimate_bisim
+        ?(cap_factor : int = 4)
+        ~(refl : bool)
+        (g : game)
+        (pi : C.Partition.t)
+        (root : Pair.t)
+    : cost
+    =
+    Logger.trace __FUNCTION__;
+    estimate_by ~cap_factor (successors_bisim ~refl g pi) root
   ;;
 
   let prefer_mutual ({ pairs; moves; nested } : cost) : bool =
