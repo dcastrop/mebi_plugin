@@ -4425,6 +4425,41 @@ a merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 That restores the `BisimProofs.v` files. Revert this before
 `theories/mutual-sim` if both are to go.
 
+## 2026-10-02 (second session) — One place to choose an answer (`Product.answer`)
+
+**Refactor.** On branch `refactor/answer-table`. Step 1 of the
+answer-selection plan agreed with Jonah: make the choice of answer a single
+function before any policy for choosing answers is tried.
+
+**Before.** How FSM "b" answers a move was written out twice:
+- in `Product.successors`, which builds the mutual block's product: a stay
+  check, then `respond` into the bisimilarity class, then the simulators
+  fallback;
+- in the solver: `handle_wk_concl`'s stay check, then
+  `handle_visible_transition`/`try_get_visible_transition`, which
+  re-resolved `b` and the label from the goal's terms, then the same
+  fallback.
+
+The two had to agree by hand. A disagreement is a pair outside the mutual
+block, and PR #5 had to add its fallback to both.
+
+**After.** `Product.answer ?silent ?sim b pi y label x'` returns
+`Stay | Move transition`. `successors` and the solver's `handle_wk_concl`
+both call it, on the same inputs: `b`, the move's own label and its target.
+`try_get_visible_transition`, `handle_visible_transition` and
+`CouldNotFindGotoState` are gone. So is the label-lookup fallback PR #5 added:
+the label is now the move's own, which is what `successors` always used.
+Any future policy for choosing answers changes this one function.
+
+**Verification.** Every count is identical: all 41 under `Auto` and forced
+`True`; under forced `False`, the documented `weak_sim` counts, then a stop
+at the first `weak_bisimilar`. `tests.exe` 74/74, `make` clean, `Test.v`
+(silent answers, similarity, `weak_bisimilar`) builds.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep refactor/answer-table main`).
+
 ---
 
 ## Outstanding
