@@ -1571,15 +1571,18 @@ Module InversionShapes.
     | go' n m : n < 3 -> succ_rel n m -> st' n (Some true) m
     | back' : st' 3 (Some false) 0.
     MeBi Config Weak As Option bool.
-    (* KNOWN WRONG (found 2026-10-02, present before the hypothesis-order fix
-       too): the guard [n < 3] before the computing premise reaches the
-       solver's "finish a silent step" path, which applies [rt1n_refl] to it
-       ("Unable to unify clos_refl_trans_1n ... with 0 < 3"). The same fails as
-       [weak_sim], in every cofix mode. When fixed: [MeBi Sim Solve 500. Qed.] *)
+    (* computed_sim: 42 iterations; computed_bis: 83. A guard headed by a
+       definition ([n < 3] is [lt]) before a target-computing premise. Until
+       2026-10-02 the solver did not recognise [0 < 3] as a premise (it
+       judged it by its head, [lt], a constant) and applied [rt1n_refl] to
+       it ("Unable to unify clos_refl_trans_1n ... with 0 < 3"), as
+       [weak_sim] and [weak_bisimilar], in every cofix mode. *)
     Example computed_sim : weak_sim st st' 0 0.
     Proof. MeBi Sim Begin st 0 And st' 0 Using st st'.
-      Fail MeBi Sim Solve 500.
-    Abort.
+      MeBi Sim Solve 500. Qed.
+    Example computed_bis : weak_bisimilar st st' 0 0.
+    Proof. MeBi Sim Begin st 0 And st' 0 Using st st'.
+      MeBi Sim Solve 500. Qed.
     MeBi Config Reset Weak.
   End Computed.
 End InversionShapes.
