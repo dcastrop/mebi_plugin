@@ -4940,6 +4940,47 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 **Session tally (2026-10-02, third session), cont.:** Optimization 1 ·
 Tooling 1.
 
+## 2026-10-02 (third session) — A premise headed by a definition (`n < 3`) was taken for a silent step
+
+**Bug fix.** On branch `fix/premise-under-definition`. This is the
+known-wrong pin `Test.v` `InversionShapes.Computed`, found while writing the
+option C tests (second session).
+
+**The bug.** For `go n m : n < 3 -> succ_rel n m -> st n (Some true) m`,
+the solver applied `go'` on the answering side and then applied
+`rt1n_refl` to the premise `0 < 3` ("Unable to unify clos_refl_trans_1n …
+with 0 < 3"). This happened as `weak_sim` and as `weak_bisimilar`, in every
+cofix mode. `Concl.is_premise` judged the goal by its syntactic head, and
+`n < 3` is headed by the *constant* `lt` (it unfolds to `le (S n) 3`). So
+it was not seen as a premise, and the constructor-application state machine
+took it for the closing silent-step goal. `n <= 3` would have worked.
+
+**The fix.** A goal headed by a constant that is not one of the plugin's
+theory definitions is classified by its weak-head normal form, as
+`Hyp.premise_grade` already does for hypotheses.
+
+**Tests.** The pin is now `computed_sim` (42) plus a new `computed_bis`
+(83). Both also pass with `MutualCofix` forced `True` (42, 83) and `False`
+(42, 283).
+
+**Also, a slip of mine from PR #14, fixed here as a separate style
+commit:** I inserted the memo table between `Premise_search.dead`'s doc
+comment and its definition, so the comment documented the table. `make`
+accepted it, because a doc comment before a module is legal. Moved back;
+the rest of that commit is ocamlformat drift from the same PR, which went
+in unformatted.
+
+**Verification:** the 41 `PluginProofs.v` counts and the CCS ones are
+identical to PR #14's in all three modes (21 runs); `Test.v` is otherwise
+unchanged; `tests.exe` 79/79; `make` clean.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep fix/premise-under-definition main`).
+
+**Session tally (2026-10-02, third session), cont.:** Optimization 1 ·
+Tooling 1 · Bug fix 1.
+
 ---
 
 ## Outstanding
