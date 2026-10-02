@@ -4838,6 +4838,75 @@ counts go back to the old baseline.
 New feature 5 · Refactor 1 · Tooling 9 · Docs 5 · Optimization 0.
 (PRs #1–#13 and two docs commits; see the entries above.)
 
+## 2026-10-02 (third session) — Step 0, option D′: refute a dead LTS step instead of inverting it
+
+**Optimization.** On branch `perf/refute-dead-hyps`. Jonah agreed option
+D′ of `notes/11-dead-hypothesis-refutation.md`, which replaces note 7's
+option D (matching inversion branches against the extracted constructor
+trees) with something simpler that does the same job.
+
+**What was measured first.** A log-only spike on a capped `abp ≤ spec`
+run: 85% of steps were LTS inversions, ~50 per answered move, and **61% of
+those inversions were of a step that `Premise_search` already proves has
+no instance**. Examples: the receiver asked for an output it never makes
+first, or a handshake on a name one side never uses. Every such verdict
+was complete. The solver inverted these layer by layer through `var k` /
+`def k`, which Rocq's `inversion` cannot discriminate, and refuted each
+impossible branch in turn.
+
+**The change.**
+- `Premise_search.dead`: turn a hypothesis's local variables into evars
+  (`abstract_vars`); the hypothesis is dead when the search finds no
+  solution and was complete. Memoised, keyed by the type with its
+  variables numbered by occurrence.
+- `refute_hyp_tac` also refutes such *open* hypotheses (before, only
+  closed ones). After each `inversion_clear` it closes the remaining goals
+  from, in order: a dead hypothesis it introduced; a closed one `prove`
+  refutes (the old case); else, for premises false only together (a
+  handshake's two sides), it inverts the newest one it introduced.
+- `try_invert_any`: when the step it has *already chosen* to invert is
+  dead, it emits `refute_hyp_tac H || inversion H`. Which hypothesis is
+  picked is unchanged. A wrong verdict costs one step, never the proof.
+
+**Two mistakes on the way, both caught before committing.**
+- *4× slower at first.* `refute_goal` ran the old un-memoised `prove` scan
+  over the whole context before anything else, at every level, and the
+  memo lived only in the solver. Reordered (introduced dead hypotheses
+  first) and the memo moved into `Premise_search.dead`: per refutation
+  ~400 ms → ~70 ms.
+- *A quarter of refutations failed and fell back to inversion.* I told
+  "hypotheses this refutation introduced" apart by name, and
+  `inversion_clear` frees a name that Rocq gives to the next premise. This
+  is the same trap as option A's bug. They are now compared by name *and*
+  type, and no refutation falls back on the ABP.
+- Also corrected before committing: the `Sync` pin's comment first claimed
+  inner `comp` premises were refuted. A trace showed it is the top-level
+  step of a pair with no move (`sys (s2, t0) a m2`).
+
+**Measured.**
+- *ABP* (`abp ≤ spec`, capped at 600 steps): 18 obligations closed instead
+  of 9, at about the same time per step (22.7 s vs 20.8 s).
+- *All 41 `PluginProofs.v` counts identical* under `Auto`, forced `True`
+  and forced `False`, against `main` built the same way; forced `False`
+  stops at the same places as on `main`. Wall times within noise.
+  `Proc`/CADP use a relation per layer, and `inversion` already discards
+  their dead branches, so there was nothing to save there.
+- *CCS examples:* chained buffers `weak_bisimilar` 179 → 175 (`Auto` and
+  forced `True`), 440 → 434 (forced `False`); the rest unchanged.
+- *`Test.v`:* 17 counts drop, none rises, none changes outcome (e.g.
+  `TwoPremises` 28 → 27, `OutputPremises` 43 → 40,
+  `InversionShapes.Sync` 29/105 → 26/81). `sync_bis` is now pinned at its
+  new least bound (`Solve 80`); on `main` it runs out of steps (checked).
+  `Deep` stays 120: constructor-headed sources are discriminated by
+  `inversion` itself.
+- `tests.exe` 79/79; `make` clean.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep perf/refute-dead-hyps main`).
+
+**Session tally (2026-10-02, third session):** Optimization 1.
+
 ---
 
 ## Outstanding
