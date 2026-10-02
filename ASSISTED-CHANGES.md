@@ -4600,6 +4600,25 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 `git log --merges --oneline --grep solver/answer-policies main`). Nothing
 else depends on it.
 
+## 2026-10-02 (second session) — `MeBi Help` on answer policies; @dcastrop items grouped
+
+**Docs.** Straight onto `main` (documentation only).
+- `MeBi Help Config Solver` now explains what an answer is, and what
+  `Default` does. It is both the name of a policy and the default setting:
+  each answer is chosen alone, with no look-ahead (stand still if silent and
+  bisimilar, else the shortest witness into the target's class, to its
+  lowest-numbered state; for merely similar states the same against the
+  simulators), which is why proofs can visit more pairs than they need. The
+  text also says what the other policies do, what was measured, and that a
+  policy can only change how long a proof is, never whether it is correct.
+- `TODO.md` has a new "To discuss with @dcastrop" section. It gathers the
+  `paper/`, LICENSE and `MutualCofix Auto` items (moved from "Project
+  Structure & Tooling"), whether `Answers Auto` should be the default, the
+  semantics decisions Jonah made on 2026-10-02 (classical weak bisimilarity,
+  `mutual_sim`/`weak_bisimilar`, `weak_bisim`'s fate, the `Sim Begin`
+  similarity change, divergence), the `rocq-sims` audit, and CADP
+  no-starvation.
+
 ---
 
 ## Outstanding
