@@ -48,7 +48,8 @@ module type S = sig
       -> t' mm
 
     val make_opt
-      :  (EConstr.t * Names.Name.t) list
+      :  ?keep_var:bool
+      -> (EConstr.t * Names.Name.t) list
       -> EConstr.t * Constr.t
       -> t' option mm
   end

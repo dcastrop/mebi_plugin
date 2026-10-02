@@ -259,11 +259,11 @@ module type S = sig
       val is_empty : t -> bool
       val unify_list_opt : Problem.t list -> tree list option mm
 
-      val sandbox_unify_all_opt
+      val sandbox_unify_all
         :  EConstr.t
         -> EConstr.t
         -> t
-        -> (EConstr.t * EConstr.t * tree list) option mm
+        -> (EConstr.t * EConstr.t * tree list) list mm
     end
 
     module ListOfProblems : sig
@@ -1299,6 +1299,116 @@ module Make (Enc : Encoding.S) :
       return ()
     ;;
 
+    (** Premises warned about as possibly incomplete, keyed like
+        [skipped_premises]. *)
+    let partial_premises : (string * string, unit) Hashtbl.t = Hashtbl.create 8
+
+    (** An open premise whose solutions were enumerated, but perhaps not all
+        of them (depth bound, solution cap, something opaque): transitions
+        may be missing -- an under-approximation. Once per LTS and head. *)
+    let warn_partial_premise
+          (lts_enc : Enc.t)
+          ((name, args) : EConstr.t * EConstr.t array)
+      : unit mm
+      =
+      let open Syntax in
+      let$+ _warned env sigma =
+        let head = Rocq_utils.Strfy.econstr env sigma name in
+        let key = Enc.to_string lts_enc, head in
+        if Bool.not (Hashtbl.mem partial_premises key)
+        then (
+          Hashtbl.add partial_premises key ();
+          Logger.warning
+            (Printf.sprintf
+               "A constructor of %s has a premise headed by [%s] (first met as \
+                [%s]) whose solutions MeBi may not have found all of (the \
+                search hit [MeBi Config Premise Depth], its solution cap, or \
+                something opaque). The extracted LTS may be missing \
+                transitions. See [MeBi Help Premises]."
+               (Rocq_utils.Strfy.econstr env sigma (decode lts_enc))
+               head
+               (Rocq_utils.Strfy.econstr
+                  env
+                  sigma
+                  (Reductionops.nf_evar sigma (EConstr.mkApp (name, args))))))
+      in
+      return ()
+    ;;
+
+    (** LTSs warned about for exploring a premise from an open source. *)
+    let open_sources : (string * string, unit) Hashtbl.t = Hashtbl.create 8
+
+    (** An LTS premise explored while its source term is still open (nothing
+        earlier fixed it): constructor matching then finds only some of its
+        steps, so transitions may be missing. Once per LTS and premise. *)
+    let warn_open_source (lts_enc : Enc.t) (premise : EConstr.t) : unit mm =
+      let open Syntax in
+      let$+ _warned env sigma =
+        let head = Rocq_utils.Strfy.econstr env sigma premise in
+        let key = Enc.to_string lts_enc, head in
+        if Bool.not (Hashtbl.mem open_sources key)
+        then (
+          Hashtbl.add open_sources key ();
+          Logger.warning
+            (Printf.sprintf
+               "A constructor of %s has a premise over [%s] whose source term \
+                nothing before it determines, so MeBi explores it from an \
+                unknown term and may find only some of its steps: the \
+                extracted LTS may be missing transitions. Order the premises \
+                so that whatever determines the source comes first. See [MeBi \
+                Help Premises]."
+               (Rocq_utils.Strfy.econstr env sigma (decode lts_enc))
+               head))
+      in
+      return ()
+    ;;
+
+    (** Decide a constructor's deferred premises, left to right, over every
+        evar map reached so far (backlog item I2, stage 2): each map is
+        dropped where a premise is refuted, multiplied where an open premise
+        has several solutions (each instantiating what it computes -- a
+        target, say), and kept unchanged where a premise stays undecided
+        (today's over-approximation). Returns the final maps, the premises
+        left undecided, and those whose solutions may be incomplete. *)
+    let resolve_deferred
+          (env : Environ.env)
+          (sigma : Evd.evar_map)
+          (deferred : (Enc.t * EConstr.t * EConstr.t array) list)
+      : Evd.evar_map list
+        * (Enc.t * EConstr.t * EConstr.t array) list
+        * (Enc.t * EConstr.t * EConstr.t array) list
+      =
+      List.fold_left
+        (fun (states, undecided, partial) ((_, name, args) as d) ->
+          let undecided = ref undecided
+          and partial = ref partial in
+          let states =
+            List.concat_map
+              (fun sigma ->
+                let premise =
+                  Reductionops.nf_evar sigma (EConstr.mkApp (name, args))
+                in
+                match Premise_search.enumerate env sigma premise with
+                | [], true -> []
+                | [], false ->
+                  (* last resort for a closed premise: [prove] also tries the
+                     user tactic *)
+                  (match Premise_search.prove env sigma premise with
+                   | Premise_search.Proved _ -> [ sigma ]
+                   | Premise_search.Refuted -> []
+                   | Premise_search.Unknown ->
+                     undecided := d :: !undecided;
+                     [ sigma ])
+                | sols, complete ->
+                  if Bool.not complete then partial := d :: !partial;
+                  sols)
+              states
+          in
+          states, !undecided, !partial)
+        ([ sigma ], [], [])
+        deferred
+    ;;
+
     module Problems = struct
       type deferred = Enc.t * EConstr.t * EConstr.t array
 
@@ -1352,47 +1462,43 @@ module Make (Enc : Encoding.S) :
               | Some acc -> return (Some (constructor_tree :: acc))))
       ;;
 
-      let sandbox_unify_all_opt
+      let sandbox_unify_all
             (act : EConstr.t)
             (goto : EConstr.t)
             ({ sigma; to_unify; deferred } : t)
-        : (EConstr.t * EConstr.t * Enc.Tree.t list) option mm
+        : (EConstr.t * EConstr.t * Enc.Tree.t list) list mm
         =
         let open Syntax in
         sandbox
           ~sigma
           (let* unified_opt = unify_list_opt to_unify in
            match unified_opt with
-           | None -> return None
+           | None -> return []
            | Some constructor_trees ->
-             let$+ decisions env sigma =
-               List.map
-                 (fun ((_, name, args) : deferred) ->
-                   decide_premise env sigma (name, args))
-                 deferred
+             let$+ resolved env sigma = resolve_deferred env sigma deferred in
+             let states, undecided, partial = resolved in
+             let warn f (ds : deferred list) =
+               iterate
+                 0
+                 (List.length ds - 1)
+                 ()
+                 (fun i () ->
+                   let lts_enc, name, args = List.nth ds i in
+                   f lts_enc (name, args))
              in
-             if List.mem (Some false) decisions
-             then (* a premise is false here: no transition *) return None
-             else
-               let* () =
-                 iterate
-                   0
-                   (List.length deferred - 1)
-                   ()
-                   (fun i () ->
-                     match List.nth decisions i with
-                     | None ->
-                       let lts_enc, name, args = List.nth deferred i in
-                       warn_if_skipped_premise lts_enc (name, args)
-                     | Some _ -> return ())
-               in
-               let$+ act env sigma = Reductionops.nf_all env sigma act in
-               let$+ goto env sigma = Reductionops.nf_all env sigma goto in
-               let$+ is_act_undefined _ sigma = EConstr.isEvar sigma act in
-               let$+ is_goto_undefined _ sigma = EConstr.isEvar sigma goto in
-               if is_act_undefined && is_goto_undefined
-               then return None
-               else return (Some (act, goto, constructor_trees)))
+             let* () = warn warn_if_skipped_premise undecided in
+             let* () = warn warn_partial_premise partial in
+             let* env = get_env in
+             (* one transition per way the deferred premises hold *)
+             return
+               (List.filter_map
+                  (fun sigma ->
+                    let act = Reductionops.nf_all env sigma act in
+                    let goto = Reductionops.nf_all env sigma goto in
+                    if EConstr.isEvar sigma act && EConstr.isEvar sigma goto
+                    then None
+                    else Some (act, goto, constructor_trees))
+                  states))
       ;;
     end
 
@@ -1438,21 +1544,19 @@ module Make (Enc : Encoding.S) :
         | _, [] -> return acc
         | lts_enc, problems :: tl ->
           let* acc = retrieve constructor_index acc act tgt (lts_enc, tl) in
-          let* constructor_opt : Constructor.t option =
+          let* found : Constructor.t list =
             sandbox
-              (let* success = Problems.sandbox_unify_all_opt act tgt problems in
-               match success with
-               | None -> return None
-               | Some (act, goto, constructor_trees) ->
-                 let tree : Enc.Tree.t =
-                   N ((lts_enc, constructor_index), constructor_trees)
-                 in
-                 let constructor = Constructor.encode act goto tree in
-                 return (Some constructor))
+              (let* results = Problems.sandbox_unify_all act tgt problems in
+               return
+                 (List.map
+                    (fun (act, goto, constructor_trees) ->
+                      let tree : Enc.Tree.t =
+                        N ((lts_enc, constructor_index), constructor_trees)
+                      in
+                      Constructor.encode act goto tree)
+                    results))
           in
-          (match constructor_opt with
-           | None -> return acc
-           | Some constructor -> return (constructor :: acc))
+          return (List.rev_append found acc)
       ;;
 
       let to_problems args (constructors : t) : Problems.t mm =
@@ -1579,33 +1683,36 @@ module Make (Enc : Encoding.S) :
       | Some (next_lts_enc, next_problems) ->
         if ListOfProblems.is_empty next_problems
         then (
-          (* No LTS premises to wait for: decide the deferred ones now. *)
+          (* No LTS premises to wait for: decide the deferred ones now --
+             each way they hold (an open one may compute the target) is an
+             axiom of its own. *)
           let deferred : Problems.deferred list =
             List.concat_map (fun (p : Problems.t) -> p.deferred) next_problems
           in
           let open Syntax in
-          let$+ decisions env sigma =
-            List.map
-              (fun ((_, name, args) : Problems.deferred) ->
-                decide_premise env sigma (name, args))
-              deferred
+          let$+ resolved env sigma = resolve_deferred env sigma deferred in
+          let states, undecided, partial = resolved in
+          let warn f (ds : Problems.deferred list) =
+            iterate
+              0
+              (List.length ds - 1)
+              ()
+              (fun i () ->
+                let lts_enc, name, args = List.nth ds i in
+                f lts_enc (name, args))
           in
-          if List.mem (Some false) decisions
-          then return constructors
-          else
-            let* () =
-              iterate
-                0
-                (List.length deferred - 1)
-                ()
-                (fun i () ->
-                  match List.nth decisions i with
-                  | None ->
-                    let lts_enc, name, args = List.nth deferred i in
-                    warn_if_skipped_premise lts_enc (name, args)
-                  | Some _ -> return ())
-            in
-            Constructors.axiom outer_act tgt_term (next_lts_enc, i) constructors)
+          let* () = warn warn_if_skipped_premise undecided in
+          let* () = warn warn_partial_premise partial in
+          let* env = get_env in
+          iterate
+            0
+            (List.length states - 1)
+            constructors
+            (fun k acc ->
+              let sigma = List.nth states k in
+              let act = Reductionops.nf_all env sigma outer_act in
+              let tgt = Reductionops.nf_all env sigma tgt_term in
+              sandbox ~sigma (Constructors.axiom act tgt (next_lts_enc, i) acc)))
         else
           Constructors.retrieve
             i
@@ -1651,24 +1758,102 @@ module Make (Enc : Encoding.S) :
       | None -> check_unknown_app lts_enc acc indmap (substl, tl) (name, args)
       | Some c ->
         let open Syntax in
-        let args = Rocq_utils.constructor_args args in
-        let$+ lhs env sigma = Reductionops.nf_evar sigma args.lhs in
-        let$+ act env sigma = Reductionops.nf_evar sigma args.act in
-        let args = { args with lhs; act } in
-        let next_lts : Ind.LTS.constructor array =
-          Ind.get_lts_constructor_types c
+        let raw_args = args in
+        (* Explore this LTS premise from the current evar map, then carry on
+           with the remaining binders. *)
+        let explore () =
+          let args = Rocq_utils.constructor_args raw_args in
+          let$+ lhs env sigma = Reductionops.nf_evar sigma args.lhs in
+          let$+ act env sigma = Reductionops.nf_evar sigma args.act in
+          let$+ lhs_open _ sigma =
+            Bool.not (Evar.Set.is_empty (Evd.evars_of_term sigma lhs))
+          in
+          let* () =
+            if lhs_open then warn_open_source lts_enc name else return ()
+          in
+          let args = { args with lhs; act } in
+          let next_lts : Ind.LTS.constructor array =
+            Ind.get_lts_constructor_types c
+          in
+          let* next_constructors : Constructors.t =
+            check_valid_constructors next_lts indmap lhs act c.enc
+          in
+          match next_constructors with
+          | [] -> return None
+          | next_constructors ->
+            let* problems : Problems.t =
+              Constructors.to_problems args next_constructors
+            in
+            let acc = ListOfProblems.cross_product problems acc in
+            check_updated_ctx lts_enc acc indmap (substl, tl)
         in
-        let* next_constructors : Constructors.t =
-          check_valid_constructors next_lts indmap lhs act c.enc
+        let lhs_raw = (Rocq_utils.constructor_args raw_args).lhs in
+        let$+ lhs_open _ sigma =
+          Bool.not
+            (Evar.Set.is_empty
+               (Evd.evars_of_term sigma (Reductionops.nf_evar sigma lhs_raw)))
         in
-        (match next_constructors with
-         | [] -> return None
-         | next_constructors ->
-           let* problems : Problems.t =
-             Constructors.to_problems args next_constructors
-           in
-           let acc = ListOfProblems.cross_product problems acc in
-           check_updated_ctx lts_enc acc indmap (substl, tl))
+        let deferred : Problems.deferred list =
+          match acc with (p : Problems.t) :: _ -> p.deferred | [] -> []
+        in
+        (* Binders are walked last to first, so premises {e declared} before
+           this one -- the natural place for whatever determines its source,
+           [In q l -> lts q a q'] -- have not been reached yet: look ahead at
+           them too. They are decided again when the walk reaches them, which
+           is harmless (in each branch they are closed by then, and hold). *)
+        let$+ ahead env sigma =
+          let rec walk acc = function
+            | _ :: substl, t :: tl ->
+              let ty =
+                EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
+              in
+              let acc =
+                match EConstr.kind sigma ty with
+                | App (h, a)
+                  when Option.is_empty (F.find_opt indmap h)
+                       && Premise_search.is_prop env sigma ty ->
+                  (lts_enc, h, a) :: acc
+                | _ -> acc
+              in
+              walk acc (substl, tl)
+            | _ -> List.rev acc
+          in
+          walk [] (substl, tl)
+        in
+        let deferred = deferred @ ahead in
+        if Bool.not lhs_open || List.is_empty deferred
+        then explore ()
+        else
+          (* The premise's source is still open, and earlier premises may
+             fix it ([In q l -> lts q a q']): resolve those first and explore
+             it once per way they hold (backlog item I2, stage 2). Exploring
+             from an open source finds only some of its steps. *)
+          let$+ resolved env sigma = resolve_deferred env sigma deferred in
+          let states, undecided, partial = resolved in
+          let warn f (ds : Problems.deferred list) =
+            iterate
+              0
+              (List.length ds - 1)
+              ()
+              (fun i () ->
+                let lts_enc, name, args = List.nth ds i in
+                f lts_enc (name, args))
+          in
+          let* () = warn warn_if_skipped_premise undecided in
+          let* () = warn warn_partial_premise partial in
+          let* branches =
+            iterate
+              0
+              (List.length states - 1)
+              []
+              (fun k acc ->
+                let* r = sandbox ~sigma:(List.nth states k) (explore ()) in
+                return (r :: acc))
+          in
+          (match List.filter_map Fun.id branches with
+           | [] -> return None
+           | (enc, _) :: _ as found ->
+             return (Some (enc, List.concat_map snd found)))
 
     and check_unknown_app
           (lts_enc : Enc.t)

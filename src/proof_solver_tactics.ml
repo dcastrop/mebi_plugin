@@ -30,6 +30,11 @@ module type S = sig
   (** [exact_term p] closes the goal with proof term [p]. *)
   val exact_term : EConstr.t -> tactic mm
 
+  (** [invert_premise h]: [simpl in h; inversion h; clear h; subst], for a premise
+      hypothesis that mentions variables it determines (an output, such as a
+      target [m] in [succ_rel n m]; backlog I2, stage 2). *)
+  val invert_premise : Rocq_utils.hyp -> tactic mm
+
   (** [prove_negation ()] proves a goal [~ P] whose [P] is refutable. *)
   val prove_negation : unit -> tactic mm
 
@@ -180,6 +185,30 @@ module Make
     Premise_search.refute_hyp_tac (Context.Named.Declaration.get_id x)
     |> Tactic.create
          ~msg:(Printf.sprintf "(refute premise %s)" (Strfy.hyp_name x))
+    |> return
+  ;;
+
+  (* [inversion; clear; subst], not [inversion_clear]: the latter reverts
+     the hypotheses that depend on the premise's variables -- the transition
+     hypothesis [H : lts n a m] -- and reintroduces them with a fresh,
+     unconstrained [m], so [get_transition] never sees the computed target.
+     Checked by hand, 2026-10-02. *)
+  let invert_premise (x : Rocq_utils.hyp) : Tactic.t mm =
+    let id = Context.Named.Declaration.get_id x in
+    Proofview.tclTHEN
+      (Tactics.simpl_in_hyp (id, Locus.InHyp))
+      (Proofview.tclTHEN
+         (Inv.inv_tac id)
+         (Proofview.tclTHEN
+            (Tacticals.tclTRY (Tactics.clear [ id ]))
+            (Equality.subst_all ())))
+    |> Tactic.create
+         ~msg:
+           (Printf.sprintf
+              "simpl in %s; inversion %s; clear %s; subst"
+              (Strfy.hyp_name x)
+              (Strfy.hyp_name x)
+              (Strfy.hyp_name x))
     |> return
   ;;
 
@@ -677,6 +706,35 @@ module Make
       get_constructor_bindings args bindings
   ;;
 
+  (** Run right after a constructor is applied, while all the subgoals it
+      made are visible (a solver step only ever sees the first goal): move
+      the premises that are not LTS steps behind the LTS ones, keeping each
+      group's order. The derivation tree replays only LTS premises, in
+      order, so this leaves its replay unchanged; a premise that computes
+      what an LTS premise needs ([In q l -> lts q a q']) then arrives with
+      [q] already fixed by that premise's constructor (backlog I2, stage 2).
+      With no such premises (every existing example) it moves nothing. *)
+  let move_premises_last : unit Proofview.tactic =
+    let open Proofview.Notations in
+    Proofview.tclEVARMAP
+    >>= fun sigma ->
+    Proofview.Unsafe.tclGETGOALS
+    >>= fun gls ->
+    let is_lts (gl : Proofview_monad.goal_with_state) : bool =
+      let ev = Proofview.drop_state gl in
+      (not (Evd.is_undefined sigma ev))
+      ||
+      let concl = Evd.evar_concl (Evd.find_undefined sigma ev) in
+      let h, _ = EConstr.decompose_app sigma concl in
+      let lts_of (m : Model.FSM.t) : bool =
+        try Theory.is_fsm_constructor h m with _ -> false
+      in
+      lts_of (W.get_fsm_a ()) || lts_of (W.get_fsm_b ())
+    in
+    let lts, others = List.partition is_lts gls in
+    Proofview.Unsafe.tclSETGOALS (lts @ others)
+  ;;
+
   exception GoalNotAnLTSStep
 
   let apply_constructor ((enc, index) : Enc.Tree.Node.t) (args : binding_args)
@@ -693,6 +751,15 @@ module Make
         raise GoalNotAnLTSStep
     in
     Logger.thing ~__FUNCTION__ Debug "bindings" bindings Strfy.econstr_bindings;
-    Tactic.create ~msg (Tactics.one_constructor index bindings) |> return
+    (* [econstructor], not [constructor]: a binder that appears only in a
+       premise ([q] in [In q l -> lts q a q' -> sys l a q']) has no binding to
+       come from, and is left for unification to fill (backlog I2, stage 2).
+       When every binder is bound the two are the same. *)
+    Tactic.create
+      ~msg
+      (Proofview.tclTHEN
+         (Tactics.constructor_tac true None index bindings)
+         move_premises_last)
+    |> return
   ;;
 end

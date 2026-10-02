@@ -48,7 +48,8 @@ module type S = sig
       -> t' mm
 
     val make_opt
-      :  (EConstr.t * Names.Name.t) list
+      :  ?keep_var:bool
+      -> (EConstr.t * Names.Name.t) list
       -> EConstr.t * Constr.t
       -> t' option mm
   end
@@ -275,7 +276,14 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
       return m
     ;;
 
+    (** [~keep_var]: also keep a position that is just a variable. For the
+        source that binding is redundant (matching the goal fixes it), so it
+        is dropped; for the target it is not -- in a proof the step's target
+        is still open when the constructor is applied, and a premise that
+        mentions it ([succ_rel n m -> lts n a m]) would stay open (backlog
+        I2, stage 2). *)
     let make_opt
+          ?(keep_var : bool = false)
           (name_pairs : (EConstr.t * Names.Name.t) list)
           ((evar, rel) : EConstr.t * Constr.t)
       : t' option mm
@@ -285,7 +293,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
       let* m = extract_binding_map name_pairs evar rel in
       match to_seq_values m |> List.of_seq with
       | [] -> return None
-      | [ (_, Instructions.Done) ] -> return None
+      | [ (_, Instructions.Done) ] when Bool.not keep_var -> return None
       | _ :: _ -> return (Some m)
     ;;
   end
@@ -334,7 +342,9 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
     let f = ConstrMap.make_opt name_pairs in
     let* from : ConstrMap.t' option = f from in
     let* action : ConstrMap.t' option = f action in
-    let* goto : ConstrMap.t' option = f goto in
+    let* goto : ConstrMap.t' option =
+      ConstrMap.make_opt ~keep_var:true name_pairs goto
+    in
     if use_no_bindings [ from; action; goto ]
     then return No_Bindings
     else return (Use_Bindings { from; action; goto })

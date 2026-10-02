@@ -18,6 +18,7 @@ module type S = sig
       ; destination : state
       ; current : Nodes.t option
       ; remaining : annotation option
+      ; step_goto : state option
       }
 
     include Json.S with type k = t
@@ -103,6 +104,9 @@ module Make
       ; destination : W.Model.State.t
       ; current : Nodes.t option
       ; remaining : W.Model.Annotation.t option
+      ; step_goto : W.Model.State.t option
+        (** the current strong step's target, bound into its first
+            constructor's arguments (backlog I2, stage 2) *)
       }
 
     include Json.Thing.Make (struct
@@ -127,6 +131,7 @@ module Make
       : t
       =
       { current = None
+      ; step_goto = None
       ; destination = goto
       ; label
       ; remaining =

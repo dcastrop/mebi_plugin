@@ -270,11 +270,11 @@ module type S = sig
       val is_empty : t -> bool
       val unify_list_opt : Problem.t list -> tree list option mm
 
-      val sandbox_unify_all_opt
+      val sandbox_unify_all
         :  EConstr.t
         -> EConstr.t
         -> t
-        -> (EConstr.t * EConstr.t * tree list) option mm
+        -> (EConstr.t * EConstr.t * tree list) list mm
     end
 
     module ListOfProblems : sig

@@ -30,6 +30,11 @@ module type S = sig
   (** [exact_term p] closes the goal with proof term [p]. *)
   val exact_term : EConstr.t -> tactic mm
 
+  (** [invert_premise h]: [simpl in h; inversion h; clear h; subst], for a premise
+      hypothesis that mentions variables it determines (an output, such as a
+      target [m] in [succ_rel n m]; backlog I2, stage 2). *)
+  val invert_premise : Rocq_utils.hyp -> tactic mm
+
   (** [prove_negation ()] proves a goal [~ P] whose [P] is refutable. *)
   val prove_negation : unit -> tactic mm
 

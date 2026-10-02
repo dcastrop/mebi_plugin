@@ -207,6 +207,23 @@ module Make
         let* xs = iterate 0 (List.length to_iter - 1) [] f in
         List.flatten xs |> return
       in
+      (* A binder can be reachable from more than one of source, label and
+         target: bind it once. In a consistent proof every occurrence gives
+         it the same value, so which is kept does not matter. *)
+      let key (b : (Tactypes.quantified_hypothesis * EConstr.t) CAst.t) =
+        match fst b.CAst.v with
+        | Tactypes.NamedHyp id -> `Named (Names.Id.to_string id.CAst.v)
+        | Tactypes.AnonHyp i -> `Anon i
+      in
+      let bindings =
+        List.fold_left
+          (fun acc b ->
+            if List.exists (fun b' -> key b' = key b) acc
+            then acc
+            else acc @ [ b ])
+          []
+          bindings
+      in
       (match bindings with
        | [] -> return Tactypes.NoBindings
        | xs -> return (Tactypes.ExplicitBindings xs))

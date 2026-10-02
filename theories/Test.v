@@ -760,10 +760,14 @@ Module UndecidedPremise.
 End UndecidedPremise.
 
 (* Pinned sizes (backlog item E(b)). No command reports an LTS's size, but
-   the bounds do: with [FailIf Incomplete] (the default), [Bounds As Num
-   States n] succeeds iff the LTS has at most [n] states, so "succeeds at n,
-   fails at n - 1" pins the count exactly. Likewise transitions, and
-   [Bounds Saturation] pins the number of weak actions saturation produces.
+   the bounds can be used as assertions: "succeeds at n, fails at n - 1" pins
+   the least bound at which extraction completes, a regression pin.
+   [Bounds Saturation] pins the weak-action count exactly. The state and
+   transition bounds are checked {e before} each state is explored, so the
+   final LTS can exceed the least bound by the out-degree of the last state
+   explored (corrected 2026-10-02: [OutputPremises.via_c] completes at 2
+   transitions with 3). Below, the hand-counted [p1] figures coincide with
+   the true counts because its last-explored states are terminal.
 
    [procLTS] recurses on itself ([p_parl]/[p_parr]); [sysLTS] has a premise
    over a {e different} LTS, the layered shape of [Proc] and [CADP] -- the
@@ -1083,6 +1087,95 @@ Module GeneralPremises.
   MeBi Config Reset Weak.
   MeBi Config Reset Premise.
 End GeneralPremises.
+
+MeBi Divider "Theories.Test.OutputPremises".
+Module OutputPremises.
+  (* Premises that compute what the transition needs (backlog item I2,
+     stage 2; notes/9). An open premise is enumerated once the LTS premises
+     are unified -- every solution its own transition -- and one that fixes an
+     LTS premise's source is resolved before that premise is explored. In
+     proofs the step's target is bound into the constructor, and premise
+     goals are moved behind the LTS ones. Until 2026-10-02 each of these
+     LTSs had one state and no transitions (or, for [via], one of three). *)
+  From Stdlib Require Import List PeanoNat. Import ListNotations.
+  MeBi Config Reset Weak.
+  Inductive succ_rel : nat -> nat -> Prop := sr n : succ_rel n (S n).
+  Inductive two : nat -> nat -> Prop :=
+  | t1 n : two n (S n) | t2 n : two n (S (S n)).
+  Inductive base : nat -> option bool -> nat -> Prop :=
+  | b0 : base 0 (Some true) 1 | b1 : base 1 (Some true) 2.
+
+  (* target by an equation: 0..3, 3 transitions *)
+  Inductive eq_c : nat -> option bool -> nat -> Prop :=
+  | eq_go n m : n <= 2 -> m = S n -> eq_c n (Some true) m.
+  (* target by a relation: 0..3 *)
+  Inductive rel_c : nat -> option bool -> nat -> Prop :=
+  | rel_go n m : n <= 2 -> succ_rel n m -> rel_c n (Some true) m.
+  Inductive rel_c' : nat -> option bool -> nat -> Prop :=
+  | rel_go' n m : n <= 2 -> succ_rel n m -> rel_c' n (Some true) m.
+  (* two solutions, two transitions: 0..3, edges 0-1 0-2 1-2 1-3 *)
+  Inductive two_c : nat -> option bool -> nat -> Prop :=
+  | two_go n m : n <= 1 -> two n m -> two_c n (Some true) m.
+  Inductive two_c' : nat -> option bool -> nat -> Prop :=
+  | two_go' n m : n <= 1 -> two n m -> two_c' n (Some true) m.
+  (* target enumerated from a list: 0, 5, 7 *)
+  Inductive in_c : nat -> option bool -> nat -> Prop :=
+  | in_go q n : n <= 0 -> In q [n + 5; n + 7] -> in_c n (Some true) q.
+  (* [In] fixes the source of the [base] premise: 0, 1, 2 and 3 transitions
+     (0-1, 0-2, 1-2) *)
+  Inductive via_c : nat -> option bool -> nat -> Prop :=
+  | via q n a q' : In q [n; S n] -> base q a q' -> via_c n a q'.
+  Inductive via_c' : nat -> option bool -> nat -> Prop :=
+  | via' q n a q' : In q [n; S n] -> base q a q' -> via_c' n a q'.
+
+  MeBi Config Bounds As Num States 4.
+  MeBi Run LTS 0 Using eq_c.
+  MeBi Run LTS 0 Using rel_c.
+  MeBi Run LTS 0 Using two_c.
+  MeBi Config Bounds As Num States 3.
+  Fail MeBi Run LTS 0 Using eq_c.
+  Fail MeBi Run LTS 0 Using rel_c.
+  Fail MeBi Run LTS 0 Using two_c.
+  MeBi Run LTS 0 Using in_c.
+  MeBi Run LTS 0 Using via_c base.
+  MeBi Config Bounds As Num Transitions 3.
+  MeBi Run LTS 0 Using eq_c.
+  MeBi Config Bounds As Num Transitions 2.
+  Fail MeBi Run LTS 0 Using eq_c.
+  (* least transition bound 2 for 3 transitions: see the note on bounds in
+     [ExtractionSizes] *)
+  MeBi Run LTS 0 Using via_c base.
+  MeBi Config Bounds As Num Transitions 1.
+  Fail MeBi Run LTS 0 Using via_c base.
+  MeBi Config Bounds As Num Transitions 4.
+  MeBi Run LTS 0 Using two_c.
+  MeBi Config Bounds As Num Transitions 3.
+  Fail MeBi Run LTS 0 Using two_c.
+  MeBi Config Bounds As Num States 2.
+  Fail MeBi Run LTS 0 Using in_c.
+  Fail MeBi Run LTS 0 Using via_c base.
+  MeBi Config Reset Bounds.
+
+  MeBi Config Weak As Option bool.
+  Example w_rel : weak_sim rel_c rel_c' 0 0.
+  Proof. MeBi Sim Begin rel_c 0 And rel_c' 0 Using rel_c. MeBi Sim Solve 100. Qed.
+  Example w_two : weak_sim two_c two_c' 0 0.
+  Proof. MeBi Sim Begin two_c 0 And two_c' 0 Using two_c. MeBi Sim Solve 100. Qed.
+  Example w_via : weak_sim via_c via_c' 0 0.
+  Proof. MeBi Sim Begin via_c 0 And via_c' 0 Using base. MeBi Sim Solve 100. Qed.
+  MeBi Config Reset Weak.
+
+  (* KNOWN WRONG: nothing determines [q] before [base q a q'] is explored,
+     so it is explored from an unknown source and only some of its steps are
+     found (with a warning). The true LTS from 0 has 3 states (0, 1, 2); this
+     extraction fits in 2. When fixed, the second command below starts
+     failing (LTS_Incomplete): turn it into [Fail]. *)
+  Inductive open_c : nat -> option bool -> nat -> Prop :=
+  | open_go q n a q' : base q a q' -> n <= 5 -> open_c n a q'.
+  MeBi Config Bounds As Num States 2.
+  MeBi Run LTS 0 Using open_c base.
+  MeBi Config Reset Bounds.
+End OutputPremises.
 
 (* [MeBi Help]: every topic parses and prints (backlog item F). *)
 MeBi Divider "Theories.Test.Help".

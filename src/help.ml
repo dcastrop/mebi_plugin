@@ -88,6 +88,10 @@ let text : string list -> string option = function
           most %i deep (MeBi Config Premise Depth <n>). A false premise drops \
           the transition; in a proof, a true one is closed with the proof \
           found, and a false one in a hypothesis is refuted;\n\
+         \  - a premise that computes something -- the target, or what an LTS \
+          premise needs ([In q l -> lts q a q']) -- is enumerated, each \
+          solution a transition of its own; MeBi warns if the solutions may be \
+          incomplete, or if an LTS premise has a source nothing determines;\n\
          \  - a negation [~ P] holds iff P is refuted by a complete search, \
           and is proved by refuting P;\n\
          \  - with [MeBi Config Premise Tactic <tactic>], a premise the search \

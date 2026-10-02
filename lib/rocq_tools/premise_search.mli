@@ -41,3 +41,13 @@ val refute_hyp_tac : ?depth:int -> Names.Id.t -> unit Proofview.tactic
 
 (** Prove a goal [~ P] whose [P] [prove] refutes. *)
 val negation_tac : unit Proofview.tactic
+
+(** [enumerate env sigma goal]: for a premise that may mention open
+    variables (a target still to be computed, say), every way to make it
+    hold -- each an evar map instantiating them -- and whether those are all
+    of them. Closed premises: one map if it holds, none if refuted. *)
+val enumerate
+  :  Environ.env
+  -> Evd.evar_map
+  -> EConstr.t
+  -> Evd.evar_map list * bool

@@ -257,8 +257,15 @@ struct
     ;;
 
     (** Grade of a premise hypothesis that is closed and provably false:
-        above any LTS step's (at most 3). *)
-    let refutable_grade : int = 4
+        above any LTS step's (at most 3) and an open premise's. *)
+    let refutable_grade : int = 5
+
+    (** Grade of a premise hypothesis that mentions variables it determines
+        (an output, e.g. the target in [succ_rel n m]): inverting it fixes
+        them. Above any LTS step's: the LTS hypothesis it came from has
+        already been inverted, and re-inverting that (kept) hypothesis is
+        the Step 0 loop. *)
+    let open_premise_grade : int = 4
 
     (** A premise hypothesis (not an LTS step): the top grade if it is
         closed and provably false -- refuting it closes the goal outright,
@@ -269,11 +276,35 @@ struct
       let open Syntax in
       let* env = get_env in
       let* sigma = get_sigma in
-      match
-        Premise_search.prove env sigma (Context.Named.Declaration.get_type x)
-      with
+      let ty = Context.Named.Declaration.get_type x in
+      match Premise_search.prove env sigma ty with
       | Premise_search.Refuted -> return refutable_grade
-      | Premise_search.Proved _ | Premise_search.Unknown -> return 0
+      | Premise_search.Proved _ -> return 0
+      | Premise_search.Unknown ->
+        (* still mentions local variables, and inversion applies: an output
+           to compute (equations are left to [subst]) *)
+        let mentions_vars =
+          Bool.not
+            (Names.Id.Set.is_empty (Termops.global_vars_set env sigma ty))
+        in
+        let inductive_non_eq =
+          match
+            EConstr.kind
+              sigma
+              (fst
+                 (EConstr.decompose_app
+                    sigma
+                    (Reductionops.whd_all env sigma ty)))
+          with
+          | Ind (ind, _) -> Bool.not (Rocqlib.check_ind_ref "core.eq.type" ind)
+          | _ -> false
+        in
+        if
+          Premise_search.is_prop env sigma ty
+          && mentions_vars
+          && inductive_non_eq
+        then return open_premise_grade
+        else return 0
     ;;
 
     (** [invertibility x] returns an integer denoting whether [x] need be inverted, with the higher numbers being of more importance to invert and [0] denoting [x] does not need to be inverted.
@@ -669,6 +700,9 @@ struct
       | Some (grade, x) when Int.equal grade Hyp.refutable_grade ->
         let* y = Tacs.refute_premise x in
         return (Some y)
+      | Some (grade, x) when Int.equal grade Hyp.open_premise_grade ->
+        let* y = Tacs.invert_premise x in
+        return (Some y)
       | Some (grade, x) ->
         let* y = Hyp.invert x in
         return (Some y)
@@ -976,7 +1010,11 @@ struct
 
   (** [handle_appconstrs_apply x] ...
       (* NOTE: relies on the bindings we extract early on *) *)
-  let handle_appconstrs_apply (x : Enc.Tree.Node.t) : Tactic.t mm =
+  let handle_appconstrs_apply
+        ?(goto : Model.State.t option = None)
+        (x : Enc.Tree.Node.t)
+    : Tactic.t mm
+    =
     Logger.trace __FUNCTION__;
     let open Syntax in
     let* _, tys = get_concl () |> to_atomic in
@@ -987,7 +1025,11 @@ struct
       if is_tau
       then (* NOTE: index (3) since [tau lts x] => [tau (term * label) x] *)
         { from = tys.(3); goto = None; label = Some (Mebi_theories.get "None") }
-      else { from = tys.(0); goto = None; label = None }
+      else
+        (* The step's target, when known, is bound too: a constructor whose
+           target is computed by a premise ([succ_rel n m -> st n a m])
+           leaves that premise open otherwise, and nothing later fixes it. *)
+        { from = tys.(0); goto = Option.map Decode.state goto; label = None }
     in
     try Tacs.apply_constructor x args with
     | Tacs.GoalNotAnLTSStep ->
@@ -1143,7 +1185,8 @@ struct
          term for it here (backlog I2, stage 1). *)
       let* env = get_env in
       let* sigma = get_sigma in
-      match Premise_search.prove env sigma (get_concl ()) with
+      let concl = get_concl () in
+      match Premise_search.prove env sigma concl with
       | Premise_search.Proved (Premise_search.Term p) -> Tacs.exact_term p
       | Premise_search.Proved (Premise_search.ByRefutation _) ->
         Tacs.prove_negation ()
@@ -1180,13 +1223,19 @@ struct
            (* NOTE: update current, prepare for next transition *)
            let current, remaining = handle_appconstrs_update_args anno in
            ProofState.update_statem
-             (ApplyConstructors { args with current; remaining });
+             (ApplyConstructors
+                { args with
+                  current
+                ; remaining
+                ; step_goto = Some anno.this.goto
+                });
            handle_appconstrs_update anno.this.label)
-      | { current = Some (h :: tl); _ } ->
-        (* NOTE: continue applying constructors *)
+      | { current = Some (h :: tl); step_goto; _ } ->
+        (* NOTE: continue applying constructors; only the step's first (top
+           level) constructor gets its target bound *)
         ProofState.update_statem
-          (ApplyConstructors { args with current = Some tl });
-        handle_appconstrs_apply h)
+          (ApplyConstructors { args with current = Some tl; step_goto = None });
+        handle_appconstrs_apply ~goto:step_goto h)
   ;;
 
   let handle_state () : Tactic.t mm =

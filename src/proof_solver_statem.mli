@@ -18,6 +18,7 @@ module type S = sig
       ; destination : state
       ; current : Nodes.t option
       ; remaining : annotation option
+      ; step_goto : state option
       }
 
     include Json.S with type k = t (** @closed *)

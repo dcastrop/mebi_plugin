@@ -3809,6 +3809,89 @@ during the build) is now gitignored.
 **Session tally (2026-10-02):** New feature 2 · Bug fix 2 · Refactor 1 ·
 Optimization 0 · Tooling 0 · Docs 0.
 
+## 2026-10-02 — I2 stage 2: premises that compute what the transition needs
+
+Branch `main` (on `fork`). **New feature** (note 9, stage 2; the user said
+continue). Plus a **Docs** correction to a claim of mine from 2026-10-01.
+
+**Before, measured on five cases.** A constructor whose target is computed
+by a premise (`m = S n`, `succ_rel n m`, a two-solution relation, `In q [..]`)
+extracted **one state and no transitions** from 0. The premise was still
+open when decided, so it was undecided and kept, but the target was never
+computed, and an evar target drops the transition. So this was a silent
+under-approximation; the only sign was the warning. `In q [n; S n] -> base q
+a q' -> sys n a q'`, where `In` fixes the source of the LTS premise `base`,
+found 1 of 3 transitions with **no warning**: exploring an LTS from an unknown
+source finds only some of its steps. That problem predates this work.
+
+**Extraction.**
+
+- `Premise_search` enumerates (`search ~all`, `enumerate`). Every solution
+  is an evar map instantiating the open variables. Open equations are
+  solved by unification. Indices may be open patterns, and parameters may
+  contain evars: first-order unification against them is complete. There is
+  a solution cap of 64. A sub-premise with open variables is always fully
+  enumerated, even when only one proof is wanted, because which solution is
+  taken can decide whether a later premise holds. Stopping at the first could
+  turn a solvable goal into a "refutation".
+- `resolve_deferred` takes the deferred premises left to right over a list
+  of evar maps: drop on refutation, multiply on solutions, keep and warn when
+  undecided. It is used where the LTS premises are unified
+  (`sandbox_unify_all`, which now returns a list) and on the axiom path.
+  Each final map is a transition.
+- An LTS premise whose source is still open first resolves the premises
+  that could fix it, then is explored once per solution, each in a sandbox.
+  Constructor binders are walked **last to first** (found by testing: the
+  generator had to be declared *after* the LTS premise to work), so it also
+  looks ahead at the premises declared before it. Changing the walk order
+  instead would have reversed the derivation-tree order that A6 depends on.
+- New warnings: possibly-incomplete solutions, and an LTS premise explored
+  from a source nothing determines (the remaining under-approximation, now
+  loud).
+
+**Proof solver.**
+
+1. A premise hypothesis that still mentions variables it determines is
+   inverted with `inversion; clear; subst`, not `inversion_clear`. Checked
+   by hand: `inversion_clear` reverts the transition hypothesis that
+   depends on the premise's variable and reintroduces it with a fresh,
+   unconstrained one, so the computed target never reached `get_transition`
+   and the solver re-inverted forever.
+2. Each step's known target (`this.goto` of the annotation) is bound into
+   its first constructor's arguments. `Bindings` used to drop a
+   bare-variable target position, since unification usually supplies it, but
+   in a proof the target is still open. Target bindings were never used
+   before, so keeping them changes only the new path. `Constructor_bindings`
+   now de-duplicates by name: the first attempt broke `Test.v`'s
+   `TwoPremises` with "q occurs more than once".
+3. `constructor` became `econstructor`, so a binder only a premise
+   mentions (`q`) is left to unification.
+4. After a constructor is applied, its non-LTS premise goals are moved
+   behind the LTS ones (`move_premises_last`). My first attempt rotated the
+   goal from inside a later step, but each step runs focused on the first
+   goal, so `cycle` could never see the sibling. The rotation path was
+   removed.
+
+**Verification.** Proof suite identical to the per-mode baselines under
+`Auto`, forced `True` and forced `False`. So `econstructor`, the target
+bindings and the dedup change no existing proof. satdiff identical,
+`tests.exe` 61/61, `make` builds. `theories/Test.v` gains
+`OutputPremises`: size pins for the five shapes (states hand-counted),
+proofs for the relation, two-solution and `In`-feeds-LTS cases, and a
+known-wrong pin for an LTS premise whose source nothing determines. Every
+`Fail` was checked for its reason.
+
+**A correction to my own claim.** On 2026-10-01 I wrote, in
+`ExtractionSizes`' comment and this log, that "succeeds at n, fails at n−1"
+pins the state and transition counts *exactly*. It pins the least bound at
+which extraction completes. The bound is checked before each state is
+explored, so the LTS can exceed it by the last state's out-degree:
+`via_c` completes at 2 transitions with 3. The `p1` hand counts matched only
+because its last-explored states are terminal. The comment is corrected.
+
+**Session tally (2026-10-02):** New feature 3 · Bug fix 2 · Refactor 1 ·
+Docs 1 · Optimization 0 · Tooling 0.
+
 ---
 
 ## Outstanding
