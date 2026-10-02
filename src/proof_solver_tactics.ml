@@ -55,6 +55,9 @@ module type S = sig
   val apply_rt1n_refl : unit -> tactic mm
   val apply_rt1n_trans : unit -> tactic mm
   val apply_weak_sim_refl : unit -> tactic mm
+  val apply_Pack_bisim : unit -> tactic mm
+  val apply_In_bisim : unit -> tactic mm
+  val apply_weak_bisimilar_refl : unit -> tactic mm
   val eapply : Evd.econstr -> tactic mm
   val eapply_wk_some : unit -> tactic mm
   val eapply_rt1n_refl : unit -> tactic mm
@@ -391,6 +394,13 @@ module Make
 
   let apply_weak_sim_refl () : Tactic.t mm =
     apply (Mebi_theories.get "weak_sim_refl")
+  ;;
+
+  let apply_Pack_bisim () : Tactic.t mm = apply (Mebi_theories.get "Pack_bisim")
+  let apply_In_bisim () : Tactic.t mm = apply (Mebi_theories.get "In_bisim")
+
+  let apply_weak_bisimilar_refl () : Tactic.t mm =
+    apply (Mebi_theories.get "weak_bisimilar_refl")
   ;;
 
   (* let apply_wk_bisim_refl () : Tactic.t mm = apply (Mebi_theories.c_wk_bisim_refl ()) *)

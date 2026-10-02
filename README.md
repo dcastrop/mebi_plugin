@@ -166,7 +166,11 @@ Times repeated LTS construction over a range of sizes using the `benchmark` pack
 
 ### Interactive proof search (`MeBi Sim`)
 
-Inside a proof whose goal is bisimilarity-shaped (e.g. `weak_sim r1 r2 t1 t2`), `MeBi Sim` drives a tactic-based proof-search state machine instead of writing the proof by hand:
+Inside a proof whose goal is bisimilarity-shaped, `MeBi Sim` drives a tactic-based proof-search state machine instead of writing the proof by hand. Two goal shapes are supported:
+
+- `weak_sim r1 r2 t1 t2`: weak *simulation*, one direction.
+- `weak_bisimilar r1 r2 t1 t2`: weak *bisimilarity* (one relation that is a simulation both ways), proved in one go. `weak_bisim` (two separate `weak_sim`s, i.e. mutual similarity) is weaker; see the comment in `theories/Bisimilarity.v`. A `weak_bisimilar` proof needs the mutual cofix, which the default `Auto` strategy chooses for it; the `examples/Bisimilarity/**/BisimProofs.v` files are worked examples.
+
 
 ```coq
 Example wsim_pq : weak_sim termLTS termLTS p q.

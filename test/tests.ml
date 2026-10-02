@@ -261,6 +261,31 @@ let test_product_respond_silently () : unit =
      | exception M.Product.NoBisimilarResponse _ -> true)
 ;;
 
+(** The bisimulation game adds the right-hand system's obligations. [0 -a-> 1] against [10 -a-> 11] and [10 -a-> 12]: the simulation game answers
+    [0]'s move once, landing on [(1, 11)]; the bisimulation game must also
+    answer both of [10]'s moves from [0], which adds [(1, 12)]. *)
+let test_product_bisim () : unit =
+  print_endline "product: bisimulation game";
+  let a' = fsm 0 [ transition 0 a 1 ] in
+  let b' = fsm 10 [ transition 10 a 11; transition 10 a 12 ] in
+  let pi = (M.Bisimilarity.fsm a' b').result.bisim_states in
+  let g : M.Product.game =
+    { a = a'; a_saturated = a'; b = b'; b_saturated = b' }
+  in
+  let root = state 0, state 10 in
+  check_int
+    "simulation: two pairs"
+    2
+    (M.Product.Pair.Set.cardinal
+       (M.Product.reachable ~refl:false a' b' pi root));
+  let pairs = M.Product.reachable_bisim ~refl:false g pi root in
+  check_int "bisimulation: three pairs" 3 (M.Product.Pair.Set.cardinal pairs);
+  check
+    "including the right-hand system's second move"
+    true
+    (M.Product.Pair.Set.mem (state 1, state 12) pairs)
+;;
+
 (** Converting an LTS to an FSM must preserve the state set. *)
 let test_of_lts_preserves_states () : unit =
   print_endline "FSM.of_lts";
@@ -836,6 +861,7 @@ let () =
   test_product_refl_leaf ();
   test_product_respond ();
   test_product_respond_silently ();
+  test_product_bisim ();
   test_product_estimate ();
   test_saturation_estimate ();
   test_tree_order ();

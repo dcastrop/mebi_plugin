@@ -5,6 +5,7 @@ module type S = sig
   val is_any_theory : Evd.econstr -> bool
   val is_exists : Evd.econstr -> bool im
   val is_weak_sim : Evd.econstr -> bool im
+  val is_weak_bisimilar : Evd.econstr -> bool im
   val is_weak : Evd.econstr -> bool im
   val is_tau : Evd.econstr -> bool im
   val is_silent : Evd.econstr -> bool im
@@ -53,6 +54,11 @@ module Make
 
   (** weak simulation*)
   let is_weak_sim (x : EConstr.t) : bool mm = is_theory x (Th.get "weak_sim")
+
+  (** weak bisimilarity, as one coinductive relation *)
+  let is_weak_bisimilar (x : EConstr.t) : bool mm =
+    is_theory x (Th.get "weak_bisimilar")
+  ;;
 
   (** weak transition *)
   let is_weak (x : EConstr.t) : bool mm = is_theory x (Th.get "weak")

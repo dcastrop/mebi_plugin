@@ -15,7 +15,18 @@ module type S = sig
   exception NoResultFound
 
   val get_the_result : unit -> Model.Bisimilarity.t
+
+  (** Whether the two systems' roles are swapped for the goal in focus: [true]
+      while answering the right-hand obligation ([bisim_r]) of a
+      [weak_bisimilar] goal. {!get_fsm_a} and {!get_fsm_b} follow it. *)
+  val swapped : bool ref
+
+  (** FSM "a": the system whose move is being answered -- the left one,
+      unless {!swapped}. *)
   val get_fsm_a : ?saturated:bool -> unit -> Model.FSM.t
+
+  (** FSM "b": the system that answers -- the right one, unless
+      {!swapped}. *)
   val get_fsm_b : ?saturated:bool -> unit -> Model.FSM.t
 
   exception CannotOverrideResult of Model.Bisimilarity.t

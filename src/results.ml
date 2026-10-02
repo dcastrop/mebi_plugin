@@ -15,7 +15,19 @@ module type S = sig
   exception NoResultFound
 
   val get_the_result : unit -> Model.Bisimilarity.t
+
+  (** Whether the two systems' roles are swapped for the goal in focus: [true]
+      while answering the right-hand obligation ([bisim_r]) of a
+      [weak_bisimilar] goal, where the {e right} system moves and the left
+      answers. {!get_fsm_a} and {!get_fsm_b} follow it. *)
+  val swapped : bool ref
+
+  (** FSM "a": the system whose move is being answered -- the left one,
+      unless {!swapped}. *)
   val get_fsm_a : ?saturated:bool -> unit -> Model.FSM.t
+
+  (** FSM "b": the system that answers -- the right one, unless
+      {!swapped}. *)
   val get_fsm_b : ?saturated:bool -> unit -> Model.FSM.t
 
   exception CannotOverrideResult of Model.Bisimilarity.t
@@ -60,16 +72,23 @@ module Make (Enc : Encoding.S) :
     match !the_result with None -> raise NoResultFound | Some x -> !x
   ;;
 
+  let swapped : bool ref = ref false
+
+  (* The right-hand obligation of a [weak_bisimilar] goal is the left-hand one
+     with the two systems exchanged, so the solver answers it by reading the
+     FSMs the other way round rather than with a mirrored copy of itself. *)
+  let pick (x : Model.Bisimilarity.FSMPair.t) (saturated : bool) : Model.FSM.t =
+    if saturated then x.saturated else x.original
+  ;;
+
   let get_fsm_a ?(saturated : bool = false) () : Model.FSM.t =
-    if saturated
-    then (get_the_result ()).fsm_a.saturated
-    else (get_the_result ()).fsm_a.original
+    let r = get_the_result () in
+    pick (if !swapped then r.fsm_b else r.fsm_a) saturated
   ;;
 
   let get_fsm_b ?(saturated : bool = false) () : Model.FSM.t =
-    if saturated
-    then (get_the_result ()).fsm_b.saturated
-    else (get_the_result ()).fsm_b.original
+    let r = get_the_result () in
+    pick (if !swapped then r.fsm_a else r.fsm_b) saturated
   ;;
 
   exception CannotOverrideResult of Model.Bisimilarity.t

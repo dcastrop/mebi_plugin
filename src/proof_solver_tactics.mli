@@ -63,6 +63,9 @@ module type S = sig
   val apply_rt1n_refl : unit -> tactic mm
   val apply_rt1n_trans : unit -> tactic mm
   val apply_weak_sim_refl : unit -> tactic mm
+  val apply_Pack_bisim : unit -> tactic mm
+  val apply_In_bisim : unit -> tactic mm
+  val apply_weak_bisimilar_refl : unit -> tactic mm
   val eapply : Evd.econstr -> tactic mm
   val eapply_wk_some : unit -> tactic mm
   val eapply_rt1n_refl : unit -> tactic mm

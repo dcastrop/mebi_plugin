@@ -464,6 +464,19 @@ struct
     ;;
 
     let is_weak_sim () : bool mm = get_concl () |> Theory.is_weak_sim
+
+    let is_weak_bisimilar () : bool mm =
+      get_concl () |> Theory.is_weak_bisimilar
+    ;;
+
+    (** [is_weak_goal ()] if the conclusion is one of the coinductive goals the
+        solver proves: [weak_sim], or [weak_bisimilar]. *)
+    let is_weak_goal () : bool mm =
+      let open Syntax in
+      let* sim = is_weak_sim () in
+      if sim then return true else is_weak_bisimilar ()
+    ;;
+
     let is_exists () : bool mm = get_concl () |> Theory.is_exists
     let is_tau () : bool mm = get_concl () |> Theory.is_tau
 
@@ -551,10 +564,13 @@ struct
       ; b : Model.State.t
       }
 
+    (* [a'] is where the moving system went: the left argument of the
+       relation, or the right one when the roles are swapped ([bisim_r]). *)
     let get_a'_from_wk_sim (wk_sim : EConstr.t) : Model.State.t mm =
       let open Syntax in
       let* _, tys = to_atomic wk_sim in
-      (W.get_fsm_a ()).states |> ReModel.state tys.(5) |> M.run |> return
+      let i : int = if !W.swapped then 6 else 5 in
+      (W.get_fsm_a ()).states |> ReModel.state tys.(i) |> M.run |> return
     ;;
 
     let get_b_from_wk_trans (wk_trans : EConstr.t) : Model.State.t mm =
@@ -580,10 +596,43 @@ struct
     let get_conj ({ wk_trans; wk_sim } : wk_conj) : conj mm =
       Logger.trace __FUNCTION__;
       let open Syntax in
-      let* () = Theory.ensure wk_sim Theory.is_weak_sim in
+      let* bisim : bool = Theory.is_weak_bisimilar wk_sim in
+      let* () =
+        if bisim then return () else Theory.ensure wk_sim Theory.is_weak_sim
+      in
       let* a' = get_a'_from_wk_sim wk_sim in
       let* b = get_b_from_wk_trans wk_trans in
       return { a'; b }
+    ;;
+
+    (** [orientation ()] reads from the goal whether the two systems' roles
+        are swapped ([Some true]), not swapped ([Some false]), or whether the
+        goal does not say ([None], e.g. mid-way through applying constructors,
+        where the last answer stands).
+
+        After [Pack_bisim] and [intros], [bisim_l]'s goal is
+        [exists n2, weak ltsN n1 n2 a /\ weak_bisimilar m2 n2] and
+        [bisim_r]'s is [exists m2, weak ltsM m1 m2 a /\ weak_bisimilar m2 n2]:
+        the witness sits on the left of the relation exactly when the
+        {e right} system moved. *)
+    let orientation () : bool option mm =
+      let open Syntax in
+      let* goal = is_weak_goal () in
+      if goal
+      then return (Some false)
+      else
+        let* ex = is_exists () in
+        if Bool.not ex
+        then return None
+        else
+          let* { wk_sim; _ } = get_wk_conj () in
+          let* bisim = Theory.is_weak_bisimilar wk_sim in
+          if Bool.not bisim
+          then return (Some false)
+          else
+            let* sigma = get_sigma in
+            let* _, tys = to_atomic wk_sim in
+            return (Some (EConstr.isRelN sigma 1 tys.(5)))
     ;;
   end
 
@@ -751,6 +800,23 @@ struct
     ;;
   end
 
+  (** The constructor and record of the coinductive goal in focus:
+      [In_sim]/[Pack_sim] for [weak_sim], [In_bisim]/[Pack_bisim] for
+      [weak_bisimilar]. *)
+  let constructors_of_goal () : (Tactic.t * Tactic.t) mm =
+    let open Syntax in
+    let* bisim = Concl.is_weak_bisimilar () in
+    if bisim
+    then
+      let* i = Tacs.apply_In_bisim () in
+      let* p = Tacs.apply_Pack_bisim () in
+      return (i, p)
+    else
+      let* i = Tacs.apply_In_sim () in
+      let* p = Tacs.apply_Pack_sim () in
+      return (i, p)
+  ;;
+
   (** [handle_open_block ()] opens the whole proof with a single mutual
       cofixpoint, one definition per pair of the precomputed product relation
       ([Model.Product.reachable]).
@@ -793,8 +859,20 @@ struct
       (* Same test as [Concl.is_weak_refl]: a pair of equal states only closes
          by [weak_sim_refl] when both sides use the same LTS. *)
       let refl : bool = econstr_eq tys.(3) tys.(4) |> run in
+      let* bisim : bool = Concl.is_weak_bisimilar () in
       let pairs : Model.Product.Pair.Set.t =
-        Model.Product.reachable ~silent ~refl fsm_a fsm_b pi root
+        if bisim
+        then
+          Model.Product.reachable_bisim
+            ~refl
+            { a = fsm_a
+            ; a_saturated = W.get_fsm_a ~saturated:true ()
+            ; b = W.get_fsm_b ()
+            ; b_saturated = fsm_b
+            }
+            pi
+            root
+        else Model.Product.reachable ~silent ~refl fsm_a fsm_b pi root
       in
       (* A reflexive leaf gets no cofixpoint of its own. Its goal would be put
          through [In_sim; Pack_sim; intros] with the rest of the block, past
@@ -836,8 +914,7 @@ struct
       Logger.notice
         (Printf.sprintf "(Mutual cofix over %i pairs.)" (1 + List.length block));
       let* cofix : Tactic.t = Tacs.mutual_cofix root_name block in
-      let* apply_In_sim : Tactic.t = Tacs.apply_In_sim () in
-      let* apply_Pack_sim : Tactic.t = Tacs.apply_Pack_sim () in
+      let* apply_In_sim, apply_Pack_sim = constructors_of_goal () in
       let* intros_all : Tactic.t = Tacs.intros_all () in
       (* One tactic, not two. Straight after [mutual_cofix] every goal in the
          block is syntactically identical to its own hypothesis, so a
@@ -861,11 +938,11 @@ struct
     let open Syntax in
     let* cofix : Tactic.t = Tacs.cofix () in
     let clear : Tactic.t = Hyps.clear_non_cofix () in
-    let* apply_In_sim : Tactic.t = Tacs.apply_In_sim () in
-    let* apply_Pack_sim : Tactic.t = Tacs.apply_Pack_sim () in
+    let* apply_In, apply_Pack = constructors_of_goal () in
     let* intros_all : Tactic.t = Tacs.intros_all () in
-    Tactic.chain [ cofix; clear; apply_In_sim; apply_Pack_sim; intros_all ]
-    |> return
+    (* [intros] runs on every goal [Pack] leaves: one for [weak_sim], two
+       ([bisim_l], [bisim_r]) for [weak_bisimilar]. *)
+    Tactic.chain [ cofix; clear; apply_In; apply_Pack; intros_all ] |> return
   ;;
 
   exception CouldNotFindGotoState
@@ -1078,7 +1155,7 @@ struct
   let handle_weaksim () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
-    let* is_weak_sim : bool = Concl.is_weak_sim () in
+    let* is_weak_sim : bool = Concl.is_weak_goal () in
     if is_weak_sim
     then (
       Logger.trace ~__FUNCTION__ "is weak sim";
@@ -1087,7 +1164,10 @@ struct
       if is_weak_refl
       then (
         Logger.trace ~__FUNCTION__ "is weak refl";
-        Tacs.apply_weak_sim_refl ())
+        let* bisim = Concl.is_weak_bisimilar () in
+        if bisim
+        then Tacs.apply_weak_bisimilar_refl ()
+        else Tacs.apply_weak_sim_refl ())
       else
         (* Normalise the conclusion BEFORE consulting the coinduction
            hypotheses. The unfolding used to live inside [handle_new_cofix],
@@ -1246,6 +1326,12 @@ struct
     ProofState.log ~__FUNCTION__ ();
     Hyps.log ~cofix_only:(Some false) ();
     log_concl ();
+    (* Which system moves in the goal in focus (see [Concl.orientation]). A
+       goal that does not say -- an LTS step or a premise, part-way through
+       an answer -- keeps the last orientation set. *)
+    (match try run (Concl.orientation ()) with _ -> None with
+     | Some s -> W.swapped := s
+     | None -> ());
     match ProofState.get_statem () with
     | NewProof ab -> handle_new_proof ab
     | OpenBlock -> handle_open_block ()

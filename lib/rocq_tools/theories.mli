@@ -5,6 +5,7 @@ module type S = sig
   val is_any_theory : Evd.econstr -> bool
   val is_exists : Evd.econstr -> bool im
   val is_weak_sim : Evd.econstr -> bool im
+  val is_weak_bisimilar : Evd.econstr -> bool im
   val is_weak : Evd.econstr -> bool im
   val is_tau : Evd.econstr -> bool im
   val is_silent : Evd.econstr -> bool im

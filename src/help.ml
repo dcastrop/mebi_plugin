@@ -25,7 +25,8 @@ let overview () : string =
   String.concat
     "\n"
     ([ "MeBi: build the LTS of a Rocq term from an inductive relation, check \
-        (weak) bisimilarity, and search for weak_sim proofs."
+        (weak) bisimilarity, and search for weak_sim and weak_bisimilar \
+        proofs."
      ; ""
      ; "Help topics:"
      ]
@@ -65,10 +66,13 @@ let text : string list -> string option = function
     Some
       "MeBi Sim Begin <lts> <term> And <lts> <term> Using <lts>...\n\
        MeBi Sim Step.  MeBi Sim Solve <n>.\n\n\
-       Inside a proof of [weak_sim lts1 lts2 t1 t2]: Begin computes both LTSs \
-       and their bisimilarity, then Step/Solve run the proof search. Solve n \
-       permits n + 1 steps and stops as soon as the proof closes. If it runs \
-       out it says which cofix strategy was used; see MeBi Help Config Solver."
+       Inside a proof of [weak_sim lts1 lts2 t1 t2] (one direction) or \
+       [weak_bisimilar lts1 lts2 t1 t2] (weak bisimilarity, both directions in \
+       one proof): Begin computes both LTSs and their bisimilarity, then \
+       Step/Solve run the proof search. Solve n permits n + 1 steps and stops \
+       as soon as the proof closes. If it runs out it says which cofix \
+       strategy was used; see MeBi Help Config Solver. A weak_bisimilar proof \
+       needs the mutual cofix, which Auto picks for it."
   | [ "Benchmark" ] ->
     Some
       "MeBi Benchmark LTS <min> <max> <term> Using <lts> [<lts>...].\n\n\
