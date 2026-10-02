@@ -472,7 +472,7 @@ module Make (Enc : Encoding.S) :
         if Bool.not (Model.Bisimilarity.Result.are_bisimilar x)
         then (
           result_log (module Model.Bisimilarity.Result) (module Decode.Result)
-          |> handle_results Result "LTS Incomplete" x;
+          |> handle_results Result "Not Bisimilar" x;
           M.Err.not_bisimilar ())
     ;;
 

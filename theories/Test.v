@@ -1369,3 +1369,40 @@ Module WeakBisimilarProofs.
   Proof. Fail MeBi Sim Begin step P And step Q Using step. Abort.
   MeBi Config Reset Weak.
 End WeakBisimilarProofs.
+
+(* [weak_sim] asks for similarity, not bisimilarity: [MeBi Sim Begin] accepts
+   states that are similar but not bisimilar, and the search falls back on the
+   weak simulation preorder for answers (it used to refuse, Not_Bisimilar). *)
+MeBi Divider "Theories.Test.SimilarNotBisimilar".
+Module SimilarNotBisimilar.
+  Inductive st : Set := p | p1 | q | q1 | z | m | m1 | r.
+  Inductive lab : Set := a | b | c.
+  Inductive step : st -> option lab -> st -> Prop :=
+  | p_a : step p (Some a) p1 | p1_b : step p1 (Some b) z
+  | q_a : step q (Some a) q1 | q1_b : step q1 (Some b) z
+  | q1_c : step q1 (Some c) z
+  | m_tau : step m None m1 | m_b : step m (Some b) z | m1_a : step m1 (Some a) z
+  | r_a : step r (Some a) z | r_b : step r (Some b) z.
+  MeBi Config Weak As Option lab.
+
+  (* [a.b <= a.(b + c)]: after [a], [b] is simulated by [b + c]. *)
+  Example sim_p_q : weak_sim step step p q.
+  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 100. Qed.
+
+  (* The converse is false, and [Begin] says so before searching. *)
+  Example sim_q_p : weak_sim step step q p.
+  Proof. Fail MeBi Sim Begin step q And step p Using step. Abort.
+
+  (* Milner's [tau.a + b] and [a + b]: mutually similar, not bisimilar. Each
+     direction proves, [mutual_sim] is their conjunction, and
+     [weak_bisimilar] is refused. *)
+  Example sim_m_r : weak_sim step step m r.
+  Proof. MeBi Sim Begin step m And step r Using step. MeBi Sim Solve 100. Qed.
+  Example sim_r_m : weak_sim step step r m.
+  Proof. MeBi Sim Begin step r And step m Using step. MeBi Sim Solve 100. Qed.
+  Example msim_m_r : mutual_sim step step m r.
+  Proof. split; [exact sim_m_r | exact sim_r_m]. Qed.
+  Example bis_m_r : weak_bisimilar step step m r.
+  Proof. Fail MeBi Sim Begin step m And step r Using step. Abort.
+  MeBi Config Reset Weak.
+End SimilarNotBisimilar.

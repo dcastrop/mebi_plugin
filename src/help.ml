@@ -72,7 +72,10 @@ let text : string list -> string option = function
        Step/Solve run the proof search. Solve n permits n + 1 steps and stops \
        as soon as the proof closes. If it runs out it says which cofix \
        strategy was used; see MeBi Help Config Solver. A weak_bisimilar proof \
-       needs the mutual cofix, which Auto picks for it."
+       needs the mutual cofix, which Auto picks for it. For weak_sim, the two \
+       states need only be similar: if they are not bisimilar, Begin checks \
+       the weak simulation preorder instead and refuses only if they are not \
+       similar."
   | [ "Benchmark" ] ->
     Some
       "MeBi Benchmark LTS <min> <max> <term> Using <lts> [<lts>...].\n\n\
