@@ -1427,3 +1427,29 @@ Module AnswerPolicies.
   MeBi Config Solver Answers Default.
   MeBi Config Reset Weak.
 End AnswerPolicies.
+
+(* Premises that are not an application: an implication or a [forall]. Until
+   2026-10-02 extraction took them for a variable's type and dropped them
+   without a warning, so the LTS silently gained transitions. *)
+MeBi Divider "Theories.Test.ProductPremises".
+Module ProductPremises.
+  (* [n = 3 -> False] is [~ (n = 3)] unfolded, and now decided like it: the
+     LTS is 0 -> 1 -> 2 -> 3, four states (it used to be six, 0..5, and fail
+     the bound of 4 below). *)
+  Inductive impl : nat -> bool -> nat -> Prop :=
+  | i_go n : (n = 3 -> False) -> n < 5 -> impl n true (S n).
+  MeBi Config Bounds As Num States 4.
+  MeBi Run LTS 0 Using impl.
+  MeBi Config Bounds As Num States 3.
+  Fail MeBi Run LTS 0 Using impl.
+
+  (* KNOWN WRONG: a universal premise is beyond the bounded proof search, so
+     it is undecided -- now with a warning -- and the constructor applies
+     from every state: 0..5 rather than 0..3. If bounded universals become
+     decidable, the [Fail] starts failing: make it a plain command. *)
+  Inductive univ : nat -> bool -> nat -> Prop :=
+  | u_go n : (forall k, k < n -> k <> 2) -> n < 5 -> univ n true (S n).
+  MeBi Config Bounds As Num States 4.
+  Fail MeBi Run LTS 0 Using univ.
+  MeBi Config Reset Bounds.
+End ProductPremises.

@@ -4619,6 +4619,64 @@ else depends on it.
   similarity change, divergence), the `rocq-sims` audit, and CADP
   no-starvation.
 
+## 2026-10-02 (second session) — Premise shapes surveyed; implication and `forall` premises were silently dropped
+
+**Bug fix** · **Tooling** (tests). On branch `fix/product-premises`. This is
+section 2 of the evaluation plan (the premise shapes never tested), agreed
+with Jonah.
+
+**Survey.** Each shape probed with `MeBi Run LTS`, and the LTS compared
+with the one worked out by hand:
+
+| shape | result |
+|---|---|
+| mutually inductive LTSs (`odd_step … with even_step …`) | correct |
+| value-passing labels (`send n`, `recv n`) over a bounded domain | correct |
+| `exists` premise, true or false | correct |
+| `~ P` premise | correct |
+| `Type`-valued relation | refused, `Invalid_Sort_LTS` (loud) |
+| parameterised LTS used through a `Definition` (`st bool`) | refused, `Invalid_Ref_LTS` (loud) |
+| **`P -> False` premise** | **wrong, silently**: 6 states where there are 4 |
+| **`P -> Q`, `forall k, …` premise** | **wrong, silently** (same) |
+
+**The bug.** Extraction collects a constructor premise only when its type
+is an application (`App (h, args)`: `n < 5`, `not (n = 3)`). A premise
+whose type is a product, such as an implication or a `forall`, fell into
+the case for a variable's type (`n : nat`) and was skipped. It never reached
+the decision procedure, and never reached the "cannot decide" warning that
+`MeBi Help Premises` promises. The constructor then applied from every
+state, so the LTS gained transitions. `~ (n = 3)` worked only because `not`
+is a constant applied to an argument; its own unfolding, `n = 3 -> False`,
+did not.
+
+**The fix.** In `check_updated_ctx`, and in the look-ahead walk that
+gathers earlier premises, a binder whose type is a `Prop` but not an
+application is a premise. It goes through `check_unknown_app` like any
+other, as `(type, [||])`. So:
+- `P -> False` is now decided, through `Premise_search`'s negation case.
+- Premises the bounded search cannot decide (universals, other
+  implications) are deferred and, if still undecided, **warned about**.
+  They still over-approximate, but now say so.
+
+**Tests** (`Test.v` `ProductPremises`, in CI):
+- `n = 3 -> False` pinned at exactly 4 states (completes at a bound of 4,
+  fails at 3). On the pre-fix code the same pin fails at 4: checked by
+  stashing the fix.
+- A known-wrong pin for the `forall` premise, with the usual note.
+
+**Not done (possible follow-ups, raise first):**
+- Deciding bounded universals (`forall k, k < n -> P k` with `n` closed is
+  a finite conjunction). That would be new capability.
+- Clearer messages for the two refusals.
+
+**Verification:** all 41 counts identical under `Auto` and forced `True`;
+forced `False` matches its documented baseline. None of the examples has a
+premise of this shape. `tests.exe` 79/79, `make` clean.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep fix/product-premises main`).
+
 ---
 
 ## Outstanding
