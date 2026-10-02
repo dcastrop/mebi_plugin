@@ -4338,6 +4338,65 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 later branch that uses `mutual_sim` first: the `PluginProofs.v` split
 (`examples/honest-plugin-proofs`).
 
+## 2026-10-02 (second session) — `MeBi Sim Begin` accepts `weak_sim` goals between similar, non-bisimilar states
+
+**New feature** (flagged to Jonah before writing: it needed the weak
+simulation preorder, backlog G's similarity algorithm) and **Bug fix**. On
+branch `solver/weak-sim-preorder`. Jonah: "it doesn't sound correct for
+`Sim Begin` to refuse similar states that aren't bisimilar."
+
+**What was wrong.** `MeBi Sim Begin` runs the bisimilarity check first,
+and with `FailIf NotBisimilar` (the default) it stops on `Not_Bisimilar`.
+A `weak_sim` goal asks only for *similarity*, which is coarser.
+`a.b ≤ a.(b+c)` holds, and was refused. Removing the refusal alone would
+not have helped: the solver picks every answer from the *bisimilarity*
+class of the move's target, and for that goal the class has no answer.
+
+**The fix.**
+- `Model.Product.simulation a b b_saturated`: the greatest weak simulation
+  as `weak_sim` defines it (each strong move of `a` answered by `=l⇒` in
+  `b`, `=ε⇒` with zero steps for a silent one). Naive refinement from all
+  pairs.
+- `Proof_solver.init`, for a `weak_sim` goal: run the check without
+  `FailIf`'s error. If the roots are not bisimilar, compute the preorder;
+  refuse with a clear message only if the roots are not even similar (still
+  under `FailIf NotBisimilar`), else store each state's simulators in
+  `Results.simulators` and say so at Notice. `weak_bisimilar` goals keep
+  the bisimilarity check.
+- The solver's answer (`handle_visible_transition`) and
+  `Product.successors` (hence the mutual block and `Auto`'s estimate) try a
+  bisimilar answer first, exactly as before, and only on failure fall back
+  to a simulator: stay put if a silent move and the current state
+  simulates the target, else respond into the simulators. Same order in
+  both places.
+- Found on the way: a silent move answered by a system that never moves
+  silently (`τ.a + b ≤ a + b`) crashed resolving the label in that
+  system's alphabet. It now falls back to the move's own label, which is
+  the same term.
+- The negative-verdict log was labelled "LTS Incomplete"; it now says
+  "Not Bisimilar".
+
+**Verification.**
+- Proof suite: all 27 `weak_sim` counts identical under `Auto`, forced
+  `True` and forced `False` (Test3 stops at 1127, as before). All 14
+  `BisimProofs.v` counts identical under `Auto` and forced `True`. Existing
+  proofs are between bisimilar states, so the fallback never fires there.
+- Scratch cases in all three modes: `a.b ≤ a.(b+c)` (15 iterations), both
+  directions of `τ.a + b`/`a + b` (18, 16), and `a.(b+c) ≤ a.b` refused.
+- `Test.v` `SimilarNotBisimilar` (built in CI): the same cases, plus
+  `mutual_sim` proved from the two directions and `weak_bisimilar` refused.
+- `tests.exe` 74/74 (`simulation`).
+- `make` clean. It was not the first time: I started the matrix before
+  running `make`, and warning 50 (a `val` inserted between a doc comment
+  and its declaration) failed every file. That is the gotcha `CLAUDE.md`
+  warns about, and it cost a matrix run.
+
+**How to revert:** delete the branch before merging. After merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep solver/weak-sim-preorder main`). It is
+independent of the other branches; `Test.v`'s `SimilarNotBisimilar` uses
+`mutual_sim` from `theories/mutual-sim`, which must stay if this does.
+
 ---
 
 ## Outstanding
