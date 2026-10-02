@@ -196,29 +196,29 @@ let text : string list -> string option = function
        How the proof search chooses each answer. Every step of a weak_sim or \
        weak_bisimilar proof has one system make a move (x -a-> x') and the \
        other answer it with a weak move to some y' such that (x', y') can be \
-       proved related in turn. Usually several answers would do; which one \
-       is taken decides the proof's next goals, and so its length.\n\n\
+       proved related in turn. Usually several answers would do; which one is \
+       taken decides the proof's next goals, and so its length.\n\n\
        Default -- the policy the solver has always used, and the default \
-       setting -- chooses each answer on its own, with no look-ahead: \
-       stand still if the move was silent and the answering state is already \
+       setting -- chooses each answer on its own, with no look-ahead: stand \
+       still if the move was silent and the answering state is already \
        bisimilar to x'; otherwise take the weak transition with the shortest \
-       witness (fewest steps to justify) into the bisimilarity class of x', ending \
-       at its lowest-numbered state (the one extraction discovered first). For \
-       a weak_sim goal between states that are similar but not bisimilar, the \
-       same two tries against the states that simulate x'. Because no choice \
-       takes the others into account, a proof can visit many more pairs than \
-       it needs -- weak_bisimilar proofs especially, whose two directions \
-       each pick answers the other never uses.\n\n\
+       witness (fewest steps to justify) into the bisimilarity class of x', \
+       ending at its lowest-numbered state (the one extraction discovered \
+       first). For a weak_sim goal between states that are similar but not \
+       bisimilar, the same two tries against the states that simulate x'. \
+       Because no choice takes the others into account, a proof can visit many \
+       more pairs than it needs -- weak_bisimilar proofs especially, whose two \
+       directions each pick answers the other never uses.\n\n\
        Greedy, Minimal and Auto plan every answer at Begin, before the first \
        step, and Begin announces the plan and its predicted cost. Greedy \
        prefers an answer whose pair has already been reached. Minimal answers \
        within a relation that no pair can be removed from. Auto plans all \
        three and keeps the cheapest predicted. Measured on the checked-in \
        examples (2026-10-02), Auto was never slower than Default and cut \
-       weak_sim proofs by 17% and weak_bisimilar proofs by 60%; Minimal \
-       alone was slower on many weak_sim proofs. Every answer is still \
-       checked by Qed, so a policy can only change how long a proof is, \
-       never whether it is correct."
+       weak_sim proofs by 17% and weak_bisimilar proofs by 60%; Minimal alone \
+       was slower on many weak_sim proofs. Every answer is still checked by \
+       Qed, so a policy can only change how long a proof is, never whether it \
+       is correct."
   | [ "Config"; "Output" ] ->
     Some
       "MeBi Config Output \"<Kind>\" True | False.\n\
