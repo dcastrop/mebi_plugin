@@ -1741,6 +1741,15 @@ module Make (Enc : Encoding.S) :
         (match EConstr.kind sigma upd_t with
          | App (name, args) ->
            handle_app lts_enc acc indmap (substl, tl) (name, args)
+         | _ when Premise_search.is_prop env sigma upd_t ->
+           (* A premise that is not an application: an implication or a
+              [forall] ([P -> False], [forall k, k < n -> P k]), or a bare
+              proposition. Until 2026-10-02 these fell into the case below,
+              as if they were a variable's type, and were dropped without a
+              warning, so the LTS silently gained transitions. They are
+              premises like any other, decided or deferred by
+              [check_unknown_app] (as [(t, [||])]: [mkApp (t, [||])] is [t]). *)
+           check_unknown_app lts_enc acc indmap (substl, tl) (upd_t, [||])
          | _ -> check_updated_ctx lts_enc acc indmap (substl, tl))
       | _substl, _ctxl -> Err.invalid_check_updated_ctx _substl _ctxl
     (* ! Impossible ! *)
@@ -1813,6 +1822,11 @@ module Make (Enc : Encoding.S) :
                   when Option.is_empty (F.find_opt indmap h)
                        && Premise_search.is_prop env sigma ty ->
                   (lts_enc, h, a) :: acc
+                | App _ -> acc
+                (* a premise that is not an application, as in
+                   [check_updated_ctx] *)
+                | _ when Premise_search.is_prop env sigma ty ->
+                  (lts_enc, ty, [||]) :: acc
                 | _ -> acc
               in
               walk acc (substl, tl)
