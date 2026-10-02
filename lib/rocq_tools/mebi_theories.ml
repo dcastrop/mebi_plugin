@@ -68,7 +68,12 @@ let reference_paths_to_load : (string, string list) Hashtbl.t =
   ; "clos_trans_1n", [ "Stdlib"; "Relations"; "Relation_Operators" ]
   ; "rt1n_refl", [ "Stdlib"; "Relations"; "Relation_Operators" ]
   ; "rt1n_trans", [ "Stdlib"; "Relations"; "Relation_Operators" ]
-  ; "clos_trans_1n", [ "Stdlib"; "Relations"; "Relation_Operators" ]
+    (* "clos_trans_1n" was listed a second time here (collapsed by
+       [Hashtbl.of_seq], so harmless). Possibly [clos_refl_trans_1n] was
+       meant -- the relation the solver's weak-transition goals use -- but
+       adding it would make those goals count as theory in
+       [Theories.is_any_theory] (unfolding, the premise-goal check), so that is
+       left as an open question, not changed. *)
   ]
   |> List.to_seq
   |> Hashtbl.of_seq

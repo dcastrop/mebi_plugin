@@ -3735,6 +3735,20 @@ hook. See note 9, stages 2 and 4.
 **Session tally (2026-10-02):** New feature 1 · Bug fix 1 · Optimization 0 ·
 Tooling 0 · Docs 0 · Refactor 0.
 
+## 2026-10-02 — A duplicate theory entry
+
+**Refactor** (no behaviour change). `Mebi_theories` listed
+`clos_trans_1n` twice and `clos_refl_trans_1n` not at all. `Hashtbl.of_seq`
+uses `replace`, so the duplicate collapsed to one entry, and nothing looks
+either key up. The duplicate is removed. Whether `clos_refl_trans_1n` was
+meant, the relation the solver's weak-transition goals use, is left
+open: adding it would make those goals count as theory (unfolding, the new
+premise-goal check), a behaviour change with no observed benefit. A comment
+at the site says so. `dune build` and `make` (plugin and `Test.v`) pass.
+
+**Session tally (2026-10-02):** New feature 1 · Bug fix 1 · Refactor 1 ·
+Optimization 0 · Tooling 0 · Docs 0.
+
 ---
 
 ## Outstanding
