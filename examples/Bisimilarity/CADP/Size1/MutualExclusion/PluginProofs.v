@@ -43,3 +43,22 @@ Example wsim_lts_bigstep : weak_sim lts bigstep c1 c1.
 Proof. MeBi Sim Begin lts c1 And bigstep c1 Using step. 
   (* Iteration History: 395 <- _ <- _ <- _  *) 
   MeBi Sim Solve 395. Qed.
+
+MeBi Divider "Examples.Bisimilarity.CADP.Size1.MutualExclusion.PluginProofs.ProofTest.bigstep_lts.mutual".
+(* Mutual similarity: the two [weak_sim]s above, one each way. *)
+Example msim_bigstep_lts : mutual_sim bigstep lts c1 c1.
+Proof. split; [exact wsim_bigstep_lts | exact wsim_lts_bigstep]. Qed.
+
+(**************************************************)
+(* Weak bisimilarity: one relation, both directions, in one proof
+   ([weak_bisimilar]), one per pair -- stronger than the [mutual_sim]s above.
+   These need the mutual cofix, which [Auto] chooses for every one of them;
+   forced to the nested strategy, all but [Glued/MutualExclusion]'s are
+   unfinished after 20000 steps, which is why they come last: a run with the
+   strategy forced still reaches every [weak_sim] above. Bounds are the
+   measured count minus one ([Solve N] permits N + 1 steps). *)
+
+MeBi Divider "Examples.Bisimilarity.CADP.Size1.MutualExclusion.PluginProofs.ProofTest.bigstep_lts.bisimilar".
+Example wbis_bigstep_lts : weak_bisimilar bigstep lts c1 c1.
+Proof. MeBi Sim Begin bigstep c1 And lts c1 Using step.
+  MeBi Sim Solve 2874. Qed.
