@@ -32,7 +32,6 @@ examples/Proc.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test1/TermTests.v ### Success
 # examples/Bisimilarity/Proc/Test1/PluginProofs.v ### Success
-# examples/Bisimilarity/Proc/Test1/BisimProofs.v ### weak_bisimilar, one proof per pair
 # examples/Bisimilarity/Proc/Test1/ManualProofs.v
 # examples/Bisimilarity/Proc/Test1/LtacProofs.v
 
@@ -40,7 +39,6 @@ examples/Bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test2/TermTests.v ### Success
 # examples/Bisimilarity/Proc/Test2/PluginProofs.v ### Success
-# examples/Bisimilarity/Proc/Test2/BisimProofs.v ### weak_bisimilar, one proof per pair
 # examples/Bisimilarity/Proc/Test2/ManualProofs.v
 # examples/Bisimilarity/Proc/Test2/LtacProofs.v
 
@@ -48,7 +46,6 @@ examples/Bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test3/TermTests.v ### RETEST: (takes a long time) Success
 # examples/Bisimilarity/Proc/Test3/PluginProofs.v ### Success (18s; needs MeBi Config Solver MutualCofix True, which the file sets)
-# examples/Bisimilarity/Proc/Test3/BisimProofs.v ### weak_bisimilar, one proof per pair
 
 # examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test4/TermTests.v ### KNOWN LIMIT (B3): fails at the default 100-state bound (LTS_Incomplete); the full LTS is 9720 states and extracts in ~25s with a raised bound, but saturates to 74.6M weak actions, so the plugin now refuses (Saturation_Too_Large) instead of exhausting memory -- still run only under a memory cap (systemd-run -p MemoryMax=...; ulimit -v breaks OCaml 5). See the header of TermTests.v
@@ -63,13 +60,10 @@ examples/Bisimilarity/CADP/Properties/MutualExclusion.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size1/MutualExclusion/PluginProofs.v ### Success
-# examples/Bisimilarity/CADP/Size1/MutualExclusion/BisimProofs.v ### weak_bisimilar, one proof per pair
 
 # examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
-# examples/Bisimilarity/CADP/Size1/Glued/BisimProofs.v ### weak_bisimilar, one proof per pair
 # examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v ### Success
-# examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/BisimProofs.v ### weak_bisimilar, one proof per pair
 
 # TODO:
 examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW

@@ -4397,6 +4397,34 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 independent of the other branches; `Test.v`'s `SimilarNotBisimilar` uses
 `mutual_sim` from `theories/mutual-sim`, which must stay if this does.
 
+## 2026-10-02 (second session) — `PluginProofs.v` say what they prove
+
+**Tooling** (examples only). On branch `examples/honest-plugin-proofs`.
+Jonah's decision: every use of the `MeBi Sim` commands should be honest
+about the relation it establishes, and the change stays additive. In each
+of the six passing `PluginProofs.v`:
+- the two `weak_sim` directions per pair are unchanged (names, bounds,
+  order);
+- after each pair, a new `msim_*`: `mutual_sim`, proved from those two by
+  `split` (no `MeBi` step). This is what the files used to call a
+  bisimilarity proof;
+- a new final section with one `wbis_*` `weak_bisimilar` proof per pair,
+  moved in from the `BisimProofs.v` files (deleted, with their
+  `_CoqProject` lines).
+
+The `weak_bisimilar` proofs come **last** on purpose: under a forced nested
+strategy they do not finish, and a run with the strategy forced should
+still reach all 27 `weak_sim` counts. `Proc/Test3`'s `p3` has only one
+`weak_sim` direction, so it has a `weak_bisimilar` proof but no
+`mutual_sim`. `CLAUDE.md`'s baseline is updated: 27 `weak_sim` counts, then
+14 `weak_bisimilar`.
+
+**How to revert:** delete the branch before merging, or after merging with
+a merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep examples/honest-plugin-proofs main`).
+That restores the `BisimProofs.v` files. Revert this before
+`theories/mutual-sim` if both are to go.
+
 ---
 
 ## Outstanding

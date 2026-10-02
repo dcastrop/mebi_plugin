@@ -55,17 +55,19 @@ To run them:
    Proc/Test3   1073, 387, 519, 519, 603, 211, 331, 603, 331   (mutual)
    CADP/Size1   268, 396, 268, 396, 81, 63        (nested)
    ```
-   Each of those six files has a sibling `BisimProofs.v` (also commented
-   out of `_CoqProject`) proving `weak_bisimilar`, one proof per pair, 14
-   total. Under `Auto` and forced `MutualCofix True`:
+   Each of those six files then ends with a `weak_bisimilar` section: one
+   proof per pair, 14 total, after the 27 above (and a `mutual_sim` per
+   pair, proved from its two `weak_sim`s, with no `Solve`). Under `Auto` and
+   forced `MutualCofix True`, in file order:
    ```
    Proc/Test1   709, 709, 51
    Proc/Test2   702, 852, 852
    Proc/Test3   14427, 6787, 10243, 4467, 6755
    CADP/Size1   2875, 2875, 185
    ```
-   Forced `False` is not expected to finish them (only
-   `Glued/MutualExclusion` does, at 3859).
+   Forced `False` stops at the first of them in every file (with a loose
+   bound, `Glued/MutualExclusion`'s alone would finish, at 3859). They come last in each file so
+   that a forced run still reaches all 27 `weak_sim` counts first.
    A change to *classification* (Solved/Unsolved) is a regression. A change
    to iteration *count* needs an explanation (fewer is fine if it fixes a
    real miss; more needs justifying).

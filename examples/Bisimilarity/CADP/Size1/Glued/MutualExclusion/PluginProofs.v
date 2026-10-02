@@ -47,3 +47,22 @@ Example wsim_spec_lts : weak_sim spec_lts bigstep (make_spec 0) (composition_cre
 Proof. MeBi Sim Begin spec_lts (make_spec 0) And bigstep (composition_create 0 Protocol.P) Using lts step.
   (* Iteration History: 64 <- _ <- _ <- _ *)
   MeBi Sim Solve 64. Qed.
+
+MeBi Divider "Examples.Bisimilarity.CADP.Size1.Glued.MutualExclusion.PluginProofs.ProofTest.bigstep.mutual".
+(* Mutual similarity: the two [weak_sim]s above, one each way. *)
+Example msim_bigstep : mutual_sim bigstep spec_lts (composition_create 0 Protocol.P) (make_spec 0).
+Proof. split; [exact wsim_bigstep | exact wsim_spec_lts]. Qed.
+
+(**************************************************)
+(* Weak bisimilarity: one relation, both directions, in one proof
+   ([weak_bisimilar]), one per pair -- stronger than the [mutual_sim]s above.
+   These need the mutual cofix, which [Auto] chooses for every one of them;
+   forced to the nested strategy, all but [Glued/MutualExclusion]'s are
+   unfinished after 20000 steps, which is why they come last: a run with the
+   strategy forced still reaches every [weak_sim] above. Bounds are the
+   measured count minus one ([Solve N] permits N + 1 steps). *)
+
+MeBi Divider "Examples.Bisimilarity.CADP.Size1.Glued.MutualExclusion.PluginProofs.ProofTest.bigstep.bisimilar".
+Example wbis_bigstep : weak_bisimilar bigstep spec_lts (composition_create 0 Protocol.P) (make_spec 0).
+Proof. MeBi Sim Begin bigstep (composition_create 0 Protocol.P) And spec_lts (make_spec 0) Using lts step.
+  MeBi Sim Solve 184. Qed.
