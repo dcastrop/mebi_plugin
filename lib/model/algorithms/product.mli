@@ -42,6 +42,7 @@ module type S = sig
     val equal : t -> t -> bool
 
     module Set : Set.S with type elt = t
+    module Map : Map.S with type key = t
   end
 
   (** Raised by {!val:respond} when no action out of the given state, under
@@ -182,9 +183,13 @@ module type S = sig
       [weak_bisimilar] goal needs. *)
   val reachable_bisim : refl:bool -> game -> partition -> Pair.t -> Pair.Set.t
 
-  (** {b Measurement only}: what other ways of choosing answers would cost,
-      computed on the model. The proof solver does not read any of this; it
-      answers with {!val:answer}. *)
+  (** Policies for choosing answers. [Default] is {!val:answer}'s choice,
+      the solver's behaviour unless [MeBi Config Solver Answers] says
+      otherwise. Any other policy is turned, at [MeBi Sim Begin], into a
+      {!type:Policy.plan}: the answer for every move the game can reach, and
+      the pairs that makes. The solver then answers from the plan, and the
+      mutual block and the cofix-strategy estimate read its pairs, so the
+      three cannot disagree. *)
   module Policy : sig
     (** [Default]: {!val:answer}'s choices. [Greedy]: breadth first,
         preferring an answer whose pair was already reached. [Minimal]: from
@@ -199,12 +204,31 @@ module type S = sig
 
     val name : t -> string
 
+    (** One possible answer: the pair it leads to, its witness length (weak
+        transitions to justify; 0 for standing still), and the answer. *)
+    type choice =
+      { next : Pair.t
+      ; cost : int
+      ; answer : answer
+      }
+
+    (** A move, the way the solver meets it: whether the roles are swapped
+        ([bisim_r]), the moving system's state, the move, and the answering
+        system's state. *)
+    type key =
+      { swapped : bool
+      ; mover : state
+      ; answerer : state
+      ; label : label
+      ; target : state
+      }
+
     (** One move to answer: the answer {!val:answer} picks ([default]) and
-        every valid one ([candidates]), each as the next pair and its witness
-        length (weak transitions to justify; 0 for standing still). *)
+        every valid one ([candidates]). *)
     type obligation =
-      { default : (Pair.t * int) option
-      ; candidates : (Pair.t * int) list
+      { key : key
+      ; default : choice option
+      ; candidates : choice list
       }
 
     (** A game, as each pair's obligations. *)
@@ -232,7 +256,35 @@ module type S = sig
       ; unanswered : int
       }
 
+    module KeyMap : Map.S with type key = key
+
+    (** A policy's answers over a whole game: the [relation] (pairs reached
+        from [root]), the answer [chosen] for each move, each pair's
+        successors ([next]), and the [measure]. *)
+    type plan =
+      { policy : t
+      ; root : Pair.t
+      ; relation : Pair.Set.t
+      ; chosen : choice KeyMap.t
+      ; next : Pair.t list Pair.Map.t
+      ; measure : measure
+      }
+
+    val plan : t -> game_of -> Pair.t -> plan
     val measure : t -> game_of -> Pair.t -> measure
+
+    (** Iterations a plan is predicted to cost: [3 pairs + 6 moves + 3.3 witness], fitted to the 41 checked-in proofs' real counts.
+    *)
+    val predicted : measure -> float
+
+    (** The plan with the lowest {!val:predicted} cost among the three
+        policies; [Default] unless another is strictly cheaper. *)
+    val best : game_of -> Pair.t -> plan
+
+    (** The answer a plan gives to a move, if the plan reaches it. *)
+    val choose : plan -> key -> answer option
+
+    val successors : plan -> Pair.t -> Pair.t list
   end
 
   (** What a proof of this product costs, in [weak_sim] goals, under each of
@@ -282,6 +334,10 @@ module type S = sig
     -> partition
     -> Pair.t
     -> cost
+
+  (** [estimate_plan ?cap_factor p]: {!val:estimate} over a plan's own
+      successors. *)
+  val estimate_plan : ?cap_factor:int -> Policy.plan -> cost
 
   (** [prefer_mutual c] is [true] when the nested walk costs more than a
       mutual cofix would, [c.nested = None] included. *)

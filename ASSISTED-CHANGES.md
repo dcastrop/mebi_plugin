@@ -4531,6 +4531,75 @@ default 58,710, greedy 38,176 (−35%), **minimal 26,218 (−55%)**. Per proof:
 merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 `git log --merges --oneline --grep tooling/answer-policies main`).
 
+## 2026-10-02 (second session) — Answer policies in the solver (step 3)
+
+**New feature** (agreed with Jonah: an opt-in setting, defaulting to today's
+behaviour, measured before anything becomes a default). On branch
+`solver/answer-policies`.
+
+`MeBi Config Solver Answers Default | Greedy | Minimal | Auto`:
+- **`Default`** (the default) is the old path, untouched. The solver
+  answers move by move with `Product.answer`, and no plan is built.
+- **Any other policy** is planned at `Sim Begin` by `Product.Policy.plan`:
+  the chosen answer, with its transition, for every
+  `(swapped, mover, move, answerer)` key the game can reach, and the pairs
+  that makes. The solver's `handle_wk_concl` looks its answer up in the plan
+  (a move outside it is answered move by move, with a notice). The mutual
+  block takes its pairs from the plan, and `Auto`'s cofix-strategy estimate
+  walks the plan. So the three cannot disagree.
+- **`Auto`** plans all three and keeps the lowest `predicted` cost (the
+  fitted `3·pairs + 6·moves + 3.3·witness`). Ties go to `Default`.
+- `Begin` announces the plan and its prediction at Notice.
+
+**Measured: real iteration counts, all 41 proofs,** each policy run with
+loose bounds so that none was cut off. Cofix strategy `Auto`, as checked in
+(Test3 forces mutual itself):
+
+| | `weak_sim` (27) | `weak_bisimilar` (14) |
+|---|---|---|
+| Default | 7,142 | 52,489 |
+| Greedy | 6,131 (−14%) | 33,217 (−37%) |
+| Minimal | 7,603 (+6%) | 21,117 (−60%) |
+| **Auto** | **5,894 (−17%)** | **21,023 (−60%)** |
+
+Every proof completed and passed `Qed` under every policy. The `Default`
+column reproduces the 41-count baseline exactly. **`Auto` is never slower
+than `Default` on any of the 41, and on every one it achieves the best of
+the three.** Selected proofs:
+- Test3 `wbis_p3`: 14,427 → 3,579.
+- CADP `weak_bisimilar`: 2,875 → 1,674.
+- Test3 `wsim_p3`: 1,073 → 438.
+- Test1 `wsim_pq`: 114 → 88.
+
+`Minimal` alone is worse than `Default` on many `weak_sim` proofs (Test3
+`wsim_pr` 211 → 438), which is why it is not offered as the policy to use
+unconditionally.
+
+**Also:**
+- `Product.Pair.Map`.
+- `Stdlib.Option` qualified in `product.ml`: in the packed `make` build a
+  plugin module named `Option` shadows it. `dune` accepted the code; `make`
+  caught it.
+- `Test.v` `AnswerPolicies` proves goals under each policy (CI).
+- `MeBi Help Config Solver` and the README document both solver settings
+  (the README had been missing `MutualCofix`).
+
+**Not decided:** making `Auto` the default. It was measured only under the
+`Auto` cofix strategy. Under forced `MutualCofix True`/`False` the plans
+interact with goal order, which is unmeasured. A default change also
+changes every checked-in count, so the bounds would need re-measuring.
+Jonah's call, and possibly @dcastrop's.
+
+**Verification under the default policy:** the standard matrix with the
+checked-in bounds, identical in all three modes: all 41 counts under `Auto`
+and forced `True`; forced `False` gives the documented `weak_sim` counts,
+then stops at the first `weak_bisimilar`. `tests.exe` 79/79, `make` clean.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep solver/answer-policies main`). Nothing
+else depends on it.
+
 ---
 
 ## Outstanding

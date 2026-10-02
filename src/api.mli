@@ -48,6 +48,19 @@ val the_mutual_cofix : bool ref
 val set_solver_strategy : solver_strategy -> unit
 val set_mutual_cofix : bool -> unit
 val reset_mutual_cofix : unit -> unit
+
+(** How the proof solver chooses each answer (see
+    [Model.Product.Policy]): [Default] as it always has; [Greedy] and
+    [Minimal] from a plan built at [MeBi Sim Begin]; [Auto] the plan with
+    the lowest predicted cost. [Default] by default. *)
+type answer_policy =
+  | Answers_default
+  | Answers_greedy
+  | Answers_minimal
+  | Answers_auto
+
+val the_answer_policy : answer_policy ref
+val set_answer_policy : answer_policy -> unit
 val set_fail_flag_empty : bool -> unit
 val set_fail_flag_incomplete : bool -> unit
 val set_fail_flag_non_bisimilar : bool -> unit

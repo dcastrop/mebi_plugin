@@ -1406,3 +1406,24 @@ Module SimilarNotBisimilar.
   Proof. Fail MeBi Sim Begin step m And step r Using step. Abort.
   MeBi Config Reset Weak.
 End SimilarNotBisimilar.
+
+(* [MeBi Config Solver Answers]: every policy parses, and each proves the
+   same goals ([Qed] checks the answers it chose). *)
+MeBi Divider "Theories.Test.AnswerPolicies".
+Module AnswerPolicies.
+  Import SilentResponse.
+  MeBi Config Weak As Option lab.
+  MeBi Config Solver Answers Greedy.
+  Example g_p_q : weak_bisimilar step step p q.
+  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 200. Qed.
+  MeBi Config Solver Answers Minimal.
+  Example m_p_q : weak_bisimilar step step p q.
+  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 200. Qed.
+  Example m_sim_p_q : weak_sim step step p q.
+  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 200. Qed.
+  MeBi Config Solver Answers Auto.
+  Example a_p_q : weak_bisimilar step step p q.
+  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 200. Qed.
+  MeBi Config Solver Answers Default.
+  MeBi Config Reset Weak.
+End AnswerPolicies.

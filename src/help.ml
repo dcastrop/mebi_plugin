@@ -191,7 +191,16 @@ let text : string list -> string option = function
        nested cofix per new pair; True opens the proof with one mutual cofix \
        over every pair it will reach; Auto (default) measures both on the \
        model before the proof starts and picks, announcing it when it takes \
-       the mutual path."
+       the mutual path.\n\n\
+       MeBi Config Solver Answers Default | Greedy | Minimal | Auto.\n\n\
+       How the proof search chooses each answer to the other system's move. \
+       Default (default): move by move, as always. Greedy prefers answers \
+       that land on a pair already reached; Minimal answers within an \
+       inclusion-minimal relation; both are planned at Begin. Auto plans all \
+       three and takes the one with the lowest predicted cost. Measured on \
+       the checked-in examples (2026-10-02), Auto was never slower than \
+       Default and cut weak_bisimilar proofs by 60%. Begin announces the \
+       plan it uses."
   | [ "Config"; "Output" ] ->
     Some
       "MeBi Config Output \"<Kind>\" True | False.\n\

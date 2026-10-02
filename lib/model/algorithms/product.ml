@@ -13,6 +13,7 @@ module type S = sig
     val equal : t -> t -> bool
 
     module Set : Set.S with type elt = t
+    module Map : Map.S with type key = t
   end
 
   exception
@@ -78,9 +79,24 @@ module type S = sig
 
     val name : t -> string
 
+    type choice =
+      { next : Pair.t
+      ; cost : int
+      ; answer : answer
+      }
+
+    type key =
+      { swapped : bool
+      ; mover : state
+      ; answerer : state
+      ; label : label
+      ; target : state
+      }
+
     type obligation =
-      { default : (Pair.t * int) option
-      ; candidates : (Pair.t * int) list
+      { key : key
+      ; default : choice option
+      ; candidates : choice list
       }
 
     type game_of = Pair.t -> obligation list
@@ -103,7 +119,23 @@ module type S = sig
       ; unanswered : int
       }
 
+    module KeyMap : Map.S with type key = key
+
+    type plan =
+      { policy : t
+      ; root : Pair.t
+      ; relation : Pair.Set.t
+      ; chosen : choice KeyMap.t
+      ; next : Pair.t list Pair.Map.t
+      ; measure : measure
+      }
+
+    val plan : t -> game_of -> Pair.t -> plan
     val measure : t -> game_of -> Pair.t -> measure
+    val predicted : measure -> float
+    val best : game_of -> Pair.t -> plan
+    val choose : plan -> key -> answer option
+    val successors : plan -> Pair.t -> Pair.t list
   end
 
   type cost =
@@ -131,6 +163,7 @@ module type S = sig
     -> Pair.t
     -> cost
 
+  val estimate_plan : ?cap_factor:int -> Policy.plan -> cost
   val prefer_mutual : cost -> bool
 end
 
@@ -168,6 +201,12 @@ struct
     let equal (a : t) (b : t) : bool = Int.equal (compare a b) 0
 
     module Set = Set.Make (struct
+        type nonrec t = t
+
+        let compare = compare
+      end)
+
+    module Map = Map.Make (struct
         type nonrec t = t
 
         let compare = compare
@@ -504,9 +543,27 @@ struct
       | Minimal -> "minimal"
     ;;
 
+    type choice =
+      { next : Pair.t
+      ; cost : int
+      ; answer : answer
+      }
+
+    (* An obligation is keyed the way the solver meets it: whether the roles
+       are swapped ([bisim_r]), the moving system's state and move, and the
+       answering system's state. *)
+    type key =
+      { swapped : bool
+      ; mover : C.State.t
+      ; answerer : C.State.t
+      ; label : C.Label.t
+      ; target : C.State.t
+      }
+
     type obligation =
-      { default : (Pair.t * int) option
-      ; candidates : (Pair.t * int) list
+      { key : key
+      ; default : choice option
+      ; candidates : choice list
       }
 
     type game_of = Pair.t -> obligation list
@@ -519,8 +576,9 @@ struct
       match t.annotation with None -> 1 | Some a -> annotation_length a
     ;;
 
-    (* Every way [b], at [y], can answer [-label-> x'], as (state reached,
-       witness length); the same targets, in the same order, as [answer]. *)
+    (* Every way [b], at [y], can answer [-label-> x'], with the answer itself
+       -- the same targets, in the same order, as [answer] tries them -- and
+       its witness length. *)
     let candidates
           ?(silent : C.EdgeMap.t' option)
           ?(sim : (C.State.t -> C.State.Set.t) option)
@@ -529,12 +587,12 @@ struct
           (y : C.State.t)
           (label : C.Label.t)
           (x' : C.State.t)
-      : (C.State.t * int) list
+      : (C.State.t * int * answer) list
       =
-      let into (target : C.State.Set.t) : (C.State.t * int) list =
+      let into (target : C.State.Set.t) : (C.State.t * int * answer) list =
         let stay =
           if C.Label.is_silent label && C.State.Set.mem y target
-          then [ y, 0 ]
+          then [ y, 0, Stay ]
           else []
         in
         let moves =
@@ -544,10 +602,20 @@ struct
             | None -> []
             | Some silent ->
               Saturation.silent_paths silent y
-              |> List.filter_map (fun (s, _, len) ->
-                if len > 0 && C.State.Set.mem s target
-                then Some (s, len)
-                else None))
+              |> List.filter_map (fun (s, ann, len) ->
+                match ann with
+                | Some ann when len > 0 && C.State.Set.mem s target ->
+                  Some
+                    ( s
+                    , len
+                    , Move
+                        { from = y
+                        ; goto = s
+                        ; label
+                        ; annotation = Some ann
+                        ; tree = None
+                        } )
+                | _ -> None))
           else (
             match C.EdgeMap.find_opt b.edges y with
             | None -> []
@@ -562,8 +630,18 @@ struct
                      | None -> 1
                      | Some a -> annotation_length a
                    in
+                   let tree = Base.Trees.min_opt action.trees in
                    C.State.Set.elements (C.State.Set.inter ds target)
-                   |> List.map (fun d -> d, len)))
+                   |> List.map (fun d ->
+                     ( d
+                     , len
+                     , Move
+                         { from = y
+                         ; goto = d
+                         ; label
+                         ; annotation = action.annotation
+                         ; tree
+                         } ))))
         in
         stay @ moves
       in
@@ -571,22 +649,6 @@ struct
       | (_ :: _ as cs), _ -> cs
       | [], Some sim -> into (sim x')
       | [], None -> []
-    ;;
-
-    let default_of
-          ?(silent : C.EdgeMap.t' option)
-          ?(sim : (C.State.t -> C.State.Set.t) option)
-          (b : FSM.t)
-          (pi : C.Partition.t)
-          (y : C.State.t)
-          (label : C.Label.t)
-          (x' : C.State.t)
-      : (C.State.t * int) option
-      =
-      match answer ?silent ?sim b pi y label x' with
-      | Some Stay -> Some (y, 0)
-      | Some (Move t) -> Some (t.goto, transition_length t)
-      | None -> None
     ;;
 
     (* The simulation game: [x]'s moves answered by [b]. *)
@@ -605,11 +667,19 @@ struct
       else
         List.map
           (fun ((label, x') : C.Label.t * C.State.t) ->
-            let pair (y', n) = (x', y'), n in
-            { default =
-                Option.map pair (default_of ?silent ?sim b pi y label x')
+            let choice ((y', cost, answer) : C.State.t * int * answer) =
+              { next = x', y'; cost; answer }
+            in
+            { key =
+                { swapped = false; mover = x; answerer = y; label; target = x' }
+            ; default =
+                (match answer ?silent ?sim b pi y label x' with
+                 | Some Stay -> Some (choice (y, 0, Stay))
+                 | Some (Move t) ->
+                   Some (choice (t.goto, transition_length t, Move t))
+                 | None -> None)
             ; candidates =
-                List.map pair (candidates ?silent ?sim b pi y label x')
+                List.map choice (candidates ?silent ?sim b pi y label x')
             })
           (obligations a x)
     ;;
@@ -619,12 +689,13 @@ struct
     let bisim_game ~(refl : bool) (g : game) (pi : C.Partition.t) : game_of =
       let left = sim_game ~silent:g.b.edges ~refl g.a g.b_saturated pi in
       let right = sim_game ~silent:g.a.edges ~refl g.b g.a_saturated pi in
-      let swap ((y, x), n) = (x, y), n in
+      let swap (c : choice) = { c with next = snd c.next, fst c.next } in
       fun ((x, y) : Pair.t) ->
         left (x, y)
         @ List.map
             (fun (o : obligation) ->
-              { default = Option.map swap o.default
+              { key = { o.key with swapped = true }
+              ; default = Stdlib.Option.map swap o.default
               ; candidates = List.map swap o.candidates
               })
             (right (y, x))
@@ -637,43 +708,101 @@ struct
       ; unanswered : int
       }
 
-    (* Close [root] under a choice function, totting up the measure. *)
+    module KeyMap = Map.Make (struct
+        type t = key
+
+        let compare (a : key) (b : key) : int =
+          match Bool.compare a.swapped b.swapped with
+          | 0 ->
+            (match C.State.compare a.mover b.mover with
+             | 0 ->
+               (match C.State.compare a.answerer b.answerer with
+                | 0 ->
+                  (match C.Label.compare a.label b.label with
+                   | 0 -> C.State.compare a.target b.target
+                   | n -> n)
+                | n -> n)
+             | n -> n)
+          | n -> n
+        ;;
+      end)
+
+    type plan =
+      { policy : t
+      ; root : Pair.t
+      ; relation : Pair.Set.t
+      ; chosen : choice KeyMap.t
+      ; next : Pair.t list Pair.Map.t
+      ; measure : measure
+      }
+
+    (* Close [root] under a choice function, recording every choice. *)
     let walk
+          (policy : t)
           (game_of : game_of)
-          (choose : Pair.Set.t -> obligation -> (Pair.t * int) option)
+          (choose : Pair.Set.t -> obligation -> choice option)
           (root : Pair.t)
-      : measure
+      : plan
       =
-      let rec go seen frontier moves witness unanswered =
+      let rec go seen frontier chosen next moves witness unanswered =
         match frontier with
-        | [] -> { pairs = Pair.Set.cardinal seen; moves; witness; unanswered }
+        | [] ->
+          { policy
+          ; root
+          ; relation = seen
+          ; chosen
+          ; next
+          ; measure =
+              { pairs = Pair.Set.cardinal seen; moves; witness; unanswered }
+          }
         | p :: rest ->
-          let seen, next, moves, witness, unanswered =
+          let seen, fresh, succ, chosen, moves, witness, unanswered =
             List.fold_left
-              (fun (seen, next, moves, witness, unanswered) o ->
+              (fun (seen, fresh, succ, chosen, moves, witness, unanswered) o ->
                 match choose seen o with
-                | None -> seen, next, moves, witness, unanswered + 1
-                | Some (q, n) ->
-                  if Pair.Set.mem q seen
-                  then seen, next, moves + 1, witness + n, unanswered
-                  else
-                    ( Pair.Set.add q seen
-                    , q :: next
+                | None ->
+                  seen, fresh, succ, chosen, moves, witness, unanswered + 1
+                | Some c ->
+                  let chosen = KeyMap.add o.key c chosen in
+                  let succ = c.next :: succ in
+                  if Pair.Set.mem c.next seen
+                  then
+                    ( seen
+                    , fresh
+                    , succ
+                    , chosen
                     , moves + 1
-                    , witness + n
+                    , witness + c.cost
+                    , unanswered )
+                  else
+                    ( Pair.Set.add c.next seen
+                    , c.next :: fresh
+                    , succ
+                    , chosen
+                    , moves + 1
+                    , witness + c.cost
                     , unanswered ))
-              (seen, [], moves, witness, unanswered)
+              (seen, [], [], chosen, moves, witness, unanswered)
               (game_of p)
           in
-          go seen (rest @ List.rev next) moves witness unanswered
+          go
+            seen
+            (rest @ List.rev fresh)
+            chosen
+            (Pair.Map.add p (List.rev succ) next)
+            moves
+            witness
+            unanswered
       in
-      go (Pair.Set.singleton root) [ root ] 0 0 0
+      go (Pair.Set.singleton root) [ root ] KeyMap.empty Pair.Map.empty 0 0 0
     ;;
 
-    let cheapest (cs : (Pair.t * int) list) : (Pair.t * int) option =
+    let cheapest (cs : choice list) : choice option =
       List.fold_left
-        (fun acc ((_, n) as c) ->
-          match acc with Some (_, m) when m <= n -> acc | _ -> Some c)
+        (fun acc (c : choice) ->
+          match acc with
+          | Some (best : choice) when best.cost <= c.cost -> acc
+          | _ -> Some c)
         None
         cs
     ;;
@@ -691,12 +820,17 @@ struct
       let all : Pair.Set.t =
         reachable_by
           (fun p ->
-            List.concat_map (fun o -> List.map fst o.candidates) (obs p))
+            List.concat_map
+              (fun o -> List.map (fun (c : choice) -> c.next) o.candidates)
+              (obs p))
           root
       in
       let valid (r : Pair.t) (rel : Pair.Set.t) : bool =
         List.for_all
-          (fun o -> List.exists (fun (q, _) -> Pair.Set.mem q rel) o.candidates)
+          (fun o ->
+            List.exists
+              (fun (c : choice) -> Pair.Set.mem c.next rel)
+              o.candidates)
           (obs r)
       in
       (* Keep only what [root] reaches within [rel]. *)
@@ -706,7 +840,8 @@ struct
             List.concat_map
               (fun o ->
                 List.filter_map
-                  (fun (q, _) -> if Pair.Set.mem q rel then Some q else None)
+                  (fun (c : choice) ->
+                    if Pair.Set.mem c.next rel then Some c.next else None)
                   o.candidates)
               (obs p))
           root
@@ -727,16 +862,19 @@ struct
       if Pair.Set.for_all (fun q -> valid q all) all then shrink all else all
     ;;
 
-    let measure (policy : t) (game_of : game_of) (root : Pair.t) : measure =
+    let plan (policy : t) (game_of : game_of) (root : Pair.t) : plan =
       match policy with
-      | Default -> walk game_of (fun _ o -> o.default) root
+      | Default -> walk policy game_of (fun _ o -> o.default) root
       | Greedy ->
         walk
+          policy
           game_of
           (fun seen o ->
             match
               cheapest
-                (List.filter (fun (q, _) -> Pair.Set.mem q seen) o.candidates)
+                (List.filter
+                   (fun (c : choice) -> Pair.Set.mem c.next seen)
+                   o.candidates)
             with
             | Some c -> Some c
             | None -> o.default)
@@ -744,11 +882,55 @@ struct
       | Minimal ->
         let rel = minimal_relation game_of root in
         walk
+          policy
           game_of
           (fun _ o ->
             cheapest
-              (List.filter (fun (q, _) -> Pair.Set.mem q rel) o.candidates))
+              (List.filter
+                 (fun (c : choice) -> Pair.Set.mem c.next rel)
+                 o.candidates))
           root
+    ;;
+
+    let measure (policy : t) (game_of : game_of) (root : Pair.t) : measure =
+      (plan policy game_of root).measure
+    ;;
+
+    (* Iterations predicted from a plan's measure, by the linear fit to all
+       41 checked-in proofs' real counts (2026-10-02, [ASSISTED-CHANGES.md]):
+       about 3 per pair, 6 per move and 3.3 per weak transition of witness. *)
+    let predicted (m : measure) : float =
+      (3.0 *. float_of_int m.pairs)
+      +. (6.0 *. float_of_int m.moves)
+      +. (3.3 *. float_of_int m.witness)
+    ;;
+
+    (* The cheapest plan by [predicted]; ties go to the earlier policy in
+       [Default; Greedy; Minimal], so [Default] wins unless another is
+       strictly cheaper. *)
+    let best (game_of : game_of) (root : Pair.t) : plan =
+      let plans =
+        List.map (fun p -> plan p game_of root) [ Default; Greedy; Minimal ]
+      in
+      List.fold_left
+        (fun (best : plan) (p : plan) ->
+          if
+            p.measure.unanswered = 0
+            && predicted p.measure < predicted best.measure
+          then p
+          else best)
+        (List.hd plans)
+        (List.tl plans)
+    ;;
+
+    let choose (p : plan) (k : key) : answer option =
+      Stdlib.Option.map
+        (fun (c : choice) -> c.answer)
+        (KeyMap.find_opt k p.chosen)
+    ;;
+
+    let successors (p : plan) (x : Pair.t) : Pair.t list =
+      Stdlib.Option.value ~default:[] (Pair.Map.find_opt x p.next)
     ;;
   end
 
@@ -823,6 +1005,11 @@ struct
     =
     Logger.trace __FUNCTION__;
     estimate_by ~cap_factor (successors_bisim ~refl g pi) root
+  ;;
+
+  let estimate_plan ?(cap_factor : int = 4) (p : Policy.plan) : cost =
+    Logger.trace __FUNCTION__;
+    estimate_by ~cap_factor (Policy.successors p) p.root
   ;;
 
   let prefer_mutual ({ pairs; moves; nested } : cost) : bool =

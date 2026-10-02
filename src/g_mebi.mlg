@@ -292,6 +292,17 @@ VERNAC COMMAND EXTEND MeBi_Config_Solver_MutualCofix CLASSIFIED AS QUERY
   { Api.set_solver_strategy Api.Auto }
 END
 
+VERNAC COMMAND EXTEND MeBi_Config_Solver_Answers CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Solver" "Answers" "Default"] ->
+  { Api.set_answer_policy Api.Answers_default }
+| ["MeBi" "Config" "Solver" "Answers" "Greedy"] ->
+  { Api.set_answer_policy Api.Answers_greedy }
+| ["MeBi" "Config" "Solver" "Answers" "Minimal"] ->
+  { Api.set_answer_policy Api.Answers_minimal }
+| ["MeBi" "Config" "Solver" "Answers" "Auto"] ->
+  { Api.set_answer_policy Api.Answers_auto }
+END
+
 (* Config -- output *)
 VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Output" string(x) "True"] -> 
