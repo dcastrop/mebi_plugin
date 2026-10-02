@@ -4981,6 +4981,45 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 **Session tally (2026-10-02, third session), cont.:** Optimization 1 ·
 Tooling 1 · Bug fix 1.
 
+## 2026-10-02 (third session) — Step 0 closed: no sterile re-inversions remain
+
+**Docs** (a measurement; no code committed). This is step 4 of note 11's
+order. Its result decides whether options B (smaller-first tie-break) and
+C (clear a hypothesis once inverted) are worth building: both target
+*sterile* steps, where the goal is unchanged and the only new hypothesis is
+an exact duplicate.
+
+**Method.** A temporary detector in the solver loop compared each step's
+before and after (goal count, focused conclusion, hypothesis types). It
+ran over all seven suites (41 Proc/CADP proofs, 6 CCS) and `abp ≤ spec`.
+**Validated first**: with the pre-option-A name-order tie-break switched
+back on, counts return to the old baseline, and the sterile steps found
+equal option A's saving *exactly*, proof by proof. For example, Test3
+`wsim_p3` has 78 sterile steps and went 1073 → 995; CADP
+`wsim_lts_bigstep` has 41 and went 396 → 355; CADP `weak_bisimilar` has
+115 and went 2875 → 2760.
+
+**Result: zero sterile steps on current code**:
+- 0 of 55,793 under `Auto` (forced `True` is identical);
+- 0 under forced `False`;
+- 0 of 6494 on the ABP.
+
+Option A removed all of them. So B and C have nothing to save and are
+closed unbuilt. D′ stage 2 is unneeded (the ABP closes), and so is note 7's
+tree-path D. **Step 0 is closed.**
+
+**A discrepancy, recorded rather than chased:** with the old order, this
+detector gives Test3 8.4% and CADP 4.4% overall, and Test1/2 0%. That is
+lower than note 7's 12% / 14.1% / 2.6–4.3% (measured 2026-09-29, before
+B2, on earlier code). The exact match with option A's savings is the
+evidence that the detector is right for the current code.
+
+The detector and the forced-strategy override are kept as patches in the
+local `notes/tools/`.
+
+**Session tally (2026-10-02, third session), final:** Optimization 1 ·
+Tooling 1 · Bug fix 1 · Docs 1 (PRs #14–#16 and this entry).
+
 ---
 
 ## Outstanding
@@ -4996,7 +5035,7 @@ Tooling 1 · Bug fix 1.
 - ~~No CI job — the Rocq 9.2 port broke the build for months without anyone noticing.~~ Added, 2026-09-27 (see below): `.github/workflows/ci.yml`.
 - ~~`.gitignore` lists `src/commandOLDunify.ml`, which no longer exists.~~ Removed, 2026-09-27 (see below). The rest of `TODO.md`'s C6 "stale detritus" item turned out to already be resolved or not actually a problem — see below for what was checked.
 - ~~`Saturation.edge_action_destinations` silently dropped all but the last-visited destination when a single action had more than one — a real correctness bug (found 2026-09-27 during the A2 investigation).~~ Fixed, 2026-09-27 (see below), with a regression test. `notes/2-unify-instead-of-lookup.md`'s A2 (multiple-actionpairs positive test case) remained separately open; ~~it~~ done 2026-10-01 (`theories/Test.v`, `MultipleDerivations`).
-- **Open as of 2026-10-02** (the chronological entries above have the detail): an LTS premise whose source nothing determines is explored from an unknown term and finds only some of its steps (warned; known-wrong test `OutputPremises.open_c`); Step 0, the inversion tie-break optimization (diagnosed, parked as design work); saturation is still cubic in witnesses on `Test4`'s shape (going linear changes which equal-length witnesses survive); `Proc/Test4` remains a documented limit (saturation refused at 74.6M weak actions; a proof would need ≥ ~700k solver iterations); C4/C5/C8 and the CADP no-starvation property are for the upstream authors. Found in the second 2026-10-02 session and fixed on branch `fix/weak-bisim-silent-closure`: the solver could not answer a silent step by moving silently, and the bisimilarity verdict was neither rooted nor split by `=ε⇒`. Open from it: `weak_bisim` in `theories/` is mutual similarity, not bisimilarity, and `MeBi Sim Begin` refuses similar-but-not-bisimilar `weak_sim` goals.
+- **Open as of 2026-10-02** (the chronological entries above have the detail): an LTS premise whose source nothing determines is explored from an unknown term and finds only some of its steps (warned; known-wrong test `OutputPremises.open_c`); Step 0, the inversion tie-break (closed in the third 2026-10-02 session: options A and D′ built, residual sterile steps measured at zero); saturation is still cubic in witnesses on `Test4`'s shape (going linear changes which equal-length witnesses survive); `Proc/Test4` remains a documented limit (saturation refused at 74.6M weak actions; a proof would need ≥ ~700k solver iterations); C4/C5/C8 and the CADP no-starvation property are for the upstream authors. Found in the second 2026-10-02 session and fixed on branch `fix/weak-bisim-silent-closure`: the solver could not answer a silent step by moving silently, and the bisimilarity verdict was neither rooted nor split by `=ε⇒`. Open from it: `weak_bisim` in `theories/` is mutual similarity, not bisimilarity, and `MeBi Sim Begin` refuses similar-but-not-bisimilar `weak_sim` goals.
 
 Working notes live in `notes/` (local only, excluded via `.git/info/exclude`, so
 not present in a fresh clone). Note 1 is done; its analysis was incomplete on two
