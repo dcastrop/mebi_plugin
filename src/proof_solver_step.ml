@@ -548,6 +548,19 @@ struct
       let* env = get_env in
       let concl = get_concl () in
       let h, _ = EConstr.decompose_app sigma concl in
+      (* A premise headed by a definition -- [n < 3] is [lt], which unfolds to
+         [le (S n) 3] -- is classified by what it unfolds to. Judged on [lt]
+         itself it was not a premise, so after [go : n < 3 -> succ_rel n m -> st n a m] was applied the solver took [0 < 3] for the silent-step
+         goal it finishes with [rt1n_refl] (found 2026-10-02, [Test.v]
+         [InversionShapes.Computed]). The plugin's own definitions keep
+         their head: the theory checks below need it. *)
+      let h =
+        if EConstr.isConst sigma h && Bool.not (Theory.is_any_theory h)
+        then
+          fst
+            (EConstr.decompose_app sigma (Reductionops.whd_all env sigma concl))
+        else h
+      in
       let lts_of (m : Model.FSM.t) : bool =
         try Theory.is_fsm_constructor h m with _ -> false
       in
