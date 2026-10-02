@@ -3892,6 +3892,81 @@ because its last-explored states are terminal. The comment is corrected.
 **Session tally (2026-10-02):** New feature 3 · Bug fix 2 · Refactor 1 ·
 Docs 1 · Optimization 0 · Tooling 0.
 
+## 2026-10-02 (second session) — Provenance audit against `rocq-sims`; a solver gap found by its example
+
+**Docs** (audit) · **Tooling** (one known-wrong test). Requested by Jonah: before
+evaluating MeBi against related work, check whether anything Claude
+contributed was copied from [`rocq-sims`](https://github.com/rocq-sims/rocq-sims)
+(N. Chappe, *A Family of Sims with Diverging Interests*, POPL'26), which works
+on the same subject, simulations over LTSs in Rocq.
+
+**What `rocq-sims` is.** A pure Rocq library (LGPL-3.0-or-later, ~4.5k lines
+of `.v`, no OCaml), first commit 2025-04-07, v0.2 2025-11-21. It defines 12
+simulation notions through one parameterised definition, including a
+divergence-sensitive weak simulation characterised by two mutually dependent
+coinductive relations, with up-to techniques built on Pous's `coinduction`
+library. Its proofs are written by hand. It has no LTS extraction, no decision
+procedure and no proof search. The subject overlaps with ours; the method
+does not.
+
+**Audit scope and method.** All 115 commits carrying the
+`Co-Authored-By: Claude` trailer (2026-08-16 to `9dab1b6`): 621 added lines
+of `.v` and 10,164 of OCaml (`.ml`/`.mli`/`.mlg`).
+- *Text.* Every added `.v` line of 25 characters or more, normalised for
+  whitespace, was matched against every line of `rocq-sims`: **0 matches**.
+  The same additions as 8-token shingles: **0 of 5,455 shared**. Over the
+  whole repository's `.v` (37 files, assisted or not), 10 shingles are
+  shared, all generic tactic or match idioms (`inversion H; subst; clear H`,
+  `| _, _ => False end`) and none from assisted lines. The OCaml has nothing
+  to compare against: `rocq-sims` contains none.
+- *Access.* The session transcripts from 2026-09-27 onward (10 sessions and 6
+  subagents) contain no web search, web fetch or clone of any outside
+  repository before this session. **Gap:** the 13 assisted commits of
+  2026-08-16 to 2026-08-18 (the Rocq 9.2 port, toolchain pinning, logger
+  refactor, encoding table, the first `tests.exe`) come from sessions whose
+  transcripts are not on disk, so for them there is only the text check.
+- *Ideas.* The techniques Claude introduced are standard and unrelated to
+  `rocq-sims`' contribution: weak-transition saturation by silent closure and
+  silent-SCC counting (textbook; Tarjan); one mutual `cofix` over the
+  reachable product (a Rocq proof-term construction, not a mutually
+  coinductive *definition* as in `rocq-sims`); bounded proof search to decide
+  constructor premises. That last one is close in spirit to QuickChick's
+  derivation of semi-decision procedures from inductive relations
+  (Paraskevopoulou, Eline, Lampropoulos, PLDI'22). It was not consulted, but
+  should be cited as related work.
+- *Limit of the audit.* A model trained on public code could reproduce an
+  idea without a session ever fetching it. The text check above is the
+  mitigation for verbatim reuse; it cannot rule out an idea absorbed in
+  training.
+
+**Verdict:** no copying from `rocq-sims` found; nothing to attribute. The
+one place `rocq-sims` content now enters this repository is deliberate and
+attributed: the LTS of its `examples/SimExample.v`, re-encoded for the
+finding below.
+
+**Finding (open, not fixed): the solver cannot answer a silent step by
+moving silently.** Porting `SimExample.v`'s 9-state LTS, `weak_sim t0 u0`
+stops on an internal `CouldNotGetGoalTransition`. Reduced to 5 states:
+`q` is `p` renamed, both `τ.a + b`, and `weak_sim p q` fails. To answer
+`p -τ-> p1`, `q` must move silently to `q1`, since staying at `q` is not
+bisimilar to `p1`. But `Saturation.edge_closure` records only weak moves
+with a visible action, so `Product.respond` finds no silent reply.
+`handle_wk_concl` covers only the case where staying put works, which
+is why every `Proc`/`CADP` proof passes: their silent steps are structural
+congruence and never change the bisimilarity class. The bisimilarity
+*checker* is unaffected (it correctly rejects Milner's `τ.a + b` vs
+`a + b`). No proof can be wrong because of this, since `Qed` checks it; it
+is missing. Pinned as known-wrong `theories/Test.v` `SilentResponse`. The
+`Fail` was checked for its reason.
+
+Also measured: `weak_sim` is divergence-insensitive, so a τ-loop and a stuck
+state prove similar both ways (5 and 2 iterations). That is correct for our
+definition, and is the main semantic difference to state in any comparison
+with `rocq-sims`.
+
+**Session tally (2026-10-02, second session):** Docs 1 · Tooling 1 ·
+New feature 0 · Bug fix 0 · Refactor 0 · Optimization 0.
+
 ---
 
 ## Outstanding
@@ -3907,7 +3982,7 @@ Docs 1 · Optimization 0 · Tooling 0.
 - ~~No CI job — the Rocq 9.2 port broke the build for months without anyone noticing.~~ Added, 2026-09-27 (see below): `.github/workflows/ci.yml`.
 - ~~`.gitignore` lists `src/commandOLDunify.ml`, which no longer exists.~~ Removed, 2026-09-27 (see below). The rest of `TODO.md`'s C6 "stale detritus" item turned out to already be resolved or not actually a problem — see below for what was checked.
 - ~~`Saturation.edge_action_destinations` silently dropped all but the last-visited destination when a single action had more than one — a real correctness bug (found 2026-09-27 during the A2 investigation).~~ Fixed, 2026-09-27 (see below), with a regression test. `notes/2-unify-instead-of-lookup.md`'s A2 (multiple-actionpairs positive test case) remained separately open; ~~it~~ done 2026-10-01 (`theories/Test.v`, `MultipleDerivations`).
-- **Open as of 2026-10-02** (the chronological entries above have the detail): an LTS premise whose source nothing determines is explored from an unknown term and finds only some of its steps (warned; known-wrong test `OutputPremises.open_c`); Step 0, the inversion tie-break optimization (diagnosed, parked as design work); saturation is still cubic in witnesses on `Test4`'s shape (going linear changes which equal-length witnesses survive); `Proc/Test4` remains a documented limit (saturation refused at 74.6M weak actions; a proof would need ≥ ~700k solver iterations); C4/C5/C8 and the CADP no-starvation property are for the upstream authors.
+- **Open as of 2026-10-02** (the chronological entries above have the detail): an LTS premise whose source nothing determines is explored from an unknown term and finds only some of its steps (warned; known-wrong test `OutputPremises.open_c`); Step 0, the inversion tie-break optimization (diagnosed, parked as design work); saturation is still cubic in witnesses on `Test4`'s shape (going linear changes which equal-length witnesses survive); `Proc/Test4` remains a documented limit (saturation refused at 74.6M weak actions; a proof would need ≥ ~700k solver iterations); C4/C5/C8 and the CADP no-starvation property are for the upstream authors. Found in the second 2026-10-02 session: the solver cannot answer a silent step by moving silently (known-wrong test `SilentResponse`).
 
 Working notes live in `notes/` (local only, excluded via `.git/info/exclude`, so
 not present in a fresh clone). Note 1 is done; its analysis was incomplete on two

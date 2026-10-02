@@ -1177,6 +1177,29 @@ Module OutputPremises.
   MeBi Config Reset Bounds.
 End OutputPremises.
 
+MeBi Divider "Theories.Test.SilentResponse".
+Module SilentResponse.
+  (* KNOWN WRONG (found 2026-10-02 while porting rocq-sims'
+     [examples/SimExample.v]): [q] is [p] renamed, both [tau.a + b], so
+     [p <= q] holds. Answering [p -tau-> p1] needs [q] to move silently to
+     [q1], since staying at [q] is not bisimilar to [p1]; but saturation
+     records only weak moves with a visible action, so [Product.respond] finds
+     no silent reply and the solver stops on [CouldNotGetGoalTransition]. A
+     proof is never wrong because of this, it is missing. When fixed, the
+     [Fail] starts failing: make it [MeBi Sim Solve 100. Qed.]. *)
+  Inductive st : Set := p | p1 | q | q1 | z.
+  Inductive lab : Set := a | b.
+  Inductive step : st -> option lab -> st -> Prop :=
+  | p_tau : step p None p1 | p_b : step p (Some b) z | p1_a : step p1 (Some a) z
+  | q_tau : step q None q1 | q_b : step q (Some b) z | q1_a : step q1 (Some a) z.
+  MeBi Config Weak As Option lab.
+  Example sim_p_q : weak_sim step step p q.
+  Proof. MeBi Sim Begin step p And step q Using step.
+    Fail MeBi Sim Solve 100.
+  Abort.
+  MeBi Config Reset Weak.
+End SilentResponse.
+
 (* [MeBi Help]: every topic parses and prints (backlog item F). *)
 MeBi Divider "Theories.Test.Help".
 MeBi Help.
