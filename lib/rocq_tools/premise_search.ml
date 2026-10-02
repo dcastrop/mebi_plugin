@@ -104,6 +104,36 @@ let unify
   | Pretype_errors.PretypeError _ | Evarconv.UnableToUnify _ -> raise NoUnify
 ;;
 
+(** [unify_conclusion env sigma concl goal]: [unify], and failing that,
+    argument by argument, left to right, each of [concl]'s arguments
+    normalized once the earlier ones have instantiated its evars. A
+    constructor whose index is computed from its binders ([ev k (dbl k)],
+    [termLTS (tfix t) None (subst (tfix t) t)]) can defeat [w_unify] on the
+    whole application, though the goal holds: [k := 2] first makes
+    [dbl k] reduce to [4]. A success is a genuine solution; the proof found
+    is still type-checked ([search_closed]). *)
+let unify_conclusion
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (concl : EConstr.t)
+      (goal : EConstr.t)
+  : Evd.evar_map
+  =
+  try unify env sigma concl goal with
+  | NoUnify ->
+    let h1, a1 = EConstr.decompose_app sigma concl in
+    let h2, a2 = EConstr.decompose_app sigma goal in
+    if Array.length a1 <> Array.length a2 then raise NoUnify;
+    let sigma = unify env sigma h1 h2 in
+    let sigma = ref sigma in
+    Array.iteri
+      (fun i x ->
+        let x = Reductionops.nf_all env !sigma (Reductionops.nf_evar !sigma x) in
+        sigma := unify env !sigma x a2.(i))
+      a1;
+    !sigma
+;;
+
 (** The most solutions one search may enumerate; reaching it makes the
     search incomplete (some solutions may be missing). *)
 let max_solutions : int = 64
@@ -234,8 +264,22 @@ and try_constructor
   let sigma, concl, evs =
     binders sigma (Retyping.get_type_of env sigma ctor) []
   in
-  match unify env sigma concl goal with
-  | exception NoUnify -> [], true
+  match unify_conclusion env sigma concl goal with
+  | exception NoUnify ->
+    (* A failed match rules this constructor out only if the conclusion's
+       indices are patterns too: first-order unification against those is
+       complete. One computed by a function of the binders -- [do_fix]'s
+       target [subst (tfix t) t] -- can fail to unify where the goal holds,
+       so that is not a refutation. Until 2026-10-02 it counted as one, and
+       [termLTS (tfix p) None (subst (tfix p) p)], true, was "refuted". *)
+    let (((ind, _), _) : Names.constructor * EConstr.EInstance.t) = c in
+    let mib, _ = Inductive.lookup_mind_specif env ind in
+    let np = mib.Declarations.mind_nparams in
+    let _, cargs = EConstr.decompose_app sigma concl in
+    ( []
+    , Array.for_all
+        Fun.id
+        (Array.mapi (fun i a -> i < np || arg_pattern env sigma a) cargs) )
   | sigma ->
     (* every partial solution continues into the next premise *)
     let rec premises (states : Evd.evar_map list) (complete : bool) = function
