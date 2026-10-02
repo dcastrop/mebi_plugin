@@ -26,6 +26,20 @@ module type S = sig
   val respond : ?silent:edgemap -> fsm -> state -> label -> states -> transition
   val simulation : fsm -> fsm -> fsm -> Pair.Set.t
 
+  type answer =
+    | Stay
+    | Move of transition
+
+  val answer
+    :  ?silent:edgemap
+    -> ?sim:(state -> states)
+    -> fsm
+    -> partition
+    -> state
+    -> label
+    -> state
+    -> answer option
+
   val successors
     :  ?silent:edgemap
     -> ?sim:(state -> states)
@@ -285,6 +299,47 @@ struct
     refine all
   ;;
 
+  type answer =
+    | Stay
+    | Move of C.Transition.t
+
+  (* THE choice of answer, for the solver and the product alike: the one place
+     a policy for choosing answers would go. [y] must answer the other
+     system's move [-label-> x'].
+
+     A silent move to somewhere already bisimilar to [y] is answered by
+     standing still, and everything else by [respond] into [x']'s
+     bisimilarity class. Failing both, given [sim] (a [weak_sim] goal between
+     states that are similar but not bisimilar), the same two tries against
+     [x']'s simulators. Before 2026-10-02 this was written out twice, here
+     and in [Proof_solver_step.handle_wk_concl]/[handle_visible_transition],
+     which had to be kept in step by hand: a mismatch is a pair outside the
+     mutual block. *)
+  let answer
+        ?(silent : C.EdgeMap.t' option)
+        ?(sim : (C.State.t -> C.State.Set.t) option)
+        (b : FSM.t)
+        (pi : C.Partition.t)
+        (y : C.State.t)
+        (label : C.Label.t)
+        (x' : C.State.t)
+    : answer option
+    =
+    Logger.trace __FUNCTION__;
+    let into (target : C.State.Set.t) : answer option =
+      if C.Label.is_silent label && C.State.Set.mem y target
+      then Some Stay
+      else (
+        match respond ?silent b y label target with
+        | t -> Some (Move t)
+        | exception NoBisimilarResponse _ -> None)
+    in
+    match into (bisimilar_with pi x'), sim with
+    | Some a, _ -> Some a
+    | None, Some sim -> into (sim x')
+    | None, None -> None
+  ;;
+
   (* [refl] says whether both sides of the game use the same LTS. When they do,
      a pair of equal states is closed outright by [weak_sim_refl] -- mirrors
      [Proof_solver_step.handle_weaksim]'s [is_weak_refl] test, which runs
@@ -308,27 +363,10 @@ struct
     else
       List.filter_map
         (fun ((label, x') : C.Label.t * C.State.t) ->
-          let bisimilar : C.State.Set.t = bisimilar_with pi x' in
-          (* Mirrors [Proof_solver_step.handle_wk_concl]: a silent move to
-             somewhere already bisimilar to [y] is answered by standing still,
-             and everything else goes through [respond]. *)
-          let answer (target : C.State.Set.t) : Pair.t option =
-            if C.Label.is_silent label && C.State.Set.mem y target
-            then Some (x', y)
-            else (
-              match respond ?silent b y label target with
-              | t -> Some (x', t.goto)
-              | exception NoBisimilarResponse _ -> None)
-          in
-          (* A bisimilar answer first, so a game between bisimilar states
-             is unchanged; failing that, given [sim], any state that
-             simulates [x'] -- mirrors [Proof_solver_step]'s fallback for a
-             [weak_sim] goal between states that are similar but not
-             bisimilar. *)
-          match answer bisimilar, sim with
-          | Some p, _ -> Some p
-          | None, Some sim -> answer (sim x')
-          | None, None -> None)
+          match answer ?silent ?sim b pi y label x' with
+          | Some Stay -> Some (x', y)
+          | Some (Move t) -> Some (x', t.goto)
+          | None -> None)
         (obligations a x)
   ;;
 

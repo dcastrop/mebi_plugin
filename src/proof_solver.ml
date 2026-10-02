@@ -258,7 +258,7 @@ let init
      bisimilarity: [a.b] is simulated by [a.(b + c)]. When the two states are
      not bisimilar, compute the greatest weak simulation, refuse only if they
      are not even similar, and give the solver each state's simulators to
-     fall back on (see [Proof_solver_step.handle_visible_transition]). *)
+     fall back on (see [Model.Product.answer]). *)
   (if
      goal_is_sim
      && Bool.not

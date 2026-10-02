@@ -86,6 +86,29 @@ module type S = sig
       bisimilarity: [a.b] is simulated by [a.(b + c)], not bisimilar to it. *)
   val simulation : fsm -> fsm -> fsm -> Pair.Set.t
 
+  (** How [b] answers a move: by standing still (a silent move, when [b]'s
+      state already qualifies), or by making a transition. *)
+  type answer =
+    | Stay
+    | Move of transition
+
+  (** [answer ?silent ?sim b pi y label x'] is how [b], at [y], answers the
+      other system's move [-label-> x'] -- for the proof solver and for
+      {!val:successors} alike, the single place answers are chosen. A silent
+      move is answered by standing still if [y] is bisimilar to [x'] (by
+      [pi]); otherwise {!val:respond} into [x']'s bisimilarity class. Failing
+      both and given [sim], the same two tries against [x']'s simulators.
+      [None] when nothing qualifies. *)
+  val answer
+    :  ?silent:edgemap
+    -> ?sim:(state -> states)
+    -> fsm
+    -> partition
+    -> state
+    -> label
+    -> state
+    -> answer option
+
   (** [successors a b pi p] is every game state reachable from [p] in one
       move, where [a] is the {b unsaturated} left-hand FSM {i (its
       transitions are the obligations, one per move the left-hand system can
