@@ -24,9 +24,11 @@ module type S = sig
   type edgemap
 
   val respond : ?silent:edgemap -> fsm -> state -> label -> states -> transition
+  val simulation : fsm -> fsm -> fsm -> Pair.Set.t
 
   val successors
     :  ?silent:edgemap
+    -> ?sim:(state -> states)
     -> refl:bool
     -> fsm
     -> fsm
@@ -36,6 +38,7 @@ module type S = sig
 
   val reachable
     :  ?silent:edgemap
+    -> ?sim:(state -> states)
     -> refl:bool
     -> fsm
     -> fsm
@@ -62,6 +65,7 @@ module type S = sig
   val estimate
     :  ?cap_factor:int
     -> ?silent:edgemap
+    -> ?sim:(state -> states)
     -> refl:bool
     -> fsm
     -> fsm
@@ -222,6 +226,65 @@ struct
         []
   ;;
 
+  (* The greatest weak simulation from [a] to [b], as [weak_sim] defines it:
+     every strong move [x -l-> x'] of [a] is answered by a weak move of [b],
+     [y =l=> y'] for a visible [l] (read off [b_saturated]) and [y =eps=> y']
+     for a silent one ([b]'s own silent closure, zero steps included), with
+     [(x', y')] again related. Naive refinement from all pairs: drop a pair
+     with an unanswerable move until nothing changes. Quadratic in the pairs
+     at worst; it is only computed for a [weak_sim] goal whose two states are
+     not bisimilar. *)
+  let simulation (a : FSM.t) (b : FSM.t) (b_saturated : FSM.t) : Pair.Set.t =
+    Logger.trace __FUNCTION__;
+    let closures : (C.State.t, C.State.Set.t) Hashtbl.t = Hashtbl.create 64 in
+    let closure (y : C.State.t) : C.State.Set.t =
+      match Hashtbl.find_opt closures y with
+      | Some c -> c
+      | None ->
+        let c =
+          Saturation.silent_paths b.edges y
+          |> List.fold_left
+               (fun acc (s, _, _) -> C.State.Set.add s acc)
+               C.State.Set.empty
+        in
+        Hashtbl.add closures y c;
+        c
+    in
+    let answers (y : C.State.t) (l : C.Label.t) : C.State.Set.t =
+      if C.Label.is_silent l
+      then closure y
+      else (
+        match C.EdgeMap.find_opt b_saturated.edges y with
+        | None -> C.State.Set.empty
+        | Some actions ->
+          C.Action.Map.destinations (C.Action.Map.reduce_by_label actions l))
+    in
+    let all : Pair.Set.t =
+      C.State.Set.fold
+        (fun x acc ->
+          C.State.Set.fold (fun y acc -> Pair.Set.add (x, y) acc) b.states acc)
+        a.states
+        Pair.Set.empty
+    in
+    let rec refine (r : Pair.Set.t) : Pair.Set.t =
+      let r' =
+        Pair.Set.filter
+          (fun ((x, y) : Pair.t) ->
+            List.for_all
+              (fun ((l, x') : C.Label.t * C.State.t) ->
+                C.State.Set.exists
+                  (fun y' -> Pair.Set.mem (x', y') r)
+                  (answers y l))
+              (obligations a x))
+          r
+      in
+      if Int.equal (Pair.Set.cardinal r') (Pair.Set.cardinal r)
+      then r
+      else refine r'
+    in
+    refine all
+  ;;
+
   (* [refl] says whether both sides of the game use the same LTS. When they do,
      a pair of equal states is closed outright by [weak_sim_refl] -- mirrors
      [Proof_solver_step.handle_weaksim]'s [is_weak_refl] test, which runs
@@ -231,6 +294,7 @@ struct
      that state's whole loop as surplus pairs the solver never visits. *)
   let successors
         ?(silent : C.EdgeMap.t' option)
+        ?(sim : (C.State.t -> C.State.Set.t) option)
         ~(refl : bool)
         (a : FSM.t)
         (b : FSM.t)
@@ -248,12 +312,23 @@ struct
           (* Mirrors [Proof_solver_step.handle_wk_concl]: a silent move to
              somewhere already bisimilar to [y] is answered by standing still,
              and everything else goes through [respond]. *)
-          if C.Label.is_silent label && C.State.Set.mem y bisimilar
-          then Some (x', y)
-          else (
-            match respond ?silent b y label bisimilar with
-            | t -> Some (x', t.goto)
-            | exception NoBisimilarResponse _ -> None))
+          let answer (target : C.State.Set.t) : Pair.t option =
+            if C.Label.is_silent label && C.State.Set.mem y target
+            then Some (x', y)
+            else (
+              match respond ?silent b y label target with
+              | t -> Some (x', t.goto)
+              | exception NoBisimilarResponse _ -> None)
+          in
+          (* A bisimilar answer first, so a game between bisimilar states
+             is unchanged; failing that, given [sim], any state that
+             simulates [x'] -- mirrors [Proof_solver_step]'s fallback for a
+             [weak_sim] goal between states that are similar but not
+             bisimilar. *)
+          match answer bisimilar, sim with
+          | Some p, _ -> Some p
+          | None, Some sim -> answer (sim x')
+          | None, None -> None)
         (obligations a x)
   ;;
 
@@ -274,6 +349,7 @@ struct
 
   let reachable
         ?(silent : C.EdgeMap.t' option)
+        ?(sim : (C.State.t -> C.State.Set.t) option)
         ~(refl : bool)
         (a : FSM.t)
         (b : FSM.t)
@@ -282,7 +358,7 @@ struct
     : Pair.Set.t
     =
     Logger.trace __FUNCTION__;
-    reachable_by (successors ?silent ~refl a b pi) root
+    reachable_by (successors ?silent ?sim ~refl a b pi) root
   ;;
 
   type game =
@@ -375,6 +451,7 @@ struct
   let estimate
         ?(cap_factor : int = 4)
         ?(silent : C.EdgeMap.t' option)
+        ?(sim : (C.State.t -> C.State.Set.t) option)
         ~(refl : bool)
         (a : FSM.t)
         (b : FSM.t)
@@ -383,7 +460,7 @@ struct
     : cost
     =
     Logger.trace __FUNCTION__;
-    estimate_by ~cap_factor (successors ?silent ~refl a b pi) root
+    estimate_by ~cap_factor (successors ?silent ?sim ~refl a b pi) root
   ;;
 
   let estimate_bisim
