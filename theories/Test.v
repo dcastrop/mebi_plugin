@@ -1165,15 +1165,88 @@ Module OutputPremises.
   Proof. MeBi Sim Begin via_c 0 And via_c' 0 Using base. MeBi Sim Solve 100. Qed.
   MeBi Config Reset Weak.
 
-  (* KNOWN WRONG: nothing determines [q] before [base q a q'] is explored,
-     so it is explored from an unknown source and only some of its steps are
-     found (with a warning). The true LTS from 0 has 3 states (0, 1, 2); this
-     extraction fits in 2. When fixed, the second command below starts
-     failing (LTS_Incomplete): turn it into [Fail]. *)
+  (* An LTS premise whose source nothing determines: [q] below. Its sources
+     are enumerated by the premise search and each is explored as usual.
+     Until 2026-10-03 it was explored from the open source, where the first
+     constructor that matched fixed [q] for all the others, so only [b0] was
+     found (2 states; [b0] and [b1] swapped gave a different 2), and a
+     recursive constructor was cut off the same way (note 9, option B). *)
   Inductive open_c : nat -> option bool -> nat -> Prop :=
   | open_go q n a q' : base q a q' -> n <= 5 -> open_c n a q'.
-  MeBi Config Bounds As Num States 2.
+  Inductive open_c' : nat -> option bool -> nat -> Prop :=
+  | open_go' q n a q' : base q a q' -> n <= 5 -> open_c' n a q'.
+  (* [base] with its constructors swapped: the same LTS *)
+  Inductive base_sw : nat -> option bool -> nat -> Prop :=
+  | bs1 : base_sw 1 (Some true) 2 | bs0 : base_sw 0 (Some true) 1.
+  Inductive open_sw : nat -> option bool -> nat -> Prop :=
+  | open_sw_go q n a q' : base_sw q a q' -> n <= 5 -> open_sw n a q'.
+  (* recursive, guarded: sources 0..3, so 0 goes to 1..4 *)
+  Inductive rb : nat -> option bool -> nat -> Prop :=
+  | rb0 : rb 0 (Some true) 1
+  | rbs q a q' : q <= 2 -> rb q a q' -> rb (S q) a (S q').
+  Inductive open_rec : nat -> option bool -> nat -> Prop :=
+  | open_rec_go q a q' : rb q a q' -> open_rec 0 a q'.
+  Inductive open_rec' : nat -> option bool -> nat -> Prop :=
+  | open_rec_go' q a q' : rb q a q' -> open_rec' 0 a q'.
+
+  MeBi Config Bounds As Num States 3.
   MeBi Run LTS 0 Using open_c base.
+  MeBi Run LTS 0 Using open_sw base_sw.
+  MeBi Config Bounds As Num States 2.
+  Fail MeBi Run LTS 0 Using open_c base.
+  Fail MeBi Run LTS 0 Using open_sw base_sw.
+  MeBi Config Bounds As Num States 5.
+  MeBi Run LTS 0 Using open_rec rb.
+  MeBi Config Bounds As Num States 4.
+  Fail MeBi Run LTS 0 Using open_rec rb.
+  MeBi Config Reset Bounds.
+
+  MeBi Config Weak As Option bool.
+  Example w_open : weak_sim open_c open_c' 0 0.
+  Proof. MeBi Sim Begin open_c 0 And open_c' 0 Using base. MeBi Sim Solve 100. Qed.
+  (* KNOWN WRONG: the solver stops on an internal [Not_found] here. Not
+     from the open source: the same LTS with the source fixed by
+     [In q [0; 1; 2; 3]] fails the same way, already before 2026-10-03,
+     while [rb] alone proves. When fixed, this [Fail] starts failing: make
+     it a proof. *)
+  Example w_open_rec : weak_sim open_rec open_rec' 0 0.
+  Proof.
+    MeBi Sim Begin open_rec 0 And open_rec' 0 Using rb.
+    Fail MeBi Sim Solve 100.
+  Abort.
+  MeBi Config Reset Weak.
+
+  (* KNOWN LIMIT, warned: transitions MeBi cannot determine. [u n] is a
+     step from [S n] for every [n], with nothing to bound [n]: [open_u 0]
+     has infinitely many successors. Such a transition is dropped with a
+     warning ("cannot determine"), so these LTSs have one state. Until
+     2026-10-03 the first two were dropped silently, and the third kept
+     [S (S ?n)] as if it were a state. *)
+  Inductive ung : nat -> option bool -> nat -> Prop := u n : ung (S n) None n.
+  Inductive open_u : nat -> option bool -> nat -> Prop :=
+  | open_u_go q a q' : ung q a q' -> open_u 0 a q'.
+  Inductive ung2 : nat -> option bool -> nat -> Prop :=
+  | u2 n : ung2 (S n) None (S (S n)).
+  Inductive open_u2 : nat -> option bool -> nat -> Prop :=
+  | open_u2_go q a q' : ung2 q a q' -> open_u2 0 a q'.
+  MeBi Config Bounds As Num States 1.
+  MeBi Run LTS 0 Using open_u ung.      (* [ung] explored as an LTS *)
+  MeBi Run LTS 0 Using open_u.          (* [ung] as a plain premise *)
+  MeBi Run LTS 0 Using open_u2 ung2.
+  MeBi Config Reset Bounds.
+
+  (* KNOWN LIMIT, warned: recursive and unguarded, so the sources are
+     infinitely many; the search stops at [MeBi Config Premise Depth] and
+     says its solutions may be incomplete. Exploring from the open source,
+     as before 2026-10-03, would recurse without bound once the first
+     match no longer cut it off. *)
+  Inductive ur : nat -> option bool -> nat -> Prop :=
+  | ur0 : ur 0 (Some true) 1
+  | urs q a q' : ur q a q' -> ur (S q) a (S q').
+  Inductive open_ur : nat -> option bool -> nat -> Prop :=
+  | open_ur_go q a q' : ur q a q' -> open_ur 0 a q'.
+  MeBi Config Bounds As Num States 100.
+  MeBi Run LTS 0 Using open_ur ur.
   MeBi Config Reset Bounds.
 End OutputPremises.
 

@@ -98,7 +98,12 @@ let text : string list -> string option = function
          \  - a premise that computes something -- the target, or what an LTS \
           premise needs ([In q l -> lts q a q']) -- is enumerated, each \
           solution a transition of its own; MeBi warns if the solutions may be \
-          incomplete, or if an LTS premise has a source nothing determines;\n\
+          incomplete. An LTS premise whose source nothing determines ([lts q a \
+          q'] with [q] free) is enumerated the same way, and each source found \
+          explored;\n\
+         \  - a transition with a binder nothing determines ([lts (S n) a n], \
+          [n] free) may stand for infinitely many: it is left out, with a \
+          warning, so the LTS may be missing transitions;\n\
          \  - a negation [~ P] holds iff P is refuted by a complete search, \
           and is proved by refuting P;\n\
          \  - with [MeBi Config Premise Tactic <tactic>], a premise the search \
