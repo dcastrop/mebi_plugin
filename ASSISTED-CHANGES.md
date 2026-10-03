@@ -5258,6 +5258,82 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 
 **Session tally (2026-10-03), cont.:** Tooling 1 · Bug fix 5 · Docs 1.
 
+## 2026-10-03 — Saturation on demand, and bisimilarity on the silent-SCC quotient
+
+**New feature** (a config option and a new code path for large FSMs) ·
+**Refactor** · **Tooling** (tests). On branch `feature/on-demand-saturation`.
+Stage 1 of note 13, agreed with Jonah after measuring: `Proc/Test4`'s
+saturation (74.6M weak actions, 34-67GB) was refused outright; the
+plan is to decide it (this entry) and, separately, to prove it up to
+silent steps (stages 2-3).
+
+**What it does.**
+- `FSM.saturate_on_demand`: an FSM whose saturated edges are filled one
+  state at a time when first asked about (`FSM.ensure`), holding at most
+  a budget of weak actions (oldest dropped, recomputed if needed). It runs
+  the *same* per-state code as `FSM.saturate` (refactored out as
+  `Saturation.state_actions`), so the weak actions and witnesses are
+  identical: no "3b" divergence. `Product`'s three readers of saturated
+  edges call `ensure` first.
+- `SaturationEstimate.partition`: weak bisimilarity on the quotient by
+  silent SCCs (states in one silent SCC have the same weak moves and are
+  weakly bisimilar), refined by weak and `=eps=>` moves and expanded to
+  states. Memory is the number of SCC-level weak moves: 5,184 for
+  `Test4`'s 9720 states.
+- `MeBi Config Saturation OnDemand True | False | Auto` (default `Auto`,
+  reset by `Reset Bounds`). `Auto`: an FSM whose saturation would exceed
+  `Bounds Saturation` -- until now an error for `Run Bisim` and `Sim
+  Begin` -- is saturated on demand, with a warning giving the estimate and
+  the memory cap; `True` forces it (for measuring); `False` restores the
+  refusal. `Run Saturate` and `Run Minimize` still saturate whole. Help
+  topics updated.
+
+**Tests.** `tests.exe` (84/84): on demand = whole, state by state, on 300
+random LTSs at budgets 1M and 1 (every fill evicting); quotient partition
+= saturated partition on 300 LTSs and 150 merged pairs; Milner's pair
+kept apart. `Test.v` `SaturationGuard`: at bound 1, `Run Bisim` and a
+`weak_sim` proof now succeed on demand, in the same 38 steps as saturated
+whole and as forced on demand; `OnDemand False` refuses as before.
+
+**Evaluation (Jonah's request: should it be used always?).**
+- *E1, the default:* every count unchanged (all six suites, CCS,
+  `LawProofs.v`, `Test.v`'s 41); no example triggers it.
+- *E2, forced on demand for every example:* first run, every count
+  identical, peak memory identical to within 0.05GB, wall time within
+  run-to-run noise either way. But see the fix below: on demand, `Auto`
+  now takes the nested cofix, so forced on demand reproduces forced
+  `MutualCofix False` exactly (CADP stops at 2875, Proc/Test1 at 709,
+  Test2 the nested counts, CCS 434, `LawProofs` at `expansion`). Using it
+  always would give up `Auto`'s mutual choice and fail checked-in bounds,
+  for no memory gain on these examples: **not as a default**.
+- *E3, `Proc/Test4`:* `Run Bisim p q` now **succeeds in 45s** (two 21s
+  extractions and the quotient check), instead of being refused (and
+  before the guard, taking the machine down). `Sim Begin` takes 45s too.
+  The proof itself remains out of reach without stage 3: 301 solver steps
+  took 68s (0.23s a step, ~70x Proc/Test3's, since dropped states are
+  saturated again) and 2.0GB, against ~525k steps needed.
+
+**A problem found by E3, and fixed (separate commit).** On demand,
+`Sim Begin` on `Test4` was still running after 29 minutes: `Auto`'s
+strategy estimate (and any non-default answer policy's plan) walks every
+reachable pair of the product game up front, saturating state after state
+as the cache drops them. When either FSM is saturated on demand both are
+now skipped, with a notice: answers move by move, nested cofix.
+
+**Mistakes on the way, caught before committing.** A test of mine set
+`OnDemand True` and then `Reset Bounds`, which resets the mode, so that
+proof ran saturated whole (spotted: it gave no warning). `make` rejected
+two things `dune build` accepts: a doc comment directly after a `val`
+(warning 50, "ambiguous"), and `Option.value`, which the packed build
+resolves to another module (`Stdlib.Option` now).
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep feature/on-demand-saturation main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 2 · Bug fix 5 · Docs 1 ·
+New feature 1 · Refactor 1.
+
 ---
 
 ## Outstanding
