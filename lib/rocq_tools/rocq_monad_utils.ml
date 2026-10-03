@@ -260,7 +260,8 @@ module type S = sig
       val unify_list_opt : Problem.t list -> tree list option mm
 
       val sandbox_unify_all
-        :  EConstr.t
+        :  enc
+        -> EConstr.t
         -> EConstr.t
         -> t
         -> (EConstr.t * EConstr.t * tree list) list mm
@@ -1272,7 +1273,11 @@ module Make (Enc : Encoding.S) :
             then String.sub h 1 (String.length h - 1)
             else h
           in
-          let key : string * string = Enc.to_string lts_enc, head in
+          (* by name: encodings are numbered afresh by every command, so
+             keying by encoding silenced a later command's different LTS *)
+          let key : string * string =
+            Rocq_utils.Strfy.econstr env sigma (decode lts_enc), head
+          in
           if Bool.not (Hashtbl.mem skipped_premises key)
           then (
             Hashtbl.add skipped_premises key ();
@@ -1314,7 +1319,7 @@ module Make (Enc : Encoding.S) :
       let open Syntax in
       let$+ _warned env sigma =
         let head = Rocq_utils.Strfy.econstr env sigma name in
-        let key = Enc.to_string lts_enc, head in
+        let key = Rocq_utils.Strfy.econstr env sigma (decode lts_enc), head in
         if Bool.not (Hashtbl.mem partial_premises key)
         then (
           Hashtbl.add partial_premises key ();
@@ -1335,32 +1340,46 @@ module Make (Enc : Encoding.S) :
       return ()
     ;;
 
-    (** LTSs warned about for exploring a premise from an open source. *)
-    let open_sources : (string * string, unit) Hashtbl.t = Hashtbl.create 8
+    (** LTSs warned about for transitions MeBi could not determine. *)
+    let undetermined : (string, unit) Hashtbl.t = Hashtbl.create 8
 
-    (** An LTS premise explored while its source term is still open (nothing
-        earlier fixed it): constructor matching then finds only some of its
-        steps, so transitions may be missing. Once per LTS and premise. *)
-    let warn_open_source (lts_enc : Enc.t) (premise : EConstr.t) : unit mm =
+    (** A transition whose label or target still has an unknown in it once
+        everything that could fix it has been tried: a constructor binder
+        nothing determines ([u n : lts (S n) None n], met from an open source),
+        or an LTS premise whose sources the search leaves open. It stands for a
+        family of transitions, possibly infinite, that MeBi cannot enumerate,
+        so it is dropped: the LTS may be missing transitions. Until 2026-10-03
+        these were dropped (or, with a target like [S ?n], kept as one state)
+        without a word. Once per LTS. *)
+    let warn_undetermined (lts_enc : Enc.t) (what : EConstr.t) : unit mm =
       let open Syntax in
       let$+ _warned env sigma =
-        let head = Rocq_utils.Strfy.econstr env sigma premise in
-        let key = Enc.to_string lts_enc, head in
-        if Bool.not (Hashtbl.mem open_sources key)
+        (* by name: encodings are numbered afresh by every command *)
+        let lts = Rocq_utils.Strfy.econstr env sigma (decode lts_enc) in
+        if Bool.not (Hashtbl.mem undetermined lts)
         then (
-          Hashtbl.add open_sources key ();
+          Hashtbl.add undetermined lts ();
           Logger.warning
             (Printf.sprintf
-               "A constructor of %s has a premise over [%s] whose source term \
-                nothing before it determines, so MeBi explores it from an \
-                unknown term and may find only some of its steps: the \
-                extracted LTS may be missing transitions. Order the premises \
-                so that whatever determines the source comes first. See [MeBi \
-                Help Premises]."
-               (Rocq_utils.Strfy.econstr env sigma (decode lts_enc))
-               head))
+               "A constructor of %s gives a transition MeBi cannot determine \
+                ([%s] still has an unknown in it): some binder is fixed by \
+                nothing, neither the source term nor a premise, so it may \
+                stand for infinitely many terms. It is left out, so the \
+                extracted LTS may be missing transitions, and a [MeBi Run \
+                Bisim] verdict on it may be wrong (a proof cannot be: [Qed] \
+                checks every step). Add a premise that bounds the binder. See \
+                [MeBi Help Premises]."
+               lts
+               (Rocq_utils.Strfy.econstr
+                  env
+                  sigma
+                  (Reductionops.nf_evar sigma what))))
       in
       return ()
+    ;;
+
+    let has_evars (sigma : Evd.evar_map) (x : EConstr.t) : bool =
+      Bool.not (Evar.Set.is_empty (Evd.evars_of_term sigma x))
     ;;
 
     (** Decide a constructor's deferred premises, left to right, over every
@@ -1463,6 +1482,7 @@ module Make (Enc : Encoding.S) :
       ;;
 
       let sandbox_unify_all
+            (lts_enc : Enc.t)
             (act : EConstr.t)
             (goto : EConstr.t)
             ({ sigma; to_unify; deferred } : t)
@@ -1489,16 +1509,33 @@ module Make (Enc : Encoding.S) :
              let* () = warn warn_if_skipped_premise undecided in
              let* () = warn warn_partial_premise partial in
              let* env = get_env in
-             (* one transition per way the deferred premises hold *)
+             (* one transition per way the deferred premises hold; one with
+                an unknown left in it is dropped, with a warning *)
+             let found =
+               List.map
+                 (fun sigma ->
+                   ( sigma
+                   , Reductionops.nf_all env sigma act
+                   , Reductionops.nf_all env sigma goto ))
+                 states
+             in
+             let* () =
+               match
+                 List.find_opt
+                   (fun (sigma, act, goto) ->
+                     has_evars sigma act || has_evars sigma goto)
+                   found
+               with
+               | Some (_, _, goto) -> warn_undetermined lts_enc goto
+               | None -> return ()
+             in
              return
                (List.filter_map
-                  (fun sigma ->
-                    let act = Reductionops.nf_all env sigma act in
-                    let goto = Reductionops.nf_all env sigma goto in
-                    if EConstr.isEvar sigma act && EConstr.isEvar sigma goto
+                  (fun (sigma, act, goto) ->
+                    if has_evars sigma act || has_evars sigma goto
                     then None
                     else Some (act, goto, constructor_trees))
-                  states))
+                  found))
       ;;
     end
 
@@ -1546,7 +1583,9 @@ module Make (Enc : Encoding.S) :
           let* acc = retrieve constructor_index acc act tgt (lts_enc, tl) in
           let* found : Constructor.t list =
             sandbox
-              (let* results = Problems.sandbox_unify_all act tgt problems in
+              (let* results =
+                 Problems.sandbox_unify_all lts_enc act tgt problems
+               in
                return
                  (List.map
                     (fun (act, goto, constructor_trees) ->
@@ -1581,9 +1620,12 @@ module Make (Enc : Encoding.S) :
         log_econstr ~__FUNCTION__ ~s:"act" act;
         log_econstr ~__FUNCTION__ ~s:"tgt" tgt;
         let open Syntax in
-        let* is_evar : bool = econstr_is_evar tgt in
-        if is_evar
-        then return constructors
+        let$+ open_ _ sigma = has_evars sigma act || has_evars sigma tgt in
+        if open_
+        then
+          (* a binder nothing fixes: see [warn_undetermined] *)
+          let* () = warn_undetermined (fst constructor_index) tgt in
+          return constructors
         else (
           let tree : Enc.Tree.t = N (constructor_index, []) in
           let axiom : Constructor.t = Constructor.encode act tgt tree in
@@ -1768,18 +1810,20 @@ module Make (Enc : Encoding.S) :
       | Some c ->
         let open Syntax in
         let raw_args = args in
-        (* Explore this LTS premise from the current evar map, then carry on
-           with the remaining binders. *)
-        let explore () =
+        let lhs_raw = (Rocq_utils.constructor_args raw_args).lhs in
+        (* the alternatives found, each in its own branch, as one result *)
+        let combine branches =
+          match List.filter_map Fun.id branches with
+          | [] -> return None
+          | (enc, _) :: _ as found ->
+            return (Some (enc, List.concat_map snd found))
+        in
+        (* Explore this LTS premise from the current evar map, its source
+           closed, then carry on with the remaining binders. *)
+        let explore_closed () =
           let args = Rocq_utils.constructor_args raw_args in
           let$+ lhs env sigma = Reductionops.nf_evar sigma args.lhs in
           let$+ act env sigma = Reductionops.nf_evar sigma args.act in
-          let$+ lhs_open _ sigma =
-            Bool.not (Evar.Set.is_empty (Evd.evars_of_term sigma lhs))
-          in
-          let* () =
-            if lhs_open then warn_open_source lts_enc name else return ()
-          in
           let args = { args with lhs; act } in
           let next_lts : Ind.LTS.constructor array =
             Ind.get_lts_constructor_types c
@@ -1796,7 +1840,75 @@ module Make (Enc : Encoding.S) :
             let acc = ListOfProblems.cross_product problems acc in
             check_updated_ctx lts_enc acc indmap (substl, tl)
         in
-        let lhs_raw = (Rocq_utils.constructor_args raw_args).lhs in
+        (* The premise's source is open and nothing fixes it. Matching
+           constructors against an open source cannot be trusted: the first
+           match fixes it for all its siblings, so only the first constructor
+           was ever found, and a recursive one could recurse without bound.
+           Instead the premise search, which is bounded and knows when it is
+           complete, enumerates the premise, and each distinct source it finds
+           is explored as usual (note 9, option B). Until 2026-10-03 this
+           explored from the open source, with a warning. *)
+        let explore_sources () =
+          let$+ found env sigma =
+            let premise =
+              Reductionops.nf_evar sigma (EConstr.mkApp (name, raw_args))
+            in
+            let sols, complete = Premise_search.enumerate env sigma premise in
+            let source s = Reductionops.nf_all env s lhs_raw in
+            let closed, open_ =
+              List.partition (fun s -> Bool.not (has_evars s (source s))) sols
+            in
+            (* closed terms: comparing them under any evar map is sound *)
+            let sources =
+              List.fold_left
+                (fun acc s ->
+                  let l = source s in
+                  if List.exists (EConstr.eq_constr sigma l) acc
+                  then acc
+                  else l :: acc)
+                []
+                closed
+            in
+            let undetermined =
+              match open_ with
+              | s :: _ ->
+                Some (Reductionops.nf_evar s (EConstr.mkApp (name, raw_args)))
+              | [] -> None
+            in
+            List.rev sources, complete, undetermined
+          in
+          let sources, complete, undetermined = found in
+          let* () =
+            if complete
+            then return ()
+            else warn_partial_premise lts_enc (name, raw_args)
+          in
+          let* () =
+            match undetermined with
+            | Some t -> warn_undetermined lts_enc t
+            | None -> return ()
+          in
+          let* branches =
+            iterate
+              0
+              (List.length sources - 1)
+              []
+              (fun k acc ->
+                let* r =
+                  sandbox
+                    (let* ok = Pair.unifies lhs_raw (List.nth sources k) in
+                     if ok then explore_closed () else return None)
+                in
+                return (r :: acc))
+          in
+          combine branches
+        in
+        let explore () =
+          let$+ lhs_open _ sigma =
+            has_evars sigma (Reductionops.nf_evar sigma lhs_raw)
+          in
+          if lhs_open then explore_sources () else explore_closed ()
+        in
         let$+ lhs_open _ sigma =
           Bool.not
             (Evar.Set.is_empty
@@ -1864,10 +1976,7 @@ module Make (Enc : Encoding.S) :
                 let* r = sandbox ~sigma:(List.nth states k) (explore ()) in
                 return (r :: acc))
           in
-          (match List.filter_map Fun.id branches with
-           | [] -> return None
-           | (enc, _) :: _ as found ->
-             return (Some (enc, List.concat_map snd found)))
+          combine branches
 
     and check_unknown_app
           (lts_enc : Enc.t)

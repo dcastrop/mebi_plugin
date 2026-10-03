@@ -271,7 +271,8 @@ module type S = sig
       val unify_list_opt : Problem.t list -> tree list option mm
 
       val sandbox_unify_all
-        :  EConstr.t
+        :  enc
+        -> EConstr.t
         -> EConstr.t
         -> t
         -> (EConstr.t * EConstr.t * tree list) list mm

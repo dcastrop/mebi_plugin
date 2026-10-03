@@ -81,7 +81,9 @@ To run them:
    instances of CTrees' CCS laws, with least bounds, so any increase fails
    the build: under `Auto`, `36, 58, 19, 19, 56, 42, 53, 28, 15, 98, 278,
    357, 325, 3192`. Forced `True` differs only at `tau1` (29); forced
-   `False` stops at `paraC` (its `paraA` was OOM-killed at 5GB).
+   `False` stops at `expansion` (bound 97, the nested path needs 155;
+   past it, `paraC`..`parap0` take 2218, 3127, 2853 and `paraA` was
+   OOM-killed at 5GB).
    A change to *classification* (Solved/Unsolved) is a regression. A change
    to iteration *count* needs an explanation (fewer is fine if it fixes a
    real miss; more needs justifying).
