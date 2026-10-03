@@ -115,6 +115,46 @@ Proof.
 Qed.
 Hint Resolve weak_sim_trans : rel_db.
 
+(* Proofs up to silent steps (notes/13, option 4; added 2026-10-03, nothing
+   above changed). A state silently reachable from [r] is simulated by
+   whatever simulates [r]: each of its moves is a weak move of [r]. And a
+   state that silently reaches [n'] simulates whatever [n'] simulates: it
+   answers as [n'] does, after the silent steps. So a proof need only treat
+   one state per silent strongly connected component, and transfer. *)
+
+(* A silent prefix extends a weak move. *)
+Lemma weak_silent_prefix {M A} {lts : LTS M A} : forall x y z a,
+    silent lts x y -> weak lts y z a -> weak lts x z a.
+Proof.
+  intros x y z a S W; destruct W as [b u t PRE ACT POST | TAUs].
+  - exact (wk_some lts x z b u t (clos_rt_trans S PRE) ACT POST).
+  - exact (wk_none lts x z (clos_rt_trans S TAUs)).
+Qed.
+
+(* A strong move after silent steps is a weak move. *)
+Lemma weak_after_silent {M A} {lts : LTS M A} : forall r m m2 a,
+    silent lts r m -> lts m a m2 -> weak lts r m2 a.
+Proof.
+  intros r m m2 a S T; exact (weak_silent_prefix r m m2 a S (inject_weak _ _ _ T)).
+Qed.
+
+Lemma weak_sim_silent_l {M N A} {ltsM : LTS M A} {ltsN : LTS N A} :
+  forall r m n, silent ltsM r m -> weak_sim ltsM ltsN r n ->
+                weak_sim ltsM ltsN m n.
+Proof.
+  intros r m n S H; constructor; constructor; intros m2 a T.
+  exact (weak_sim_act_clos H (weak_after_silent r m m2 a S T)).
+Qed.
+
+Lemma weak_sim_silent_r {M N A} {ltsM : LTS M A} {ltsN : LTS N A} :
+  forall m n n', silent ltsN n n' -> weak_sim ltsM ltsN m n' ->
+                 weak_sim ltsM ltsN m n.
+Proof.
+  intros m n n' S H; constructor; constructor; intros m2 a T.
+  destruct (sim_weak (out_sim H) T) as [n2 [W B]].
+  exists n2; split; [exact (weak_silent_prefix n n' n2 a S W) | exact B].
+Qed.
+
 Section WeakBisim.
   Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
 
@@ -279,4 +319,30 @@ Proof.
       as [x' [Wx Byx]].
     exists x'; split;
       [exact Wx | exact (CH _ _ _ (weak_bisimilar_sym _ _ Byx) Byr)].
+Qed.
+
+(* The same for [weak_bisimilar], within a silent SCC: [m] and [r] must
+   reach each other silently. One way is not enough: [m] must also answer
+   the other side's moves as [r] did, which it can only do by first reaching
+   [r] ([tau.a + b] reaches [a], but [a] cannot answer a [b]). Added
+   2026-10-03 (notes/13). *)
+Lemma weak_bisimilar_silent_l {M N A} {ltsM : LTS M A} {ltsN : LTS N A} :
+  forall r m n, silent ltsM r m -> silent ltsM m r ->
+                weak_bisimilar ltsM ltsN r n -> weak_bisimilar ltsM ltsN m n.
+Proof.
+  intros r m n Srm Smr H; constructor; constructor.
+  - intros m2 a T.
+    exact (weak_bisimilar_act_clos H (weak_after_silent r m m2 a Srm T)).
+  - intros n2 a T.
+    destruct (bisim_r (out_bisim H) T) as [m2 [W B]].
+    exists m2; split; [exact (weak_silent_prefix m r m2 a Smr W) | exact B].
+Qed.
+
+Lemma weak_bisimilar_silent_r {M N A} {ltsM : LTS M A} {ltsN : LTS N A} :
+  forall m n n', silent ltsN n n' -> silent ltsN n' n ->
+                 weak_bisimilar ltsM ltsN m n' -> weak_bisimilar ltsM ltsN m n.
+Proof.
+  intros m n n' Snn' Sn'n H.
+  exact (weak_bisimilar_sym _ _
+           (weak_bisimilar_silent_l n' n m Sn'n Snn' (weak_bisimilar_sym _ _ H))).
 Qed.

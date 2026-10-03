@@ -1702,3 +1702,50 @@ Module InversionShapes.
     MeBi Config Reset Weak.
   End Computed.
 End InversionShapes.
+
+(* Proofs up to silent steps (notes/13, option 4): the plugin proves one pair,
+   and [Bisimilarity.v]'s transfer lemmas give the other members of a silent
+   cycle. [cyc]: 0 and 1 reach each other silently, and 1 does [a] to 2;
+   [lin] does [a] from 0. Added 2026-10-03. *)
+MeBi Divider "Theories.Test.SilentTransfer".
+Module SilentTransfer.
+  Inductive cyc : nat -> option bool -> nat -> Prop :=
+  | c01 : cyc 0 None 1 | c10 : cyc 1 None 0 | c12 : cyc 1 (Some true) 2.
+  (* [lin]'s states are numbered apart from [cyc]'s on purpose: when the
+     two systems' state terms coincide, the bisimilarity check merges them
+     as one state (found 2026-10-03, open: notes/13). *)
+  Inductive lin : nat -> option bool -> nat -> Prop :=
+  | l01 : lin 10 (Some true) 11.
+  MeBi Config Weak As Option bool.
+  Example sim_0 : weak_sim cyc lin 0 10.
+  Proof. MeBi Sim Begin cyc 0 And lin 10 Using cyc. MeBi Sim Solve 100. Qed.
+  Example bis_0 : weak_bisimilar cyc lin 0 10.
+  Proof. MeBi Sim Begin cyc 0 And lin 10 Using cyc. MeBi Sim Solve 100. Qed.
+  Example sim_rev_0 : weak_sim lin cyc 10 0.
+  Proof. MeBi Sim Begin lin 10 And cyc 0 Using lin. MeBi Sim Solve 100. Qed.
+  MeBi Config Reset Weak.
+
+  Lemma s01 : silent cyc 0 1.
+  Proof. eapply rt1n_trans; [constructor | constructor]. Qed.
+  Lemma s10 : silent cyc 1 0.
+  Proof. eapply rt1n_trans; [constructor | constructor]. Qed.
+
+  (* 1 from 0, on the left *)
+  Example sim_1 : weak_sim cyc lin 1 10.
+  Proof. exact (weak_sim_silent_l 0 1 10 s01 sim_0). Qed.
+  Example bis_1 : weak_bisimilar cyc lin 1 10.
+  Proof. exact (weak_bisimilar_silent_l 0 1 10 s01 s10 bis_0). Qed.
+  (* and on the right *)
+  Example sim_rev_1 : weak_sim lin cyc 10 1.
+  Proof. exact (weak_sim_silent_r 10 1 0 s10 sim_rev_0). Qed.
+  Example bis_rev_1 : weak_bisimilar lin cyc 10 1.
+  Proof.
+    exact (weak_bisimilar_silent_r 10 1 0 s10 s01
+             (weak_bisimilar_sym _ _ bis_0)).
+  Qed.
+
+  Print Assumptions weak_sim_silent_l.
+  Print Assumptions weak_sim_silent_r.
+  Print Assumptions weak_bisimilar_silent_l.
+  Print Assumptions weak_bisimilar_silent_r.
+End SilentTransfer.
