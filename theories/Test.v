@@ -728,6 +728,20 @@ Module SaturationGuard.
   Example wsim_whole : weak_sim termLTS termLTS p q.
   Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
 
+  (* On demand, settings that plan the whole proof up front are refused
+     (they would walk every reachable pair, saturating as they go); [Auto]
+     takes the nested cofix instead, with a notice. *)
+  MeBi Config Saturation OnDemand True.
+  MeBi Config Solver MutualCofix True.
+  Example wsim_mutual : weak_sim termLTS termLTS p q.
+  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  MeBi Config Solver MutualCofix Auto.
+  MeBi Config Solver Answers Greedy.
+  Example wsim_greedy : weak_sim termLTS termLTS p q.
+  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  MeBi Config Solver Answers Default.
+  MeBi Config Saturation OnDemand False.
+
   (* [Saturation OnDemand False]: refused above the bound, as before. *)
   MeBi Config Bounds Saturation 1.
   Fail MeBi Run Bisim p With termLTS And q With termLTS Using termLTS.

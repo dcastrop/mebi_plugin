@@ -5536,6 +5536,38 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 **Session tally (2026-10-03), cont.:** Tooling 3 · Bug fix 6 · Docs 2 ·
 New feature 3 · Refactor 1.
 
+## 2026-10-03 — On demand: refuse explicit whole-game settings
+
+**Bug fix** (behaviour change). On branch `fix/on-demand-strategy-refusal`.
+Item 2 of the open list; Jonah's decision: refuse as the baseline, then
+discuss bounding.
+
+When an FSM is saturated on demand, planning the whole proof up front --
+the mutual cofix's pair set, or a non-default answer policy's plan -- walks
+every reachable pair, saturating state after state. Until now a forced
+`MutualCofix True` was not guarded (it would stall silently) and a
+non-default answer policy was silently downgraded to `Default`. Both are
+now refused with an error saying why and what to use instead. `Auto` is
+the tool's own choice, so it still takes the nested cofix, with a notice.
+Help (`Config Saturation`) updated.
+
+**Tests.** `Test.v` `SaturationGuard`: forced on demand with `MutualCofix
+True`, and with `Answers Greedy`, `Sim Begin` fails (each checked: the new
+error). A slip caught by the build: my first version of the test left
+`OnDemand True` set, so the next test (expecting `OnDemand False` to
+refuse) passed instead of failing; fixed.
+
+**Verification.** `tests.exe` 93/93, `make` clean; the on-demand path is
+not triggered by any checked-in example by default, so their counts are
+unaffected by construction.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep fix/on-demand-strategy-refusal main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 3 · Bug fix 7 · Docs 2 ·
+New feature 3 · Refactor 1.
+
 ---
 
 ## Outstanding
