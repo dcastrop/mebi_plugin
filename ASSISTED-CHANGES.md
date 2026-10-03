@@ -5062,6 +5062,74 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 
 **Session tally (2026-10-03):** Tooling 1.
 
+## 2026-10-03 — An LTS premise whose source nothing determines
+
+**Bug fix** (two) · **Docs** (a correction). On branch
+`fix/open-source-premise`. This closes the gap note 9 left open, pinned by
+the known-wrong test `OutputPremises.open_c`. I labelled it a bug fix,
+not a new capability: the plugin already accepted this shape and gave an
+answer that depended on the order the constructors were declared in.
+Jonah agreed the approach (note 9, option B) after three small
+experiments, recorded there.
+
+**The bug.** For `open_go q n a q' : base q a q' -> n <= 5 -> open_c n a
+q'`, nothing fixes `q`, so `base` was explored from an open source `?q`.
+Matching a constructor commits its unifications to the shared evar map
+(`Pair.unifies`), so the first constructor that matched fixed `?q` for all
+its siblings. Only one constructor's steps were found (2 states of 3), and
+swapping `base`'s constructors gave a *different* 2. A recursive
+constructor was cut off the same way, and that was all that kept it
+finite: in a spike with each constructor sandboxed instead (option A),
+`ur q a q' -> ur (S q) a (S q')` was OOM-killed at 3GB within 18 s.
+
+**The fix.** Such a premise is now enumerated by `Premise_search` (the
+bounded search that already decides general premises, with a completeness
+flag), and each distinct source it finds is explored as usual
+(`handle_app`'s new `explore_sources`). If the search is cut off, the
+existing "may not have found all" warning says so.
+
+**Also fixed, found on the way.**
+- *Silent drops.* A found transition whose label or target still had an
+  unknown in it (a binder nothing fixes: `u n : ung (S n) None n` reached
+  from an open source, or as a plain premise) was dropped without a word
+  when the target was a bare evar, and kept as if it were one state when it
+  was not (`S (S ?n)`). Both are now dropped with a new warning, "cannot
+  determine", naming the term (`warn_undetermined`).
+- *Warnings silenced across commands* (separate commit). The once-only
+  premise warnings were keyed by the LTS's encoding, which every command
+  numbers afresh, so a later command's *different* LTS with the same
+  premise head got no warning (reproduced: two LTSs over an opaque `f n =
+  0`, only the first warned). Keyed by the LTS's name now.
+
+**Tests** (`Test.v`, `OutputPremises`). `open_c` is now a positive test
+(3 states, least bound; `weak_sim` proved in 55 steps), plus a
+swapped-constructor copy (same LTS) and a guarded recursive premise (5
+states). Known limits, each warned: `open_u` (both ways), `open_u2`,
+`open_ur` (stops at the premise depth). Every new `Fail` was checked for
+its reason. **A new known-wrong pin:** `w_open_rec`, the guarded recursive
+case, stops on an internal `Not_found` in the solver. It is not from this
+change: the same LTS with its source fixed by `In q [0; 1; 2; 3]` fails the
+same way on `main`, while `rb` alone proves. Left open (note 9).
+
+**A mistake of mine, corrected here.** PR #17's `CLAUDE.md` text and log
+entry said forced `MutualCofix False` stops `LawProofs.v` at `paraC`. It
+stops earlier, at `expansion`: its bound is 97 and the nested path needs
+155. I measured `False` before setting the least bounds and did not
+re-check after. `CLAUDE.md` is corrected; the claim above that "a
+forced-`False` run reports every other count before it stops" was wrong
+for the same reason.
+
+**Verification.** All 27 `weak_sim` and 14 `weak_bisimilar` counts, the
+CCS counts and the 14 `LawProofs.v` counts unchanged under `Auto`, forced
+`True` and forced `False` (which stops where it did before). ABP:
+`abp <= spec` 6494 and `weak_bisimilar abp spec` 9914 (`Auto`), unchanged, ~3.7 min and ~4.4GB each. `tests.exe` 79/79, `satdiff -- 200` identical, `make` clean.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep fix/open-source-premise main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 1 · Bug fix 2 · Docs 1.
+
 ---
 
 ## Outstanding
