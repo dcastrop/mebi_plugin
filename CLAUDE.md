@@ -41,9 +41,12 @@ To run them:
    memory — backlog item B3. Since 2026-10-03 `Run Bisim`/`Sim Begin`
    saturate such FSMs on demand and decide on the silent-SCC quotient (~45s;
    `MeBi Config Saturation OnDemand`, notes/13); `Run Saturate` still refuses
-   with `Saturation_Too_Large`, and a proof is still out of reach: proving
-   one state per silent SCC is unsound inside a coinduction (notes/13,
-   `Test.v` `CircularTransfer`). Run
+   with `Saturation_Too_Large`. A direct proof is out of reach (proving one
+   state per silent SCC is unsound inside a coinduction: notes/13, `Test.v`
+   `CircularTransfer`), but `Test4` **is** proved via a normalised semantics
+   with structural congruence made explicit (`examples/ProcCongruence.v`,
+   `Test4/NormProofs.v`: 48,821 steps, ~7 min, ~3.8GB, not built by
+   default). Run
    anything on `Test4` under a memory cap,
    with `systemd-run --user --scope -p MemoryMax=6G -p MemorySwapMax=0` --
    `ulimit -v` does not work, OCaml 5 then cannot reserve its heaps. An
