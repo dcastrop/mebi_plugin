@@ -35,6 +35,7 @@ module type S = sig
      and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
      and type annotation = Annotation.t
+     and type actionmap = Action.Map.t'
 
   module Minimization :
     Minimization.S

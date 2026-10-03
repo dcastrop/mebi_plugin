@@ -14,6 +14,14 @@ module type S = sig
       silent steps of [edges], each with the length and the annotation of a
       shortest such path ([None] for [s] itself). *)
   val silent_paths : edgemap -> state -> (state * annotation option * int) list
+
+  type actionmap
+
+  (** [on_demand old_edges] saturates one state at a time: applied to [s], it
+      returns [s]'s weak actions exactly as [edges] would ([None] if it has
+      none). Silent closures are shared between calls, in a cache cleared once
+      it holds [closure_cap] states (default 4096). *)
+  val on_demand : ?closure_cap:int -> edgemap -> state -> actionmap option
 end
 
 module Make
@@ -24,7 +32,8 @@ module Make
    and type states = C.State.Set.t
    and type labels = C.Label.Set.t
    and type edgemap = C.EdgeMap.t'
-   and type annotation = C.Annotation.t = struct
+   and type annotation = C.Annotation.t
+   and type actionmap = C.Action.Map.t' = struct
   module State = C.State
   module States = C.State.Set
   module Labels = C.Label.Set
@@ -41,6 +50,7 @@ module Make
   type labels = Labels.t
   type annotation = Annotation.t
   type edgemap = EdgeMap.t'
+  type actionmap = ActionMap.t'
   (* Closure-based saturation. Replaces the depth-first path enumeration
      above, which cost time exponential in the path count rather than the
      state count -- 101 states took 437 seconds on a grid (see
@@ -223,42 +233,70 @@ module Make
 
   (****************************************************************************)
 
+  (** A silent-closure lookup over [old_edges], memoised. A state's silent
+      closure does not depend on where the weak step started, so each is
+      computed once rather than once per visible move into it (backlog item
+      3b). With [cap], the memo is emptied whenever it reaches [cap] states,
+      bounding its memory for on-demand use. *)
+  let closures_of ?(cap : int option) (old_edges : EdgeMap.t')
+    : State.t -> (State.t * Note.t list * int) list
+    =
+    let closures : (State.t * Note.t list * int) list StateTbl.t =
+      StateTbl.create 64
+    in
+    fun (t : State.t) ->
+      match StateTbl.find_opt closures t with
+      | Some c -> c
+      | None ->
+        let c = with_lengths (silent_closure old_edges t) in
+        (match cap with
+         | Some n when StateTbl.length closures >= n -> StateTbl.reset closures
+         | _ -> ());
+        StateTbl.add closures t c;
+        c
+  ;;
+
+  (** [from]'s weak actions, or [None] if it has none. The one place a
+      state is saturated: [edges] and [on_demand] both use it, so they agree
+      by construction. *)
+  let state_actions
+        (closure_of : State.t -> (State.t * Note.t list * int) list)
+        (old_edges : EdgeMap.t')
+        (from : State.t)
+    : ActionMap.t' option
+    =
+    let new_actions : ActionMap.t' = ActionMap.create 0 in
+    edge_closure closure_of new_actions from old_edges;
+    if ActionMap.length new_actions > 0 then Some new_actions else None
+  ;;
+
   (** [] returns a saturated [EdgeMap.t'] paired with a set of terminals states {i (i.e., states that now have no outgoing actions, and if reached)}.*)
   let edges (labels : Labels.t) (states : States.t) (old_edges : EdgeMap.t')
     : EdgeMap.t' * States.t
     =
     Logger.trace __FUNCTION__;
     let new_edges : EdgeMap.t' = EdgeMap.create 0 in
-    (* A state's silent closure does not depend on where the weak step
-       started, so each is computed once per saturation rather than once per
-       visible move into it (backlog item 3b). *)
-    let closures : (State.t * Note.t list * int) list StateTbl.t =
-      StateTbl.create 64
-    in
-    let closure_of (t : State.t) : (State.t * Note.t list * int) list =
-      match StateTbl.find_opt closures t with
-      | Some c -> c
-      | None ->
-        let c = with_lengths (silent_closure old_edges t) in
-        StateTbl.add closures t c;
-        c
-    in
+    let closure_of = closures_of old_edges in
     let terminals : States.t =
       EdgeMap.fold
         (fun (from : State.t) (_old_actions : ActionMap.t') (acc : States.t) ->
           (* [edge_closure] reads [from]'s actions out of [old_edges] itself,
              along with those of every state in its silent closure, so the
              fold's own [_old_actions] is redundant here. *)
-          let new_actions : ActionMap.t' = ActionMap.create 0 in
-          let () = edge_closure closure_of new_actions from old_edges in
-          if ActionMap.length new_actions > 0
-          then (
+          match state_actions closure_of old_edges from with
+          | Some new_actions ->
             EdgeMap.replace new_edges from new_actions;
-            acc)
-          else States.add from acc)
+            acc
+          | None -> States.add from acc)
         old_edges
         States.empty
     in
     new_edges, terminals
+  ;;
+
+  let on_demand ?(closure_cap : int = 4096) (old_edges : EdgeMap.t')
+    : State.t -> ActionMap.t' option
+    =
+    state_actions (closures_of ~cap:closure_cap old_edges) old_edges
   ;;
 end
