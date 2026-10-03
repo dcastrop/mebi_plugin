@@ -1068,6 +1068,36 @@ let test_minimal_relation () : unit =
   check "most relations non-trivial" true (!nontrivial > !games / 2)
 ;;
 
+(* 2026-10-03: game walks can be capped ([MeBi Config Bounds Game]). *)
+let test_game_cap () : unit =
+  print_endline "game walk cap";
+  let a' = fsm 0 [ transition 0 a 1; transition 1 a 2; transition 2 a 0 ] in
+  let b' =
+    fsm 10 [ transition 10 a 11; transition 11 a 12; transition 12 a 10 ]
+  in
+  let pi = (M.Bisimilarity.fsm a' b').result.bisim_states in
+  let root = state 0, state 10 in
+  let walk () = M.Product.reachable ~refl:false a' b' pi root in
+  let n = M.Product.Pair.Set.cardinal (walk ()) in
+  check "uncapped walk reaches 3 pairs" true (n = 3);
+  check
+    "capped at 3: fine"
+    true
+    (M.Product.Pair.Set.cardinal (M.Product.with_cap 3 walk) = 3);
+  check
+    "capped at 2: Game_too_large"
+    true
+    (try
+       ignore (M.Product.with_cap 2 walk);
+       false
+     with
+     | M.Product.Game_too_large 2 -> true);
+  check
+    "the cap is lifted afterwards"
+    true
+    (M.Product.Pair.Set.cardinal (walk ()) = 3)
+;;
+
 (* 2026-10-03: two systems whose states share terms. A shared state with
    the same moves on both sides is one state (same relation); with
    different moves it is a conflict, which [Bisimilarity.fsm] would merge. *)
@@ -1273,6 +1303,7 @@ let () =
   test_quotient_partition ();
   test_conflicts ();
   test_minimal_relation ();
+  test_game_cap ();
   test_tree_order ();
   test_tree_preorder ();
   test_encoding_counter ();

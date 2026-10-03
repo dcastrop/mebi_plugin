@@ -83,6 +83,13 @@ type saturation_mode =
   | Saturation_auto
 
 val the_saturation_mode : saturation_mode ref
+
+(** The most pairs a proof's up-front game walk may visit on demand
+    ([MeBi Config Bounds Game <n>]); [None] (the default) refuses such walks.
+    Reset by [Reset Bounds]. *)
+val the_game_bound : int option ref
+
+val set_game_bound : int -> unit
 val set_saturation_mode : saturation_mode -> unit
 val reset_bounds_args : unit -> unit
 val set_the_bounds_args : bounds_args -> unit

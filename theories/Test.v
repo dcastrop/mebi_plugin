@@ -740,6 +740,30 @@ Module SaturationGuard.
   Example wsim_greedy : weak_sim termLTS termLTS p q.
   Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
   MeBi Config Solver Answers Default.
+
+  (* With [Bounds Game <n>] they are allowed, the walk run within <n> pairs;
+     past it they are refused, and Auto takes the nested cofix. *)
+  MeBi Config Bounds Game 1000.
+  MeBi Config Solver MutualCofix True.
+  Example wsim_mutual_bounded : weak_sim termLTS termLTS p q.
+  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  MeBi Config Solver MutualCofix Auto.
+  MeBi Config Solver Answers Greedy.
+  Example wsim_greedy_bounded : weak_sim termLTS termLTS p q.
+  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  MeBi Config Solver Answers Default.
+  MeBi Config Bounds Game 1.
+  MeBi Config Solver MutualCofix True.
+  Example wsim_mutual_over : weak_sim termLTS termLTS p q.
+  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  MeBi Config Solver MutualCofix Auto.
+  MeBi Config Solver Answers Greedy.
+  Example wsim_greedy_over : weak_sim termLTS termLTS p q.
+  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  MeBi Config Solver Answers Default.
+  Example wsim_auto_over : weak_sim termLTS termLTS p q.
+  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  MeBi Config Reset Bounds.
   MeBi Config Saturation OnDemand False.
 
   (* [Saturation OnDemand False]: refused above the bound, as before. *)

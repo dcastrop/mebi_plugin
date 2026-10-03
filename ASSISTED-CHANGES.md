@@ -5614,6 +5614,50 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 **Session tally (2026-10-03), cont.:** Tooling 4 · Bug fix 7 · Docs 2 ·
 New feature 3 · Refactor 1 · Optimization 2.
 
+## 2026-10-03 — A bound on the up-front game walk, required on demand
+
+**New feature** (a config option). On branch `feature/game-bound`. Item 2
+of the open list, after PR #27's refusal baseline. Jonah: add bounding,
+and enforce that a bound is given for the explicit settings.
+
+**What.** `MeBi Config Bounds Game <n>` (unset by default; reset by
+`Reset Bounds`). Every game walk (`Product.reachable_by`, the planners'
+walk) counts the pairs it visits and, under `Product.with_cap n`, raises
+`Game_too_large` past `n`. When an FSM is saturated on demand:
+- `MutualCofix True` or an answer policy other than `Default` is refused
+  unless the bound is set (the message says how);
+- with it, the walk runs within the bound: the plan, or for `MutualCofix
+  True` a validating estimate at `Begin` (the mutual block's own walk, in
+  the first step, is then known to fit); past it they are refused, naming
+  the bound;
+- `Auto` without the bound takes the nested cofix (as before); with it, it
+  estimates within the bound, and past it takes the nested cofix with a
+  notice.
+Below the saturation bound nothing changes: no cap is ever set.
+
+**Why bounding helps (as explained to Jonah).** On demand, the walk's
+size is unknown until it is done and each pair may saturate a state; a
+pair bound turns "never on demand" into "on demand when the game is
+small", with the cost bounded. The per-state saturation speed-up (PR #28,
+35ms a state on `Test4`) makes moderate bounds affordable. Caveat: pairs
+bound time only indirectly.
+
+**Tests.** `tests.exe` (99/99): a capped walk raises past the cap, not at
+it, and the cap is lifted afterwards. `Test.v` `SaturationGuard`, forced on
+demand: with `Bounds Game 1000`, `MutualCofix True` proves (38) and
+`Answers Greedy` proves (31); with `Bounds Game 1`, both are refused
+(checked: "more than 1 pairs"), and `Auto` falls back to nested (notice,
+38). `Test.v`'s other counts identical to `main`; `make` clean. The proof
+matrix is unaffected by construction (no cap is set below the saturation
+bound).
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep feature/game-bound main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 4 · Bug fix 7 · Docs 2 ·
+New feature 4 · Refactor 1 · Optimization 2.
+
 ---
 
 ## Outstanding

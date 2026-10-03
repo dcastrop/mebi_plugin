@@ -171,9 +171,23 @@ let set_saturation_mode (x : saturation_mode) : unit =
   |> Logger.show
 ;;
 
+(** The most pairs a proof's up-front game walk may visit when an FSM is
+    saturated on demand ([MeBi Config Bounds Game <n>]; unset by default).
+    Such a walk -- [MutualCofix True]'s pair set, a planned answer policy,
+    [Auto]'s estimate -- saturates states as it goes. Unset, the explicit
+    settings are refused on demand; set, the walk runs under the bound
+    (notes/13, 2026-10-03). Reset by [Reset Bounds]. *)
+let the_game_bound : int option ref = ref None
+
+let set_game_bound (x : int) : unit =
+  the_game_bound := Some x;
+  Printf.sprintf "(MeBi Config: Set Game Bound to: %i pairs.)" x |> Logger.show
+;;
+
 let reset_bounds_args () : unit =
   the_bounds_args := default_bounds;
   the_saturation_bound := default_saturation_bound;
+  the_game_bound := None;
   the_saturation_mode := Saturation_auto;
   Premise_search.max_depth := Premise_search.default_depth
 ;;
