@@ -338,7 +338,9 @@ module Make
       (fun (s : State.t) (i : int) ->
         let b = block.(q.comp.(i)) in
         let prev =
-          Option.value (Hashtbl.find_opt by_block b) ~default:States.empty
+          Stdlib.Option.value
+            (Hashtbl.find_opt by_block b)
+            ~default:States.empty
         in
         Hashtbl.replace by_block b (States.add s prev))
       q.ids;

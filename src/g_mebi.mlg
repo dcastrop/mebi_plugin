@@ -282,6 +282,16 @@ VERNAC COMMAND EXTEND MeBi_Config_FailIf_Oversaturated CLASSIFIED AS QUERY
   { Api.set_fail_flag_oversaturated false }
 END
 
+(* Config -- saturation: whole, or on demand (notes/13) *)
+VERNAC COMMAND EXTEND MeBi_Config_Saturation_OnDemand CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Saturation" "OnDemand" "True"] ->
+  { Api.set_saturation_mode Api.Saturation_on_demand }
+| ["MeBi" "Config" "Saturation" "OnDemand" "False"] ->
+  { Api.set_saturation_mode Api.Saturation_whole }
+| ["MeBi" "Config" "Saturation" "OnDemand" "Auto"] ->
+  { Api.set_saturation_mode Api.Saturation_auto }
+END
+
 (* Config -- solver strategy *)
 VERNAC COMMAND EXTEND MeBi_Config_Solver_MutualCofix CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Solver" "MutualCofix" "True"] ->
@@ -322,6 +332,7 @@ VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
 | ["MeBi" "Help" "Config" "Bounds"] -> { Help.show [ "Config"; "Bounds" ] }
 | ["MeBi" "Help" "Config" "Bounds" "Saturation"] ->
   { Help.show [ "Config"; "Bounds"; "Saturation" ] }
+| ["MeBi" "Help" "Config" "Saturation"] -> { Help.show [ "Config"; "Saturation" ] }
 | ["MeBi" "Help" "Config" "Weak"] -> { Help.show [ "Config"; "Weak" ] }
 | ["MeBi" "Help" "Config" "FailIf"] -> { Help.show [ "Config"; "FailIf" ] }
 | ["MeBi" "Help" "Config" "Solver"] -> { Help.show [ "Config"; "Solver" ] }

@@ -11,7 +11,7 @@ module type S = sig
 
     include Json.S with type k = t
 
-    val get : fsm -> t
+    val get : ?on_demand:int -> fsm -> t
   end
 
   module Result : sig
@@ -42,7 +42,15 @@ module type S = sig
   exception NoCachedResult of unit
 
   val get_the_result : unit -> t
-  val fsm : fsm -> fsm -> t
+
+  type on_demand =
+    { a : bool
+    ; b : bool
+    ; budget : int
+    ; partition : fsm -> partition
+    }
+
+  val fsm : ?on_demand:on_demand -> fsm -> fsm -> t
 end
 
 module Make
@@ -93,10 +101,20 @@ module Make
         ;;
       end)
 
-    let get (x : FSM.t) : t =
-      { original = x; saturated = FSM.saturate ~only_if_weak:true x }
+    let get ?(on_demand : int option) (x : FSM.t) : t =
+      match on_demand with
+      | None -> { original = x; saturated = FSM.saturate ~only_if_weak:true x }
+      | Some budget ->
+        { original = x; saturated = FSM.saturate_on_demand ~budget x }
     ;;
   end
+
+  type on_demand =
+    { a : bool
+    ; b : bool
+    ; budget : int
+    ; partition : fsm -> partition
+    }
 
   module Result = struct
     type t =
@@ -191,8 +209,30 @@ module Make
     | Some x -> x
   ;;
 
-  let fsm (a : FSM.t) (b : FSM.t) : t =
-    Logger.trace __FUNCTION__;
+  (** Whether the roots share a block, and the result split by [pi]. *)
+  let finish
+        (fsm_a : FSMPair.t)
+        (fsm_b : FSMPair.t)
+        (merged : FSM.t)
+        (pi : Partition.t)
+    : t
+    =
+    let roots_related : bool option =
+      match fsm_a.original.init, fsm_b.original.init with
+      | Some x, Some y ->
+        Some
+          (States.mem
+             y
+             (try Partition.get_bisimilar x pi with Not_found -> States.empty))
+      | _ -> None
+    in
+    let result =
+      Result.split ?roots_related pi fsm_a.original.states fsm_b.original.states
+    in
+    { fsm_a; fsm_b; merged; result }
+  ;;
+
+  let fsm_whole (a : FSM.t) (b : FSM.t) : t =
     let fsm_a : FSMPair.t = FSMPair.get a in
     let fsm_b : FSMPair.t = FSMPair.get b in
     let merged : FSM.t = FSM.merge fsm_a.saturated fsm_b.saturated in
@@ -210,18 +250,23 @@ module Make
       else None
     in
     let pi : Partition.t = Minimization.partition_states ?silent merged in
-    let roots_related : bool option =
-      match fsm_a.original.init, fsm_b.original.init with
-      | Some x, Some y ->
-        Some
-          (States.mem
-             y
-             (try Partition.get_bisimilar x pi with Not_found -> States.empty))
-      | _ -> None
-    in
-    let result =
-      Result.split ?roots_related pi fsm_a.original.states fsm_b.original.states
-    in
-    { fsm_a; fsm_b; merged; result }
+    finish fsm_a fsm_b merged pi
+  ;;
+
+  let fsm ?(on_demand : on_demand option) (a : FSM.t) (b : FSM.t) : t =
+    Logger.trace __FUNCTION__;
+    match on_demand with
+    | Some ({ a = od_a; b = od_b; budget; partition } : on_demand)
+      when od_a || od_b ->
+      let get (od : bool) (x : FSM.t) : FSMPair.t =
+        FSMPair.get ?on_demand:(if od then Some budget else None) x
+      in
+      let fsm_a : FSMPair.t = get od_a a in
+      let fsm_b : FSMPair.t = get od_b b in
+      (* nothing saturated whole to merge: the originals, partitioned on
+         their silent-SCC quotient *)
+      let merged : FSM.t = FSM.merge a b in
+      finish fsm_a fsm_b merged (partition merged)
+    | _ -> fsm_whole a b
   ;;
 end

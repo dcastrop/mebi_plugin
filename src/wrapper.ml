@@ -338,6 +338,62 @@ module Make (Enc : Encoding.S) :
         else Logger.warning (String.capitalize_ascii msg)))
   ;;
 
+  (** Whether the bisimilarity check saturates [x] on demand
+      ({!Api.the_saturation_mode}; notes/13). Under [Auto], exactly when
+      saturating it whole would exceed the saturation bound -- which used to
+      be an error -- and then it warns: the result is the same, the cost
+      profile is not. Under [Whole], the guard as before. *)
+  let on_demand_for (name : string) (x : FSM.t) : bool =
+    if Bool.not (Model.FSM.is_weak_mode x)
+    then false
+    else (
+      match !Api.the_saturation_mode with
+      | Api.Saturation_whole ->
+        check_saturation_size name x;
+        false
+      | (Api.Saturation_auto | Api.Saturation_on_demand) as mode ->
+        let e : Model.SaturationEstimate.t = Model.SaturationEstimate.fsm x in
+        Logger.info
+          (Printf.sprintf
+             "Saturating %s: %s."
+             name
+             (Model.SaturationEstimate.to_string e));
+        let bound : int = !Api.the_saturation_bound in
+        let above : bool = e.weak > bound in
+        if above || mode = Api.Saturation_on_demand
+        then (
+          let lo, hi = Api.bytes_per_weak_action in
+          let mem (n : int) : string =
+            Printf.sprintf
+              "%s--%s"
+              (Api.human_bytes (n * lo))
+              (Api.human_bytes (n * hi))
+          in
+          Logger.warning
+            (Printf.sprintf
+               "%s would saturate to %s%s. Instead, MeBi saturates each state \
+                only when it is needed, holding at most %i weak actions (about \
+                %s) and saturating again any it had to drop, and decides \
+                bisimilarity on the %i silent SCCs rather than on the \
+                saturated FSM. The verdict is the same; a proof may take \
+                longer. [MeBi Config Saturation OnDemand False] refuses such \
+                FSMs instead. See [MeBi Help Config Saturation]."
+               (String.capitalize_ascii name)
+               (Model.SaturationEstimate.to_string e)
+               (if above
+                then
+                  Printf.sprintf
+                    ", above the bound of %i (about %s of memory)"
+                    bound
+                    (mem e.weak)
+                else " (on demand by [MeBi Config Saturation OnDemand True])")
+               bound
+               (mem bound)
+               e.sccs);
+          true)
+        else false)
+  ;;
+
   let make_graph_args ()
     : (module Graph_type.Args with type enc = Enc.t and type tree = Enc.Tree.t)
     =
@@ -534,10 +590,15 @@ module Make (Enc : Encoding.S) :
       Logger.trace __FUNCTION__;
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
-      check_saturation_size "FSM A" the_fsm_a;
-      check_saturation_size "FSM B" the_fsm_b;
+      let on_demand : Model.Bisimilarity.on_demand =
+        { a = on_demand_for "FSM A" the_fsm_a
+        ; b = on_demand_for "FSM B" the_fsm_b
+        ; budget = !Api.the_saturation_bound
+        ; partition = Model.SaturationEstimate.partition
+        }
+      in
       Logger.info "Checking Bisimilarity of FSMs...";
-      let result = Model.Bisimilarity.fsm the_fsm_a the_fsm_b in
+      let result = Model.Bisimilarity.fsm ~on_demand the_fsm_a the_fsm_b in
       let r = result_log (module Model.FSM) (module Decode.FSM) in
       r |> handle_results Result "FSM a (original)" result.fsm_a.original;
       r |> handle_results Result "FSM a (saturated)" result.fsm_a.saturated;

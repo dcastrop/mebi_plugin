@@ -144,9 +144,37 @@ let human_bytes (b : int) : string =
   else Printf.sprintf "%.0fKB" (f /. 1e3)
 ;;
 
+(** How the bisimilarity check ([Run Bisim], [Sim Begin]) saturates each
+    FSM (notes/13): whole, or one state at a time when asked about, with the
+    partition computed on the quotient by silent SCCs instead. [Auto] (the
+    default) saturates on demand exactly the FSMs whose saturation would
+    exceed [the_saturation_bound], and warns when it does; [Whole] refuses
+    those, as before 2026-10-03 (or, with [FailIf Oversaturated False],
+    saturates them whole anyway); [On_demand] uses it for every FSM, for
+    measuring it. [Run Saturate] and [Run Minimize] always saturate whole.
+    Reset by [Reset Bounds]. *)
+type saturation_mode =
+  | Saturation_whole
+  | Saturation_on_demand
+  | Saturation_auto
+
+let the_saturation_mode : saturation_mode ref = ref Saturation_auto
+
+let set_saturation_mode (x : saturation_mode) : unit =
+  the_saturation_mode := x;
+  Printf.sprintf
+    "(MeBi Config: Set Saturation OnDemand to: %s.)"
+    (match x with
+     | Saturation_whole -> "False"
+     | Saturation_on_demand -> "True"
+     | Saturation_auto -> "Auto")
+  |> Logger.show
+;;
+
 let reset_bounds_args () : unit =
   the_bounds_args := default_bounds;
   the_saturation_bound := default_saturation_bound;
+  the_saturation_mode := Saturation_auto;
   Premise_search.max_depth := Premise_search.default_depth
 ;;
 
