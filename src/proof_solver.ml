@@ -318,7 +318,25 @@ let init
      can reach, which the solver, the mutual block and the estimate below
      all read, so they cannot disagree. *)
   Solver.W.plan := None;
-  (if !Api.the_answer_policy <> Api.Answers_default
+  (* An FSM saturated on demand (notes/13) is too large to walk the whole
+     game of up front: planning answers, or [Auto]'s estimate below, would
+     saturate state after state, again and again as the cache drops them
+     ([Proc/Test4]: still running after 29 minutes). Both are skipped, with a
+     notice, and the proof answers move by move on the nested path. *)
+  let on_demand : bool =
+    Stdlib.Option.is_some (Solver.W.get_fsm_a ~saturated:true ()).fill
+    || Stdlib.Option.is_some (Solver.W.get_fsm_b ~saturated:true ()).fill
+  in
+  if
+    on_demand
+    && (!Api.the_answer_policy <> Api.Answers_default
+        || !Api.the_solver_strategy = Api.Auto)
+  then
+    Logger.notice
+      "(Saturated on demand: answers are chosen move by move (Answers \
+       Default), and Auto takes the nested cofix without estimating, as either \
+       would walk the whole game up front.)";
+  (if !Api.the_answer_policy <> Api.Answers_default && Bool.not on_demand
    then
      let module P = Solver.W.Model.Product in
      let fsm_a = Solver.W.get_fsm_a () in
@@ -382,6 +400,7 @@ let init
      is larger. See [Model.Product.estimate]. *)
   (match !Api.the_solver_strategy with
    | Api.Nested | Api.Mutual -> ()
+   | Api.Auto when on_demand -> Api.set_mutual_cofix false
    | Api.Auto ->
      let module S = Solver in
      let fsm_a = S.W.get_fsm_a () in
