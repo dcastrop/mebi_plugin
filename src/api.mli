@@ -72,6 +72,18 @@ type bounds_args =
 
 val default_bounds : bounds_args
 val the_bounds_args : bounds_args ref
+
+(** How the bisimilarity check saturates each FSM: whole, on demand with
+    the partition on the silent-SCC quotient, or ([Saturation_auto], the
+    default) on demand only above the saturation bound, with a warning. See
+    [notes/13]. Reset by [Reset Bounds]. *)
+type saturation_mode =
+  | Saturation_whole
+  | Saturation_on_demand
+  | Saturation_auto
+
+val the_saturation_mode : saturation_mode ref
+val set_saturation_mode : saturation_mode -> unit
 val reset_bounds_args : unit -> unit
 val set_the_bounds_args : bounds_args -> unit
 val default_saturation_bound : int

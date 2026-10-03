@@ -23,11 +23,14 @@
      --scope -p MemoryMax=6G -p MemorySwapMax=0 (ulimit -v does not work --
      OCaml 5 cannot then reserve its heaps).
 
-   Getting past it means saturating over the silent-SCC quotient (81 nodes)
-   rather than over states, which changes what minimisation, bisimilarity
-   and the proof solver receive. That is design work, deferred until the
-   other outstanding backlog items are resolved. See ASSISTED-CHANGES.md,
-   2026-10-01. *)
+   Since 2026-10-03 the bisimilarity check gets past it: above the bound,
+   [Run Bisim] and [Sim Begin] saturate on demand and decide on the
+   silent-SCC quotient (81 nodes), with a warning ([MeBi Help Config
+   Saturation]). [Run Bisim p With compLTS And q With compLTS] takes ~45s.
+   [Run Saturate] and [Run Minimize], below, still need the whole saturated
+   FSM and are still refused. A proof is still out of reach (~0.23s a step,
+   ~525k steps): proving one state per silent SCC is notes/13's stages 2-3.
+   See ASSISTED-CHANGES.md, 2026-10-01 and 2026-10-03. *)
 
 Require Import MEBI.loader.
 

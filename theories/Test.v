@@ -706,13 +706,34 @@ Module SaturationGuard.
   MeBi Config Reset Weak.
   MeBi Config Weak As Option action.
 
-  (* [p] saturates to a handful of weak actions: over a bound of 1. *)
+  (* [p] saturates to a handful of weak actions: over a bound of 1.
+     [Run Saturate] and [Run Minimize] need the whole saturated FSM, so they
+     are refused. *)
   MeBi Config Bounds Saturation 1.
   Fail MeBi Run Saturate p Using termLTS.
   Fail MeBi Run Minimize p Using termLTS.
+
+  (* The bisimilarity check saturates on demand instead (since 2026-10-03,
+     notes/13; it warns): each state when asked about, the partition on the
+     silent-SCC quotient. The proof is the same proof, step for step: the
+     count is pinned below the bound, saturated whole, and at bound 1. *)
+  MeBi Run Bisim p With termLTS And q With termLTS Using termLTS.
+  Example wsim_on_demand : weak_sim termLTS termLTS p q.
+  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  MeBi Config Reset Bounds.
+  MeBi Config Saturation OnDemand True.
+  Example wsim_forced : weak_sim termLTS termLTS p q.
+  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  MeBi Config Saturation OnDemand False.
+  Example wsim_whole : weak_sim termLTS termLTS p q.
+  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+
+  (* [Saturation OnDemand False]: refused above the bound, as before. *)
+  MeBi Config Bounds Saturation 1.
   Fail MeBi Run Bisim p With termLTS And q With termLTS Using termLTS.
   Example wsim_refused : weak_sim termLTS termLTS p q.
   Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  MeBi Config Saturation OnDemand Auto.
 
   (* [FailIf Oversaturated False]: warn and carry on. *)
   MeBi Config FailIf Oversaturated False.

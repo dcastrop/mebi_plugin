@@ -269,7 +269,8 @@ struct
       (try
          let ({ annotation; trees; _ }, destinations) : C.Action.Pair.t =
            (* NOTE: get actions [from] with [label] *)
-           (match C.EdgeMap.find_opt m.edges from with
+           (FSM.ensure m from;
+            match C.EdgeMap.find_opt m.edges from with
             | Some actions -> C.Action.Map.reduce_by_label actions label
             | None ->
               (* No weak move at all from [from] (a terminal of the saturated
@@ -343,6 +344,7 @@ struct
       if C.Label.is_silent l
       then closure y
       else (
+        FSM.ensure b_saturated y;
         match C.EdgeMap.find_opt b_saturated.edges y with
         | None -> C.State.Set.empty
         | Some actions ->
@@ -617,6 +619,7 @@ struct
                         } )
                 | _ -> None))
           else (
+            FSM.ensure b y;
             match C.EdgeMap.find_opt b.edges y with
             | None -> []
             | Some actions ->

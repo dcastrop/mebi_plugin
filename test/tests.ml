@@ -788,6 +788,154 @@ let test_saturation_estimate () : unit =
   check "random LTSs are mostly non-trivial" true (!nonempty > 250)
 ;;
 
+(** A canonical rendering of one state's saturated actions, for comparing
+    two saturations ([EdgeMap] and [Action.Map] are hash tables, so their
+    order is not a contract). As in [satdiff.ml]. *)
+let render_actions (x : M.Action.Map.t' option) : string =
+  match x with
+  | None -> "none"
+  | Some actions ->
+    M.Action.Map.to_seq actions
+    |> List.of_seq
+    |> List.map (fun ((act, dests) : M.Action.t * M.State.Set.t) ->
+      Printf.sprintf
+        "%i %s -> {%s}"
+        act.label.base
+        (match act.annotation with
+         | None -> "-"
+         | Some a -> M.Annotation.to_string ~pretty:false a)
+        (M.State.Set.elements dests
+         |> List.map (fun (s : M.State.t) -> string_of_int s.base)
+         |> String.concat ","))
+    |> List.sort compare
+    |> String.concat "; "
+;;
+
+(** Small pseudo-random LTSs with label 0 silent, as in
+    [test_saturation_estimate]. *)
+let random_fsms (seed : int array) (count : int) : M.FSM.t list =
+  let rng = Random.State.make seed in
+  List.init count (fun _ ->
+    let n = 2 + Random.State.int rng 7 in
+    let ts =
+      List.init
+        (n * (1 + Random.State.int rng 3))
+        (fun _ ->
+          let l = Random.State.int rng 3 in
+          transition
+            (Random.State.int rng n)
+            (if l = 0 then tau else label l)
+            (Random.State.int rng n))
+    in
+    fsm ~weak_labels:(M.Label.Set.singleton tau) 0 ts)
+;;
+
+(* note 13: an FSM saturated on demand answers every state exactly as the
+   FSM saturated whole, whatever the budget and whatever order states are
+   asked in; and the partition computed on the silent-SCC quotient is the
+   one computed on the saturated FSM. *)
+let test_on_demand_saturation () : unit =
+  print_endline "on-demand saturation";
+  let mismatches = ref 0 in
+  List.iter
+    (fun (f : M.FSM.t) ->
+      let full = M.FSM.saturate f in
+      List.iter
+        (fun budget ->
+          let od = M.FSM.saturate_on_demand ~budget f in
+          (* twice over, the second time in reverse, so that evicted states
+             are recomputed *)
+          let states = M.State.Set.elements f.states in
+          List.iter
+            (fun (s : M.State.t) ->
+              M.FSM.ensure od s;
+              if
+                render_actions (M.EdgeMap.find_opt od.edges s)
+                <> render_actions (M.EdgeMap.find_opt full.edges s)
+              then incr mismatches)
+            (states @ List.rev states))
+        [ 1_000_000; 1 ])
+    (random_fsms [| 2026; 10; 3 |] 300);
+  check_int "300 random LTSs, budgets 1M and 1: on demand = whole" 0 !mismatches;
+  (* without silent labels there is nothing to saturate *)
+  let strong = fsm 0 [ transition 0 a 1 ] in
+  check
+    "not weak: unchanged"
+    true
+    (Option.is_none (M.FSM.saturate_on_demand strong).fill)
+;;
+
+let test_quotient_partition () : unit =
+  print_endline "quotient partition";
+  let reference (f : M.FSM.t) : M.Partition.t =
+    M.Minimization.partition_states ~silent:f.edges (M.FSM.saturate f)
+  in
+  let mismatches = ref 0 in
+  let split = ref 0 in
+  let fs = random_fsms [| 2026; 10; 3; 1 |] 300 in
+  List.iter
+    (fun (f : M.FSM.t) ->
+      let p = M.SaturationEstimate.partition f in
+      if M.Partition.cardinal p > 1 then incr split;
+      if Bool.not (M.Partition.equal p (reference f)) then incr mismatches)
+    fs;
+  (* and on pairs merged, as [Bisimilarity.fsm] partitions them: the second
+     FSM's states renumbered apart from the first's *)
+  let shift (f : M.FSM.t) : M.FSM.t =
+    let moved =
+      M.EdgeMap.fold
+        (fun (from : M.State.t) (actions : M.Action.Map.t') acc ->
+          M.Action.Map.fold
+            (fun (act : M.Action.t) (ds : M.State.Set.t) acc ->
+              M.State.Set.fold
+                (fun (d : M.State.t) acc ->
+                  transition (from.base + 100) act.label (d.base + 100) :: acc)
+                ds
+                acc)
+            actions
+            acc)
+        f.edges
+        []
+    in
+    fsm ~weak_labels:(M.Label.Set.singleton tau) 100 moved
+  in
+  let rec pairs = function
+    | x :: y :: tl -> (x, shift y) :: pairs tl
+    | _ -> []
+  in
+  List.iter
+    (fun ((x, y) : M.FSM.t * M.FSM.t) ->
+      let m = M.FSM.merge x y in
+      if
+        Bool.not
+          (M.Partition.equal (M.SaturationEstimate.partition m) (reference m))
+      then incr mismatches)
+    (pairs fs);
+  check_int
+    "300 random LTSs and 150 merged pairs: quotient = saturated"
+    0
+    !mismatches;
+  check "random partitions are mostly non-trivial" true (!split > 150);
+  (* Milner's pair, by hand: [tau.a + b] and [a + b] are not weakly
+     bisimilar *)
+  let m =
+    fsm
+      ~weak_labels:(M.Label.Set.singleton tau)
+      0
+      [ transition 0 tau 1
+      ; transition 1 a 2
+      ; transition 0 b 3
+      ; transition 10 a 12
+      ; transition 10 b 13
+      ]
+  in
+  let p = M.SaturationEstimate.partition m in
+  check
+    "Milner's pair: roots apart"
+    false
+    (M.State.Set.mem (state 10) (M.Partition.get_bisimilar (state 0) p))
+;;
+
 (* ------------------------------------------------------------------ *)
 (* lib/terms: constructor trees and the encoding counter (backlog E(c)). *)
 
@@ -936,6 +1084,8 @@ let () =
   test_product_policies ();
   test_product_estimate ();
   test_saturation_estimate ();
+  test_on_demand_saturation ();
+  test_quotient_partition ();
   test_tree_order ();
   test_tree_preorder ();
   test_encoding_counter ();

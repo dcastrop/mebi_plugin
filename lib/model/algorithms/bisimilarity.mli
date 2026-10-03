@@ -15,7 +15,7 @@ module type S = sig
     include Json.S with type k = t (** @closed *)
 
     (** [get x] saturates [x], keeping the original alongside. *)
-    val get : fsm -> t
+    val get : ?on_demand:int -> fsm -> t
   end
 
   (** The partition of the merged FSM's states, split by whether a block
@@ -64,11 +64,27 @@ module type S = sig
   (** @raise NoCachedResult if no check has run. *)
   val get_the_result : unit -> t
 
+  (** For FSMs too large to saturate whole (notes/13): which of the two to
+      saturate on demand ({!FSM.saturate_on_demand}, at most [budget] weak
+      actions held), and how to partition without saturating: on the
+      silent-SCC quotient of the merged originals
+      ({!Saturation_estimate.S.partition}). *)
+  type on_demand =
+    { a : bool
+    ; b : bool
+    ; budget : int
+    ; partition : fsm -> partition
+    }
+
   (** [fsm a b] checks [a] and [b] for (weak) bisimilarity: saturates both,
       merges them ({!FSM.merge}; their states must be disjoint, as the
       plugin's encoding makes them), partitions the merged FSM by
-      {!Minimization.partition_states}, and splits the result. *)
-  val fsm : fsm -> fsm -> t
+      {!Minimization.partition_states}, and splits the result. With
+      [on_demand] and either FSM on demand, that FSM is saturated on demand,
+      [merged] is the merge of the originals, and the partition is
+      [on_demand.partition merged]: the same partition, by a different route
+      (checked in [tests.exe]). *)
+  val fsm : ?on_demand:on_demand -> fsm -> fsm -> t
 end
 
 module Make

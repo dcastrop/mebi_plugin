@@ -21,6 +21,15 @@ module type S = sig
       [s] itself). The proof solver answers a silent move with one of these
       when standing still will not do (see {!Product.respond}). *)
   val silent_paths : edgemap -> state -> (state * annotation option * int) list
+
+  type actionmap
+
+  (** [on_demand old_edges] saturates one state at a time: applied to [s], it
+      returns [s]'s weak actions exactly as {!edges} would ([None] if it has
+      none), from the same code. Silent closures are shared between calls, in
+      a cache emptied once it holds [closure_cap] states (default 4096), so
+      memory stays bounded however many states are asked about. *)
+  val on_demand : ?closure_cap:int -> edgemap -> state -> actionmap option
 end
 
 module Make
@@ -32,3 +41,4 @@ module Make
    and type labels = C.Label.Set.t
    and type edgemap = C.EdgeMap.t'
    and type annotation = C.Annotation.t
+   and type actionmap = C.Action.Map.t'

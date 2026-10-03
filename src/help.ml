@@ -12,6 +12,7 @@ let topics : string list list =
   ; [ "Config" ]
   ; [ "Config"; "Bounds" ]
   ; [ "Config"; "Bounds"; "Saturation" ]
+  ; [ "Config"; "Saturation" ]
   ; [ "Config"; "Weak" ]
   ; [ "Config"; "FailIf" ]
   ; [ "Config"; "Solver" ]
@@ -126,6 +127,7 @@ let text : string list -> string option = function
        Settings, each with its own topic:\n\
       \  MeBi Help Config Bounds.     how big an LTS (and its saturation) may \
        get\n\
+      \  MeBi Help Config Saturation. saturating whole, or on demand\n\
       \  MeBi Help Config Weak.       which label is silent (weak bisimilarity)\n\
       \  MeBi Help Config FailIf.     which outcomes are errors, not warnings\n\
       \  MeBi Help Config Solver.     the proof search's cofix strategy\n\
@@ -162,10 +164,12 @@ let text : string list -> string option = function
           Run Saturate, Minimize, Bisim and Sim Begin when a label is silent) \
           can be orders of magnitude larger than the LTS: one weak action per \
           (state, label, state reachable by tau* label tau*). Before \
-          saturating, MeBi computes that number exactly and cheaply, and above \
-          the bound refuses with Saturation_Too_Large (or warns, with MeBi \
-          Config FailIf Oversaturated False). Run [MeBi Config Output \"Info\" \
-          True.] to see each estimate.\n\n\
+          saturating, MeBi computes that number exactly and cheaply. Above the \
+          bound, Run Bisim and Sim Begin saturate on demand instead, with a \
+          warning (MeBi Help Config Saturation), holding at most <n> weak \
+          actions; Run Saturate and Minimize refuse with Saturation_Too_Large \
+          (or warn, with MeBi Config FailIf Oversaturated False). Run [MeBi \
+          Config Output \"Info\" True.] to see each estimate.\n\n\
           Measured memory is %i-%i bytes per weak action (the higher for \
           larger LTSs: each keeps its shortest witness path). Choose a bound \
           your machine can hold:\n\
@@ -177,6 +181,26 @@ let text : string list -> string option = function
          lo
          hi
          (saturation_table ()))
+  | [ "Config"; "Saturation" ] ->
+    Some
+      "MeBi Config Saturation OnDemand True | False | Auto.   (default Auto)\n\
+       MeBi Config Reset Bounds.   (restores Auto)\n\n\
+       How Run Bisim and Sim Begin saturate each FSM. Whole: every weak action \
+       up front, which for an LTS with large silent cycles can take far more \
+       memory than the machine has (Proc/Test4: 74.6M weak actions, 34-67GB). \
+       On demand: each state when the check or the proof needs it, from the \
+       same code, so with the same weak actions and witnesses, holding at most \
+       Bounds Saturation of them (the oldest dropped and saturated again if \
+       needed); bisimilarity is decided on the quotient by silent strongly \
+       connected components instead (states in one silent SCC have the same \
+       weak moves; Proc/Test4's 9720 states make 81), with the same verdict. A \
+       proof is the same proof, step for step; it may take longer, as dropped \
+       states are saturated again.\n\n\
+       Auto saturates on demand exactly the FSMs whose saturation would exceed \
+       Bounds Saturation, and warns when it does; True does so for every FSM; \
+       False refuses those FSMs (Saturation_Too_Large), or with FailIf \
+       Oversaturated False saturates them whole anyway. Run Saturate and \
+       Minimize always saturate whole."
   | [ "Config"; "Weak" ] ->
     Some
       "MeBi Config Weak As Option <type>.\n\

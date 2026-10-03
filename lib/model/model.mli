@@ -72,6 +72,7 @@ module type S = sig
      and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
      and type annotation = Annotation.t
+     and type actionmap = Action.Map.t'
   (** {i See {!FSM.saturate}.} *)
 
   (** {2 Minimization} *)
@@ -123,7 +124,8 @@ module type S = sig
       quotient by silent SCCs without saturating. The plugin checks it
       against a bound before every saturation, as saturating a large LTS can
       exhaust memory. *)
-  module SaturationEstimate : Saturation_estimate.S with type fsm = FSM.t
+  module SaturationEstimate :
+    Saturation_estimate.S with type fsm = FSM.t and type partition = Partition.t
 end
 
 (** Builds a model from a term's [base] representation, plus a source of constructor-bindings used for the proof solver.

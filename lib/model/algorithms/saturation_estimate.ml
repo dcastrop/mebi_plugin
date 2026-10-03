@@ -12,6 +12,10 @@ module type S = sig
 
   val fsm : fsm -> t
   val to_string : t -> string
+
+  type partition
+
+  val partition : fsm -> partition
 end
 
 module Make
@@ -22,7 +26,8 @@ module Make
         and type states = C.State.Set.t
         and type labels = C.Label.Set.t
         and type edgemap = C.EdgeMap.t'
-        and type info = C.Info.t) : S with type fsm = FSM.t = struct
+        and type info = C.Info.t) :
+  S with type fsm = FSM.t and type partition = C.Partition.t = struct
   module State = C.State
   module States = C.State.Set
   module Label = C.Label
@@ -33,6 +38,7 @@ module Make
   module StateTbl = Hashtbl.Make (State)
 
   type fsm = FSM.t
+  type partition = C.Partition.t
 
   type t =
     { states : int
@@ -143,8 +149,21 @@ module Make
     comp, !nc
   ;;
 
-  let fsm (x : FSM.t) : t =
-    Logger.trace __FUNCTION__;
+  (** The quotient of an FSM by its silent SCCs: what both the estimate and
+      the partition need. *)
+  type quotient =
+    { ids : int StateTbl.t (** state -> dense id *)
+    ; comp : int array (** dense id -> SCC; reverse topological *)
+    ; k : int (** number of SCCs *)
+    ; size : int array (** SCC -> its number of states *)
+    ; succ : int list array (** SCC -> silent successor SCCs, others *)
+    ; vout : (Label.t * int) list array (** SCC -> visible moves, to SCCs *)
+    ; reach : int array array (** SCC -> SCCs reachable by [tau*] *)
+    ; labels : Labels.t (** visible labels used *)
+    ; strong : int
+    }
+
+  let quotient (x : FSM.t) : quotient =
     let ids : int StateTbl.t = StateTbl.create 64 in
     let id (s : State.t) : int =
       match StateTbl.find_opt ids s with
@@ -208,34 +227,126 @@ module Make
       List.iter (fun d -> Bits.union_into r reach.(d)) succ.(c);
       reach.(c) <- r
     done;
-    (* Per visible label [a], [weak.(c)]: SCCs reachable from [c] by
-       [tau* a tau*] -- [c]'s own [a]-moves closed under [tau*], plus those of
-       every silent successor. One label at a time, so only K^2 bits are live
-       on top of [reach]. *)
+    { ids; comp; k; size; succ; vout; reach; labels; strong = !strong }
+  ;;
+
+  (** [weak_of q a] is, per SCC [c], the SCCs reachable from [c] by
+      [tau* a tau*]: [c]'s own [a]-moves closed under [tau*], plus those of
+      every silent successor. *)
+  let weak_of (q : quotient) (a : Label.t) : int array array =
+    let weak : int array array = Array.make q.k [||] in
+    for c = 0 to q.k - 1 do
+      let b : int array = Bits.create q.k in
+      List.iter
+        (fun ((l, e) : Label.t * int) ->
+          if Label.equal l a then Bits.union_into b q.reach.(e))
+        q.vout.(c);
+      List.iter (fun d -> Bits.union_into b weak.(d)) q.succ.(c);
+      weak.(c) <- b
+    done;
+    weak
+  ;;
+
+  let fsm (x : FSM.t) : t =
+    Logger.trace __FUNCTION__;
+    let q : quotient = quotient x in
+    (* One label at a time, so only K^2 bits are live on top of [reach]. *)
     let total : int =
       Labels.fold
         (fun (a : Label.t) (acc : int) ->
-          let weak : int array array = Array.make k [||] in
+          let weak = weak_of q a in
           let acc : int ref = ref acc in
-          for c = 0 to k - 1 do
-            let b : int array = Bits.create k in
-            List.iter
-              (fun ((l, e) : Label.t * int) ->
-                if Label.equal l a then Bits.union_into b reach.(e))
-              vout.(c);
-            List.iter (fun d -> Bits.union_into b weak.(d)) succ.(c);
-            weak.(c) <- b;
-            acc := !acc + (size.(c) * Bits.weight size b)
+          for c = 0 to q.k - 1 do
+            acc := !acc + (q.size.(c) * Bits.weight q.size weak.(c))
           done;
           !acc)
-        labels
+        q.labels
         0
     in
-    { states = n
-    ; sccs = k
-    ; largest_scc = Array.fold_left max 0 size
-    ; strong = !strong
+    { states = StateTbl.length q.ids
+    ; sccs = q.k
+    ; largest_scc = Array.fold_left max 0 q.size
+    ; strong = q.strong
     ; weak = total
     }
+  ;;
+
+  (** The members of a bitset, ascending. *)
+  let members (b : int array) : int list =
+    let acc : int list ref = ref [] in
+    for j = Array.length b - 1 downto 0 do
+      let x = b.(j) in
+      if x <> 0
+      then
+        for i = Bits.w - 1 downto 0 do
+          if x land (1 lsl i) <> 0 then acc := ((j * Bits.w) + i) :: !acc
+        done
+    done;
+    !acc
+  ;;
+
+  let partition (x : FSM.t) : C.Partition.t =
+    Logger.trace __FUNCTION__;
+    let q : quotient = quotient x in
+    (* Per SCC, its weak moves as (label index, target SCC), and its
+       [=eps=>] targets: all a partition round reads. Kept as lists, so the
+       memory is the number of such SCC-level moves, not states. *)
+    let labels : Label.t array = Array.of_list (Labels.elements q.labels) in
+    let moves : (int * int) list array = Array.make q.k [] in
+    Array.iteri
+      (fun li a ->
+        let weak = weak_of q a in
+        for c = 0 to q.k - 1 do
+          moves.(c)
+          <- List.rev_append
+               (List.map (fun d -> li, d) (members weak.(c)))
+               moves.(c)
+        done)
+      labels;
+    let eps : int list array = Array.map members q.reach in
+    (* Signature refinement: a block is split by (label, block reached) over
+       its weak moves and ([-1], block) over its [=eps=>] moves, until the
+       number of blocks stops growing. *)
+    let block : int array = Array.make q.k 0 in
+    let rec refine (blocks : int) : unit =
+      let tbl : (int * (int * int) list, int) Hashtbl.t = Hashtbl.create q.k in
+      let next : int array =
+        Array.init q.k (fun c ->
+          let sg =
+            List.sort_uniq
+              compare
+              (List.rev_append
+                 (List.map (fun (li, d) -> li, block.(d)) moves.(c))
+                 (List.map (fun d -> -1, block.(d)) eps.(c)))
+          in
+          let key = block.(c), sg in
+          match Hashtbl.find_opt tbl key with
+          | Some b -> b
+          | None ->
+            let b = Hashtbl.length tbl in
+            Hashtbl.add tbl key b;
+            b)
+      in
+      let blocks' : int = Hashtbl.length tbl in
+      Array.blit next 0 block 0 q.k;
+      if blocks' > blocks then refine blocks'
+    in
+    refine 1;
+    (* Expand: the states of each block. *)
+    let by_block : (int, States.t) Hashtbl.t = Hashtbl.create 16 in
+    StateTbl.iter
+      (fun (s : State.t) (i : int) ->
+        let b = block.(q.comp.(i)) in
+        let prev =
+          Stdlib.Option.value
+            (Hashtbl.find_opt by_block b)
+            ~default:States.empty
+        in
+        Hashtbl.replace by_block b (States.add s prev))
+      q.ids;
+    Hashtbl.fold
+      (fun _ ss acc -> C.Partition.add ss acc)
+      by_block
+      C.Partition.empty
   ;;
 end
