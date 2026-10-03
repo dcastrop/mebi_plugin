@@ -51,6 +51,15 @@ module type S = sig
     }
 
   val fsm : ?on_demand:on_demand -> fsm -> fsm -> t
+
+  (** [conflicts a b] are the states [a] and [b] share (the same term,
+      hence the same encoding) whose moves differ between the two: labels
+      or targets. {!fsm} merges [a] and [b] assuming a shared state is one
+      state, which is exact when both sides use the same relation (so the
+      same term has the same moves) and wrong otherwise: two relations over
+      [nat], both from [0], conflate their [0]s. Empty in every checked-in
+      example. Found 2026-10-03 (notes/13). *)
+  val conflicts : fsm -> fsm -> states
 end
 
 module Make
@@ -207,6 +216,31 @@ module Make
     match !the_cached_result with
     | None -> raise (NoCachedResult ())
     | Some x -> x
+  ;;
+
+  module Move = Set.Make (struct
+      type t = C.Label.t * C.State.t
+
+      let compare ((l, s) : t) ((l', s') : t) : int =
+        match C.Label.compare l l' with 0 -> C.State.compare s s' | n -> n
+      ;;
+    end)
+
+  let conflicts (a : FSM.t) (b : FSM.t) : States.t =
+    Logger.trace __FUNCTION__;
+    let moves (x : FSM.t) (s : C.State.t) : Move.t =
+      match C.EdgeMap.find_opt x.edges s with
+      | None -> Move.empty
+      | Some actions ->
+        C.Action.Map.fold
+          (fun (act : C.Action.t) (ds : States.t) acc ->
+            States.fold (fun d acc -> Move.add (act.label, d) acc) ds acc)
+          actions
+          Move.empty
+    in
+    States.filter
+      (fun s -> Bool.not (Move.equal (moves a s) (moves b s)))
+      (States.inter a.states b.states)
   ;;
 
   (** Whether the roots share a block, and the result split by [pi]. *)

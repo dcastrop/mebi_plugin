@@ -1749,3 +1749,26 @@ Module SilentTransfer.
   Print Assumptions weak_bisimilar_silent_l.
   Print Assumptions weak_bisimilar_silent_r.
 End SilentTransfer.
+
+(* Two systems whose state terms coincide (two relations over [nat], both
+   from [0]). Until 2026-10-03 the bisimilarity check merged them into one
+   state: [lin] (does [a]) and [other] (does [b]) were reported bisimilar,
+   and the [weak_sim] proof below stopped on an internal error. It now
+   refuses when a shared state moves differently on each side. *)
+MeBi Divider "Theories.Test.OverlappingStates".
+Module OverlappingStates.
+  Inductive cyc : nat -> option bool -> nat -> Prop :=
+  | c01 : cyc 0 None 1 | c10 : cyc 1 None 0 | c12 : cyc 1 (Some true) 2.
+  Inductive lin : nat -> option bool -> nat -> Prop := l01 : lin 0 (Some true) 1.
+  Inductive other : nat -> option bool -> nat -> Prop :=
+  | o01 : other 0 (Some false) 1.
+  Inductive lin' : nat -> option bool -> nat -> Prop := l01' : lin' 0 (Some true) 1.
+  MeBi Config Weak As Option bool.
+  Fail MeBi Run Bisim 0 With lin And 0 With other Using lin other.
+  Fail MeBi Run Bisim 0 With cyc And 0 With lin Using cyc lin.
+  Example sim : weak_sim cyc lin 0 0.
+  Proof. Fail MeBi Sim Begin cyc 0 And lin 0 Using cyc. Abort.
+  (* the same moves on both sides: one state, as before *)
+  MeBi Run Bisim 0 With lin And 0 With lin' Using lin lin'.
+  MeBi Config Reset Weak.
+End OverlappingStates.

@@ -85,6 +85,15 @@ module type S = sig
       [on_demand.partition merged]: the same partition, by a different route
       (checked in [tests.exe]). *)
   val fsm : ?on_demand:on_demand -> fsm -> fsm -> t
+
+  (** [conflicts a b] are the states [a] and [b] share (the same term,
+      hence the same encoding) whose moves differ between the two: labels
+      or targets. {!fsm} merges [a] and [b] assuming a shared state is one
+      state, which is exact when both sides use the same relation (so the
+      same term has the same moves) and wrong otherwise: two relations over
+      [nat], both from [0], conflate their [0]s. Empty in every checked-in
+      example. Found 2026-10-03 (notes/13). *)
+  val conflicts : fsm -> fsm -> states
 end
 
 module Make
