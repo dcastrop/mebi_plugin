@@ -37,6 +37,7 @@ examples/Bisimilarity/CCS/LawProofs.v ### Success (CTrees' CCS laws, tau-laws; ~
 ###############################################################################
 ### Proc
 examples/Proc.v ### REQUIRED FOR BELOW
+examples/ProcCongruence.v ### structural congruence made explicit: a normalised semantics for Proc.Layered, proved weakly bisimilar to it (fast, no plugin calls)
 
 ### Proc.Flat.Simple
 examples/Bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
@@ -57,9 +58,11 @@ examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test3/TermTests.v ### RETEST: (takes a long time) Success
 # examples/Bisimilarity/Proc/Test3/PluginProofs.v ### Success (18s; needs MeBi Config Solver MutualCofix True, which the file sets)
 
-# examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/Proc/Test4/TermTests.v ### KNOWN LIMIT (B3): fails at the default 100-state bound (LTS_Incomplete); the full LTS is 9720 states and extracts in ~25s with a raised bound, but saturates to 74.6M weak actions, so the plugin now refuses (Saturation_Too_Large) instead of exhausting memory -- still run only under a memory cap (systemd-run -p MemoryMax=...; ulimit -v breaks OCaml 5). See the header of TermTests.v
-# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### not written -- blocked by the same limit: the proof solver needs the saturated LTS. Deferred until the other outstanding backlog items are resolved
+examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
+examples/Bisimilarity/Proc/Test4/NormTermTests.v ### Success (Test4 under the normalised semantics: 82 states, Run Bisim 0.4s each)
+# examples/Bisimilarity/Proc/Test4/NormProofs.v ### Success (Test4's weak_sim proved, via ProcCongruence.wsim_transfer; ~7 min, ~3.8GB: run under a memory cap)
+# examples/Bisimilarity/Proc/Test4/TermTests.v ### KNOWN LIMIT (B3): under compLTS, 9720 states; Run Bisim/Sim Begin decide it on demand (~45s, notes/13), but the file also runs Run Saturate (74.6M weak actions), still refused. Run only under a memory cap (systemd-run -p MemoryMax=...; ulimit -v breaks OCaml 5). See its header
+# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### not written: a direct proof under compLTS needs ~525k solver steps (notes/13); Test4 is proved instead via the normalised semantics, NormProofs.v above
 
 ###############################################################################
 ### CADP

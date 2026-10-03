@@ -28,9 +28,12 @@
    silent-SCC quotient (81 nodes), with a warning ([MeBi Help Config
    Saturation]). [Run Bisim p With compLTS And q With compLTS] takes ~45s.
    [Run Saturate] and [Run Minimize], below, still need the whole saturated
-   FSM and are still refused. A proof is still out of reach (~0.23s a step,
-   ~525k steps): proving one state per silent SCC is notes/13's stages 2-3.
-   See ASSISTED-CHANGES.md, 2026-10-01 and 2026-10-03. *)
+   FSM and are still refused. A direct proof under [compLTS] is out of reach
+   (~525k steps; proving one state per silent SCC is unsound inside a
+   coinduction, notes/13). Test4 is proved instead through a normalised
+   semantics, structural congruence made explicit: [ProcCongruence.v],
+   [NormTermTests.v] (82 states), [NormProofs.v] ([weak_sim compLTS compLTS
+   p q]). See ASSISTED-CHANGES.md, 2026-10-01 and 2026-10-03. *)
 
 Require Import MEBI.loader.
 

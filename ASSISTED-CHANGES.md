@@ -5496,6 +5496,46 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 **Session tally (2026-10-03), cont.:** Tooling 3 · Bug fix 6 · Docs 2 ·
 New feature 2 · Refactor 1.
 
+## 2026-10-03 — Test4 proved, via structural congruence made explicit
+
+**New feature** (example and theory; no plugin code). On branch
+`examples/test4-congruence`. Jonah's suggestion: split `Test4`'s semantics
+into one with structural congruence embedded (as `Proc.Layered.compLTS`
+has it, as silent steps) and one with it explicit.
+
+**What was added.** `examples/ProcCongruence.v`, module `Normalised`:
+- `congr`: structural congruence as an explicit relation (comm, assoc,
+  the unit law `tend | x == x`, contexts, equivalence);
+- `norm`: a canonical representative (unfinished components, sorted,
+  rebuilt right-nested); `core`: `compLTS` without its congruence rules;
+  `nLTS`: `core` with every target normalised;
+- `link`: `Permutation (comps c) (comps d) -> weak_bisimilar compLTS nLTS
+  c d`, one cofix (congruence steps answered by standing still, component
+  steps by the same component on the other side); `congr_link`;
+  `wsim_transfer` and `wbis_transfer`: what the plugin proves over `nLTS`
+  holds over `compLTS`. All axiom-free (`Print Assumptions`).
+
+**A detail the scratch experiment had glossed over.** `compLTS`'s
+`do_par_end` (`tend | tend -tau-> tend`) cannot fire under normalisation
+unless the two finished components happen to be adjacent, so `norm` must
+also drop finished components (the unit law); without that, `link` is
+false. `Test4` never reaches `tend`, so its 82 states are unaffected.
+
+**Results.** `Test4/NormTermTests.v` (built by default): 82 states from
+each of `p`, `q`, `r` (least bound pinned), `Run Bisim` 0.4s each.
+`Test4/NormProofs.v` (not built by default): the plugin proves `weak_sim
+nLTS nLTS p q` in 48,821 steps (356s, `Qed` 42s), and `wsim_transfer`
+gives **`weak_sim compLTS compLTS p q`** -- `Test4` proved in the semantics
+it was written in, 6.7 min, 3.8GB peak. `weak_bisimilar` is not attempted:
+52,088 moves predicted, unfinished after 25 minutes.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep examples/test4-congruence main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 3 · Bug fix 6 · Docs 2 ·
+New feature 3 · Refactor 1.
+
 ---
 
 ## Outstanding
