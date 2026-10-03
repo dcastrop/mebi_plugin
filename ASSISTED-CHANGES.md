@@ -5660,6 +5660,63 @@ New feature 4 · Refactor 1 · Optimization 2.
 
 ---
 
+## 2026-10-03 — Saturation per state, linear in its output (3b's remainder)
+
+**Optimization** (behaviour change in tie-breaking only). On branch
+`perf/action-hash`, two commits. Item 1 of the open list, done at Jonah's
+request, with the outcome reported for a keep/revert decision.
+
+**Measured first, and a wrong guess of mine.** I estimated that on
+`Proc/Test4` a state's saturation examined only ~2.5x its output, so the
+planned linear rewrite would gain little. A probe loading `Test4`'s dumped
+FSM into the pure-OCaml model (kept out of the repo:
+`notes/tools/satprobe.ml`) showed otherwise: **2.9s per state**, with
+**2.3M-4.7M candidate witnesses** for 5,280-7,680 weak actions. My estimate
+assumed silent closures stay within an SCC; they do not (`do_fix` and
+`do_seq_end` are silent steps that change a component's local state).
+`perf` is not permitted here, so phases were timed in a replica:
+enumerating witnesses dominated; building annotations, the set and the map
+took under 45ms together.
+
+**Two changes.**
+- `Action.hash` hashed only the label, so all of a state's weak actions
+  under one label shared one bucket of the action map, and each insertion
+  scanned it with a deep equality. Now a saturated action also hashes its
+  witness (length, first and last state); one without a witness hashes as
+  before, keeping unsaturated FSMs' table order, which
+  `ReModel.transition` breaks ties by. (Alone: state 1 508 -> 349ms.)
+- `Saturation.edge_bfs` replaces `edge_closure`: per label, a
+  breadth-first search over silent steps from every `t` with `from -tau*->
+  s -a-> t` (each at its shortest distance), each state settled once.
+  `edge_closure` and its `Key` table are removed.
+
+**Outcome.**
+- Speed on `Test4`: **2.9s -> 35ms per state** (83x); state 0, building
+  closures, 8.9s -> 46ms. On demand, 301 solver steps on `Test4` (original
+  semantics): **68s -> 1.8s**, peak **2.0GB -> 0.76GB**.
+- Output: same weak actions, same witness lengths everywhere; among
+  witnesses of equal length, a different one kept for **2 of the 2426** in
+  `satdiff` (the silent path after the visible step). `satdiff.expected`
+  regenerated for those 2 lines.
+- Proofs: every count unchanged -- all Proc, CADP, CCS, `LawProofs.v`
+  under `Auto`, forced `True` and forced `False`; `Test.v` identical to
+  `main`; ABP 6494/9914; `Test4/NormProofs.v` 48,821. `tests.exe` 93/93,
+  `make` clean.
+
+**Mistakes on the way.** A `pkill -f` matched my own shell and killed it.
+Removing the dead `edge_closure` I first cut `closures_of` too, which sat
+between it and the new code; `make` caught it, restored from `HEAD`, and
+`satdiff` checked byte-identical to the verified version afterwards.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep perf/action-hash main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 4 · Bug fix 7 · Docs 2 ·
+New feature 4 · Refactor 1 · Optimization 3.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
