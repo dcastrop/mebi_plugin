@@ -61,6 +61,7 @@ examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/Proc/Test4/NormTermTests.v ### Success (Test4 under the normalised semantics: 82 states, Run Bisim 0.4s each)
 # examples/Bisimilarity/Proc/Test4/NormProofs.v ### Success (Test4's weak_sim proved, via ProcCongruence.wsim_transfer; ~7 min, ~3.8GB: run under a memory cap)
+# examples/Bisimilarity/Proc/Test4/NormBisimProofs.v ### Success (Test4's weak_bisimilar, Answers Minimal, via wbis_transfer; ~4 min, ~2.8GB: run under a memory cap; separate file, heavy proofs add up)
 # examples/Bisimilarity/Proc/Test4/TermTests.v ### KNOWN LIMIT (B3): under compLTS, 9720 states; Run Bisim/Sim Begin decide it on demand (~45s, notes/13), but the file also runs Run Saturate (74.6M weak actions), still refused. Run only under a memory cap (systemd-run -p MemoryMax=...; ulimit -v breaks OCaml 5). See its header
 # examples/Bisimilarity/Proc/Test4/PluginProofs.v ### not written: a direct proof under compLTS needs ~525k solver steps (notes/13); Test4 is proved instead via the normalised semantics, NormProofs.v above
 
