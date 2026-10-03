@@ -115,12 +115,19 @@ Proof.
 Qed.
 Hint Resolve weak_sim_trans : rel_db.
 
-(* Proofs up to silent steps (notes/13, option 4; added 2026-10-03, nothing
-   above changed). A state silently reachable from [r] is simulated by
-   whatever simulates [r]: each of its moves is a weak move of [r]. And a
-   state that silently reaches [n'] simulates whatever [n'] simulates: it
-   answers as [n'] does, after the silent steps. So a proof need only treat
-   one state per silent strongly connected component, and transfer. *)
+(* Transfer along silent steps (added 2026-10-03, nothing above changed). A
+   state silently reachable from [r] is simulated by whatever simulates [r]:
+   each of its moves is a weak move of [r]. And a state that silently
+   reaches [n'] simulates whatever [n'] simulates: it answers as [n'] does,
+   after the silent steps.
+
+   Use them on facts already proved: one pair proved, the others obtained
+   (Test.v, [SilentTransfer]). NOT inside a coinduction, on the hypothesis
+   being proved: that is circular and unsound (a state's silent move to a
+   member of its own SCC would be "answered" by the pair itself), and Rocq's
+   guard check rejects it (Test.v, [CircularTransfer]). They were meant to
+   let the plugin prove one state per silent SCC (notes/13, stage 3); that
+   plan was abandoned for this reason. *)
 
 (* A silent prefix extends a weak move. *)
 Lemma weak_silent_prefix {M A} {lts : LTS M A} : forall x y z a,
