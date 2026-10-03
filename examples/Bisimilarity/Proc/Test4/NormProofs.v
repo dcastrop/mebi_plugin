@@ -7,8 +7,7 @@
    -p MemorySwapMax=0 ...). The bound is the least that closes the proof:
    [MeBi Sim Solve N] permits N + 1 steps, and it reports 48821.
 
-   [weak_bisimilar nLTS nLTS p q] is not attempted: Auto predicts 6592 pairs
-   and 52,088 moves, and it did not finish within 25 minutes. *)
+   [weak_bisimilar] is in NormBisimProofs.v (with [Answers Minimal]). *)
 
 Require Import MEBI.loader.
 

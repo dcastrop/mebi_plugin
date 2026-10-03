@@ -271,6 +271,14 @@ module type S = sig
       }
 
     val plan : t -> game_of -> Pair.t -> plan
+
+    (** The relation [Minimal] answers within: from every pair any answer
+        reaches, pairs removed while every remaining pair can still answer
+        all its moves within what remains (the first removable in [Pair.Set]
+        order each time), then trimmed to what the root reaches. Exposed for
+        [tests.exe]'s check against the original algorithm. *)
+    val minimal_relation : game_of -> Pair.t -> Pair.Set.t
+
     val measure : t -> game_of -> Pair.t -> measure
 
     (** Iterations a plan is predicted to cost: [3 pairs + 6 moves + 3.3 witness], fitted to the 41 checked-in proofs' real counts.

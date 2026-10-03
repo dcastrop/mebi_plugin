@@ -45,8 +45,9 @@ To run them:
    state per silent SCC is unsound inside a coinduction: notes/13, `Test.v`
    `CircularTransfer`), but `Test4` **is** proved via a normalised semantics
    with structural congruence made explicit (`examples/ProcCongruence.v`,
-   `Test4/NormProofs.v`: 48,821 steps, ~7 min, ~3.8GB, not built by
-   default). Run
+   `Test4/NormProofs.v`: 48,821 steps, ~7 min, ~3.8GB; `weak_bisimilar` in
+   `Test4/NormBisimProofs.v` with `Answers Minimal`: 61,161 steps, ~4 min,
+   ~2.8GB; neither built by default). Run
    anything on `Test4` under a memory cap,
    with `systemd-run --user --scope -p MemoryMax=6G -p MemorySwapMax=0` --
    `ulimit -v` does not work, OCaml 5 then cannot reserve its heaps. An
