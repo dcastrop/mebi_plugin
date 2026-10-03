@@ -319,23 +319,44 @@ let init
      all read, so they cannot disagree. *)
   Solver.W.plan := None;
   (* An FSM saturated on demand (notes/13) is too large to walk the whole
-     game of up front: planning answers, or [Auto]'s estimate below, would
-     saturate state after state, again and again as the cache drops them
-     ([Proc/Test4]: still running after 29 minutes). Both are skipped, with a
-     notice, and the proof answers move by move on the nested path. *)
+     game of up front: planning answers, or the mutual cofix's pair set, or
+     [Auto]'s estimate, would saturate state after state, again and again as
+     the cache drops them ([Proc/Test4]: still running after 29 minutes).
+     [Auto] is the tool's own choice, so it takes the nested cofix without
+     estimating, with a notice. A setting the user made explicitly is
+     refused rather than overridden: [MutualCofix True], or an answer policy
+     other than [Default] (2026-10-03; until then the policy was silently
+     downgraded and [True] stalled). *)
   let on_demand : bool =
     Stdlib.Option.is_some (Solver.W.get_fsm_a ~saturated:true ()).fill
     || Stdlib.Option.is_some (Solver.W.get_fsm_b ~saturated:true ()).fill
   in
-  if
-    on_demand
-    && (!Api.the_answer_policy <> Api.Answers_default
-        || !Api.the_solver_strategy = Api.Auto)
-  then
-    Logger.notice
-      "(Saturated on demand: answers are chosen move by move (Answers \
-       Default), and Auto takes the nested cofix without estimating, as either \
-       would walk the whole game up front.)";
+  if on_demand
+  then (
+    let refuse (setting : string) : unit =
+      CErrors.user_err
+        (Pp.str
+           (Printf.sprintf
+              "MeBi: [%s] plans the whole proof up front, walking every pair \
+               of states the proof can reach. With an FSM saturated on demand \
+               (too large to saturate whole; see the warning above) that walk \
+               saturates state after state and may not finish. Use [MeBi \
+               Config Solver MutualCofix Auto] or [False], and [MeBi Config \
+               Solver Answers Default]."
+              setting))
+    in
+    if !Api.the_solver_strategy = Api.Mutual
+    then refuse "MeBi Config Solver MutualCofix True";
+    (match !Api.the_answer_policy with
+     | Api.Answers_default -> ()
+     | Api.Answers_greedy -> refuse "MeBi Config Solver Answers Greedy"
+     | Api.Answers_minimal -> refuse "MeBi Config Solver Answers Minimal"
+     | Api.Answers_auto -> refuse "MeBi Config Solver Answers Auto");
+    if !Api.the_solver_strategy = Api.Auto
+    then
+      Logger.notice
+        "(Saturated on demand: Auto takes the nested cofix without estimating, \
+         as estimating would walk the whole game up front.)");
   (if !Api.the_answer_policy <> Api.Answers_default && Bool.not on_demand
    then
      let module P = Solver.W.Model.Product in

@@ -200,7 +200,11 @@ let text : string list -> string option = function
        Bounds Saturation, and warns when it does; True does so for every FSM; \
        False refuses those FSMs (Saturation_Too_Large), or with FailIf \
        Oversaturated False saturates them whole anyway. Run Saturate and \
-       Minimize always saturate whole."
+       Minimize always saturate whole.\n\n\
+       On demand, Sim Begin cannot plan the whole proof up front (that walk \
+       would saturate state after state): Solver MutualCofix True and any \
+       Solver Answers but Default are refused, and Auto takes the nested \
+       cofix."
   | [ "Config"; "Weak" ] ->
     Some
       "MeBi Config Weak As Option <type>.\n\
