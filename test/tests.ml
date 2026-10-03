@@ -936,6 +936,59 @@ let test_quotient_partition () : unit =
     (M.State.Set.mem (state 10) (M.Partition.get_bisimilar (state 0) p))
 ;;
 
+(* 2026-10-03: two systems whose states share terms. A shared state with
+   the same moves on both sides is one state (same relation); with
+   different moves it is a conflict, which [Bisimilarity.fsm] would merge. *)
+let test_conflicts () : unit =
+  print_endline "conflicting shared states";
+  let lin = fsm 0 [ transition 0 a 1 ] in
+  let other = fsm 0 [ transition 0 b 1 ] in
+  let same = fsm 0 [ transition 0 a 1 ] in
+  let apart = fsm 10 [ transition 10 b 11 ] in
+  let c = M.Bisimilarity.conflicts lin other in
+  check "a vs b from a shared 0: 0 conflicts" true (M.State.Set.mem (state 0) c);
+  check
+    "... and 1 does not (no moves either side)"
+    false
+    (M.State.Set.mem (state 1) c);
+  check
+    "same moves: no conflict"
+    true
+    (M.State.Set.is_empty (M.Bisimilarity.conflicts lin same));
+  check
+    "numbered apart: no conflict"
+    true
+    (M.State.Set.is_empty (M.Bisimilarity.conflicts lin apart));
+  (* renaming the second system's states apart, as [Wrapper.separate] does
+     (there with fresh encodings that decode to the same terms) *)
+  let rename (s : M.State.t) : M.State.t = state (s.base + 100) in
+  let other' = M.FSM.rename rename other in
+  check
+    "renamed: no conflict"
+    true
+    (M.State.Set.is_empty (M.Bisimilarity.conflicts lin other'));
+  check "renamed: init moved" true (other'.init = Some (state 100));
+  check
+    "renamed: same moves, new states"
+    true
+    (match M.EdgeMap.find_opt other'.edges (state 100) with
+     | Some acts ->
+       M.State.Set.equal
+         (M.Action.Map.destinations acts)
+         (M.State.Set.singleton (state 101))
+     | None -> false);
+  let r = M.Bisimilarity.fsm lin other' in
+  check
+    "renamed: a vs b not bisimilar"
+    false
+    (M.Bisimilarity.Result.are_bisimilar r.result);
+  let r = M.Bisimilarity.fsm lin other in
+  check
+    "not renamed: a vs b wrongly bisimilar (the bug, pinned)"
+    true
+    (M.Bisimilarity.Result.are_bisimilar r.result)
+;;
+
 (* ------------------------------------------------------------------ *)
 (* lib/terms: constructor trees and the encoding counter (backlog E(c)). *)
 
@@ -1086,6 +1139,7 @@ let () =
   test_saturation_estimate ();
   test_on_demand_saturation ();
   test_quotient_partition ();
+  test_conflicts ();
   test_tree_order ();
   test_tree_preorder ();
   test_encoding_counter ();

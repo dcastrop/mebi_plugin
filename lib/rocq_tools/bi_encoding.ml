@@ -42,6 +42,8 @@ module type S = sig
   val decode_map : 'a B.t -> 'a F.t
   val encode_map : 'a F.t -> 'a B.t
   val to_list : unit -> (enc * EConstr.t) list
+  val alias : enc -> enc
+  val aliases_of : enc -> enc list
 
   (** The [EConstr.t] keys of [F] are compared and hashed under a [sigma], so
       this instance's table has to know which context to read it from. Install
@@ -91,7 +93,11 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
 
   let the_maps : maps ref option ref = ref None
 
+  (* encoding -> the aliases made for it ([alias]); cleared with the maps *)
+  let the_aliases : Enc.t list B.t = B.create 0
+
   let alloc () : unit =
+    B.reset the_aliases;
     let fwd : Enc.t F.t = F.create 0 in
     let bck : EConstr.t B.t = B.create 0 in
     the_maps := Some (ref { fwd; bck })
@@ -206,6 +212,20 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     | DecodingNotFound x ->
       Logger.thing ~__FUNCTION__ Trace "Err: DecodingNotFound" x Enc.to_string;
       raise (CannotDecode x)
+  ;;
+
+  let alias (x : Enc.t) : Enc.t =
+    Logger.trace __FUNCTION__;
+    let term : EConstr.t = get_econstr x in
+    let fresh : Enc.t = Enc.incr () in
+    B.add (bckmap ()) fresh term;
+    let prev = try B.find the_aliases x with Not_found -> [] in
+    B.replace the_aliases x (fresh :: prev);
+    fresh
+  ;;
+
+  let aliases_of (x : Enc.t) : Enc.t list =
+    try B.find the_aliases x with Not_found -> []
   ;;
 
   let decode_opt (x : Enc.t) : EConstr.t option =

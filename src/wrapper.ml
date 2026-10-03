@@ -565,10 +565,80 @@ module Make (Enc : Encoding.S) :
       M.return (the_fsm_a, the_fsm_b)
     ;;
 
+    (** Refuses two FSMs that share a state behaving differently on each side
+        ({!Model.Bisimilarity.conflicts}): merged, it would be one state, and
+        the verdict could be wrong (2026-10-03: [a] and [b] were reported
+        bisimilar). Sharing states with the same moves -- both sides using
+        the same relation -- is exact, and allowed. *)
+    let refuse_conflicts (the_fsm_a : FSM.t) (the_fsm_b : FSM.t) : unit M.mm =
+      let c : Model.State.Set.t =
+        Model.Bisimilarity.conflicts the_fsm_a the_fsm_b
+      in
+      if Model.State.Set.is_empty c
+      then M.return ()
+      else
+        M.state (fun env sigma ->
+          let example : string =
+            Rocq_utils.Strfy.econstr
+              env
+              sigma
+              (Decode.state (Model.State.Set.min_elt c))
+          in
+          CErrors.user_err
+            (Pp.str
+               (Printf.sprintf
+                  "MeBi: the two systems share %i state(s), e.g. [%s], that \
+                   move differently on each side: two different relations \
+                   whose state terms coincide. The bisimilarity check would \
+                   take each for one state and could give a wrong verdict, so \
+                   it refuses. Number one system's states apart from the \
+                   other's."
+                  (Model.State.Set.cardinal c)
+                  example)))
+    ;;
+
+    (** When [a] and [b] share states that move differently on each side,
+        [b]'s copies of {e all} the shared states are renamed apart: each gets
+        a fresh encoding that decodes to the same term ([M.alias]), so the
+        merge keeps them distinct while proofs and output still read the
+        right terms. All, not only the conflicting ones: a shared state with
+        the same moves on both sides may lead to a conflicting one, and would
+        then differ once that one is renamed on one side only. With no
+        conflict (both sides one relation) [b] is returned unchanged. *)
+    let separate (the_fsm_a : FSM.t) (the_fsm_b : FSM.t) : FSM.t =
+      let c = Model.Bisimilarity.conflicts the_fsm_a the_fsm_b in
+      if Model.State.Set.is_empty c
+      then the_fsm_b
+      else (
+        let shared : Model.State.Set.t =
+          Model.State.Set.inter the_fsm_a.states the_fsm_b.states
+        in
+        let fresh : (Enc.t, Model.State.t) Hashtbl.t =
+          Hashtbl.create (Model.State.Set.cardinal shared)
+        in
+        Model.State.Set.iter
+          (fun (s : Model.State.t) ->
+            Hashtbl.replace fresh s.base { base = M.alias s.base })
+          shared;
+        Logger.notice
+          (Printf.sprintf
+             "(The two systems share %i states, %i of which move differently \
+              on each side: two relations whose state terms coincide. The \
+              second system's copies are kept apart.)"
+             (Model.State.Set.cardinal shared)
+             (Model.State.Set.cardinal c));
+        Model.FSM.rename
+          (fun (s : Model.State.t) ->
+            Stdlib.Option.value (Hashtbl.find_opt fresh s.base) ~default:s)
+          the_fsm_b)
+    ;;
+
     let do_merge { a; b } refs : Model.Bisimilarity.t option M.mm =
       Logger.trace __FUNCTION__;
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
+      let the_fsm_b = separate the_fsm_a the_fsm_b in
+      let* () = refuse_conflicts the_fsm_a the_fsm_b in
       Logger.info "Merging FSMs...";
       let the_fsm = FSM.merge the_fsm_a the_fsm_b in
       result_log (module Model.FSM) (module Decode.FSM)
@@ -590,6 +660,9 @@ module Make (Enc : Encoding.S) :
       Logger.trace __FUNCTION__;
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
+      let the_fsm_b = separate the_fsm_a the_fsm_b in
+      (* after [separate], a conflict would be a bug in it: still refuse *)
+      let* () = refuse_conflicts the_fsm_a the_fsm_b in
       let on_demand : Model.Bisimilarity.on_demand =
         { a = on_demand_for "FSM A" the_fsm_a
         ; b = on_demand_for "FSM B" the_fsm_b

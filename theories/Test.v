@@ -1749,3 +1749,37 @@ Module SilentTransfer.
   Print Assumptions weak_bisimilar_silent_l.
   Print Assumptions weak_bisimilar_silent_r.
 End SilentTransfer.
+
+(* Two systems whose state terms coincide (two relations over [nat], both
+   from [0]). Until 2026-10-03 the bisimilarity check merged them into one
+   state: [lin] (does [a]) and [other] (does [b]) were reported bisimilar,
+   and the [weak_sim] proof below stopped on an internal error. When a shared
+   state moves differently on each side, the second system's copies are now
+   renamed apart (with a notice), and the check is right. *)
+MeBi Divider "Theories.Test.OverlappingStates".
+Module OverlappingStates.
+  Inductive cyc : nat -> option bool -> nat -> Prop :=
+  | c01 : cyc 0 None 1 | c10 : cyc 1 None 0 | c12 : cyc 1 (Some true) 2.
+  Inductive cyc' : nat -> option bool -> nat -> Prop :=
+  | c01' : cyc' 0 None 1 | c10' : cyc' 1 None 0 | c12' : cyc' 1 (Some true) 2.
+  Inductive lin : nat -> option bool -> nat -> Prop := l01 : lin 0 (Some true) 1.
+  Inductive other : nat -> option bool -> nat -> Prop :=
+  | o01 : other 0 (Some false) 1.
+  Inductive lin' : nat -> option bool -> nat -> Prop := l01' : lin' 0 (Some true) 1.
+  MeBi Config Weak As Option bool.
+  (* not bisimilar, and now said so (Not_Bisimilar) *)
+  Fail MeBi Run Bisim 0 With lin And 0 With other Using lin other.
+  (* bisimilar, with states 0 and 1 shared but moving differently *)
+  MeBi Run Bisim 0 With cyc And 0 With lin Using cyc lin.
+  Example sim : weak_sim cyc lin 0 0.
+  Proof. MeBi Sim Begin cyc 0 And lin 0 Using cyc. MeBi Sim Solve 100. Qed.
+  Example bis : weak_bisimilar cyc lin 0 0.
+  Proof. MeBi Sim Begin cyc 0 And lin 0 Using cyc. MeBi Sim Solve 100. Qed.
+  Example sim_rev : weak_sim lin cyc 0 0.
+  Proof. MeBi Sim Begin lin 0 And cyc 0 Using lin. MeBi Sim Solve 100. Qed.
+  (* the same moves on both sides: one state, nothing renamed *)
+  MeBi Run Bisim 0 With lin And 0 With lin' Using lin lin'.
+  Example sim_copy : weak_sim cyc cyc' 0 0.
+  Proof. MeBi Sim Begin cyc 0 And cyc' 0 Using cyc. MeBi Sim Solve 100. Qed.
+  MeBi Config Reset Weak.
+End OverlappingStates.

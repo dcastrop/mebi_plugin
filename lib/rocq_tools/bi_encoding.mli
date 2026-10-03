@@ -44,6 +44,15 @@ module type S = sig
   val encode_map : 'a F.t -> 'a B.t
   val to_list : unit -> (enc * EConstr.t) list
 
+  (** [alias e] is a fresh encoding that decodes to the same term as [e]
+      (the term still encodes to [e]): a second state for one term, for when
+      two systems' state terms coincide but their states must not (see
+      [Wrapper]'s conflict handling). [aliases_of e] are those made for [e],
+      cleared with the table. *)
+  val alias : enc -> enc
+
+  val aliases_of : enc -> enc list
+
   (** The [EConstr.t] keys of [F] are compared and hashed under a [sigma], so
       this instance's table has to know which context to read it from. Install
       it once, when the instance is created; it defaults to
