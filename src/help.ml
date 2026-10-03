@@ -139,6 +139,7 @@ let text : string list -> string option = function
          "MeBi Config Bounds As Num States <n>.\n\
           MeBi Config Bounds As Num Transitions <n>.\n\
           MeBi Config Bounds Saturation <n>.\n\
+          MeBi Config Bounds Game <n>.\n\
           MeBi Config Premise Depth <n>.\n\
           MeBi Config Reset Bounds.\n\n\
           Exploration stops after <n> states (default %s) or transitions; an \
@@ -201,10 +202,12 @@ let text : string list -> string option = function
        False refuses those FSMs (Saturation_Too_Large), or with FailIf \
        Oversaturated False saturates them whole anyway. Run Saturate and \
        Minimize always saturate whole.\n\n\
-       On demand, Sim Begin cannot plan the whole proof up front (that walk \
-       would saturate state after state): Solver MutualCofix True and any \
-       Solver Answers but Default are refused, and Auto takes the nested \
-       cofix."
+       On demand, planning the whole proof up front walks every pair the proof \
+       can reach, saturating as it goes. So Solver MutualCofix True and any \
+       Solver Answers but Default are refused unless MeBi Config Bounds Game \
+       <n> is set (unset by default); with it, the walk runs within <n> pairs \
+       and past it they are refused. Auto estimates within the bound, and \
+       otherwise (or past it) takes the nested cofix."
   | [ "Config"; "Weak" ] ->
     Some
       "MeBi Config Weak As Option <type>.\n\

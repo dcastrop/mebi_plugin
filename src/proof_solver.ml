@@ -318,46 +318,86 @@ let init
      can reach, which the solver, the mutual block and the estimate below
      all read, so they cannot disagree. *)
   Solver.W.plan := None;
-  (* An FSM saturated on demand (notes/13) is too large to walk the whole
-     game of up front: planning answers, or the mutual cofix's pair set, or
-     [Auto]'s estimate, would saturate state after state, again and again as
-     the cache drops them ([Proc/Test4]: still running after 29 minutes).
-     [Auto] is the tool's own choice, so it takes the nested cofix without
-     estimating, with a notice. A setting the user made explicitly is
-     refused rather than overridden: [MutualCofix True], or an answer policy
-     other than [Default] (2026-10-03; until then the policy was silently
-     downgraded and [True] stalled). *)
+  (* An FSM saturated on demand (notes/13) may be too large to walk the
+     whole game of up front: planning answers, the mutual cofix's pair set,
+     or [Auto]'s estimate, saturate state after state as they walk
+     ([Proc/Test4]: still running after 29 minutes). A setting the user made
+     explicitly -- [MutualCofix True], an answer policy other than
+     [Default] -- needs [MeBi Config Bounds Game <n>] on demand, and is
+     refused, naming the bound, if the walk goes past it. [Auto] is the
+     tool's own choice: without the bound it takes the nested cofix without
+     estimating; with it, it estimates within the bound, and past it takes
+     the nested cofix. (2026-10-03; before, the explicit settings were
+     refused outright, and before that silently downgraded or stalled.) *)
   let on_demand : bool =
     Stdlib.Option.is_some (Solver.W.get_fsm_a ~saturated:true ()).fill
     || Stdlib.Option.is_some (Solver.W.get_fsm_b ~saturated:true ()).fill
   in
+  let bound : int option = if on_demand then !Api.the_game_bound else None in
+  (* [f ()], within the bound when there is one *)
+  let capped : 'a. (unit -> 'a) -> ('a, int) result =
+    fun f ->
+    match bound with
+    | None -> Ok (f ())
+    | Some n ->
+      (try Ok (Solver.W.Model.Product.with_cap n f) with
+       | Solver.W.Model.Product.Game_too_large n -> Error n)
+  in
+  let explicit : string list =
+    (if !Api.the_solver_strategy = Api.Mutual
+     then [ "MeBi Config Solver MutualCofix True" ]
+     else [])
+    @
+    match !Api.the_answer_policy with
+    | Api.Answers_default -> []
+    | Api.Answers_greedy -> [ "MeBi Config Solver Answers Greedy" ]
+    | Api.Answers_minimal -> [ "MeBi Config Solver Answers Minimal" ]
+    | Api.Answers_auto -> [ "MeBi Config Solver Answers Auto" ]
+  in
+  let refuse : 'a. string -> string -> 'a =
+    fun setting why ->
+    CErrors.user_err
+      (Pp.str
+         (Printf.sprintf
+            "MeBi: [%s] plans the whole proof up front, walking every pair of \
+             states the proof can reach, and an FSM here is saturated on \
+             demand (too large to saturate whole; see the warning above), so \
+             that walk saturates state after state as it goes. %s Or use [MeBi \
+             Config Solver MutualCofix Auto] or [False], and [MeBi Config \
+             Solver Answers Default]."
+            setting
+            why))
+  in
+  let refuse_unbounded : 'a. string -> 'a =
+    fun setting ->
+    refuse
+      setting
+      "Bound it with [MeBi Config Bounds Game <n>] (pairs) to allow it."
+  in
+  let refuse_exceeded : 'a. string -> int -> 'a =
+    fun setting n ->
+    refuse
+      setting
+      (Printf.sprintf
+         "The game has more than %i pairs, the bound set with [MeBi Config \
+          Bounds Game %i]: raise it to allow it."
+         n
+         n)
+  in
   if on_demand
   then (
-    let refuse (setting : string) : unit =
-      CErrors.user_err
-        (Pp.str
-           (Printf.sprintf
-              "MeBi: [%s] plans the whole proof up front, walking every pair \
-               of states the proof can reach. With an FSM saturated on demand \
-               (too large to saturate whole; see the warning above) that walk \
-               saturates state after state and may not finish. Use [MeBi \
-               Config Solver MutualCofix Auto] or [False], and [MeBi Config \
-               Solver Answers Default]."
-              setting))
-    in
-    if !Api.the_solver_strategy = Api.Mutual
-    then refuse "MeBi Config Solver MutualCofix True";
-    (match !Api.the_answer_policy with
-     | Api.Answers_default -> ()
-     | Api.Answers_greedy -> refuse "MeBi Config Solver Answers Greedy"
-     | Api.Answers_minimal -> refuse "MeBi Config Solver Answers Minimal"
-     | Api.Answers_auto -> refuse "MeBi Config Solver Answers Auto");
-    if !Api.the_solver_strategy = Api.Auto
+    (match explicit, bound with
+     | setting :: _, None -> refuse_unbounded setting
+     | _ -> ());
+    if !Api.the_solver_strategy = Api.Auto && Stdlib.Option.is_none bound
     then
       Logger.notice
         "(Saturated on demand: Auto takes the nested cofix without estimating, \
-         as estimating would walk the whole game up front.)");
-  (if !Api.the_answer_policy <> Api.Answers_default && Bool.not on_demand
+         as estimating would walk the whole game up front. [MeBi Config Bounds \
+         Game <n>] lets it estimate within <n> pairs.)");
+  (if
+     !Api.the_answer_policy <> Api.Answers_default
+     && ((not on_demand) || Stdlib.Option.is_some bound)
    then
      let module P = Solver.W.Model.Product in
      let fsm_a = Solver.W.get_fsm_a () in
@@ -387,10 +427,23 @@ let init
              pi
        in
        let p : P.Policy.plan =
-         match !Api.the_answer_policy with
-         | Api.Answers_greedy -> P.Policy.plan P.Policy.Greedy game (ra, rb)
-         | Api.Answers_minimal -> P.Policy.plan P.Policy.Minimal game (ra, rb)
-         | Api.Answers_auto | Api.Answers_default -> P.Policy.best game (ra, rb)
+         match
+           capped (fun () ->
+             match !Api.the_answer_policy with
+             | Api.Answers_greedy -> P.Policy.plan P.Policy.Greedy game (ra, rb)
+             | Api.Answers_minimal ->
+               P.Policy.plan P.Policy.Minimal game (ra, rb)
+             | Api.Answers_auto | Api.Answers_default ->
+               P.Policy.best game (ra, rb))
+         with
+         | Ok p -> p
+         | Error n ->
+           refuse_exceeded
+             (List.find
+                (fun x ->
+                  String.starts_with ~prefix:"MeBi Config Solver Answers" x)
+                explicit)
+             n
        in
        if p.measure.unanswered > 0
        then
@@ -420,9 +473,11 @@ let init
      of the mutual cost -- the exact figure does not matter, only whether it
      is larger. See [Model.Product.estimate]. *)
   (match !Api.the_solver_strategy with
-   | Api.Nested | Api.Mutual -> ()
-   | Api.Auto when on_demand -> Api.set_mutual_cofix false
-   | Api.Auto ->
+   | Api.Nested -> ()
+   | Api.Mutual when Bool.not on_demand -> ()
+   | Api.Auto when on_demand && Stdlib.Option.is_none bound ->
+     Api.set_mutual_cofix false
+   | (Api.Auto | Api.Mutual) as strategy ->
      let module S = Solver in
      let fsm_a = S.W.get_fsm_a () in
      let fsm_b = S.W.get_fsm_b ~saturated:true () in
@@ -435,7 +490,7 @@ let init
            a missing pair. *)
         let refl = Libnames.qualid_eq (snd a) (snd b) in
         let silent = (S.W.get_fsm_b ()).edges in
-        let c =
+        let estimate () =
           match !S.W.plan with
           | Some p -> S.W.Model.Product.estimate_plan p
           | None ->
@@ -460,34 +515,48 @@ let init
                 pi
                 (ra, rb)
         in
-        let use_mutual = S.W.Model.Product.prefer_mutual c in
-        Api.set_mutual_cofix use_mutual;
-        (* Only the mutual path is announced. It is the deviation from what
-           the solver has always done, it changes the iteration count a
-           checked-in [MeBi Sim Solve] bound was measured against, and on a
-           product where it matters it is the difference between finishing and
-           not. Staying on the nested path is the status quo and says
-           nothing. *)
-        if use_mutual
-        then
-          Logger.notice
-            (Printf.sprintf
-               "(Auto: mutual cofix -- %i pairs, %i moves; a nested cofix \
-                would visit %s goals.)"
-               c.pairs
-               c.moves
-               (match c.nested with
-                | Some n -> Printf.sprintf "%i" n
-                | None -> Printf.sprintf "over %i" (4 * (c.pairs + c.moves))))
-        else
-          Logger.debug
-            (Printf.sprintf
-               "(Auto: nested cofix -- %i pairs, %i moves, nested walk %s.)"
-               c.pairs
-               c.moves
-               (match c.nested with
-                | Some n -> Printf.sprintf "%i" n
-                | None -> "capped"))
+        (match capped estimate with
+         | Error n when strategy = Api.Mutual ->
+           refuse_exceeded "MeBi Config Solver MutualCofix True" n
+         | Error n ->
+           Api.set_mutual_cofix false;
+           Logger.notice
+             (Printf.sprintf
+                "(Saturated on demand: the game has more than %i pairs, the \
+                 bound set with [MeBi Config Bounds Game %i]; Auto takes the \
+                 nested cofix.)"
+                n
+                n)
+         | Ok _ when strategy = Api.Mutual -> ()
+         | Ok c ->
+           let use_mutual = S.W.Model.Product.prefer_mutual c in
+           Api.set_mutual_cofix use_mutual;
+           (* Only the mutual path is announced. It is the deviation from what
+              the solver has always done, it changes the iteration count a
+              checked-in [MeBi Sim Solve] bound was measured against, and on a
+              product where it matters it is the difference between finishing and
+              not. Staying on the nested path is the status quo and says
+              nothing. *)
+           if use_mutual
+           then
+             Logger.notice
+               (Printf.sprintf
+                  "(Auto: mutual cofix -- %i pairs, %i moves; a nested cofix \
+                   would visit %s goals.)"
+                  c.pairs
+                  c.moves
+                  (match c.nested with
+                   | Some n -> Printf.sprintf "%i" n
+                   | None -> Printf.sprintf "over %i" (4 * (c.pairs + c.moves))))
+           else
+             Logger.debug
+               (Printf.sprintf
+                  "(Auto: nested cofix -- %i pairs, %i moves, nested walk %s.)"
+                  c.pairs
+                  c.moves
+                  (match c.nested with
+                   | Some n -> Printf.sprintf "%i" n
+                   | None -> "capped")))
       | _ -> Api.set_mutual_cofix false));
   Solver.ProofState.init pstate (fst a, fst b);
   pstate

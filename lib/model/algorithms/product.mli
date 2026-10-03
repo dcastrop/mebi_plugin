@@ -142,6 +142,16 @@ module type S = sig
     -> Pair.t
     -> Pair.t list
 
+  (** Raised by a game walk ({!val:reachable}, the planners) that visits
+      more pairs than the cap {!val:with_cap} set. *)
+  exception Game_too_large of int
+
+  (** [with_cap n f] runs [f] with every game walk capped at [n] pairs:
+      past it, the walk raises {!exception:Game_too_large}. For FSMs
+      saturated on demand, whose walks saturate as they go
+      ([MeBi Config Bounds Game]). *)
+  val with_cap : int -> (unit -> 'a) -> 'a
+
   (** [reachable ~refl a b pi root] is the set of game states reachable from
       [root], by breadth-first closure over {!val:successors}.
 

@@ -51,6 +51,16 @@ module type S = sig
     -> Pair.t
     -> Pair.t list
 
+  (** Raised by a game walk ({!val:reachable}, the planners) that visits
+      more pairs than the cap {!val:with_cap} set. *)
+  exception Game_too_large of int
+
+  (** [with_cap n f] runs [f] with every game walk capped at [n] pairs:
+      past it, the walk raises {!exception:Game_too_large}. For FSMs
+      saturated on demand, whose walks saturate as they go
+      ([MeBi Config Bounds Game]). *)
+  val with_cap : int -> (unit -> 'a) -> 'a
+
   val reachable
     :  ?silent:edgemap
     -> ?sim:(state -> states)
@@ -448,14 +458,35 @@ struct
         (obligations a x)
   ;;
 
+  exception Game_too_large of int
+
+  (* The cap on game walks, set by [with_cap] (notes/13, 2026-10-03). *)
+  let walk_cap : int option ref = ref None
+
+  let with_cap (n : int) (f : unit -> 'a) : 'a =
+    let before = !walk_cap in
+    walk_cap := Some n;
+    Fun.protect ~finally:(fun () -> walk_cap := before) f
+  ;;
+
+  (* [count] pairs reached so far: past the cap, stop. *)
+  let check_cap (count : int) : unit =
+    match !walk_cap with
+    | Some n when count > n -> raise (Game_too_large n)
+    | _ -> ()
+  ;;
+
   (* Breadth-first closure of [root] under [step]. *)
   let reachable_by (step : Pair.t -> Pair.t list) (root : Pair.t) : Pair.Set.t =
+    let count : int ref = ref 1 in
     let rec go (seen : Pair.Set.t) : Pair.t list -> Pair.Set.t = function
       | [] -> seen
       | p :: rest ->
         let next : Pair.t list =
           step p |> List.filter (fun q -> not (Pair.Set.mem q seen))
         in
+        count := !count + List.length next;
+        check_cap !count;
         go
           (List.fold_left (fun acc q -> Pair.Set.add q acc) seen next)
           (List.rev_append next rest)
@@ -778,14 +809,16 @@ struct
                     , moves + 1
                     , witness + c.cost
                     , unanswered )
-                  else
+                  else (
+                    if Stdlib.Option.is_some !walk_cap
+                    then check_cap (Pair.Set.cardinal seen + 1);
                     ( Pair.Set.add c.next seen
                     , c.next :: fresh
                     , succ
                     , chosen
                     , moves + 1
                     , witness + c.cost
-                    , unanswered ))
+                    , unanswered )))
               (seen, [], [], chosen, moves, witness, unanswered)
               (game_of p)
           in
