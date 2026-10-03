@@ -1204,16 +1204,13 @@ Module OutputPremises.
   MeBi Config Weak As Option bool.
   Example w_open : weak_sim open_c open_c' 0 0.
   Proof. MeBi Sim Begin open_c 0 And open_c' 0 Using base. MeBi Sim Solve 100. Qed.
-  (* KNOWN WRONG: the solver stops on an internal [Not_found] here. Not
-     from the open source: the same LTS with the source fixed by
-     [In q [0; 1; 2; 3]] fails the same way, already before 2026-10-03,
-     while [rb] alone proves. When fixed, this [Fail] starts failing: make
-     it a proof. *)
+  (* Until 2026-10-03 the solver stopped here on an internal [Not_found]:
+     reading the hypotheses for the transition to answer, it took [rb 2 a
+     3], a premise's step left by inverting [open_rec 0 a 3], for a step of
+     [open_rec] (its states are numbers too), and state 2 has no edges. It
+     now reads only steps of the relation being simulated. *)
   Example w_open_rec : weak_sim open_rec open_rec' 0 0.
-  Proof.
-    MeBi Sim Begin open_rec 0 And open_rec' 0 Using rb.
-    Fail MeBi Sim Solve 100.
-  Abort.
+  Proof. MeBi Sim Begin open_rec 0 And open_rec' 0 Using rb. MeBi Sim Solve 100. Qed.
   MeBi Config Reset Weak.
 
   (* KNOWN LIMIT, warned: transitions MeBi cannot determine. [u n] is a
