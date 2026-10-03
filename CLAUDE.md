@@ -77,6 +77,11 @@ To run them:
    Forced `False` stops at the first of them in every file (with a loose
    bound, `Glued/MutualExclusion`'s alone would finish, at 3859). They come last in each file so
    that a forced run still reaches all 27 `weak_sim` counts first.
+   `CCS/LawProofs.v` (built by default) adds 14 more, `weak_bisimilar`
+   instances of CTrees' CCS laws, with least bounds, so any increase fails
+   the build: under `Auto`, `36, 58, 19, 19, 56, 42, 53, 28, 15, 98, 278,
+   357, 325, 3192`. Forced `True` differs only at `tau1` (29); forced
+   `False` stops at `paraC` (its `paraA` was OOM-killed at 5GB).
    A change to *classification* (Solved/Unsolved) is a regression. A change
    to iteration *count* needs an explanation (fewer is fine if it fixes a
    real miss; more needs justifying).
