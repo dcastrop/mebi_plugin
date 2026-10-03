@@ -94,7 +94,9 @@ let text : string list -> string option = function
           Forall, /\\, \\/, ...) by a proof search over its constructors, at \
           most %i deep (MeBi Config Premise Depth <n>). A false premise drops \
           the transition; in a proof, a true one is closed with the proof \
-          found, and a false one in a hypothesis is refuted;\n\
+          found, and a false one in a hypothesis is refuted. A binder only \
+          such premises mention ([In q l -> P q -> ...], no LTS step on [q]) \
+          is chosen in the proof by solving those premises together;\n\
          \  - a premise that computes something -- the target, or what an LTS \
           premise needs ([In q l -> lts q a q']) -- is enumerated, each \
           solution a transition of its own; MeBi warns if the solutions may be \
