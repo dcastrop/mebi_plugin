@@ -5367,7 +5367,8 @@ apart, both are right. Proofs stay sound (`Qed`), but a `Run Bisim`
 verdict can be wrong. The checked-in examples compare distinct terms, or
 structurally identical copies where the merge happens to be harmless. The
 tests number the second system apart, with a comment. Fix to be agreed:
-note 13.
+note 13. **Corrected in the next entry:** that claim about the examples was
+wrong; CADP `Glued` was affected.
 
 **A slip of mine:** my first commit on the branch did not build. I tested
 the new `Test.v` module in a standalone copy that imported
@@ -5381,6 +5382,63 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 `git log --merges --oneline --grep theories/silent-transfer-lemmas main`).
 
 **Session tally (2026-10-03), cont.:** Tooling 2 · Bug fix 5 · Docs 1 ·
+New feature 2 · Refactor 1.
+
+## 2026-10-03 — Two systems whose state terms coincide
+
+**Bug fix.** On branch `fix/overlapping-states`, two commits: a guard,
+then the fix it guards. Found during stage 2 (previous entry). Jonah's
+concern was overhead for everyone for a corner case; both parts cost
+nothing unless the case arises.
+
+**The bug.** `Bisimilarity.fsm` merges the two FSMs, taking a shared
+state (the same term, so the same encoding) for one state. Right when both
+sides use the same relation (Proc's `p` vs `q`, the CCS pairs: a shared
+term moves the same way on both sides); wrong when they do not. Two
+relations over `nat`, both from `0`: `Run Bisim` called `lin` (does `a`)
+and `other` (does `b`) bisimilar, and a true `weak_sim` stopped on an
+internal error.
+
+**Not a corner case after all -- my earlier claim was wrong.** I said the
+checked-in examples were unaffected. The guard, run over the matrix,
+stopped CADP `Size1/Glued` and `Size1/Glued/MutualExclusion` at once:
+their `bigstep` proofs compare two different semantics whose states share
+terms, 8 of which move differently. Their bisimilarity checks had been
+running on a conflated merge; the proofs passed because `Qed` checks them
+independently, and (measured below) the conflation did not change their
+counts.
+
+**The fix.**
+- `Bisimilarity.conflicts a b`: shared states whose moves (labels and
+  targets) differ. Cheap: only shared states are compared.
+- The guard (first commit): refuse, naming a state, in `Run Bisim`,
+  `Sim Begin` and `Run Merge`. Kept after the fix as an assertion.
+- The fix (second commit), only on conflict: `B`'s copies of *all* shared
+  states are renamed apart (`Wrapper.separate`), each to a fresh encoding
+  that decodes to the same term (`Bi_encoding.alias`), so proofs and output
+  read the right terms; the solver's term-to-state lookup
+  (`ReModel.state`) falls back to a term's aliases. A notice says so.
+  `FSM.rename` is the model side. With no conflict nothing changes.
+
+**Tests.** `tests.exe` 93/93: `conflicts`, `FSM.rename`, and the bug
+pinned at model level (not renamed: wrongly bisimilar; renamed: not).
+`Test.v` `OverlappingStates`: `lin`/`other` now `Not_Bisimilar` (checked);
+`cyc`/`lin` bisimilar, with proofs in 16, 37 and 11 steps -- exactly the
+counts of the same pairs numbered apart by hand (`SilentTransfer`);
+identical copies still share states, no notice.
+
+**Verification.** All Proc, CADP, CCS and `LawProofs.v` counts identical
+under `Auto`, forced `True` and forced `False`, with the CADP `Glued`
+proofs now separated; `Test.v`'s 47 other counts identical to `main`;
+`satdiff` identical; `make` clean. ABP not rerun: same relation on both
+sides, so nothing is renamed, and the solver change is a fallback on a
+lookup miss that needs aliases.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep fix/overlapping-states main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 2 · Bug fix 6 · Docs 1 ·
 New feature 2 · Refactor 1.
 
 ---

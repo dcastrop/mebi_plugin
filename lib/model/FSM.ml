@@ -41,6 +41,12 @@ module type S = sig
       too large to saturate whole ({!Saturation_estimate}); see
       [notes/13]. *)
   val saturate_on_demand : ?budget:int -> t -> t
+
+  (** [rename f x] is [x] with every state [s] replaced by [f s]: states,
+      initial state, terminals, and edges (sources and destinations). For an
+      FSM as extracted, before saturation: annotations, which name states,
+      are left as they are. *)
+  val rename : (state -> state) -> t -> t
 end
 
 module Make
@@ -194,5 +200,26 @@ module Make
             done)
       in
       { x with edges; fill = Some fill })
+  ;;
+
+  let rename (f : State.t -> State.t) (x : t) : t =
+    Logger.trace __FUNCTION__;
+    let edges : EdgeMap.t' = EdgeMap.create (EdgeMap.length x.edges) in
+    EdgeMap.iter
+      (fun (from : State.t) (actions : C.Action.Map.t') ->
+        let renamed : C.Action.Map.t' = C.Action.Map.create 0 in
+        C.Action.Map.iter
+          (fun (a : C.Action.t) (ds : States.t) ->
+            C.Action.Map.update renamed a (States.map f ds))
+          actions;
+        EdgeMap.replace edges (f from) renamed)
+      x.edges;
+    { x with
+      init = Stdlib.Option.map f x.init
+    ; states = States.map f x.states
+    ; terminals = States.map f x.terminals
+    ; edges
+    ; fill = None
+    }
   ;;
 end

@@ -103,7 +103,19 @@ struct
       try
         let enc : Enc.t = M.get_encoding x in
         (* NOTE: [Model.State.Set.compare] only cares about [base]. *)
-        Model.State.Set.find { base = enc } ys |> M.return
+        match Model.State.Set.find_opt { base = enc } ys with
+        | Some s -> M.return s
+        | None ->
+          (* a state renamed apart from the other system's copy
+             ([Wrapper.separate]): the term encodes to [enc], the state is
+             one of its aliases *)
+          (match
+             List.find_map
+               (fun e -> Model.State.Set.find_opt { base = e } ys)
+               (M.aliases_of enc)
+           with
+           | Some s -> M.return s
+           | None -> raise Not_found)
       with
       | M.EncodingNotFound _ ->
         Logger.debug ~__FUNCTION__ "miss: term has no encoding";

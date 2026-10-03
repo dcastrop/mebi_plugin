@@ -958,7 +958,35 @@ let test_conflicts () : unit =
   check
     "numbered apart: no conflict"
     true
-    (M.State.Set.is_empty (M.Bisimilarity.conflicts lin apart))
+    (M.State.Set.is_empty (M.Bisimilarity.conflicts lin apart));
+  (* renaming the second system's states apart, as [Wrapper.separate] does
+     (there with fresh encodings that decode to the same terms) *)
+  let rename (s : M.State.t) : M.State.t = state (s.base + 100) in
+  let other' = M.FSM.rename rename other in
+  check
+    "renamed: no conflict"
+    true
+    (M.State.Set.is_empty (M.Bisimilarity.conflicts lin other'));
+  check "renamed: init moved" true (other'.init = Some (state 100));
+  check
+    "renamed: same moves, new states"
+    true
+    (match M.EdgeMap.find_opt other'.edges (state 100) with
+     | Some acts ->
+       M.State.Set.equal
+         (M.Action.Map.destinations acts)
+         (M.State.Set.singleton (state 101))
+     | None -> false);
+  let r = M.Bisimilarity.fsm lin other' in
+  check
+    "renamed: a vs b not bisimilar"
+    false
+    (M.Bisimilarity.Result.are_bisimilar r.result);
+  let r = M.Bisimilarity.fsm lin other in
+  check
+    "not renamed: a vs b wrongly bisimilar (the bug, pinned)"
+    true
+    (M.Bisimilarity.Result.are_bisimilar r.result)
 ;;
 
 (* ------------------------------------------------------------------ *)

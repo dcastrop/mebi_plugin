@@ -69,6 +69,12 @@ module type S = sig
       terminal by saturating are not found without saturating them. For FSMs
       too large to saturate whole; see [notes/13]. *)
   val saturate_on_demand : ?budget:int -> t -> t
+
+  (** [rename f x] is [x] with every state [s] replaced by [f s]: states,
+      initial state, terminals, and edges (sources and destinations). For an
+      FSM as extracted, before saturation: annotations, which name states,
+      are left as they are. *)
+  val rename : (state -> state) -> t -> t
 end
 
 module Make
