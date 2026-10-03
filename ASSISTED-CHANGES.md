@@ -5334,6 +5334,55 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 **Session tally (2026-10-03), cont.:** Tooling 2 · Bug fix 5 · Docs 1 ·
 New feature 1 · Refactor 1.
 
+## 2026-10-03 — Proofs up to silent steps: transfer lemmas
+
+**New feature** (theory; additive). On branch
+`theories/silent-transfer-lemmas`. Stage 2 of note 13. Nothing existing in
+`theories/Bisimilarity.v` is changed, and the plugin does not use the new
+lemmas yet (stage 3).
+
+**The lemmas.** With `silent` the reflexive-transitive closure of silent
+steps:
+- `weak_sim_silent_l`: `silent ltsM r m -> weak_sim r n -> weak_sim m n`;
+  every move of `m` is a weak move of `r`, answered by `weak_sim_act_clos`.
+- `weak_sim_silent_r`: `silent ltsN n n' -> weak_sim m n' -> weak_sim m n`;
+  `n` answers as `n'` does, after the silent steps.
+- `weak_bisimilar_silent_l` / `_r`: the same for `weak_bisimilar`, needing
+  silent reachability *both ways* (within a silent SCC): the other side's
+  moves must be answered too, which `m` can only do by first reaching `r`.
+- Helpers `weak_silent_prefix`, `weak_after_silent`.
+None needed a new coinduction; all are closed under the global context
+(`Print Assumptions`, in `Test.v`).
+
+**Tests.** `Test.v` `SilentTransfer`: on a two-state silent cycle, the
+plugin proves one pair per relation (16, 37, 11 steps) and the lemmas give
+the other member, on both sides, for `weak_sim` and `weak_bisimilar`.
+
+**A bug found on the way, not fixed here (open).** Writing those tests,
+`weak_sim cyc lin 0 0` stopped on an internal error although it holds.
+When the two systems' state terms coincide (both `nat`, both from `0`),
+the bisimilarity check merges them into one state: `MeBi Run Bisim` then
+called `lin` (does `a`) and `other` (does `b`) **bisimilar**. Renumbered
+apart, both are right. Proofs stay sound (`Qed`), but a `Run Bisim`
+verdict can be wrong. The checked-in examples compare distinct terms, or
+structurally identical copies where the merge happens to be harmless. The
+tests number the second system apart, with a comment. Fix to be agreed:
+note 13.
+
+**A slip of mine:** my first commit on the branch did not build. I tested
+the new `Test.v` module in a standalone copy that imported
+`Relation_Operators`, which `Test.v` does not, and chained the commit
+after the build in one command without gating on it. Fixed in the next
+commit (qualified `Relation_Operators.rt1n_trans`); both builds checked
+before it.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep theories/silent-transfer-lemmas main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 2 · Bug fix 5 · Docs 1 ·
+New feature 2 · Refactor 1.
+
 ---
 
 ## Outstanding
