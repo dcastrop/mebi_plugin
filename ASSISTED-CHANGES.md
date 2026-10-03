@@ -5352,7 +5352,9 @@ steps:
   moves must be answered too, which `m` can only do by first reaching `r`.
 - Helpers `weak_silent_prefix`, `weak_after_silent`.
 None needed a new coinduction; all are closed under the global context
-(`Print Assumptions`, in `Test.v`).
+(`Print Assumptions`, in `Test.v`). **Corrected later the same day:** these
+lemmas cannot shrink a proof as intended (used inside the coinduction they
+are circular and unsound); see "Stage 3 abandoned" below.
 
 **Tests.** `Test.v` `SilentTransfer`: on a two-state silent cycle, the
 plugin proves one pair per relation (16, 37, 11 steps) and the lemmas give
@@ -5439,6 +5441,59 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 `git log --merges --oneline --grep fix/overlapping-states main`).
 
 **Session tally (2026-10-03), cont.:** Tooling 2 · Bug fix 6 · Docs 1 ·
+New feature 2 · Refactor 1.
+
+## 2026-10-03 — Stage 3 abandoned; Test4 under a normalised semantics
+
+**Docs** · **Tooling** (tests). On branch `docs/test4-proof-limit`.
+
+**Stage 3 abandoned, and a wrong estimate of mine.** Note 13's plan was
+to prove `Test4` one state per silent SCC, transferring to the other
+members with the stage-2 lemmas. Working out how the solver would use them,
+before writing code: inside a coinduction, a representative's silent move
+to another member of its SCC would be "answered" by transfer from the very
+pair being proved. That is circular, and unsound: `r <-tau-> m`, `m -b->`,
+against `n` with no moves, "proves" `n` simulates `r`. Rocq's guard check
+rejects the circular term, so no false proof could have resulted -- the
+stage would just never have closed a proof. A sound version must answer
+every member's moves (>= 87,480 for `Test4`), so my estimate of "81
+representatives x ~9 moves, ABP-sized" (note 13, (b)) was wrong.
+
+**Is earlier work now redundant?** Reviewed with Jonah:
+- stage 1 (PR #22, saturation on demand and the quotient partition): no;
+  it decides FSMs too large to saturate (`Test4` in 45s), and costs
+  nothing below the guard;
+- the overlap fix (PR #24): no; independent, a real wrong-verdict bug;
+- stage 2's lemmas (PR #23): they no longer serve stage 3, but are sound
+  library lemmas for transfer *outside* a coinduction (`SilentTransfer`);
+  kept, and their comment in `Bisimilarity.v`, which suggested using them
+  to shrink proofs, corrected.
+
+**Tests.** `Test.v` `CircularTransfer`: the plugin refuses the false goal
+(checked: "not weakly simulated"); the circular term fails `Guarded`
+(checked: "Recursive definition ... ill-formed"); and the goal is proved
+false by hand (`~ weak_sim ...`).
+
+**Structural congruence (Jonah's question), measured, not committed.**
+`Test4`'s semantics makes congruence silent steps (`do_comm`,
+`do_assocl`/`r`), hence 81 SCCs x 120 shapes. Explicit congruence rules
+as premises would not help (the plugin would enumerate all 120 congruent
+targets); a canonical representative does: `core p a q -> nLTS p a (norm
+q)`, with `norm` flattening, sorting and rebuilding the parallel
+components, and `core` = `compLTS` without the congruence rules -- all
+expressible with the plugin as it is. In a scratch file: 82 states (not
+9720), `Run Bisim` 2.2s, and **`weak_sim nLTS nLTS p q` proved** (46,269
+steps, 345s, `Qed` 43s, 3.9GB peak). `weak_bisimilar p q` predicted 52,088
+moves and did not finish within 25 minutes. It proves `nLTS`, not
+`compLTS`: linking them is one generic hand proof (congruence is a
+bisimulation, `norm p == p`). Next step proposed to Jonah: an example
+splitting the two semantics.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep docs/test4-proof-limit main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 3 · Bug fix 6 · Docs 2 ·
 New feature 2 · Refactor 1.
 
 ---

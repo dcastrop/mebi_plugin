@@ -1783,3 +1783,51 @@ Module OverlappingStates.
   Proof. MeBi Sim Begin cyc 0 And cyc' 0 Using cyc. MeBi Sim Solve 100. Qed.
   MeBi Config Reset Weak.
 End OverlappingStates.
+
+(* Why proofs cannot be shortened to one state per silent SCC (notes/13,
+   stage 3, abandoned 2026-10-03). [r] and [m] reach each other silently,
+   [m] can do [b], [n] can do nothing: [n] does not simulate [r]. Inside a
+   coinduction, answering [r]'s silent move to [m] by transfer from the pair
+   being proved ([weak_sim_silent_l] applied to the cofix hypothesis) would
+   "prove" it: circular, so unsound -- and Rocq's guard check rejects it.
+   The transfer lemmas are sound only outside a coinduction
+   ([SilentTransfer]). *)
+MeBi Divider "Theories.Test.CircularTransfer".
+Module CircularTransfer.
+  Inductive cx : nat -> option bool -> nat -> Prop :=
+  | x_rm : cx 0 None 1 | x_mr : cx 1 None 0 | x_mb : cx 1 (Some false) 2.
+  Inductive nx : nat -> option bool -> nat -> Prop := .
+  MeBi Config Weak As Option bool.
+  (* the plugin refuses the goal: not similar *)
+  Example refused : weak_sim cx nx 0 10.
+  Proof. Fail MeBi Sim Begin cx 0 And nx 10 Using cx. Abort.
+  MeBi Config Reset Weak.
+
+  Lemma s_rm : silent cx 0 1.
+  Proof. eapply Relation_Operators.rt1n_trans; [constructor | constructor]. Qed.
+
+  (* the circular "proof" is not accepted *)
+  Example circular : weak_sim cx nx 0 10.
+  Proof.
+    cofix CH.
+    constructor; constructor; intros m2 a T.
+    inversion T; subst.
+    exists 10; split.
+    - constructor. constructor.
+    - exact (weak_sim_silent_l 0 1 10 s_rm CH).
+    Fail Guarded.
+  Abort.
+
+  (* and the goal is false *)
+  Example not_similar : ~ weak_sim cx nx 0 10.
+  Proof.
+    intros H.
+    destruct (weak_sim_silent_clos H s_rm) as [n2 [S W]].
+    destruct (sim_weak (out_sim W) x_mb) as [n3 [Wk _]].
+    inversion Wk as [b z t PRE ACT POST | ]; subst.
+    (* [nx] has no transitions: the silent path from 10 is empty, and no
+       step can follow it *)
+    inversion S; subst; [ | match goal with H : tau nx _ _ |- _ => inversion H end ].
+    inversion PRE; subst; [ inversion ACT | match goal with H : tau nx _ _ |- _ => inversion H end ].
+  Qed.
+End CircularTransfer.
