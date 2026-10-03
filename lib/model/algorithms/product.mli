@@ -142,6 +142,16 @@ module type S = sig
     -> Pair.t
     -> Pair.t list
 
+  (** Raised by a game walk ({!val:reachable}, the planners) that visits
+      more pairs than the cap {!val:with_cap} set. *)
+  exception Game_too_large of int
+
+  (** [with_cap n f] runs [f] with every game walk capped at [n] pairs:
+      past it, the walk raises {!exception:Game_too_large}. For FSMs
+      saturated on demand, whose walks saturate as they go
+      ([MeBi Config Bounds Game]). *)
+  val with_cap : int -> (unit -> 'a) -> 'a
+
   (** [reachable ~refl a b pi root] is the set of game states reachable from
       [root], by breadth-first closure over {!val:successors}.
 
@@ -271,6 +281,14 @@ module type S = sig
       }
 
     val plan : t -> game_of -> Pair.t -> plan
+
+    (** The relation [Minimal] answers within: from every pair any answer
+        reaches, pairs removed while every remaining pair can still answer
+        all its moves within what remains (the first removable in [Pair.Set]
+        order each time), then trimmed to what the root reaches. Exposed for
+        [tests.exe]'s check against the original algorithm. *)
+    val minimal_relation : game_of -> Pair.t -> Pair.Set.t
+
     val measure : t -> game_of -> Pair.t -> measure
 
     (** Iterations a plan is predicted to cost: [3 pairs + 6 moves + 3.3 witness], fitted to the 41 checked-in proofs' real counts.

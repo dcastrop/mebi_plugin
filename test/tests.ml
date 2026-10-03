@@ -936,6 +936,168 @@ let test_quotient_partition () : unit =
     (M.State.Set.mem (state 10) (M.Partition.get_bisimilar (state 0) p))
 ;;
 
+(* 2026-10-03: [Policy.minimal_relation] was rewritten (counts and a reverse
+   index instead of re-validating everything per removal). The original
+   algorithm, kept here as the reference: the same relation on every game. *)
+let reference_minimal_relation
+      (game_of : M.Product.Policy.game_of)
+      (root : M.Product.Pair.t)
+  : M.Product.Pair.Set.t
+  =
+  let module P = M.Product.Pair in
+  let reachable_by step root =
+    let rec go seen = function
+      | [] -> seen
+      | p :: rest ->
+        let next = step p |> List.filter (fun q -> not (P.Set.mem q seen)) in
+        go
+          (List.fold_left (fun acc q -> P.Set.add q acc) seen next)
+          (List.rev_append next rest)
+    in
+    go (P.Set.singleton root) [ root ]
+  in
+  let memo = Hashtbl.create 256 in
+  let obs p =
+    match Hashtbl.find_opt memo p with
+    | Some o -> o
+    | None ->
+      let o = game_of p in
+      Hashtbl.add memo p o;
+      o
+  in
+  let all =
+    reachable_by
+      (fun p ->
+        List.concat_map
+          (fun (o : M.Product.Policy.obligation) ->
+            List.map (fun (c : M.Product.Policy.choice) -> c.next) o.candidates)
+          (obs p))
+      root
+  in
+  let valid r rel =
+    List.for_all
+      (fun (o : M.Product.Policy.obligation) ->
+        List.exists
+          (fun (c : M.Product.Policy.choice) -> P.Set.mem c.next rel)
+          o.candidates)
+      (obs r)
+  in
+  let trim rel =
+    reachable_by
+      (fun p ->
+        List.concat_map
+          (fun (o : M.Product.Policy.obligation) ->
+            List.filter_map
+              (fun (c : M.Product.Policy.choice) ->
+                if P.Set.mem c.next rel then Some c.next else None)
+              o.candidates)
+          (obs p))
+      root
+  in
+  let rec shrink rel =
+    match
+      P.Set.elements rel
+      |> List.find_opt (fun p ->
+        (not (P.equal p root))
+        &&
+        let rel' = P.Set.remove p rel in
+        P.Set.for_all (fun q -> valid q rel') rel')
+    with
+    | None -> rel
+    | Some p -> shrink (trim (P.Set.remove p rel))
+  in
+  if P.Set.for_all (fun q -> valid q all) all then shrink all else all
+;;
+
+let test_minimal_relation () : unit =
+  print_endline "minimal relation: rewrite = original";
+  let shift (f : M.FSM.t) : M.FSM.t =
+    let moved =
+      M.EdgeMap.fold
+        (fun (from : M.State.t) (actions : M.Action.Map.t') acc ->
+          M.Action.Map.fold
+            (fun (act : M.Action.t) (ds : M.State.Set.t) acc ->
+              M.State.Set.fold
+                (fun (d : M.State.t) acc ->
+                  transition (from.base + 100) act.label (d.base + 100) :: acc)
+                ds
+                acc)
+            actions
+            acc)
+        f.edges
+        []
+    in
+    fsm ~weak_labels:(M.Label.Set.singleton tau) 100 moved
+  in
+  let games = ref 0
+  and nontrivial = ref 0
+  and mismatches = ref 0 in
+  List.iteri
+    (fun i (a' : M.FSM.t) ->
+      (* against a renumbered copy (bisimilar), and against the next one *)
+      List.iter
+        (fun (b' : M.FSM.t) ->
+          let r = M.Bisimilarity.fsm a' b' in
+          let g : M.Product.game =
+            { a = a'
+            ; a_saturated = M.FSM.saturate a'
+            ; b = b'
+            ; b_saturated = M.FSM.saturate b'
+            }
+          in
+          let root = state 0, state 100 in
+          List.iter
+            (fun game ->
+              incr games;
+              let mine = M.Product.Policy.minimal_relation game root in
+              let ref_ = reference_minimal_relation game root in
+              if M.Product.Pair.Set.cardinal ref_ > 1 then incr nontrivial;
+              if not (M.Product.Pair.Set.equal mine ref_) then incr mismatches)
+            [ M.Product.Policy.bisim_game ~refl:false g r.result.bisim_states
+            ; M.Product.Policy.sim_game
+                ~silent:b'.edges
+                ~refl:false
+                a'
+                b'
+                r.result.bisim_states
+            ])
+        [ shift a' ];
+      ignore i)
+    (random_fsms [| 2026; 10; 3; 7 |] 200);
+  check_int "400 random games: same relation" 0 !mismatches;
+  check "most relations non-trivial" true (!nontrivial > !games / 2)
+;;
+
+(* 2026-10-03: game walks can be capped ([MeBi Config Bounds Game]). *)
+let test_game_cap () : unit =
+  print_endline "game walk cap";
+  let a' = fsm 0 [ transition 0 a 1; transition 1 a 2; transition 2 a 0 ] in
+  let b' =
+    fsm 10 [ transition 10 a 11; transition 11 a 12; transition 12 a 10 ]
+  in
+  let pi = (M.Bisimilarity.fsm a' b').result.bisim_states in
+  let root = state 0, state 10 in
+  let walk () = M.Product.reachable ~refl:false a' b' pi root in
+  let n = M.Product.Pair.Set.cardinal (walk ()) in
+  check "uncapped walk reaches 3 pairs" true (n = 3);
+  check
+    "capped at 3: fine"
+    true
+    (M.Product.Pair.Set.cardinal (M.Product.with_cap 3 walk) = 3);
+  check
+    "capped at 2: Game_too_large"
+    true
+    (try
+       ignore (M.Product.with_cap 2 walk);
+       false
+     with
+     | M.Product.Game_too_large 2 -> true);
+  check
+    "the cap is lifted afterwards"
+    true
+    (M.Product.Pair.Set.cardinal (walk ()) = 3)
+;;
+
 (* 2026-10-03: two systems whose states share terms. A shared state with
    the same moves on both sides is one state (same relation); with
    different moves it is a conflict, which [Bisimilarity.fsm] would merge. *)
@@ -1140,6 +1302,8 @@ let () =
   test_on_demand_saturation ();
   test_quotient_partition ();
   test_conflicts ();
+  test_minimal_relation ();
+  test_game_cap ();
   test_tree_order ();
   test_tree_preorder ();
   test_encoding_counter ();

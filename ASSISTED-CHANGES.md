@@ -5568,6 +5568,98 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 **Session tally (2026-10-03), cont.:** Tooling 3 · Bug fix 7 · Docs 2 ·
 New feature 3 · Refactor 1.
 
+## 2026-10-03 — The Minimal answer planner, near-linear; Test4's weak_bisimilar proved
+
+**Optimization** · **Tooling** (example). On branch `perf/minimal-relation`.
+Item 3 of the open list: why `Test4`'s `weak_bisimilar` (under the
+normalised semantics) was out of reach, walked through with Jonah.
+
+**Why it was expensive.** Every `Test4` state is weakly bisimilar to every
+other, so the default answers ("shortest witness into the class, lowest
+state") scatter over nearly all 82 x 82 pairs: 6592 pairs, 52,088 moves.
+The opt-in planned policies predict `Greedy` 1874 pairs / 14,400 moves
+(133k steps) and **`Minimal` 245 / 1912 (32k steps)** -- but `Minimal`'s
+plan took **19.5 minutes**.
+
+**The fix, in two rounds (the first was not enough).**
+`Policy.minimal_relation` removes, from every pair any answer reaches, the
+first pair (in `Pair.Set` order) whose removal keeps every remaining pair
+able to answer all its moves, then trims what the root no longer reaches,
+until nothing is removable. It re-validated every remaining pair per
+candidate removal, and re-walked the whole relation per removal. My first
+rewrite (a reverse index and answer counts for the removability test) kept
+the per-removal re-walk and still ran past 10 minutes; I had not measured
+which cost dominated. The second: removability as a count of moves a pair
+alone still answers, with the removable pairs in an ordered set; and
+reachability as a spanning tree, where a removal can only disconnect its
+own subtree, re-attached through any other remaining predecessor.
+
+**Same relation.** The removals and their order are the original's, so the
+relation is the same: `tests.exe` keeps the original algorithm as a
+reference and compares on 400 random games (95/95); `Test.v`'s `Greedy`,
+`Minimal` and `Auto` proofs unchanged (51 counts identical to `main`);
+`Test4`'s plan identical (245 pairs, 1912 moves, witness 6082); `make` clean after a blank line it wanted (warning 50, again). Default
+answers do not use it, so the proof matrix is unaffected by construction.
+
+**Outcome.** `Test4`'s `Minimal` plan: **19.5 min -> 5.6s** (`Auto`,
+planning all three, 9.2s). Then **`weak_bisimilar nLTS nLTS p q` proved**:
+61,161 steps (the plan predicted ~32k; the fit is 2x low here), 202s,
+`Qed` 41s, 2.8GB peak; `wbis_transfer` gives `weak_bisimilar compLTS
+compLTS p q`. In `Test4/NormBisimProofs.v`, not built by default.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep perf/minimal-relation main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 4 · Bug fix 7 · Docs 2 ·
+New feature 3 · Refactor 1 · Optimization 2.
+
+## 2026-10-03 — A bound on the up-front game walk, required on demand
+
+**New feature** (a config option). On branch `feature/game-bound`. Item 2
+of the open list, after PR #27's refusal baseline. Jonah: add bounding,
+and enforce that a bound is given for the explicit settings.
+
+**What.** `MeBi Config Bounds Game <n>` (unset by default; reset by
+`Reset Bounds`). Every game walk (`Product.reachable_by`, the planners'
+walk) counts the pairs it visits and, under `Product.with_cap n`, raises
+`Game_too_large` past `n`. When an FSM is saturated on demand:
+- `MutualCofix True` or an answer policy other than `Default` is refused
+  unless the bound is set (the message says how);
+- with it, the walk runs within the bound: the plan, or for `MutualCofix
+  True` a validating estimate at `Begin` (the mutual block's own walk, in
+  the first step, is then known to fit); past it they are refused, naming
+  the bound;
+- `Auto` without the bound takes the nested cofix (as before); with it, it
+  estimates within the bound, and past it takes the nested cofix with a
+  notice.
+Below the saturation bound nothing changes: no cap is ever set.
+
+**Why bounding helps (as explained to Jonah).** On demand, the walk's
+size is unknown until it is done and each pair may saturate a state; a
+pair bound turns "never on demand" into "on demand when the game is
+small", with the cost bounded. The per-state saturation speed-up (PR #28,
+35ms a state on `Test4`) makes moderate bounds affordable. Caveat: pairs
+bound time only indirectly.
+
+**Tests.** `tests.exe` (99/99): a capped walk raises past the cap, not at
+it, and the cap is lifted afterwards. `Test.v` `SaturationGuard`, forced on
+demand: with `Bounds Game 1000`, `MutualCofix True` proves (38) and
+`Answers Greedy` proves (31); with `Bounds Game 1`, both are refused
+(checked: "more than 1 pairs"), and `Auto` falls back to nested (notice,
+38). `Test.v`'s other counts identical to `main`; `make` clean. The proof
+matrix is unaffected by construction (no cap is set below the saturation
+bound).
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep feature/game-bound main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 4 · Bug fix 7 · Docs 2 ·
+New feature 4 · Refactor 1 · Optimization 2.
+
+---
+
 ## 2026-10-03 — Saturation per state, linear in its output (3b's remainder)
 
 **Optimization** (behaviour change in tie-breaking only). On branch
@@ -5620,8 +5712,8 @@ between it and the new code; `make` caught it, restored from `HEAD`, and
 merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 `git log --merges --oneline --grep perf/action-hash main`).
 
-**Session tally (2026-10-03), cont.:** Tooling 3 · Bug fix 7 · Docs 2 ·
-New feature 3 · Refactor 1 · Optimization 1.
+**Session tally (2026-10-03), cont.:** Tooling 4 · Bug fix 7 · Docs 2 ·
+New feature 4 · Refactor 1 · Optimization 3.
 
 ---
 
