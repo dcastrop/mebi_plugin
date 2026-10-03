@@ -5130,6 +5130,46 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 
 **Session tally (2026-10-03), cont.:** Tooling 1 · Bug fix 2 · Docs 1.
 
+## 2026-10-03 — The solver read a premise's step as the transition to answer
+
+**Bug fix.** On branch `fix/solver-not-found`. Found while fixing the
+open-source premise (previous entry), pinned there as the known-wrong
+`OutputPremises.w_open_rec`, and present on `main` before it.
+
+**The bug.** To answer a step of the system being simulated, the solver
+reads it back from a hypothesis (`Hyps.get_transition`): the first one
+headed by *any* relation in `Using` whose terms are states of the model.
+After inverting `open_rec 0 a 3`, a premise's own step, `rb 2 (Some true)
+3`, is among the hypotheses, and since both relations' states are
+numbers, it reads as a step of `open_rec` from state 2. State 2 has no
+edges, so `EdgeMap.find` raised a bare `Not_found`, which the scan does
+not catch, and the solver stopped on an internal error. Had state 2 had
+edges, the solver would have answered the wrong transition and only `Qed`
+would have caught it. `via_c` (Test.v) proved only because its top-level
+hypotheses happened to come first.
+
+**The fix.** `Hyps.get_transition` takes the relation being simulated,
+read from the conclusion's `weak_sim`/`weak_bisimilar` conjunct (argument
+3, or 4 when swapped, beside the `a'` that `get_a'_from_wk_sim` already
+reads), and reads only steps of that relation. Defensively,
+`ReModel.transition` raises its own `CouldNotFind_Transition` for a state
+with no edges, which the scan skips, instead of `Not_found`.
+
+**Tests.** `w_open_rec` is now a proof (47 steps). The same LTS with its
+source fixed by `In q [0; 1; 2; 3]` (failing on `main` too) proves in 53.
+
+**Verification.** `Test.v`'s 38 other counts identical to `main`'s
+(compiled side by side with notices on). All Proc, CADP, CCS and
+`LawProofs.v` counts identical under `Auto`, forced `True` and forced
+`False`. ABP 6494 and 9914, unchanged. `tests.exe` 79/79, `satdiff -- 200`
+identical, `make` clean.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep fix/solver-not-found main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 1 · Bug fix 3 · Docs 1.
+
 ---
 
 ## Outstanding

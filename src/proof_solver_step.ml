@@ -197,7 +197,13 @@ struct
       =
       Logger.trace __FUNCTION__;
       (* TODO: export some of this to the [Model.Action.Map] ? *)
-      let actions = Model.EdgeMap.find edges from in
+      (* a state with no outgoing edges has no entry: a miss like any other,
+         not a bare [Not_found] that [Hyps.get_transition] cannot skip *)
+      let actions =
+        match Model.EdgeMap.find_opt edges from with
+        | Some actions -> actions
+        | None -> raise (CouldNotFind_Transition { from; goto; label; edges })
+      in
       let labelled = Model.Action.Map.reduce_by_label actions label in
       if Model.Action.Map.length labelled |> Int.equal 0
       then raise (CouldNotFind_Transition { from; goto; label; edges })
@@ -456,12 +462,19 @@ struct
         ; fsm : Model.FSM.t
         }
 
-    (** *)
-    let get_transition (x : t) (m : Model.FSM.t) : Model.Transition.t mm =
+    (** [get_transition ?lts x m] reads hypothesis [x] as a transition of
+        [m]. With [lts], only a step of that relation is read: see
+        [Hyps.get_transition]. *)
+    let get_transition ?(lts : EConstr.t option) (x : t) (m : Model.FSM.t)
+      : Model.Transition.t mm
+      =
       Logger.trace __FUNCTION__;
       let open Syntax in
       let* ty, tys = to_atomic x in
-      if Theory.is_fsm_constructor ty m
+      let of_lts : bool =
+        match lts with None -> true | Some l -> run (econstr_eq ty l)
+      in
+      if of_lts && Theory.is_fsm_constructor ty m
       then (
         try
           let from : Model.State.t = M.run (ReModel.state tys.(0) m.states) in
@@ -661,6 +674,21 @@ struct
       match Array.to_list app_tys with
       | [ wk_trans; wk_sim ] -> return { wk_trans; wk_sim }
       | _ -> raise ConclDoesNotMatchConj
+    ;;
+
+    (** [lts_a ()] is the relation of the system being simulated, read from the
+        [weak_sim] or [weak_bisimilar] conjunct of an [exists] conclusion:
+        [@weak_sim M N A ltsM ltsN m n] gives [ltsM], or [ltsN] when swapped,
+        as {!get_a'_from_wk_sim} reads [m] or [n]. [None] for any other
+        conclusion. *)
+    let lts_a () : EConstr.t option mm =
+      let open Syntax in
+      match run (get_wk_conj ()) with
+      | exception e when CErrors.noncritical e -> return None
+      | { wk_sim; _ } ->
+        let* _, tys = to_atomic wk_sim in
+        let i : int = if !W.swapped then 4 else 3 in
+        return (if i < Array.length tys then Some tys.(i) else None)
     ;;
 
     let get_conj ({ wk_trans; wk_sim } : wk_conj) : conj mm =
@@ -900,7 +928,15 @@ struct
 
     exception CannotGetTransition of Model.FSM.t
 
-    let get_transition (m : Model.FSM.t) : Model.Transition.t mm =
+    (** [get_transition ?lts m] is the first hypothesis that reads as a
+        transition of [m]. Pass [lts], the relation being simulated: [m]'s
+        relations include every one in [Using], and a premise's step left by
+        inversion ([rb 2 a 3] under [open_rec 0 a 3]) can name states of [m]
+        too. Read as a transition of [m] it was the wrong one, or, from a
+        state with no edges, an uncaught [Not_found] (2026-10-03). *)
+    let get_transition ?(lts : EConstr.t option) (m : Model.FSM.t)
+      : Model.Transition.t mm
+      =
       Logger.trace __FUNCTION__;
       let hyps = get_non_cofixes () in
       let open Syntax in
@@ -913,7 +949,7 @@ struct
         | None ->
           let y = List.nth hyps i in
           (try
-             let y : Model.Transition.t = Hyp.get_transition y m |> run in
+             let y : Model.Transition.t = Hyp.get_transition ?lts y m |> run in
              return (Some y)
            with
            | Hyp.CouldNotGetTransition _ -> return None)
@@ -1164,7 +1200,8 @@ struct
   let handle_hyp_transition () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
-    match run (Hyps.get_transition (W.get_fsm_a ())) with
+    let* lts = Concl.lts_a () in
+    match run (Hyps.get_transition ?lts (W.get_fsm_a ())) with
     | exception (Hyps.CannotGetTransition _ as e) ->
       (* No hypothesis is a transition of the model. In a branch inversion
          opened for a derivation that does not exist, some step hypothesis
