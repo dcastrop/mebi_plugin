@@ -5020,6 +5020,48 @@ local `notes/tools/`.
 **Session tally (2026-10-02, third session), final:** Optimization 1 ·
 Tooling 1 · Bug fix 1 · Docs 1 (PRs #14–#16 and this entry).
 
+## 2026-10-03 — Comparison cases: instances of CTrees' CCS laws
+
+**Tooling** (examples). On branch `examples/ctrees-ccs-laws`. Note 10, A.4:
+CTrees' CCS case study (vellvm/ctrees, `examples/CCS/Denotation.v`, section
+`Theory`, at `cabcf9b`) proves ten algebraic laws by hand. This adds
+`examples/Bisimilarity/CCS/LawProofs.v`, one `MeBi Sim Solve` per law
+instance, built by default (~20 s, ~0.8GB). No plugin code changes.
+
+**Not like for like, stated in the file:** CTrees proves each law for all
+`p, q, r` and as *strong* bisimilarity; MeBi proves closed instances and
+`weak_bisimilar`, a weaker statement on the same pair. The instances use
+three processes that synchronise in a cycle, so regrouping a parallel
+composition moves handshakes across the brackets. CTrees'
+`unfold_bang'` (`!p ~ !p | p`) is out of scope: replication has no finite
+LTS. Beyond CTrees' list: Milner's three tau-laws and `tau.p ≈ p` (weak
+only), an expansion-law instance, and three negative neighbours, each
+checked to fail as a decided `Not_Bisimilar` (rerun without `Fail`).
+
+| law | Auto | forced True | forced False |
+|---|---|---|---|
+| `plsC`, `plsA`, `pls0p`, `plsp0`, `plsidem` | 36, 58, 19, 19, 56 | same | same |
+| `tau1`, `tau2`, `tau3`, `tau0` | 42, 53, 28, 15 | **29**, 53, 28, 15 | 42, 53, 28, 15 |
+| `expansion` | 98 (mutual) | 98 | 155 |
+| `paraC`, `para0p`, `parap0` | 278, 357, 325 (mutual) | same | 2218, 3127, 2853 |
+| `paraA` | 3192 (mutual) | same | **OOM-killed at 5GB after ~2 min** |
+
+Bounds are the least that close each proof under `Auto`. Two findings,
+neither acted on: `paraA` is the strongest case yet for the mutual
+strategy (the nested one does not finish at all), and `Auto` picks nested
+for `tau1` although mutual is cheaper (42 vs 29), a small mis-estimate by
+`Product.estimate` on a tiny case. The parallel laws are last in the file,
+so a forced-`False` run reports every other count before it stops.
+
+**A slip on the way, caught before committing:** my first comment called
+the expansion law weak-only; it holds strongly too.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep examples/ctrees-ccs-laws main`).
+
+**Session tally (2026-10-03):** Tooling 1.
+
 ---
 
 ## Outstanding
