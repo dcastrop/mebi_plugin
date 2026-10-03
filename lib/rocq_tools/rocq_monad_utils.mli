@@ -356,5 +356,15 @@ module type S = sig
   val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t)
 end
 
+(** What made the LTS being extracted approximate (undecided premises,
+    incomplete premise searches, undetermined transitions), noted by the
+    extraction's warnings every time they apply. [reset] before an
+    extraction, [get] after it. *)
+module Approximations : sig
+  val reset : unit -> unit
+  val note : string -> unit
+  val get : unit -> string list
+end
+
 module Make (Enc : Encoding.S) :
   S with type enc = Enc.t and type tree = Enc.Tree.t

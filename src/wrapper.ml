@@ -226,7 +226,16 @@ module Make (Enc : Encoding.S) :
     | _ -> ()
   ;;
 
-  let check_if_lts_fail (x : LTS.t) : unit =
+  (** [approximations] are what made [x] approximate (see
+      {!Rocq_monad_utils.Approximations}), and [x] is then already marked
+      incomplete; [cut_short] is whether exploration also stopped at the
+      bound. *)
+  let check_if_lts_fail
+        ?(approximations : string list = [])
+        ?(cut_short : bool = true)
+        (x : LTS.t)
+    : unit
+    =
     if
       !Api.the_fail_flags.empty
       && (Int.equal (Model.State.Set.cardinal x.states) 1
@@ -246,17 +255,45 @@ module Make (Enc : Encoding.S) :
           | Transitions n -> Printf.sprintf "%i transitions" n
           | Merged (a, b) -> Printf.sprintf "%s and %s" (bound a) (bound b)
         in
+        let states = Model.State.Set.cardinal x.states
+        and transitions = Model.Transition.Set.cardinal x.transitions in
+        let cut_short : string option =
+          if List.is_empty approximations || cut_short
+          then
+            Some
+              (Printf.sprintf
+                 "exploration stopped at the bound of %s, with %i states and \
+                  %i transitions found and more still unexplored. Raise the \
+                  bound with [MeBi Config Bounds As Num States <n>] (or [... \
+                  Num Transitions <n>]). A large LTS can still be too big to \
+                  saturate."
+                 (bound bounds)
+                 states
+                 transitions)
+          else None
+        in
+        let approximate : string option =
+          match approximations with
+          | [] -> None
+          | xs ->
+            Some
+              (Printf.sprintf
+                 "the extracted LTS (%i states, %i transitions) is only an \
+                  approximation: %s. A [MeBi Run Bisim] verdict on it may be \
+                  wrong (a proof cannot be: [Qed] checks every step). See the \
+                  warnings above and [MeBi Help Premises]."
+                 states
+                 transitions
+                 (let shown = List.filteri (fun i _ -> i < 3) xs in
+                  let more = List.length xs - List.length shown in
+                  String.concat "; " shown
+                  ^ if more > 0 then Printf.sprintf "; and %i more" more else ""))
+        in
         M.Err.lts_incomplete
-          (Printf.sprintf
-             "exploration stopped at the bound of %s, with %i states and %i \
-              transitions found and more still unexplored. Raise the bound \
-              with [MeBi Config Bounds As Num States <n>] (or [... Num \
-              Transitions <n>]), or accept a partial LTS with [MeBi Config \
-              FailIf Incomplete False]. A large LTS can still be too big to \
-              saturate."
-             (bound bounds)
-             (Model.State.Set.cardinal x.states)
-             (Model.Transition.Set.cardinal x.transitions))
+          (String.concat
+             " Also, "
+             (List.filter_map Fun.id [ cut_short; approximate ])
+           ^ " Accept it anyway with [MeBi Config FailIf Incomplete False].")
       | _ -> ())
     else ()
   ;;
@@ -335,9 +372,26 @@ module Make (Enc : Encoding.S) :
     let module G = G ((val make_graph_args ())) in
     let grefs = Rocq_utils.libnames_to_globrefs (primary_lts :: names) in
     let open M.Syntax in
+    Rocq_monad_utils.Approximations.reset ();
     let* the_graph : G.t = G.build ~weak init primary_lts grefs in
     let* the_lts : Model.LTS.t = G.extract the_graph in
-    check_if_lts_fail the_lts;
+    (* an approximate LTS is incomplete, like one cut short by the bound *)
+    let approximations = Rocq_monad_utils.Approximations.get () in
+    let cut_short : bool =
+      match the_lts.info.meta with
+      | Some { is_complete; _ } -> Bool.not is_complete
+      | None -> false
+    in
+    let the_lts : Model.LTS.t =
+      match approximations, the_lts.info.meta with
+      | _ :: _, Some meta ->
+        { the_lts with
+          info =
+            { the_lts.info with meta = Some { meta with is_complete = false } }
+        }
+      | _ -> the_lts
+    in
+    check_if_lts_fail ~approximations ~cut_short the_lts;
     M.return the_lts
   ;;
 
