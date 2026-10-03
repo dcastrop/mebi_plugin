@@ -1273,7 +1273,11 @@ module Make (Enc : Encoding.S) :
             then String.sub h 1 (String.length h - 1)
             else h
           in
-          let key : string * string = Enc.to_string lts_enc, head in
+          (* by name: encodings are numbered afresh by every command, so
+             keying by encoding silenced a later command's different LTS *)
+          let key : string * string =
+            Rocq_utils.Strfy.econstr env sigma (decode lts_enc), head
+          in
           if Bool.not (Hashtbl.mem skipped_premises key)
           then (
             Hashtbl.add skipped_premises key ();
@@ -1315,7 +1319,7 @@ module Make (Enc : Encoding.S) :
       let open Syntax in
       let$+ _warned env sigma =
         let head = Rocq_utils.Strfy.econstr env sigma name in
-        let key = Enc.to_string lts_enc, head in
+        let key = Rocq_utils.Strfy.econstr env sigma (decode lts_enc), head in
         if Bool.not (Hashtbl.mem partial_premises key)
         then (
           Hashtbl.add partial_premises key ();
