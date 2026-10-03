@@ -1726,9 +1726,9 @@ Module SilentTransfer.
   MeBi Config Reset Weak.
 
   Lemma s01 : silent cyc 0 1.
-  Proof. eapply rt1n_trans; [constructor | constructor]. Qed.
+  Proof. eapply Relation_Operators.rt1n_trans; [constructor | constructor]. Qed.
   Lemma s10 : silent cyc 1 0.
-  Proof. eapply rt1n_trans; [constructor | constructor]. Qed.
+  Proof. eapply Relation_Operators.rt1n_trans; [constructor | constructor]. Qed.
 
   (* 1 from 0, on the left *)
   Example sim_1 : weak_sim cyc lin 1 10.

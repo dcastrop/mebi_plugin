@@ -5369,6 +5369,13 @@ structurally identical copies where the merge happens to be harmless. The
 tests number the second system apart, with a comment. Fix to be agreed:
 note 13.
 
+**A slip of mine:** my first commit on the branch did not build. I tested
+the new `Test.v` module in a standalone copy that imported
+`Relation_Operators`, which `Test.v` does not, and chained the commit
+after the build in one command without gating on it. Fixed in the next
+commit (qualified `Relation_Operators.rt1n_trans`); both builds checked
+before it.
+
 **How to revert:** delete the branch before merging; after merging with a
 merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 `git log --merges --oneline --grep theories/silent-transfer-lemmas main`).
