@@ -145,94 +145,6 @@ module Make
       (with_lengths (silent_closure old_edges src))
   ;;
 
-  (** Weak actions from one state, keyed by [(label, goto)]: the
-      deduplication [ActionPair.merge_lists] used to do by scanning a list,
-      which cost (witnesses) x (distinct weak actions) per state -- ~10x per
-      doubling on [Proc/Test4]'s shape, see [test/satscale.ml] and backlog
-      item 3b. *)
-  module Key = Hashtbl.Make (struct
-      type t = C.Label.t * State.t
-
-      let equal ((l, s) : t) ((l', s') : t) : bool =
-        C.Label.equal l l' && State.equal s s'
-      ;;
-
-      let hash ((l, s) : t) : int = Hashtbl.hash (C.Label.hash l, State.hash s)
-    end)
-
-  (** The closure-based counterpart of [edge].
-
-      Survivors are exactly those [merge_lists] picked. It was fed the
-      witnesses newest-first and kept [Annotation.shorter existing incoming],
-      which returns [incoming] on a tie: so the shortest witness wins, ties go
-      to the {e earliest} generated, and the label to the {e latest}
-      ([Label.equal] ignores [is_silent], so which one is not quite moot).
-      Checked against [test/satdiff.expected]. *)
-  let edge_closure
-        (closure_of : State.t -> (State.t * Note.t list * int) list)
-        (new_actions : ActionMap.t')
-        (from : State.t)
-        (old_edges : EdgeMap.t')
-    : unit
-    =
-    Logger.trace __FUNCTION__;
-    let found : (C.Label.t * int * Annotation.t) Key.t = Key.create 16 in
-    List.iter
-      (fun ((s, pre_rev, pre_len) : State.t * Note.t list * int) ->
-        match EdgeMap.find_opt old_edges s with
-        | None -> ()
-        | Some actions ->
-          ActionMap.fold
-            (fun (a : Action.t) (ds : States.t) () ->
-              if Action.is_silent a
-              then ()
-              else
-                States.iter
-                  (fun (t : State.t) ->
-                    let mid : Note.t = note_of s a t in
-                    List.iter
-                      (fun ((goto, post_rev, post_len) :
-                             State.t * Note.t list * int) ->
-                        (* Lengths first: the witness is only built if it
-                           replaces the one held, and on this shape almost
-                           none do. *)
-                        let len : int = pre_len + 1 + post_len in
-                        let key : Key.key = a.label, goto in
-                        match Key.find_opt found key with
-                        | Some (_, len', ann') when len' <= len ->
-                          Key.replace found key (a.label, len', ann')
-                        | _ ->
-                          (match
-                             annotation_of_notes
-                               (List.rev_append
-                                  pre_rev
-                                  (mid :: List.rev post_rev))
-                           with
-                           | None -> ()
-                           | Some ann ->
-                             Key.replace found key (a.label, len, ann)))
-                      (closure_of t))
-                  ds)
-            actions
-            ())
-      (with_lengths (silent_closure old_edges from));
-    Key.fold
-      (fun ((_, goto) : Key.key)
-        ((label, _, ann) : C.Label.t * int * Annotation.t)
-        (acc : (Action.t * States.t) list) ->
-        ( { label; annotation = Some ann; trees = Base.Trees.empty }
-        , States.singleton goto )
-        :: acc)
-      found
-      []
-    |> ActionPairs.of_list
-    |> ActionPairs.iter
-         (fun ((saturated_action, destinations) : Action.t * States.t) ->
-         ActionMap.update new_actions saturated_action destinations)
-  ;;
-
-  (****************************************************************************)
-
   (** A silent-closure lookup over [old_edges], memoised. A state's silent
       closure does not depend on where the weak step started, so each is
       computed once rather than once per visible move into it (backlog item
@@ -256,6 +168,135 @@ module Make
         c
   ;;
 
+  (** [edge_bfs closure_of new_actions from old_edges] computes [from]'s
+      weak actions, in time linear in its output rather than in the number
+      of witnesses (backlog item 3b, 2026-10-03; it replaces [edge_closure],
+      see git history). For
+      each visible label [a]: the states [t] with [from -tau*-> s -a-> t],
+      each at its shortest distance (ties: the first met, in the order
+      [edge_closure] met them), are the sources of one breadth-first search
+      over silent steps, and every state it reaches is a weak [a]-target, at
+      its shortest distance, with the path that reached it first as its
+      witness. [edge_closure] instead proposed one witness per (s, visible
+      step, state reachable from t) -- 2.3M-4.7M per state on [Proc/Test4],
+      for 5,280-7,680 weak actions: 2.9s a state, now 35ms.
+
+      Same targets and lengths as [edge_closure]; among witnesses of equal
+      length it may keep a different one (2 of the 2426 in [satdiff]; no
+      proof count changed). *)
+  let edge_bfs
+        (closure_of : State.t -> (State.t * Note.t list * int) list)
+        (new_actions : ActionMap.t')
+        (from : State.t)
+        (old_edges : EdgeMap.t')
+    : unit
+    =
+    Logger.trace __FUNCTION__;
+    (* per label, its sources: t -> (path, length, arrival index) *)
+    let labels : (C.Label.t * (Note.t list * int * int) StateTbl.t) list ref =
+      ref []
+    in
+    let sources_of (l : C.Label.t) : (Note.t list * int * int) StateTbl.t =
+      match List.find_opt (fun (l', _) -> C.Label.equal l l') !labels with
+      | Some (_, tbl) -> tbl
+      | None ->
+        let tbl = StateTbl.create 64 in
+        labels := !labels @ [ l, tbl ];
+        tbl
+    in
+    List.iter
+      (fun ((s, pre_rev, pre_len) : State.t * Note.t list * int) ->
+        match EdgeMap.find_opt old_edges s with
+        | None -> ()
+        | Some actions ->
+          ActionMap.fold
+            (fun (a : Action.t) (ds : States.t) () ->
+              if Bool.not (Action.is_silent a)
+              then (
+                let tbl = sources_of a.label in
+                States.iter
+                  (fun (t : State.t) ->
+                    let len = pre_len + 1 in
+                    match StateTbl.find_opt tbl t with
+                    | Some (_, len', _) when len' <= len -> ()
+                    | Some (_, _, k) ->
+                      StateTbl.replace tbl t (note_of s a t :: pre_rev, len, k)
+                    | None ->
+                      StateTbl.replace
+                        tbl
+                        t
+                        (note_of s a t :: pre_rev, len, StateTbl.length tbl))
+                  ds))
+            actions
+            ())
+      (closure_of from);
+    List.iter
+      (fun ((label, sources) : C.Label.t * (Note.t list * int * int) StateTbl.t) ->
+        let best : (Note.t list * int) StateTbl.t = StateTbl.create 256 in
+        (* frontier by distance; within a distance, in arrival order *)
+        let buckets : (int, (State.t * Note.t list) Queue.t) Hashtbl.t =
+          Hashtbl.create 16
+        in
+        let push (d : int) (x : State.t * Note.t list) : unit =
+          match Hashtbl.find_opt buckets d with
+          | Some q -> Queue.push x q
+          | None ->
+            let q = Queue.create () in
+            Queue.push x q;
+            Hashtbl.replace buckets d q
+        in
+        StateTbl.fold
+          (fun (t : State.t) ((path, len, k) : Note.t list * int * int) acc ->
+            (len, k, t, path) :: acc)
+          sources
+          []
+        |> List.sort (fun (l, k, _, _) (l', k', _, _) ->
+          match Int.compare l l' with 0 -> Int.compare k k' | n -> n)
+        |> List.iter
+             (fun ((len, _, t, path) : int * int * State.t * Note.t list) ->
+             StateTbl.replace best t (path, len);
+             push len (t, path));
+        let d = ref (Hashtbl.fold (fun k _ acc -> min k acc) buckets max_int) in
+        while Hashtbl.length buckets > 0 do
+          (match Hashtbl.find_opt buckets !d with
+           | None -> ()
+           | Some q ->
+             Hashtbl.remove buckets !d;
+             Queue.iter
+               (fun ((u, path) : State.t * Note.t list) ->
+                 (* settled at a shorter distance by now: skip *)
+                 match StateTbl.find_opt best u with
+                 | Some (_, du) when du < !d -> ()
+                 | _ ->
+                   List.iter
+                     (fun ((a, v) : Action.t * State.t) ->
+                       match StateTbl.find_opt best v with
+                       | Some (_, dv) when dv <= !d + 1 -> ()
+                       | _ ->
+                         let p = note_of u a v :: path in
+                         StateTbl.replace best v (p, !d + 1);
+                         push (!d + 1) (v, p))
+                     (silent_steps old_edges u))
+               q);
+          incr d
+        done;
+        StateTbl.fold
+          (fun (goto : State.t) ((path, _) : Note.t list * int) acc ->
+            match annotation_of_notes (List.rev path) with
+            | None -> acc
+            | Some ann ->
+              ( ({ label; annotation = Some ann; trees = Base.Trees.empty }
+                 : Action.t)
+              , States.singleton goto )
+              :: acc)
+          best
+          []
+        |> ActionPairs.of_list
+        |> ActionPairs.iter (fun ((x, ds) : Action.t * States.t) ->
+          ActionMap.update new_actions x ds))
+      !labels
+  ;;
+
   (** [from]'s weak actions, or [None] if it has none. The one place a
       state is saturated: [edges] and [on_demand] both use it, so they agree
       by construction. *)
@@ -266,7 +307,7 @@ module Make
     : ActionMap.t' option
     =
     let new_actions : ActionMap.t' = ActionMap.create 0 in
-    edge_closure closure_of new_actions from old_edges;
+    edge_bfs closure_of new_actions from old_edges;
     if ActionMap.length new_actions > 0 then Some new_actions else None
   ;;
 
@@ -280,7 +321,7 @@ module Make
     let terminals : States.t =
       EdgeMap.fold
         (fun (from : State.t) (_old_actions : ActionMap.t') (acc : States.t) ->
-          (* [edge_closure] reads [from]'s actions out of [old_edges] itself,
+          (* [state_actions] reads [from]'s actions out of [old_edges] itself,
              along with those of every state in its silent closure, so the
              fold's own [_old_actions] is redundant here. *)
           match state_actions closure_of old_edges from with

@@ -701,13 +701,13 @@ seeds=200
   from 1
     1 ann={"Annotation":{"this":{"from":"1","label":{"base":"0","is_silent":true},"goto":"3","using":[]},"next":{"this":{"from":"3","label":{"base":"1","is_silent":false},"goto":"1","using":[]},"next":"None"}}} -> {1}
     1 ann={"Annotation":{"this":{"from":"1","label":{"base":"0","is_silent":true},"goto":"3","using":[]},"next":{"this":{"from":"3","label":{"base":"1","is_silent":false},"goto":"1","using":[]},"next":{"this":{"from":"1","label":{"base":"0","is_silent":true},"goto":"3","using":[]},"next":"None"}}}} -> {3}
+    1 ann={"Annotation":{"this":{"from":"1","label":{"base":"0","is_silent":true},"goto":"3","using":[]},"next":{"this":{"from":"3","label":{"base":"1","is_silent":false},"goto":"1","using":[]},"next":{"this":{"from":"1","label":{"base":"0","is_silent":true},"goto":"3","using":[]},"next":{"this":{"from":"3","label":{"base":"0","is_silent":true},"goto":"2","using":[]},"next":"None"}}}}} -> {2}
     1 ann={"Annotation":{"this":{"from":"1","label":{"base":"0","is_silent":true},"goto":"3","using":[]},"next":{"this":{"from":"3","label":{"base":"1","is_silent":false},"goto":"1","using":[]},"next":{"this":{"from":"1","label":{"base":"2","is_silent":true},"goto":"0","using":[]},"next":"None"}}}} -> {0}
-    1 ann={"Annotation":{"this":{"from":"1","label":{"base":"0","is_silent":true},"goto":"3","using":[]},"next":{"this":{"from":"3","label":{"base":"1","is_silent":false},"goto":"1","using":[]},"next":{"this":{"from":"1","label":{"base":"2","is_silent":true},"goto":"0","using":[]},"next":{"this":{"from":"0","label":{"base":"2","is_silent":true},"goto":"2","using":[]},"next":"None"}}}}} -> {2}
   from 3
     1 ann={"Annotation":{"this":{"from":"3","label":{"base":"1","is_silent":false},"goto":"1","using":[]},"next":"None"}} -> {1}
     1 ann={"Annotation":{"this":{"from":"3","label":{"base":"1","is_silent":false},"goto":"1","using":[]},"next":{"this":{"from":"1","label":{"base":"0","is_silent":true},"goto":"3","using":[]},"next":"None"}}} -> {3}
+    1 ann={"Annotation":{"this":{"from":"3","label":{"base":"1","is_silent":false},"goto":"1","using":[]},"next":{"this":{"from":"1","label":{"base":"0","is_silent":true},"goto":"3","using":[]},"next":{"this":{"from":"3","label":{"base":"0","is_silent":true},"goto":"2","using":[]},"next":"None"}}}} -> {2}
     1 ann={"Annotation":{"this":{"from":"3","label":{"base":"1","is_silent":false},"goto":"1","using":[]},"next":{"this":{"from":"1","label":{"base":"2","is_silent":true},"goto":"0","using":[]},"next":"None"}}} -> {0}
-    1 ann={"Annotation":{"this":{"from":"3","label":{"base":"1","is_silent":false},"goto":"1","using":[]},"next":{"this":{"from":"1","label":{"base":"2","is_silent":true},"goto":"0","using":[]},"next":{"this":{"from":"0","label":{"base":"2","is_silent":true},"goto":"2","using":[]},"next":"None"}}}} -> {2}
 
 --- seed 59 (states=4 labels=3 trans=8) ---
   from 0
