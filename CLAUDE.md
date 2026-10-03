@@ -38,8 +38,11 @@ To run them:
    `CADP/Size1/Glued/MutualExclusion`. `Proc/Test3` adds ~9s; the other five
    together are under a minute. (`Test4` has no `PluginProofs.v`: its LTS has
    9720 states, which now *extract* in ~25s, but saturating them exhausted
-   memory — backlog item B3; the plugin now refuses that saturation with
-   `Saturation_Too_Large` instead. Run anything on `Test4` under a memory cap,
+   memory — backlog item B3. Since 2026-10-03 `Run Bisim`/`Sim Begin`
+   saturate such FSMs on demand and decide on the silent-SCC quotient (~45s;
+   `MeBi Config Saturation OnDemand`, notes/13); `Run Saturate` still refuses
+   with `Saturation_Too_Large`, and a proof is still out of reach. Run
+   anything on `Test4` under a memory cap,
    with `systemd-run --user --scope -p MemoryMax=6G -p MemorySwapMax=0` --
    `ulimit -v` does not work, OCaml 5 then cannot reserve its heaps. An
    uncapped run took the whole machine down.)
