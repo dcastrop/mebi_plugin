@@ -31,6 +31,18 @@ module type S = sig
 
   val fsm : fsm -> t
   val to_string : t -> string
+
+  type partition
+
+  (** [partition x] is the weak bisimilarity partition of [x]'s states,
+      computed on the quotient by silent SCCs rather than on [x] saturated:
+      states in one silent SCC have the same weak moves and are weakly
+      bisimilar, so the quotient is refined, by weak moves and [=eps=>] moves
+      into blocks, and each block expanded to its states. Memory is the
+      number of SCC-level weak moves, not of saturated ones ([Proc/Test4]:
+      5,184 for 9720 states, against 74.6M). For FSMs too large to saturate
+      whole; see [notes/13]. *)
+  val partition : fsm -> partition
 end
 
 module Make
@@ -41,4 +53,5 @@ module Make
         and type states = C.State.Set.t
         and type labels = C.Label.Set.t
         and type edgemap = C.EdgeMap.t'
-        and type info = C.Info.t) : S with type fsm = FSM.t
+        and type info = C.Info.t) :
+  S with type fsm = FSM.t and type partition = C.Partition.t

@@ -63,7 +63,8 @@ module type S = sig
      and type partition = Partition.t
      and type edgemap = EdgeMap.t'
 
-  module SaturationEstimate : Saturation_estimate.S with type fsm = FSM.t
+  module SaturationEstimate :
+    Saturation_estimate.S with type fsm = FSM.t and type partition = Partition.t
 end
 
 module Make (Base : Base_term.S) (ConstructorBindings : Json.S) = struct
