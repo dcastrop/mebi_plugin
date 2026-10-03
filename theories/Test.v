@@ -1211,6 +1211,21 @@ Module OutputPremises.
      now reads only steps of the relation being simulated. *)
   Example w_open_rec : weak_sim open_rec open_rec' 0 0.
   Proof. MeBi Sim Begin open_rec 0 And open_rec' 0 Using rb. MeBi Sim Solve 100. Qed.
+
+  (* [base] as a plain premise (not in [Using]): applying [open_go] leaves
+     [q] an evar that no LTS premise's replay fixes, in [base ?q a 1]. The
+     witness is now chosen by enumerating the premise goals that mention it,
+     together: in [two_p], [q = 0] satisfies [In q [0; 1]] but not [base q a
+     2]. Until 2026-10-03 both stopped on "cannot prove the constructor
+     premise". *)
+  Inductive two_p : nat -> option bool -> nat -> Prop :=
+  | tp q n a q' : In q [0; 1] -> base q a q' -> n <= 0 -> two_p n a q'.
+  Inductive two_p' : nat -> option bool -> nat -> Prop :=
+  | tp' q n a q' : In q [0; 1] -> base q a q' -> n <= 0 -> two_p' n a q'.
+  Example w_open_plain : weak_sim open_c open_c' 0 0.
+  Proof. MeBi Sim Begin open_c 0 And open_c' 0. MeBi Sim Solve 100. Qed.
+  Example w_two_plain : weak_sim two_p two_p' 0 0.
+  Proof. MeBi Sim Begin two_p 0 And two_p' 0. MeBi Sim Solve 100. Qed.
   MeBi Config Reset Weak.
 
   (* KNOWN LIMIT, warned: transitions MeBi cannot determine. [u n] is a

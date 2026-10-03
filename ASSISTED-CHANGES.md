@@ -5211,6 +5211,53 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 
 **Session tally (2026-10-03), cont.:** Tooling 1 · Bug fix 4 · Docs 1.
 
+## 2026-10-03 — A premise's witness that no LTS step fixes, in proofs
+
+**Bug fix.** On branch `fix/premise-witness-in-proofs`. Point 3 of the
+open list after PR #18: a constructor whose binder appears only in
+premises that are not LTS steps extracted correctly, but its proof
+stopped.
+
+**The bug.** With `base` *not* in `Using`, `open_go q n a q' : base q a q'
+-> n <= 5 -> open_c n a q'` gives the right LTS: the premise search
+enumerates `base`. In the proof, `econstructor` leaves `q` an evar, and
+since no LTS premise's derivation is replayed to fix it, the solver met
+`base ?q (Some true) 1` and stopped: the search proves closed goals only
+("cannot prove the constructor premise"). The same with two plain
+premises sharing the witness (`In q [0; 1] -> base q a q' -> ...`), where
+choosing `q` for one premise alone can break the other.
+
+**The fix.** A new step in the constructor tactic, after
+`move_premises_last` while all the subgoals are visible
+(`fix_premise_witnesses`): the evars that occur in premise goals but in no
+LTS goal are witnesses nothing else will fix. The premise goals mentioning
+them are enumerated *together*, as one conjunction, and the first solution
+giving each a closed value is committed. Any such solution will do, since
+no other goal mentions them. A goal that also mentions an evar an LTS
+premise fixes is left alone, so as not to pre-empt that replay (`via_c`'s
+`In q [n; S n]`, whose `q` the `base` step fixes, is unchanged). With no
+such witnesses (every example) the step does nothing.
+
+**Tests.** `Test.v` `OutputPremises`: `w_open_plain` (55 steps) and
+`w_two_plain`, the shared witness (25), both stopping before.
+
+**Verification.** `Test.v`'s 39 other counts identical to `main`'s.
+All Proc, CADP, CCS and `LawProofs.v`
+counts identical under `Auto`, forced `True` and forced `False`. ABP 6494
+and 9914, unchanged. `tests.exe` 79/79, `satdiff -- 200` identical, full
+`make` clean.
+
+**A slip, caught before committing:** factoring out `is_lts_goal`, I put
+it between `move_premises_last`'s doc comment and its definition, the
+warning-50 trap the notes describe; `dune build` accepted it, `make`
+rejected it. Moved back.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep fix/premise-witness-in-proofs main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 1 · Bug fix 5 · Docs 1.
+
 ---
 
 ## Outstanding

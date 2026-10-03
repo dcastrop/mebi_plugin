@@ -735,6 +735,21 @@ module Make
       get_constructor_bindings args bindings
   ;;
 
+  (** A goal that is an LTS step of either FSM, or already solved. *)
+  let is_lts_goal (sigma : Evd.evar_map) (gl : Proofview_monad.goal_with_state)
+    : bool
+    =
+    let ev = Proofview.drop_state gl in
+    (not (Evd.is_undefined sigma ev))
+    ||
+    let concl = Evd.evar_concl (Evd.find_undefined sigma ev) in
+    let h, _ = EConstr.decompose_app sigma concl in
+    let lts_of (m : Model.FSM.t) : bool =
+      try Theory.is_fsm_constructor h m with _ -> false
+    in
+    lts_of (W.get_fsm_a ()) || lts_of (W.get_fsm_b ())
+  ;;
+
   (** Run right after a constructor is applied, while all the subgoals it
       made are visible (a solver step only ever sees the first goal): move
       the premises that are not LTS steps behind the LTS ones, keeping each
@@ -749,19 +764,81 @@ module Make
     >>= fun sigma ->
     Proofview.Unsafe.tclGETGOALS
     >>= fun gls ->
-    let is_lts (gl : Proofview_monad.goal_with_state) : bool =
-      let ev = Proofview.drop_state gl in
-      (not (Evd.is_undefined sigma ev))
-      ||
-      let concl = Evd.evar_concl (Evd.find_undefined sigma ev) in
-      let h, _ = EConstr.decompose_app sigma concl in
-      let lts_of (m : Model.FSM.t) : bool =
-        try Theory.is_fsm_constructor h m with _ -> false
-      in
-      lts_of (W.get_fsm_a ()) || lts_of (W.get_fsm_b ())
-    in
-    let lts, others = List.partition is_lts gls in
+    let lts, others = List.partition (is_lts_goal sigma) gls in
     Proofview.Unsafe.tclSETGOALS (lts @ others)
+  ;;
+
+  (** Run after [move_premises_last], while the constructor's subgoals are
+      all visible. A binder that appears only in premises that are not LTS
+      steps ([q] in [base q a q' -> open_c n a q'] with [base] not in
+      [Using]) is an evar no LTS premise's replay will fix, and the premise
+      goal it leaves open ([base ?q a 1]) cannot be proved as it is: the
+      search proves closed goals. Such witnesses are chosen here, by
+      enumerating every premise goal that mentions them together (a choice
+      that suits one premise may fail another: [In q [0; 1]] and [base q a 2]) and committing the first solution that fixes each of them to a
+      closed term. Any such solution will do: no other goal mentions them.
+      A goal that also mentions an evar an LTS premise fixes is left alone,
+      so as not to pre-empt that replay. Until 2026-10-03 the solver stopped
+      on such a goal ("cannot prove the constructor premise"). *)
+  let fix_premise_witnesses : unit Proofview.tactic =
+    let open Proofview.Notations in
+    Proofview.tclENV
+    >>= fun env ->
+    Proofview.tclEVARMAP
+    >>= fun sigma ->
+    Proofview.Unsafe.tclGETGOALS
+    >>= fun gls ->
+    let lts, others = List.partition (is_lts_goal sigma) gls in
+    let concl (gl : Proofview_monad.goal_with_state) : EConstr.t =
+      Evd.evar_concl (Evd.find_undefined sigma (Proofview.drop_state gl))
+    in
+    let evars (t : EConstr.t) : Evar.Set.t = Evd.evars_of_term sigma t in
+    let union = List.fold_left Evar.Set.union Evar.Set.empty in
+    let in_lts : Evar.Set.t =
+      union (List.map (fun gl -> evars (concl gl)) lts)
+    in
+    let premises : EConstr.t list = List.map concl others in
+    let witnesses : Evar.Set.t =
+      Evar.Set.diff (union (List.map evars premises)) in_lts
+    in
+    let involved : EConstr.t list =
+      List.filter
+        (fun p ->
+          let e = evars p in
+          (not (Evar.Set.is_empty (Evar.Set.inter e witnesses)))
+          && Evar.Set.is_empty (Evar.Set.inter e in_lts))
+        premises
+    in
+    match involved with
+    | [] -> Proofview.tclUNIT ()
+    | p :: ps ->
+      let and_ : EConstr.t =
+        EConstr.of_constr
+          (UnivGen.constr_of_monomorphic_global
+             env
+             (Rocqlib.lib_ref "core.and.type"))
+      in
+      let goal : EConstr.t =
+        List.fold_left (fun acc q -> EConstr.mkApp (and_, [| acc; q |])) p ps
+      in
+      let mentioned : Evar.Set.t = union (List.map evars involved) in
+      (* every witness the involved goals mention is given a closed value *)
+      let fixed (sol : Evd.evar_map) : bool =
+        Evar.Set.for_all
+          (fun ev ->
+            match Evd.find_defined sol ev with
+            | None -> false
+            | Some info ->
+              (match Evd.evar_body info with
+               | Evd.Evar_defined c ->
+                 Evar.Set.is_empty
+                   (Evd.evars_of_term sol (Reductionops.nf_evar sol c))))
+          (Evar.Set.inter witnesses mentioned)
+      in
+      let sols, _complete = Premise_search.enumerate env sigma goal in
+      (match List.find_opt fixed sols with
+       | Some sol -> Proofview.Unsafe.tclEVARS sol
+       | None -> Proofview.tclUNIT ())
   ;;
 
   exception GoalNotAnLTSStep
@@ -787,8 +864,10 @@ module Make
     Tactic.create
       ~msg
       (Proofview.tclTHEN
-         (Tactics.constructor_tac true None index bindings)
-         move_premises_last)
+         (Proofview.tclTHEN
+            (Tactics.constructor_tac true None index bindings)
+            move_premises_last)
+         fix_premise_witnesses)
     |> return
   ;;
 end
