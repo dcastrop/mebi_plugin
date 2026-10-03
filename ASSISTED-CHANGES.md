@@ -5170,6 +5170,47 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 
 **Session tally (2026-10-03), cont.:** Tooling 1 · Bug fix 3 · Docs 1.
 
+## 2026-10-03 — An approximate LTS is incomplete
+
+**Bug fix.** On branch `fix/approximate-lts-incomplete`. Point 2 of the
+open list after PR #18, agreed with Jonah: an LTS that extraction knows to
+be only an approximation was still reported complete.
+
+**The problem.** Extraction warns when an LTS may contain transitions
+that do not exist (a premise it could not decide: over-approximation) or
+may be missing some (a premise search cut short, a transition it could
+not determine: under-approximation). But the LTS was still marked
+`complete`, so `MeBi Run Bisim` gave a verdict on it as if it were exact,
+and `MeBi Sim Begin`, which decides bisimilarity first, could refuse a
+true goal on a wrong "not bisimilar". The warnings are printed once per
+LTS and session, so a later command on the same LTS had no sign at all.
+
+**The fix.** No new option: the existing `MeBi Config FailIf Incomplete`
+covers it. A record (`Rocq_monad_utils.Approximations`, outside the
+functors) is reset at the start of each extraction and noted by the three
+warnings *every* time they apply, printed or not. A non-empty record marks
+the LTS incomplete, and `LTS_Incomplete` then says why: "only an
+approximation", with the reasons (up to three, "and N more"), and/or the
+bound, as before. `FailIf Incomplete False` accepts it, as it already did
+for the bound. Help texts for `FailIf` and `Premises` updated.
+
+**Tests.** The known-limit pins `open_u` (three ways) and `open_ur` now
+`Fail` by default, each checked to fail for the approximation and not the
+bound, and are also run under `FailIf Incomplete False`. The older
+`Fail`s over undecided premises (`st`, `le_c`, `univ`) still fail on the
+bound, and now give the approximation as a second reason.
+
+**Verification.** No example's LTS is approximate: all Proc, CADP, CCS
+(including ABP's extraction, by its `Run Bisim`) and `LawProofs.v` counts
+unchanged under `Auto`. The solver is untouched, so forced modes were not
+rerun. `tests.exe` 79/79, `satdiff -- 200` identical, full `make` clean.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep fix/approximate-lts-incomplete main`).
+
+**Session tally (2026-10-03), cont.:** Tooling 1 · Bug fix 4 · Docs 1.
+
 ---
 
 ## Outstanding

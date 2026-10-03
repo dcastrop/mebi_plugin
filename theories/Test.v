@@ -1218,7 +1218,9 @@ Module OutputPremises.
      has infinitely many successors. Such a transition is dropped with a
      warning ("cannot determine"), so these LTSs have one state. Until
      2026-10-03 the first two were dropped silently, and the third kept
-     [S (S ?n)] as if it were a state. *)
+     [S (S ?n)] as if it were a state. Such an LTS is incomplete: an error
+     ([LTS_Incomplete], "only an approximation") unless [FailIf Incomplete
+     False]. *)
   Inductive ung : nat -> option bool -> nat -> Prop := u n : ung (S n) None n.
   Inductive open_u : nat -> option bool -> nat -> Prop :=
   | open_u_go q a q' : ung q a q' -> open_u 0 a q'.
@@ -1227,23 +1229,31 @@ Module OutputPremises.
   Inductive open_u2 : nat -> option bool -> nat -> Prop :=
   | open_u2_go q a q' : ung2 q a q' -> open_u2 0 a q'.
   MeBi Config Bounds As Num States 1.
-  MeBi Run LTS 0 Using open_u ung.      (* [ung] explored as an LTS *)
-  MeBi Run LTS 0 Using open_u.          (* [ung] as a plain premise *)
+  Fail MeBi Run LTS 0 Using open_u ung.      (* [ung] explored as an LTS *)
+  Fail MeBi Run LTS 0 Using open_u.          (* [ung] as a plain premise *)
+  Fail MeBi Run LTS 0 Using open_u2 ung2.
+  MeBi Config FailIf Incomplete False.
+  MeBi Run LTS 0 Using open_u ung.
+  MeBi Run LTS 0 Using open_u.
   MeBi Run LTS 0 Using open_u2 ung2.
+  MeBi Config Reset FailIf.
   MeBi Config Reset Bounds.
 
   (* KNOWN LIMIT, warned: recursive and unguarded, so the sources are
      infinitely many; the search stops at [MeBi Config Premise Depth] and
      says its solutions may be incomplete. Exploring from the open source,
      as before 2026-10-03, would recurse without bound once the first
-     match no longer cut it off. *)
+     match no longer cut it off. Incomplete, as above. *)
   Inductive ur : nat -> option bool -> nat -> Prop :=
   | ur0 : ur 0 (Some true) 1
   | urs q a q' : ur q a q' -> ur (S q) a (S q').
   Inductive open_ur : nat -> option bool -> nat -> Prop :=
   | open_ur_go q a q' : ur q a q' -> open_ur 0 a q'.
   MeBi Config Bounds As Num States 100.
+  Fail MeBi Run LTS 0 Using open_ur ur.
+  MeBi Config FailIf Incomplete False.
   MeBi Run LTS 0 Using open_ur ur.
+  MeBi Config Reset FailIf.
   MeBi Config Reset Bounds.
 End OutputPremises.
 

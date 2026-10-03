@@ -104,6 +104,9 @@ let text : string list -> string option = function
          \  - a transition with a binder nothing determines ([lts (S n) a n], \
           [n] free) may stand for infinitely many: it is left out, with a \
           warning, so the LTS may be missing transitions;\n\
+         \  - an LTS with any such warning is incomplete: an error, as when \
+          exploration hits the bound, unless [MeBi Config FailIf Incomplete \
+          False];\n\
          \  - a negation [~ P] holds iff P is refuted by a complete search, \
           and is proved by refuting P;\n\
          \  - with [MeBi Config Premise Tactic <tactic>], a premise the search \
@@ -186,9 +189,13 @@ let text : string list -> string option = function
       "MeBi Config FailIf Empty | Incomplete | NotBisimilar | Oversaturated \
        True | False.\n\
        MeBi Config Reset FailIf.\n\n\
-       Whether an empty LTS (default False), an exploration cut short by the \
-       bound (True), a negative bisimilarity result (True), or a saturation \
-       above Bounds Saturation (True) is an error rather than a warning."
+       Whether an empty LTS (default False), an incomplete one (True), a \
+       negative bisimilarity result (True), or a saturation above Bounds \
+       Saturation (True) is an error rather than a warning. An LTS is \
+       incomplete if exploration was cut short by the bound, or if it is only \
+       an approximation: a premise MeBi could not decide (it may contain \
+       transitions that do not exist), or a premise search or transition it \
+       could not complete (it may be missing some). See MeBi Help Premises."
   | [ "Config"; "Solver" ] ->
     Some
       "MeBi Config Solver MutualCofix True | False | Auto.\n\n\

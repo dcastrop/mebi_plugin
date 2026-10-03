@@ -345,6 +345,25 @@ module type S = sig
   val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t)
 end
 
+(** What made the LTS being extracted approximate: a premise left undecided
+    (the LTS may contain transitions that do not exist), or one whose
+    solutions may be incomplete, or a transition MeBi could not determine
+    (it may be missing some). Each warning is printed once per LTS and
+    session, but noted here every time, so an extraction knows it is
+    approximate even when the warning was printed by an earlier command.
+    [Wrapper.extract_lts] resets it and marks such an LTS incomplete
+    (2026-10-03). *)
+module Approximations = struct
+  let notes : string list ref = ref []
+  let reset () : unit = notes := []
+
+  let note (s : string) : unit =
+    if Bool.not (List.mem s !notes) then notes := !notes @ [ s ]
+  ;;
+
+  let get () : string list = !notes
+end
+
 module Make (Enc : Encoding.S) :
   S with type enc = Enc.t and type tree = Enc.Tree.t = struct
   (*****************************************)
@@ -1278,6 +1297,12 @@ module Make (Enc : Encoding.S) :
           let key : string * string =
             Rocq_utils.Strfy.econstr env sigma (decode lts_enc), head
           in
+          Approximations.note
+            (Printf.sprintf
+               "a premise headed by [%s] of %s was left undecided, so it may \
+                contain transitions that do not exist"
+               head
+               (fst key));
           if Bool.not (Hashtbl.mem skipped_premises key)
           then (
             Hashtbl.add skipped_premises key ();
@@ -1320,6 +1345,12 @@ module Make (Enc : Encoding.S) :
       let$+ _warned env sigma =
         let head = Rocq_utils.Strfy.econstr env sigma name in
         let key = Rocq_utils.Strfy.econstr env sigma (decode lts_enc), head in
+        Approximations.note
+          (Printf.sprintf
+             "the solutions of a premise headed by [%s] of %s may be \
+              incomplete, so it may be missing transitions"
+             head
+             (fst key));
         if Bool.not (Hashtbl.mem partial_premises key)
         then (
           Hashtbl.add partial_premises key ();
@@ -1356,6 +1387,11 @@ module Make (Enc : Encoding.S) :
       let$+ _warned env sigma =
         (* by name: encodings are numbered afresh by every command *)
         let lts = Rocq_utils.Strfy.econstr env sigma (decode lts_enc) in
+        Approximations.note
+          (Printf.sprintf
+             "a constructor of %s gives transitions MeBi cannot determine, so \
+              it may be missing transitions"
+             lts);
         if Bool.not (Hashtbl.mem undetermined lts)
         then (
           Hashtbl.add undetermined lts ();
