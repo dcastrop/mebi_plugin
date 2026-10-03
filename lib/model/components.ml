@@ -884,7 +884,27 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
-      let hash (x : t) : int = Label.hash x.label
+      (* Consistent with [equal] (equal actions have equal labels and
+         witnesses). An action without a witness hashes by its label alone,
+         as before, so unsaturated FSMs keep their table order (which
+         [ReModel.transition] breaks ties by). A saturated action also hashes
+         its witness: its length and its first and last states. Hashing the
+         label alone put all of a state's weak actions under one label into
+         one bucket, so filling its action map scanned that bucket per
+         insertion with a deep equality -- ~30M comparisons per state on
+         [Proc/Test4], seconds per state (2026-10-03). *)
+      let hash (x : t) : int =
+        match x.annotation with
+        | None -> Label.hash x.label
+        | Some (a : Annotation.t) ->
+          let rec last (a : Annotation.t) (n : int) : Note.t * int =
+            match a.next with None -> a.this, n | Some b -> last b (n + 1)
+          in
+          let (z : Note.t), (n : int) = last a 1 in
+          Hashtbl.hash
+            (Label.hash x.label, n, State.hash a.this.from, State.hash z.goto)
+      ;;
+
       let wk_equal (a : t) (b : t) : bool = Label.equal a.label b.label
       let is_silent (x : t) : bool = Label.is_silent x.label
       let is_labelled (x : Label.t) (y : t) : bool = Label.equal x y.label
