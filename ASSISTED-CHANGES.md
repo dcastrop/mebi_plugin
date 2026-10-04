@@ -6198,6 +6198,56 @@ review, 19 split commits) · Docs 5 · Tooling 1 · Optimization 1 · Bug fix 1.
 
 ---
 
+## 2026-10-04 — Fixes for the latent bugs the `lib/rocq_tools` pass found
+
+**Bug fix.** On branch `fix/rocq-tools-latent-bugs`, at Jonah's request
+to clear the quick ones from `TODO.md`'s list. One commit each:
+- `econstr_to_lambda` raises `EConstrIsNot_Lambda`, the exception
+  declared for it, not `EConstrIsNot_App`.
+- `unpack_constr_args` catches `Invalid_argument` (what an out-of-range
+  index raises), so its `CouldNotExtractBinding` can fire.
+- `Rocq_monad_utils.econstr_to_constr` passes `?abort_on_undefined_evars`
+  on (no caller sets it).
+- `Problem`'s JSON writes its target pair under `"goto"`; it wrote the
+  label pair twice.
+- `Mebi_theories` exports `ErrorWithGlobalOfPath`.
+- `Pair.unify` reads an occur-check and a binder-type mismatch as "does
+  not unify", like `CannotUnify`. Deliberately *not* every
+  `PretypeError`: where Rocq gives up (`ProblemBeyondCapabilities`,
+  unsatisfiable constraints) reading it as "no" would silently drop a
+  transition, so those stay errors.
+- The nine `Strfy` placeholders print their values. Three were reached:
+  an error message for an invalid LTS term, the `Ind` JSON in dumps, and
+  two kind printers in logs.
+
+Removed, unused: `Mebi_theories.constants`, `get_proof_from_pstate`,
+`get_partial_proof`; `Theories_enc.get_None_enc`/`get_Some_enc` (whose
+handler could not fire); `Rocq_utils.extract_benchmark_args` and
+`Strfy.econstr_type`.
+
+**Left open:** the 13 `try` blocks around monadic values. Making a dead
+handler live changes control flow, mostly in the proof solver, so each
+site needs its own analysis.
+
+**No new tests**, against `TODO.md`'s "each needs a fix with a test":
+these functions need a Rocq runtime, so `tests.exe` cannot reach them,
+and I found no `Test.v` input that hits an occur-check or a malformed
+constructor. The fixes are small enough to check by reading; the proof
+matrix and `Test.v` guard against regressions.
+
+**Verification.** On the branch head: the proof matrix in all three solver
+modes, every `Solve` identical; `Test.v`'s 60 counts identical to
+`main`'s; `tests.exe` 103/103; `make` clean.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep fix/rocq-tools-latent-bugs main`), or one fix
+by its commit.
+
+**Session tally (2026-10-04), cont.:** New feature 3 · Refactor 20 · Docs
+5 · Tooling 1 · Optimization 1 · Bug fix 8.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
