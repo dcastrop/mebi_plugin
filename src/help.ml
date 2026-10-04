@@ -112,6 +112,11 @@ let text : string list -> string option = function
           False];\n\
          \  - a negation [~ P] holds iff P is refuted by a complete search, \
           and is proved by refuting P;\n\
+         \  - a bounded universal over nat, [forall k, k < n -> P k] or [k <= \
+          n] (also [n > k]), [n] a number up to 1024 once the premise is \
+          closed, holds iff every [P i] does: each is decided as above, and \
+          the proof is assembled from theirs with the lemmas in MEBI.Premises; \
+          a false one is refuted at a false [P i];\n\
          \  - with [MeBi Config Premise Tactic <tactic>], a premise the search \
           leaves undecided is tried with that tactic (proving it, or its \
           negation);\n\

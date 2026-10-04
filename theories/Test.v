@@ -1597,15 +1597,50 @@ Module ProductPremises.
   MeBi Config Bounds As Num States 3.
   Fail MeBi Run LTS 0 Using impl.
 
-  (* KNOWN WRONG: a universal premise is beyond the bounded proof search, so
-     it is undecided -- now with a warning -- and the constructor applies
-     from every state: 0..5 rather than 0..3. If bounded universals become
-     decidable, the [Fail] starts failing: make it a plain command. *)
+  (* A bounded universal, [forall k, k < n -> P k] with [n] a numeral once
+     the source is known, is decided value by value (2026-10-04, notes/14
+     item 1; until then undecided, applied from every state, 0..5, and
+     pinned KNOWN WRONG here). [k <> 2] for all [k < n]: n = 0..2, so
+     states 0..3; [n = 0] holds vacuously. [<=] and [>] the same way. *)
   Inductive univ : nat -> bool -> nat -> Prop :=
   | u_go n : (forall k, k < n -> k <> 2) -> n < 5 -> univ n true (S n).
+  Inductive univ_le : nat -> bool -> nat -> Prop :=
+  | ul_go n : (forall k, k <= n -> k <> 3) -> n < 5 -> univ_le n true (S n).
+  Inductive univ_gt : nat -> bool -> nat -> Prop :=
+  | ug_go n : (forall k, n > k -> k <> 2) -> n < 5 -> univ_gt n true (S n).
+  (* negated: holds from 3 on, so from 3, states 3..5 *)
+  Inductive univ_neg : nat -> bool -> nat -> Prop :=
+  | un_go n : ~ (forall k, k < n -> k <> 2) -> n < 5 -> univ_neg n true (S n).
   MeBi Config Bounds As Num States 4.
+  MeBi Run LTS 0 Using univ.
+  MeBi Run LTS 0 Using univ_le.
+  MeBi Run LTS 0 Using univ_gt.
+  MeBi Config Bounds As Num States 3.
   Fail MeBi Run LTS 0 Using univ.
+  Fail MeBi Run LTS 0 Using univ_le.
+  Fail MeBi Run LTS 0 Using univ_gt.
+  MeBi Run LTS 3 Using univ_neg.
+  MeBi Config Bounds As Num States 2.
+  Fail MeBi Run LTS 3 Using univ_neg.
   MeBi Config Reset Bounds.
+
+  (* In proofs: a true universal premise is proved instance by instance
+     ([MEBI.Premises]' lemmas), and a false one in a hypothesis (state 3 of
+     [univ_s]) refuted at its false instance; the negated form both ways. *)
+  Inductive univ_s : nat -> option bool -> nat -> Prop :=
+  | us_go n : (forall k, k < n -> k <> 2) -> n < 5 -> univ_s n (Some true) (S n).
+  Inductive univ_s' : nat -> option bool -> nat -> Prop :=
+  | us_go' n : (forall k, k < n -> k <> 2) -> n < 5 -> univ_s' n (Some true) (S n).
+  Inductive univ_n : nat -> option bool -> nat -> Prop :=
+  | unn_go n : ~ (forall k, k < n -> k <> 2) -> n < 5 -> univ_n n (Some true) (S n).
+  Inductive univ_n' : nat -> option bool -> nat -> Prop :=
+  | unn_go' n : ~ (forall k, k < n -> k <> 2) -> n < 5 -> univ_n' n (Some true) (S n).
+  MeBi Config Weak As Option bool.
+  Example w_univ : weak_sim univ_s univ_s' 0 0.
+  Proof. MeBi Sim Begin univ_s 0 And univ_s' 0 Using univ_s. MeBi Sim Solve 100. Qed.
+  Example w_univ_neg : weak_sim univ_n univ_n' 3 3.
+  Proof. MeBi Sim Begin univ_n 3 And univ_n' 3 Using univ_n. MeBi Sim Solve 100. Qed.
+  MeBi Config Reset Weak.
 End ProductPremises.
 
 (* A premise over a constructor whose index is computed ([e k : ev k (dbl k)]).

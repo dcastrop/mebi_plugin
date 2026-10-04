@@ -3,10 +3,13 @@
     and the proof solver, which uses the proof. *)
 
 (** How a premise was proved: a closed proof term, or -- for a negation
-    [~ P] -- the refutation of [P], replayed by {!negation_tac}. *)
+    [~ P] -- the refutation of [P], replayed by {!negation_tac}, or -- for a
+    bounded universal [forall k, k < n -> P k] -- each instance [P i], the
+    proof built by {!premise_tac}. *)
 type proof =
   | Term of EConstr.t
   | ByRefutation of EConstr.t
+  | ByCases
 
 type result =
   | Proved of proof (** the premise holds *)
@@ -42,6 +45,15 @@ val refute_hyp_tac : ?depth:int -> Names.Id.t -> unit Proofview.tactic
 
 (** Prove a goal [~ P] whose [P] [prove] refutes. *)
 val negation_tac : unit Proofview.tactic
+
+(** [is_bounded_universal env sigma t]: [t] is [forall k, k < n -> P k]
+    or [forall k, k <= n -> P k] over [nat], [n] a numeral once normalized
+    (at most 1024): {!prove} decides it instance by instance. *)
+val is_bounded_universal : Environ.env -> Evd.evar_map -> EConstr.t -> bool
+
+(** [premise_tac ()] proves the closed premise in focus the way {!prove}
+    decided it holds (bounded universals need [MEBI.Premises]). *)
+val premise_tac : unit -> unit Proofview.tactic
 
 (** [enumerate env sigma goal]: for a premise that may mention open
     variables (a target still to be computed, say), every way to make it

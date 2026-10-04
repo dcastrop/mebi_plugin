@@ -5715,6 +5715,55 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 **Session tally (2026-10-03), cont.:** Tooling 4 · Bug fix 7 · Docs 2 ·
 New feature 4 · Refactor 1 · Optimization 3.
 
+## 2026-10-04 — Bounded universal premises decided, and proved by cases
+
+**New feature.** On branch `feature/bounded-universals`. Item 1 of the
+new-capability agenda (notes/14), agreed with Jonah before any code, with
+items 3, 4 (as "design B": `Run Bisim` opening the proof itself, no
+cache) and 8 to follow; item 5 closed as covered by `weak_bisimilar`; 2, 6
+and 7 deferred.
+
+**What.** A premise `forall k, k < n -> P k` or `forall k, k <= n -> P k`
+over `nat` (and `n > k`, which is `k < n`), with `n` a numeral (at most
+1024) once the premise is closed, used to be beyond the bounded proof
+search: undecided, applied as if it held, the LTS refused as incomplete
+(`Test.v` `ProductPremises.univ`, pinned KNOWN WRONG). Now
+`Premise_search.prove` recognises the shape (on Peano's `le` after
+unfolding, so `lt`/`gt` come for free) and decides it instance by instance:
+true iff every `P i` is proved, false as soon as one is refuted, else
+undecided as before. Each `P i` goes through `prove` itself, so negations,
+equations, nested bounded universals and the user tactic all apply.
+- **Extraction** only needs the verdict, a new `Proved ByCases`: no proof
+  term is built per state.
+- **Proofs**: `Premise_search.premise_tac` builds the term when the
+  solver asks, proving each `P i` as a sub-proof and chaining four small
+  lemmas in a new `theories/Premises.v` (`bounded_le_0`, `bounded_le_S`,
+  `bounded_lt_0`, `bounded_lt_S`; exported by `MEBI.loader`); the solver
+  now classifies such a goal as a premise (it had taken it for a silent
+  step and tried `rt1n_refl`). A false one in a hypothesis is refuted at
+  its first false instance: `H i (le_S ... le_n)`, then the usual
+  refutation of `P i`.
+- Not covered: a bounded universal nested inside another inductive's
+  constructor search (only premises in their own right), bounds that stay
+  open, and forms other than `<`/`<=` over `nat` (`In k l`, `Forall`
+  already go through the constructor search).
+
+**Tests.** `Test.v` `ProductPremises`: the KNOWN WRONG pin is now positive
+(4 states, not 6), plus `<=`, `>`, a negated universal, and two `weak_sim`
+proofs that use both directions (proved at states 0..2, refuted at 3:
+33 iterations; the negated form: 23); `Print Assumptions` closed. Every
+other `Test.v` count identical to `main`. Proof matrix: `Auto` and forced
+`True` match `CLAUDE.md`'s baseline (27 + 14 + `LawProofs`' 14); forced
+`False` identical to `main` file by file. `CCS/ABPProofs.v` 6494 and
+`ABPBisimProofs.v` 9914, as before (221s, 227s). `tests.exe`
+99/99; `make` clean. Docs: README and `MeBi Help Premises`.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep feature/bounded-universals main`).
+
+**Session tally (2026-10-04):** New feature 1.
+
 ---
 
 ## Outstanding
@@ -5732,7 +5781,7 @@ New feature 4 · Refactor 1 · Optimization 3.
 - ~~`Saturation.edge_action_destinations` silently dropped all but the last-visited destination when a single action had more than one — a real correctness bug (found 2026-09-27 during the A2 investigation).~~ Fixed, 2026-09-27 (see below), with a regression test. `notes/2-unify-instead-of-lookup.md`'s A2 (multiple-actionpairs positive test case) remained separately open; ~~it~~ done 2026-10-01 (`theories/Test.v`, `MultipleDerivations`).
 - **Open as of 2026-10-02** (the chronological entries above have the detail): an LTS premise whose source nothing determines is explored from an unknown term and finds only some of its steps (warned; known-wrong test `OutputPremises.open_c`); Step 0, the inversion tie-break (closed in the third 2026-10-02 session: options A and D′ built, residual sterile steps measured at zero); saturation is still cubic in witnesses on `Test4`'s shape (going linear changes which equal-length witnesses survive); `Proc/Test4` remains a documented limit (saturation refused at 74.6M weak actions; a proof would need ≥ ~700k solver iterations); C4/C5/C8 and the CADP no-starvation property are for the upstream authors. Found in the second 2026-10-02 session and fixed on branch `fix/weak-bisim-silent-closure`: the solver could not answer a silent step by moving silently, and the bisimilarity verdict was neither rooted nor split by `=ε⇒`. Open from it: `weak_bisim` in `theories/` is mutual similarity, not bisimilarity, and `MeBi Sim Begin` refuses similar-but-not-bisimilar `weak_sim` goals.
 
-- **Open as of the end of 2026-10-03** (superseding the bullet above; the chronological entries have the detail): the 2026-10-02 items are all closed -- open-source premises (PR #18), `Proc/Test4` (decided on demand, PR #22; `weak_sim` and `weak_bisimilar` proved via explicit structural congruence, PRs #26, #29), and saturation's cost (PR #28). The plugin's known limits are pinned in `Test.v` (`KNOWN WRONG` / `KNOWN LIMIT`), e.g. bounded universal premises (refused as incomplete) and undeterminable transitions (warned, refused). What remains is new capability, to be agreed before any code (bounded universals in premises, goals with an unknown state, wider benchmarking, auto-starting `Sim`, a similarity command, collapsing self-referential definitions, structural congruence as a general recipe), and @dcastrop's decisions (C4/C5/C8, `Auto` defaults, the CADP no-starvation property).
+- **Open as of the end of 2026-10-03** (superseding the bullet above; the chronological entries have the detail): the 2026-10-02 items are all closed -- open-source premises (PR #18), `Proc/Test4` (decided on demand, PR #22; `weak_sim` and `weak_bisimilar` proved via explicit structural congruence, PRs #26, #29), and saturation's cost (PR #28). The plugin's known limits are pinned in `Test.v` (`KNOWN WRONG` / `KNOWN LIMIT`), e.g. undeterminable transitions (warned, refused). What remains is new capability, to be agreed before any code (bounded universals in premises, goals with an unknown state, wider benchmarking, auto-starting `Sim`, a similarity command, collapsing self-referential definitions, structural congruence as a general recipe), and @dcastrop's decisions (C4/C5/C8, `Auto` defaults, the CADP no-starvation property).
 
 Working notes live in `notes/` (local only, excluded via `.git/info/exclude`, so
 not present in a fresh clone). Note 1 is done; its analysis was incomplete on two

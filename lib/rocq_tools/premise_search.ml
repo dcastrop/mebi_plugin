@@ -12,6 +12,7 @@
 type proof =
   | Term of EConstr.t
   | ByRefutation of EConstr.t
+  | ByCases
 
 type result =
   | Proved of proof
@@ -509,7 +510,139 @@ let by_user_tactic (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
      | None -> Unknown)
 ;;
 
-let prove (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t) : result
+(** A bounded universal over [nat]: [forall k, k <= n -> P k] ([strict]
+    false) or [forall k, k < n -> P k] ([strict] true; [k < n] is
+    [S k <= n], and [n > k] the same), its bound [n] a numeral once
+    normalized. [pred] is [fun k => P k]; [le] is Peano's [le]. *)
+type bounded =
+  { pred : EConstr.t
+  ; strict : bool
+  ; bound : int
+  ; le : Names.inductive * EConstr.EInstance.t
+  }
+
+(** The largest bound unfolded: each value of [k] is a proof search, so a
+    larger one is left undecided (and warned about as such). *)
+let max_bounded : int = 1024
+
+let nat_ind () : Names.inductive option =
+  match Rocqlib.lib_ref "num.nat.type" with
+  | Names.GlobRef.IndRef ind -> Some ind
+  | _ | (exception _) -> None
+;;
+
+(** [numeral i]: [S (... (S O))]. *)
+let numeral (ind : Names.inductive) (i : int) : EConstr.t =
+  let o = EConstr.mkConstructU ((ind, 1), EConstr.EInstance.empty) in
+  let s = EConstr.mkConstructU ((ind, 2), EConstr.EInstance.empty) in
+  let rec f acc i =
+    if i <= 0 then acc else f (EConstr.mkApp (s, [| acc |])) (i - 1)
+  in
+  f o i
+;;
+
+(** [to_int sigma x]: the number [x] spells, if it is a numeral. *)
+let to_int (ind : Names.inductive) (sigma : Evd.evar_map) (x : EConstr.t)
+  : int option
+  =
+  let rec f acc x =
+    if acc > max_bounded
+    then None
+    else (
+      let h, args = EConstr.decompose_app sigma x in
+      match EConstr.kind sigma h, args with
+      | Construct ((i, 1), _), [||] when Names.Ind.CanOrd.equal i ind ->
+        Some acc
+      | Construct ((i, 2), _), [| y |] when Names.Ind.CanOrd.equal i ind ->
+        f (acc + 1) y
+      | _ -> None)
+  in
+  f 0 x
+;;
+
+let bounded_universal
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (goal : EConstr.t)
+  : bounded option
+  =
+  match nat_ind () with
+  | None -> None
+  | Some nat ->
+    (match EConstr.kind sigma (Reductionops.whd_all env sigma goal) with
+     | Prod (na, t, b) ->
+       let is_nat =
+         match EConstr.kind sigma (Reductionops.whd_all env sigma t) with
+         | Ind (i, _) -> Names.Ind.CanOrd.equal i nat
+         | _ -> false
+       in
+       let env' =
+         EConstr.push_rel (Context.Rel.Declaration.LocalAssum (na, t)) env
+       in
+       (match EConstr.kind sigma (Reductionops.whd_all env' sigma b) with
+        | Prod (_, d, p) when is_nat && EConstr.Vars.noccurn sigma 1 p ->
+          let h, args =
+            EConstr.decompose_app sigma (Reductionops.whd_all env' sigma d)
+          in
+          (match EConstr.kind sigma h with
+           | Ind (le, u)
+             when Rocqlib.check_ind_ref "num.nat.le" le
+                  && Array.length args = 2
+                  && EConstr.Vars.noccurn sigma 1 args.(1) ->
+             let x = Reductionops.whd_all env' sigma args.(0) in
+             let strict =
+               if EConstr.isRelN sigma 1 x
+               then Some false
+               else (
+                 let hx, ax = EConstr.decompose_app sigma x in
+                 match EConstr.kind sigma hx, ax with
+                 | Construct ((i, 2), _), [| y |]
+                   when Names.Ind.CanOrd.equal i nat
+                        && EConstr.isRelN
+                             sigma
+                             1
+                             (Reductionops.whd_all env' sigma y) ->
+                   Some true
+                 | _ -> None)
+             in
+             let n = EConstr.Vars.lift (-1) args.(1) in
+             (match
+                strict, to_int nat sigma (Reductionops.nf_all env sigma n)
+              with
+              | Some strict, Some bound ->
+                Some
+                  { pred = EConstr.mkLambda (na, t, EConstr.Vars.lift (-1) p)
+                  ; strict
+                  ; bound
+                  ; le = le, u
+                  }
+              | _ -> None)
+           | _ -> None)
+        | _ -> None)
+     | _ -> None)
+;;
+
+let is_bounded_universal env sigma t : bool =
+  Stdlib.Option.is_some (bounded_universal env sigma t)
+;;
+
+(** The values [k] ranges over: [0 .. bound - 1] or [0 .. bound]. *)
+let bounded_range (b : bounded) : int list =
+  List.init (if b.strict then b.bound else b.bound + 1) Fun.id
+;;
+
+(** [P i], beta-reduced. *)
+let bounded_instance (sigma : Evd.evar_map) (b : bounded) (i : int) : EConstr.t =
+  let nat = match nat_ind () with Some n -> n | None -> assert false in
+  Reductionops.beta_applist sigma (b.pred, [ numeral nat i ])
+;;
+
+(** [prove env sigma goal]: a closed premise decided. A bounded universal
+    ({!bounded_universal}) is decided value by value: it holds if every
+    instance does ([Proved ByCases], the proof built by {!premise_tac} when
+    asked for), and is refuted by any one refuted instance. *)
+let rec prove (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
+  : result
   =
   let goal = Reductionops.nf_evar sigma goal in
   if not (closed sigma goal)
@@ -519,13 +652,66 @@ let prove (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t) : result
       match negated env sigma goal with
       | Some p ->
         (* [~ P] holds iff [P] is refuted, by a complete search *)
-        (match search_closed env sigma p with
+        (match decide_closed env sigma p with
          | Proved _ -> Refuted
          | Refuted -> Proved (ByRefutation p)
          | Unknown -> Unknown)
-      | None -> search_closed env sigma goal
+      | None -> decide_closed env sigma goal
     in
     match decided with Unknown -> by_user_tactic env sigma goal | r -> r)
+
+and decide_closed (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
+  : result
+  =
+  match bounded_universal env sigma goal with
+  | None -> search_closed env sigma goal
+  | Some b ->
+    let rec each (all_proved : bool) = function
+      | [] -> if all_proved then Proved ByCases else Unknown
+      | i :: tl ->
+        (match prove env sigma (bounded_instance sigma b i) with
+         | Refuted -> Refuted
+         | Proved _ -> each all_proved tl
+         | Unknown -> each false tl)
+    in
+    each true (bounded_range b)
+;;
+
+(** [bounded_counterexample env sigma ty]: for a bounded universal [ty]
+    refuted at [i], the bound and [i]. *)
+let bounded_counterexample
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (ty : EConstr.t)
+  : (bounded * int) option
+  =
+  match bounded_universal env sigma ty with
+  | None -> None
+  | Some b ->
+    List.find_opt
+      (fun i ->
+        match prove env sigma (bounded_instance sigma b i) with
+        | Refuted -> true
+        | _ -> false)
+      (bounded_range b)
+    |> Stdlib.Option.map (fun i -> b, i)
+;;
+
+(** [bounded_le_proof b i]: a proof of [i <= bound] ([S i <= bound] if
+    [strict]), as [le_S] applied to [le_n]. *)
+let bounded_le_proof (b : bounded) (i : int) : EConstr.t =
+  let nat = match nat_ind () with Some n -> n | None -> assert false in
+  let le, u = b.le in
+  let le_n = EConstr.mkConstructU ((le, 1), u) in
+  let le_S = EConstr.mkConstructU ((le, 2), u) in
+  let lo = if b.strict then i + 1 else i in
+  let x = numeral nat lo in
+  let rec f p m =
+    if m >= b.bound
+    then p
+    else f (EConstr.mkApp (le_S, [| x; numeral nat m; p |])) (m + 1)
+  in
+  f (EConstr.mkApp (le_n, [| x |])) lo
 ;;
 
 (** [refute_hyp_tac id]: close the goal from hypothesis [id], which cannot
@@ -565,6 +751,24 @@ and refute_hyp_from
          Tactics.exfalso <*> Tactics.exact_check false_elim
        | _ ->
          Tacticals.tclZEROMSG (Pp.str "MeBi: cannot refute a negated premise"))
+    | None
+      when depth > 0
+           && Stdlib.Option.is_some (bounded_counterexample env sigma ty) ->
+      (* a bounded universal with a false instance [P i]: instantiate it,
+         [id i (_ : i <= n)], and refute that *)
+      let b, i =
+        match bounded_counterexample env sigma ty with
+        | Some x -> x
+        | None -> assert false
+      in
+      let nat = match nat_ind () with Some n -> n | None -> assert false in
+      let inst =
+        EConstr.mkApp
+          (EConstr.mkVar id, [| numeral nat i; bounded_le_proof b i |])
+      in
+      Generalize.generalize [ inst ]
+      <*> Tactics.intro_using_then (Names.Id.of_string "H_instance") (fun id' ->
+        refute_hyp_from ~depth:(depth - 1) ~before id')
     | None
       when Bool.not (dead env sigma ty)
            &&
@@ -677,4 +881,97 @@ let negation_tac : unit Proofview.tactic =
     Tactics.hnf_in_concl
     (Tactics.intro_using_then (Names.Id.of_string "H_premise") (fun id ->
        refute_hyp_tac id))
+;;
+
+(** A [MEBI.Premises] lemma (see [theories/Premises.v]). *)
+let premises_lemma (name : string) : EConstr.t option =
+  let path =
+    Names.DirPath.make (List.rev_map Names.Id.of_string [ "MEBI"; "Premises" ])
+  in
+  match
+    Nametab.global_of_path (Libnames.make_path path (Names.Id.of_string name))
+  with
+  | gr ->
+    Some
+      (EConstr.of_constr
+         (UnivGen.constr_of_monomorphic_global (Global.env ()) gr))
+  | exception Not_found -> None
+;;
+
+(** [premise_tac]: prove the closed premise in focus as {!prove} decided
+    it. *)
+let rec premise_tac () : unit Proofview.tactic =
+  Proofview.Goal.enter (fun gl ->
+    let env = Proofview.Goal.env gl in
+    let sigma = Proofview.Goal.sigma gl in
+    match prove env sigma (Proofview.Goal.concl gl) with
+    | Proved (Term p) -> Tactics.exact_check p
+    | Proved (ByRefutation _) -> negation_tac
+    | Proved ByCases -> bounded_tac ()
+    | Refuted | Unknown ->
+      Tacticals.tclZEROMSG (Pp.str "MeBi: cannot prove the premise"))
+
+(** [bounded_tac]: prove a bounded universal [forall k, k < n -> P k] (or
+    [<=]): each instance [P i] proved on its own by {!premise_tac}, and the
+    universal from those by [MEBI.Premises]' lemmas, one per value of [k]:
+    [bounded_lt_S P m (bounded_le_S P (m-1) (... (bounded_le_0 P p0) ...) pm)].
+*)
+and bounded_tac () : unit Proofview.tactic =
+  Proofview.Goal.enter (fun gl ->
+    let env = Proofview.Goal.env gl in
+    let sigma = Proofview.Goal.sigma gl in
+    let fail msg = Tacticals.tclZEROMSG (Pp.str ("MeBi: " ^ msg)) in
+    match bounded_universal env sigma (Proofview.Goal.concl gl) with
+    | None -> fail "not a bounded universal"
+    | Some b ->
+      let nat = match nat_ind () with Some n -> n | None -> assert false in
+      let instance (i : int) : EConstr.t option =
+        let typ = bounded_instance sigma b i in
+        match
+          Subproof.build_by_tactic_opt
+            env
+            ~uctx:(Evd.ustate sigma)
+            ~poly:PolyFlags.default
+            ~typ
+            (premise_tac ())
+        with
+        | Some (c, _, _, _, _) -> Some (EConstr.of_constr c)
+        | None -> None
+        | exception e when CErrors.noncritical e -> None
+      in
+      let lemmas =
+        List.map
+          premises_lemma
+          [ "bounded_le_0"; "bounded_le_S"; "bounded_lt_0"; "bounded_lt_S" ]
+      in
+      (match lemmas with
+       | [ Some le_0; Some le_S; Some lt_0; Some lt_S ] ->
+         (* [forall k, k <= m -> P k], from the proofs of [P 0 .. P m] *)
+         let rec le_chain (m : int) : EConstr.t option =
+           match instance m with
+           | None -> None
+           | Some pm when m = 0 -> Some (EConstr.mkApp (le_0, [| b.pred; pm |]))
+           | Some pm ->
+             Stdlib.Option.map
+               (fun rest ->
+                 EConstr.mkApp
+                   (le_S, [| b.pred; numeral nat (m - 1); rest; pm |]))
+               (le_chain (m - 1))
+         in
+         let proof =
+           if not b.strict
+           then le_chain b.bound
+           else if b.bound = 0
+           then Some (EConstr.mkApp (lt_0, [| b.pred |]))
+           else
+             Stdlib.Option.map
+               (fun rest ->
+                 EConstr.mkApp
+                   (lt_S, [| b.pred; numeral nat (b.bound - 1); rest |]))
+               (le_chain (b.bound - 1))
+         in
+         (match proof with
+          | Some p -> Tactics.exact_check p
+          | None -> fail "cannot prove an instance of a bounded universal")
+       | _ -> fail "bounded universals need [MEBI.Premises] loaded"))
 ;;
