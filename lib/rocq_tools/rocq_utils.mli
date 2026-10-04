@@ -56,8 +56,7 @@ type econstr_kind =
     , Evd.erelevance )
     Constr.kind_of_term
 
-(** Raised by {!econstr_to_app}, and by {!econstr_to_lambda}: not of the expected kind.
-*)
+(** Raised by {!econstr_to_app}: not an application. *)
 exception
   Rocq_utils_EConstrIsNot_App of (Evd.evar_map * Evd.econstr * econstr_kind)
 
@@ -75,17 +74,15 @@ type lambda_triple =
   * Evd.econstr
   * Evd.econstr
 
-(** Meant for {!econstr_to_lambda}, which raises
-    {!Rocq_utils_EConstrIsNot_App} instead; never raised ([TODO.md]). *)
+(** Raised by {!econstr_to_lambda}: not a [fun]. *)
 exception
   Rocq_utils_EConstrIsNot_Lambda of (Evd.evar_map * Evd.econstr * econstr_kind)
 
 (** [econstr_to_lambda sigma x] is the binder, type and body of the [fun]
     [x].
 
-    @raise Rocq_utils_EConstrIsNot_App
-      if [x] is not a [fun] (raised here;
-      not {!Rocq_utils_EConstrIsNot_Lambda}, see [TODO.md]). *)
+    @raise Rocq_utils_EConstrIsNot_Lambda if [x] is not a [fun] (raised here).
+*)
 val econstr_to_lambda : Evd.evar_map -> Evd.econstr -> lambda_triple
 
 (** A named hypothesis of a goal. *)

@@ -81,7 +81,7 @@ exception
 let econstr_to_lambda (sigma : Evd.evar_map) (x : EConstr.t) : lambda_triple =
   match EConstr.kind sigma x with
   | Lambda (binder, types, constr) -> binder, types, constr
-  | k -> raise (Rocq_utils_EConstrIsNot_App (sigma, x, k))
+  | k -> raise (Rocq_utils_EConstrIsNot_Lambda (sigma, x, k))
 ;;
 
 type hyp = (EConstr.t, EConstr.t, Evd.erelevance) Context.Named.Declaration.pt

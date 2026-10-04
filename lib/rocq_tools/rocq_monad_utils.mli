@@ -66,9 +66,8 @@ module type S = sig
 
   (** [to_lambda x] is the binder, type and body of the [fun] [x].
 
-      @raise Rocq_utils.Rocq_utils_EConstrIsNot_App
-        when run, if [x] is not
-        a [fun] (propagated; see {!Rocq_utils.econstr_to_lambda}). *)
+      @raise Rocq_utils.Rocq_utils_EConstrIsNot_Lambda
+        when run, if [x] is not a [fun] (propagated). *)
   val to_lambda : EConstr.t -> Rocq_utils.lambda_triple mm
 
   (** [to_app x] is the head and arguments of the application [x].
