@@ -562,6 +562,58 @@ let init
   pstate
 ;;
 
+(** Which goal [MeBi Run Bisim ... As] states: [weak_bisimilar] ([Bisim])
+    or [weak_sim] ([Sim]). *)
+type goal_kind =
+  | Bisim
+  | Sim
+
+(** [goal_statement kind (x, a) (y, b)]: the statement to prove, as an
+    expression to interpret: [weak_bisimilar a b x y] or [weak_sim a b x
+    y], [x] stepping by the relation [a] and [y] by [b]. *)
+let goal_statement
+      (kind : goal_kind)
+      ((x, a) : Constrexpr.constr_expr * Libnames.qualid)
+      ((y, b) : Constrexpr.constr_expr * Libnames.qualid)
+  : Constrexpr.constr_expr
+  =
+  let head : string =
+    match kind with
+    | Bisim -> "MEBI.Bisimilarity.weak_bisimilar"
+    | Sim -> "MEBI.Bisimilarity.weak_sim"
+  in
+  Constrexpr_ops.mkAppC
+    ( Constrexpr_ops.mkRefC (Libnames.qualid_of_string head)
+    , [ Constrexpr_ops.mkRefC a; Constrexpr_ops.mkRefC b; x; y ] )
+;;
+
+(** [start ~kind ~name refs a b]: open a proof named [name] (an [Example])
+    of {!goal_statement}, and begin the proof search on it with {!init}, so
+    that [MeBi Sim Solve] can follow at once. The check is the one
+    [MeBi Sim Begin] would run, done once: nothing is kept after the
+    command. If the two are not bisimilar ([Bisim]) or not similar ([Sim]),
+    [init] refuses and no proof is opened. *)
+let start
+      ~(kind : goal_kind)
+      ~(name : Names.Id.t)
+      (refs : Libnames.qualid list)
+      (a : Constrexpr.constr_expr * Libnames.qualid)
+      (b : Constrexpr.constr_expr * Libnames.qualid)
+  : Declare.Proof.t
+  =
+  Logger.trace __FUNCTION__;
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let typ, uctx = Constrintern.interp_type env sigma (goal_statement kind a b) in
+  let pstate =
+    Declare.Proof.start
+      ~info:(Declare.Info.make ~kind:Decls.(IsDefinition Example) ())
+      ~cinfo:(Declare.CInfo.make ~name ~typ ())
+      (Evd.from_ctx uctx)
+  in
+  init pstate refs a b
+;;
+
 (** [guard f] runs a [MeBi Sim] command. An exception from inside the plugin
     that nothing handled would reach Rocq as an {e Anomaly} ("please report
     at rocq-prover.org"), blaming Rocq for a plugin failure -- as

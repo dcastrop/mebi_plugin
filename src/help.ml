@@ -57,12 +57,19 @@ let text : string list -> string option = function
       "MeBi Run LTS <term> Using <lts> [<lts>...].\n\
        MeBi Run FSM | Saturate | Minimize <term> Using <lts> [<lts>...].\n\
        MeBi Run Bisim <term> With <lts> And <term> With <lts> Using <lts>...\n\
-       MeBi Run Merge <term> With <lts> And <term> With <lts> Using <lts>...\n\n\
+       MeBi Run Merge <term> With <lts> And <term> With <lts> Using <lts>...\n\
+       MeBi Run Bisim <term> With <lts> And <term> With <lts> As Bisim|Sim \
+       <name> [Using <lts>...]\n\n\
        Build the LTS reachable from <term>, then optionally saturate it (weak \
        transitions across silent steps), minimize it, or check two for (weak) \
        bisimilarity. The first relation after Using is the one <term> steps \
        by; the rest are the relations its constructors' premises mention \
-       (layered LTSs). See: MeBi Help Premises."
+       (layered LTSs). With As Bisim <name> (or As Sim <name>), Run Bisim also \
+       states weak_bisimilar (or weak_sim) as the Example <name>, opens its \
+       proof and begins the proof search, as MeBi Sim Begin would: continue \
+       with MeBi Sim Solve <n>, then Qed. Nothing opens if the two are not \
+       bisimilar (not similar, for Sim). See: MeBi Help Premises, MeBi Help \
+       Sim."
   | [ "Sim" ] ->
     Some
       "MeBi Sim Begin <lts> <term> And <lts> <term> Using <lts>...\n\

@@ -1582,6 +1582,33 @@ Module AnswerPolicies.
   MeBi Config Reset Weak.
 End AnswerPolicies.
 
+(* [MeBi Run Bisim ... As Bisim|Sim <name>] states [weak_bisimilar] or
+   [weak_sim], opens its proof and begins the proof search, as [Example
+   ... Proof. MeBi Sim Begin ...] would: the same counts (43, 22, 9,
+   measured 2026-10-04). It refuses, opening nothing, if the two are not
+   bisimilar (not similar, for [Sim]). *)
+MeBi Divider "Theories.Test.RunBisimAs".
+Module RunBisimAs.
+  Inductive st : nat -> option bool -> nat -> Prop :=
+  | p0 : st 0 (Some true) 1 | p1 : st 1 (Some false) 0
+  | q0 : st 10 (Some true) 11 | q1 : st 11 (Some false) 12
+  | q2 : st 12 (Some true) 11
+  | r0 : st 20 (Some true) 21.
+  MeBi Config Weak As Option bool.
+  MeBi Run Bisim 0 With st And 10 With st As Bisim pq_bis Using st.
+  MeBi Sim Solve 100. Qed.
+  Check pq_bis : weak_bisimilar st st 0 10.
+  MeBi Run Bisim 0 With st And 10 With st As Sim pq_sim.
+  MeBi Sim Solve 100. Qed.
+  Check pq_sim : weak_sim st st 0 10.
+  (* [20] is simulated by [0] but not bisimilar to it (Not_Bisimilar) *)
+  Fail MeBi Run Bisim 20 With st And 0 With st As Bisim rp_bis Using st.
+  Fail Check rp_bis.
+  MeBi Run Bisim 20 With st And 0 With st As Sim rp_sim Using st.
+  MeBi Sim Solve 100. Qed.
+  MeBi Config Reset Weak.
+End RunBisimAs.
+
 (* Premises that are not an application: an implication or a [forall]. Until
    2026-10-02 extraction took them for a variable's type and dropped them
    without a warning, so the LTS silently gained transitions. *)

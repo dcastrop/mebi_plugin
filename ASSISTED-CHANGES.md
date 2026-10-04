@@ -5824,6 +5824,44 @@ there as the next piece of work.
 **Session tally (2026-10-04), cont.:** New feature 1 (with its `Premise
 Range` setting) · Refactor 1 (review) · Docs 1.
 
+## 2026-10-04 — `MeBi Run Bisim ... As Bisim|Sim <name>` opens the proof
+
+**New feature.** On branch `feature/bisim-opens-proof`. Item 4 of the
+agenda, as Jonah chose it ("design B"): no cache. The alternative, keeping
+`Run Bisim`'s result for a later `Sim Begin`, would have held whole FSMs in
+memory between commands (`Test4`: everything, growing during the proof
+under on-demand saturation) and gone stale when the user steps back and
+redefines a relation; rejected.
+
+**What.** `MeBi Run Bisim x With a And y With b As Bisim <name> [Using
+rs]` states `weak_bisimilar a b x y` as the `Example <name>`, opens its
+proof and runs `Sim Begin` on it (`Proof_solver.start`: interpret the
+statement, `Declare.Proof.start`, then the existing `init`); `As Sim`
+states `weak_sim`. The check is done once, inside the command, and nothing
+outlives it. If the two are not bisimilar (or not similar, for `Sim`),
+`init` refuses (`Not_Bisimilar`) and no proof is opened. `Sim Begin` is
+unchanged. `As` comes before `Using`, because grammar words are not
+reserved: a `reference_list` read `As Bisim pq` as three more relations
+(found on the first try). `As Bisim`/`As Sim`, not `As weak_sim`: a
+grammar string is a keyword, and `weak_sim` must stay an identifier.
+
+**Tests.** `Test.v` `RunBisimAs`: a bisimilar pair as `Bisim` (43) and
+`Sim` (22), a similar-not-bisimilar pair refused as `Bisim` (checked:
+`Not_Bisimilar`, and no `rp_bis` declared) and proved as `Sim` (9); the
+same counts as `Example ... MeBi Sim Begin`. Other `Test.v` counts
+identical; proof matrix under `Auto` identical (the change only adds a
+function); `tests.exe` 99/99. Mistake on the way: I inserted the new code
+between `guard`'s doc comment and `guard`, which `dune build` accepts and
+`make` rejects (warning 50), exactly the trap `CLAUDE.md` describes; `make`
+caught it before commit. Docs: README (`MeBi Sim` section), `MeBi Help
+Run`.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep feature/bisim-opens-proof main`).
+
+**Session tally (2026-10-04), cont.:** New feature 2 · Refactor 1 (review)
+· Docs 1 · Tooling 1.
+
 ---
 
 ## Outstanding

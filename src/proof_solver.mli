@@ -56,6 +56,25 @@ val init
   -> Constrexpr.constr_expr * Libnames.qualid
   -> Declare.Proof.t
 
+(** Which goal [MeBi Run Bisim ... As] states: [weak_bisimilar] ([Bisim])
+    or [weak_sim] ([Sim]). *)
+type goal_kind =
+  | Bisim
+  | Sim
+
+(** [start ~kind ~name refs (x, a) (y, b)]: open a proof named [name] of
+    [weak_bisimilar a b x y] ([Bisim]) or [weak_sim a b x y] ([Sim]), and
+    begin the proof search on it as [MeBi Sim Begin a x And b y Using refs]
+    would, so [MeBi Sim Solve] can follow at once. Refuses, opening nothing,
+    if the two are not bisimilar (or not similar). *)
+val start
+  :  kind:goal_kind
+  -> name:Names.Id.t
+  -> Libnames.qualid list
+  -> Constrexpr.constr_expr * Libnames.qualid
+  -> Constrexpr.constr_expr * Libnames.qualid
+  -> Declare.Proof.t
+
 val step : Declare.Proof.t -> Declare.Proof.t
 val solve : ?bound:int -> Declare.Proof.t -> Declare.Proof.t
 
