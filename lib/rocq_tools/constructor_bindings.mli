@@ -19,12 +19,13 @@ module type S = sig
 
   include Json.S with type k = t (** @closed *)
 
-  (** [extract_info ind] is, for each constructor of the LTS [ind] (in
-      order), its index, name and binder locations ({!Bindings.extract}),
-      read from its source, label and target.
+  (** [extract_info ind] is, for each constructor of the LTS [ind] (the
+      last first), its index, name and binder locations
+      ({!Bindings.extract}), read from its source, label and target.
 
-      Raises nothing directly; propagates whatever {!Bindings.extract}
-      raises when run. *)
+      Raises nothing directly; when run, propagates whatever
+      {!Bindings.extract} raises, and [Rocq_utils]'s errors for a
+      constructor whose type is not an application of its LTS. *)
   val extract_info : ind -> t list mm
 
   (** [get_quantified_hyp n] is the binder name [n] as a quantified

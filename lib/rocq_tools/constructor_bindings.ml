@@ -73,40 +73,57 @@ module Make
       ;;
     end)
 
-  (* See the [.mli]. *)
+  (** [constructor_info index c] is the binder paths of the LTS constructor
+      [c] ({!Bindings.extract}), with [index], [c]'s position for the
+      [constructor] tactic (from 1), and its name. Each binder is first
+      given a fresh evar, so that the evar term can be walked alongside the
+      de Bruijn one.
+
+      Raises, when run, whatever {!Bindings.extract} raises, and, if [c]'s
+      type is not an application of its LTS, the errors of
+      {!Rocq_utils.extract_args} and {!Rocq_utils.constr_to_app} (all
+      propagated). *)
+  let constructor_info (index : int) (c : Ind.LTS.constructor) : t mm =
+    Logger.trace __FUNCTION__;
+    let open Syntax in
+    let { name; constructor = ctx, c } : Ind.LTS.constructor = c in
+    let name : string = Names.Id.to_string name in
+    let decls : Rocq_utils.econstr_decl list =
+      Rocq_utils.get_econstr_decls ctx
+    in
+    let* substl = mk_ctx_substl [] (List.rev decls) in
+    let name_pairs = Rocq_utils.map_decl_evar_pairs decls substl in
+    let args : Rocq_utils.constructor_args =
+      Rocq_utils.extract_args ~substl c
+    in
+    let from, action, goto =
+      Rocq_utils.constr_to_app c |> Rocq_utils.unpack_constr_args
+    in
+    let* bindings : Bindings.t =
+      Bindings.extract
+        name_pairs
+        (args.lhs, from)
+        (args.act, action)
+        (args.rhs, goto)
+    in
+    return { index; name; bindings }
+  ;;
+
+  (* See the [.mli]. One {!constructor_info} per constructor, numbered from
+     1, the last first. *)
   let extract_info (x : Ind.t) : t list mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
     (* NOTE: constructor tactic index starts from 1 -- ignore 0 below *)
     let (get_constructor_index, _), _ = Utils.new_int_counter ~start:0 () in
     let tys : Ind.LTS.constructor array = Ind.get_lts_constructor_types x in
-    let f (i : int) (acc : t list) : t list mm =
-      Logger.trace __FUNCTION__;
-      let { name; constructor = ctx, c } : Ind.LTS.constructor = tys.(i) in
-      let index : int = get_constructor_index () in
-      let name : string = Names.Id.to_string name in
-      let decls : Rocq_utils.econstr_decl list =
-        Rocq_utils.get_econstr_decls ctx
-      in
-      let* substl = mk_ctx_substl [] (List.rev decls) in
-      let name_pairs = Rocq_utils.map_decl_evar_pairs decls substl in
-      let args : Rocq_utils.constructor_args =
-        Rocq_utils.extract_args ~substl c
-      in
-      let from, action, goto =
-        Rocq_utils.constr_to_app c |> Rocq_utils.unpack_constr_args
-      in
-      let* bindings : Bindings.t =
-        Bindings.extract
-          name_pairs
-          (args.lhs, from)
-          (args.act, action)
-          (args.rhs, goto)
-      in
-      let h : t = { index; name; bindings } in
-      h :: acc |> return
-    in
-    iterate 0 (Array.length tys - 1) [] f
+    iterate
+      0
+      (Array.length tys - 1)
+      []
+      (fun i acc ->
+        let* h = constructor_info (get_constructor_index ()) tys.(i) in
+        return (h :: acc))
   ;;
 
   (* See the [.mli]. *)
