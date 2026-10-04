@@ -1715,6 +1715,23 @@ module Make (Enc : Encoding.S) :
       ;;
     end
 
+    (** [warn_each warn ds] is [warn lts_enc (name, args)] for each deferred
+        premise [(lts_enc, name, args)] of [ds], in order (one of the
+        [warn_*] functions above). Raises nothing. *)
+    let warn_each
+          (warn : Enc.t -> EConstr.t * EConstr.t array -> unit mm)
+          (ds : Problems.deferred list)
+      : unit mm
+      =
+      iterate
+        0
+        (List.length ds - 1)
+        ()
+        (fun i () ->
+          let lts_enc, name, args = List.nth ds i in
+          warn lts_enc (name, args))
+    ;;
+
     (* See the [.mli]. *)
     let check_constructor_args_unify
           (lhs : EConstr.t)
@@ -1816,17 +1833,8 @@ module Make (Enc : Encoding.S) :
           let open Syntax in
           let$+ resolved env sigma = resolve_deferred env sigma deferred in
           let states, undecided, partial = resolved in
-          let warn f (ds : Problems.deferred list) =
-            iterate
-              0
-              (List.length ds - 1)
-              ()
-              (fun i () ->
-                let lts_enc, name, args = List.nth ds i in
-                f lts_enc (name, args))
-          in
-          let* () = warn warn_if_skipped_premise undecided in
-          let* () = warn warn_partial_premise partial in
+          let* () = warn_each warn_if_skipped_premise undecided in
+          let* () = warn_each warn_partial_premise partial in
           let* env = get_env in
           iterate
             0
@@ -2048,17 +2056,8 @@ module Make (Enc : Encoding.S) :
              from an open source finds only some of its steps. *)
           let$+ resolved env sigma = resolve_deferred env sigma deferred in
           let states, undecided, partial = resolved in
-          let warn f (ds : Problems.deferred list) =
-            iterate
-              0
-              (List.length ds - 1)
-              ()
-              (fun i () ->
-                let lts_enc, name, args = List.nth ds i in
-                f lts_enc (name, args))
-          in
-          let* () = warn warn_if_skipped_premise undecided in
-          let* () = warn warn_partial_premise partial in
+          let* () = warn_each warn_if_skipped_premise undecided in
+          let* () = warn_each warn_partial_premise partial in
           let* branches =
             iterate
               0
