@@ -758,6 +758,30 @@ struct
           | _ -> None)
     ;;
 
+    (** [moves_of_action y label target (action, ds)] is one candidate per
+        destination of [action] (from [y], under [label]) that lies in
+        [target], in order, each with the action's witness length (1 for a
+        plain step). Raises nothing. *)
+    let moves_of_action
+          (y : C.State.t)
+          (label : C.Label.t)
+          (target : C.State.Set.t)
+          ((action, ds) : C.Action.t * C.State.Set.t)
+      : (C.State.t * int * answer) list
+      =
+      let len =
+        match action.annotation with None -> 1 | Some a -> annotation_length a
+      in
+      let tree = Base.Trees.min_opt action.trees in
+      C.State.Set.elements (C.State.Set.inter ds target)
+      |> List.map (fun d ->
+        ( d
+        , len
+        , Move
+            { from = y; goto = d; label; annotation = action.annotation; tree }
+        ))
+    ;;
+
     (** [visible_move_candidates b y label target] is every weak move of [b]
         from [y] under [label] into [target] (one per destination), in the
         order of [y]'s actions, with its witness length (1 for a plain
@@ -776,24 +800,7 @@ struct
         C.Action.Map.reduce_by_label actions label
         |> C.Action.Map.to_actionpairs
         |> C.Action.Pair.Set.elements
-        |> List.concat_map (fun ((action, ds) : C.Action.t * C.State.Set.t) ->
-          let len =
-            match action.annotation with
-            | None -> 1
-            | Some a -> annotation_length a
-          in
-          let tree = Base.Trees.min_opt action.trees in
-          C.State.Set.elements (C.State.Set.inter ds target)
-          |> List.map (fun d ->
-            ( d
-            , len
-            , Move
-                { from = y
-                ; goto = d
-                ; label
-                ; annotation = action.annotation
-                ; tree
-                } )))
+        |> List.concat_map (moves_of_action y label target)
     ;;
 
     (** [candidates ?silent ?sim b pi y label x'] is every way [b], at [y],
@@ -826,6 +833,38 @@ struct
       | [], None -> []
     ;;
 
+    (** [obligation_of ~answer_of ~candidates_of (x, y) (label, x')] is the
+        obligation the move [x -label-> x'] sets [y]: keyed unswapped, with
+        [answer_of y label x'] as the default choice (standing still costing
+        0, a move its witness length) and every candidate from
+        [candidates_of y label x'] as a choice. Raises nothing directly;
+        propagates whatever [answer_of] and [candidates_of] raise. *)
+    let obligation_of
+          ~(answer_of : C.State.t -> C.Label.t -> C.State.t -> answer option)
+          ~(candidates_of :
+             C.State.t
+             -> C.Label.t
+             -> C.State.t
+             -> (C.State.t * int * answer) list)
+          ((x, y) : Pair.t)
+          ((label, x') : C.Label.t * C.State.t)
+      : obligation
+      =
+      (* a candidate [(y', cost, answer)] as the choice it makes *)
+      let choice ((y', cost, answer) : C.State.t * int * answer) : choice =
+        { next = x', y'; cost; answer }
+      in
+      { key = { swapped = false; mover = x; answerer = y; label; target = x' }
+      ; default =
+          (match answer_of y label x' with
+           | Some Stay -> Some (choice (y, 0, Stay))
+           | Some (Move t) ->
+             Some (choice (t.goto, transition_length t, Move t))
+           | None -> None)
+      ; candidates = List.map choice (candidates_of y label x')
+      }
+    ;;
+
     (* See the [.mli]. *)
     let sim_game
           ?(silent : C.EdgeMap.t' option)
@@ -836,28 +875,15 @@ struct
           (pi : C.Partition.t)
       : game_of
       =
+      let answer_of = answer ?silent ?sim b pi in
+      let candidates_of = candidates ?silent ?sim b pi in
       fun ((x, y) : Pair.t) ->
-      if refl && C.State.equal x y
-      then []
-      else
-        List.map
-          (fun ((label, x') : C.Label.t * C.State.t) ->
-            (* a candidate [(y', cost, answer)] as the choice it makes *)
-            let choice ((y', cost, answer) : C.State.t * int * answer) =
-              { next = x', y'; cost; answer }
-            in
-            { key =
-                { swapped = false; mover = x; answerer = y; label; target = x' }
-            ; default =
-                (match answer ?silent ?sim b pi y label x' with
-                 | Some Stay -> Some (choice (y, 0, Stay))
-                 | Some (Move t) ->
-                   Some (choice (t.goto, transition_length t, Move t))
-                 | None -> None)
-            ; candidates =
-                List.map choice (candidates ?silent ?sim b pi y label x')
-            })
-          (obligations a x)
+        if refl && C.State.equal x y
+        then []
+        else
+          List.map
+            (obligation_of ~answer_of ~candidates_of (x, y))
+            (obligations a x)
     ;;
 
     (* See the [.mli]. *)
@@ -925,12 +951,47 @@ struct
       ; unanswered_moves : int
       }
 
+    (** [answer_obligation choose (st, fresh, succ) o] is the walk after
+        answering the obligation [o] with [choose] (given the pairs reached
+        so far): with no choice, [st] with one more unanswered move; with a
+        choice [c], [st] with [c] recorded and its move and witness counted,
+        [c]'s pair added to [succ], and, if not reached before, added to
+        [st] and to [fresh] (both lists newest first).
+
+        @raise Game_too_large
+          if a new pair passes the {!with_cap} cap
+          (propagated from {!check_cap}). *)
+    let answer_obligation
+          (choose : Pair.Set.t -> obligation -> choice option)
+          ((st, fresh, succ) : walk_state * Pair.t list * Pair.t list)
+          (o : obligation)
+      : walk_state * Pair.t list * Pair.t list
+      =
+      match choose st.reached o with
+      | None ->
+        { st with unanswered_moves = st.unanswered_moves + 1 }, fresh, succ
+      | Some c ->
+        let st =
+          { st with
+            choices = KeyMap.add o.key c st.choices
+          ; moves_answered = st.moves_answered + 1
+          ; witness_total = st.witness_total + c.cost
+          }
+        in
+        if Pair.Set.mem c.next st.reached
+        then st, fresh, c.next :: succ
+        else (
+          if Stdlib.Option.is_some !walk_cap
+          then check_cap (Pair.Set.cardinal st.reached + 1);
+          ( { st with reached = Pair.Set.add c.next st.reached }
+          , c.next :: fresh
+          , c.next :: succ ))
+    ;;
+
     (** [answer_pair choose st p obligations] is [st] after answering each
-        of [p]'s [obligations] with [choose] (given the pairs reached so
-        far), with the pairs newly reached, in order. A choice is recorded
-        and its move and witness counted, and a pair not reached before is
-        added; an obligation [choose] leaves unanswered is only counted.
-        [p]'s successors are recorded in order.
+        of [p]'s [obligations] in turn ({!answer_obligation}), with [p]'s
+        successors recorded in order, and the pairs newly reached, in
+        order.
 
         @raise Game_too_large
           if a new pair passes the {!with_cap} cap
@@ -943,31 +1004,7 @@ struct
       : walk_state * Pair.t list
       =
       let st, fresh, succ =
-        List.fold_left
-          (fun ((st, fresh, succ) : walk_state * Pair.t list * Pair.t list) o ->
-            match choose st.reached o with
-            | None ->
-              ( { st with unanswered_moves = st.unanswered_moves + 1 }
-              , fresh
-              , succ )
-            | Some c ->
-              let st =
-                { st with
-                  choices = KeyMap.add o.key c st.choices
-                ; moves_answered = st.moves_answered + 1
-                ; witness_total = st.witness_total + c.cost
-                }
-              in
-              if Pair.Set.mem c.next st.reached
-              then st, fresh, c.next :: succ
-              else (
-                if Stdlib.Option.is_some !walk_cap
-                then check_cap (Pair.Set.cardinal st.reached + 1);
-                ( { st with reached = Pair.Set.add c.next st.reached }
-                , c.next :: fresh
-                , c.next :: succ )))
-          (st, [], [])
-          obligations
+        List.fold_left (answer_obligation choose) (st, [], []) obligations
       in
       ( { st with
           successors_of = Pair.Map.add p (List.rev succ) st.successors_of
@@ -1142,6 +1179,22 @@ struct
         | None -> Hashtbl.remove st.contrib (q, i))
     ;;
 
+    (** [index_obligation st q i a] records [q]'s obligation [i], whose
+        answers are [a]: all of them counted as remaining, and the
+        obligation added to each answer's predecessors. Raises nothing. *)
+    let index_obligation
+          (st : shrink_state)
+          (q : Pair.t)
+          (i : int)
+          (a : Pair.t array)
+      : unit
+      =
+      Hashtbl.replace st.rem (q, i) (Array.length a);
+      Array.iter
+        (fun p -> Hashtbl.replace st.preds p ((q, i) :: preds_of st p))
+        a
+    ;;
+
     (** [init_shrink answers root all] is the bookkeeping for the valid
         relation [all]: every pair alive, the reverse edges and answer
         counts, every obligation's pin, and [removable]. The spanning tree
@@ -1167,21 +1220,7 @@ struct
       in
       Pair.Set.iter (fun p -> Hashtbl.replace st.alive p ()) all;
       Pair.Set.iter
-        (fun q ->
-          Array.iteri
-            (fun i a ->
-              Hashtbl.replace st.rem (q, i) (Array.length a);
-              Array.iter
-                (fun p ->
-                  Hashtbl.replace
-                    st.preds
-                    p
-                    ((q, i)
-                     :: Stdlib.Option.value
-                          ~default:[]
-                          (Hashtbl.find_opt st.preds p)))
-                a)
-            (answers q))
+        (fun q -> Array.iteri (index_obligation st q) (answers q))
         all;
       Pair.Set.iter
         (fun q -> Array.iteri (fun i _ -> recompute st (q, i)) (answers q))
