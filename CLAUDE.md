@@ -141,6 +141,13 @@ anything the proof solver reads.
 
 ## Other repo-specific notes
 
+- **Result dumps are off by default** (since 2026-10-04; they were on during
+  active development). For debugging or analysis you may turn them on in a
+  scratch copy with `MeBi Config Output "DumpResults" True.`: each command
+  then writes its FSMs and results as JSON into `./_dumps/` in the compile
+  directory. Keep them off for timing runs (on `Test4` they cost ~20s and
+  ~1GB a command) and delete large dumps afterwards. `_dumps/` is no longer
+  refreshed by every run, so don't rely on an old one being current.
 - `notes/` holds local planning notes and is excluded via
   `.git/info/exclude` (not `.gitignore`) — it will not appear in a fresh
   clone's `git status` as untracked, but is not shared upstream either.

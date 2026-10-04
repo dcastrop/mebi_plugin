@@ -16,14 +16,19 @@ type output_config =
   ; mutable dump_results : bool
   }
 
-let output_config_default : output_config =
-  { decode_results = true; dump_results = true }
+(** [dump_results] is off by default: dumping writes JSON files of every
+    FSM and result into [./_dumps/] on each command (on [Proc/Test4]: ~20s
+    and hundreds of MB a command), and disk writes are opt-in. It was on
+    during active development (from [e53a386]) and turned off 2026-10-04;
+    [MeBi Config Output "DumpResults" True] turns it on for debugging. *)
+let output_config_default () : output_config =
+  { decode_results = true; dump_results = false }
 ;;
 
-let the_output_config : output_config ref = ref output_config_default
+let the_output_config : output_config ref = ref (output_config_default ())
 
 let reset_output_config () : unit =
-  the_output_config := { decode_results = true; dump_results = true };
+  the_output_config := output_config_default ();
   Logger.reset_config ()
 ;;
 

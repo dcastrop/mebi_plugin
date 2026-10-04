@@ -285,7 +285,9 @@ let text : string list -> string option = function
       "MeBi Config Output \"<Kind>\" True | False.\n\
        MeBi Config Reset Output.\n\n\
        Toggle one message kind: Debug, Info, Notice, Warning, Error, Trace, \
-       Result, Show, DecodeResults, DumpResults."
+       Result, Show, DecodeResults, DumpResults. DumpResults (off by default) \
+       writes each FSM and result as JSON into ./_dumps/, for debugging: on a \
+       large FSM that is hundreds of MB and many seconds a command."
   | _ -> None
 ;;
 
