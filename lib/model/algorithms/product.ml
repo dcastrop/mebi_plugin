@@ -1023,6 +1023,307 @@ struct
         cs
     ;;
 
+    (** [memo_answers game_of]: per pair, per obligation, its distinct
+        answers (the pairs its candidates lead to, sorted), computed once per
+        pair. *)
+    let memo_answers (game_of : game_of) : Pair.t -> Pair.t array array =
+      let memo : (Pair.t, Pair.t array array) Hashtbl.t = Hashtbl.create 256 in
+      fun (p : Pair.t) ->
+        match Hashtbl.find_opt memo p with
+        | Some a -> a
+        | None ->
+          let a =
+            Array.of_list
+              (List.map
+                 (fun (o : obligation) ->
+                   Array.of_list
+                     (List.sort_uniq
+                        Pair.compare
+                        (List.map (fun (c : choice) -> c.next) o.candidates)))
+                 (game_of p))
+          in
+          Hashtbl.add memo p a;
+          a
+    ;;
+
+    (** {!minimal_relation}'s bookkeeping while it removes pairs:
+        - [alive]: the pairs still in the relation;
+        - [preds]: per pair [p], the obligations [(q, i)] (pair, index) that
+          [p] answers;
+        - [rem]: per obligation, how many of its answers are alive;
+        - [contrib]: per obligation, the pair it pins (its only remaining
+          answer, other than its own pair), if any;
+        - [blocking]: per pair, how many obligations pin it;
+        - [removable]: the pairs that can go (alive, not the root, pinned by
+          none), in [Pair.Set] order;
+        - [parent], [children]: a spanning tree of what the root reaches. *)
+    type shrink_state =
+      { answers : Pair.t -> Pair.t array array
+      ; root : Pair.t
+      ; alive : (Pair.t, unit) Hashtbl.t
+      ; preds : (Pair.t, (Pair.t * int) list) Hashtbl.t
+      ; rem : (Pair.t * int, int) Hashtbl.t
+      ; contrib : (Pair.t * int, Pair.t) Hashtbl.t
+      ; blocking : (Pair.t, int) Hashtbl.t
+      ; mutable removable : Pair.Set.t
+      ; parent : (Pair.t, Pair.t) Hashtbl.t
+      ; children : (Pair.t, Pair.t list) Hashtbl.t
+      }
+
+    (** [is_alive st p]: [p] is still in the relation. *)
+    let is_alive (st : shrink_state) (p : Pair.t) : bool =
+      Hashtbl.mem st.alive p
+    ;;
+
+    (** [preds_of st p]: the obligations [p] answers. *)
+    let preds_of (st : shrink_state) (p : Pair.t) : (Pair.t * int) list =
+      Stdlib.Option.value ~default:[] (Hashtbl.find_opt st.preds p)
+    ;;
+
+    (** [refresh st s]: put [s] in or out of [removable]: in iff alive, not
+        the root, and pinned by no obligation. *)
+    let refresh (st : shrink_state) (s : Pair.t) : unit =
+      if
+        is_alive st s
+        && (not (Pair.equal s st.root))
+        && Stdlib.Option.value ~default:0 (Hashtbl.find_opt st.blocking s) = 0
+      then st.removable <- Pair.Set.add s st.removable
+      else st.removable <- Pair.Set.remove s st.removable
+    ;;
+
+    (** [recompute st (q, i)]: bring obligation [i] of [q]'s pin up to date
+        (its only remaining answer, unless [q] is gone or is that answer),
+        moving the [blocking] count from the old pinned pair to the new one
+        and refreshing both. *)
+    let recompute (st : shrink_state) ((q, i) : Pair.t * int) : unit =
+      let now : Pair.t option =
+        if is_alive st q && Hashtbl.find st.rem (q, i) = 1
+        then (
+          match Array.find_opt (is_alive st) (st.answers q).(i) with
+          | Some s when Bool.not (Pair.equal s q) -> Some s
+          | _ -> None)
+        else None
+      in
+      let before = Hashtbl.find_opt st.contrib (q, i) in
+      if Stdlib.Option.equal Pair.equal before now
+      then ()
+      else (
+        (match before with
+         | Some s ->
+           Hashtbl.replace st.blocking s (Hashtbl.find st.blocking s - 1);
+           refresh st s
+         | None -> ());
+        match now with
+        | Some s ->
+          Hashtbl.replace
+            st.blocking
+            s
+            (1 + Stdlib.Option.value ~default:0 (Hashtbl.find_opt st.blocking s));
+          Hashtbl.replace st.contrib (q, i) s;
+          refresh st s
+        | None -> Hashtbl.remove st.contrib (q, i))
+    ;;
+
+    (** [init_shrink answers root all]: the bookkeeping for the valid
+        relation [all]: every pair alive, the reverse edges and answer counts,
+        every obligation's pin, and [removable]. The spanning tree is built
+        separately ({!span_from_root}). *)
+    let init_shrink
+          (answers : Pair.t -> Pair.t array array)
+          (root : Pair.t)
+          (all : Pair.Set.t)
+      : shrink_state
+      =
+      let st =
+        { answers
+        ; root
+        ; alive = Hashtbl.create 1024
+        ; preds = Hashtbl.create 1024
+        ; rem = Hashtbl.create 1024
+        ; contrib = Hashtbl.create 1024
+        ; blocking = Hashtbl.create 1024
+        ; removable = Pair.Set.empty
+        ; parent = Hashtbl.create 1024
+        ; children = Hashtbl.create 1024
+        }
+      in
+      Pair.Set.iter (fun p -> Hashtbl.replace st.alive p ()) all;
+      Pair.Set.iter
+        (fun q ->
+          Array.iteri
+            (fun i a ->
+              Hashtbl.replace st.rem (q, i) (Array.length a);
+              Array.iter
+                (fun p ->
+                  Hashtbl.replace
+                    st.preds
+                    p
+                    ((q, i)
+                     :: Stdlib.Option.value
+                          ~default:[]
+                          (Hashtbl.find_opt st.preds p)))
+                a)
+            (answers q))
+        all;
+      Pair.Set.iter
+        (fun q -> Array.iteri (fun i _ -> recompute st (q, i)) (answers q))
+        all;
+      Pair.Set.iter (refresh st) all;
+      st
+    ;;
+
+    (** [kill st xs]: take the pairs [xs] out of the relation, as a batch:
+        out of [alive] and [removable], one fewer remaining answer for each
+        obligation they answer, then every pin they or their predecessors
+        hold recomputed. *)
+    let kill (st : shrink_state) (xs : Pair.t list) : unit =
+      List.iter (fun x -> Hashtbl.remove st.alive x) xs;
+      List.iter
+        (fun x ->
+          st.removable <- Pair.Set.remove x st.removable;
+          List.iter
+            (fun (q, i) ->
+              Hashtbl.replace st.rem (q, i) (Hashtbl.find st.rem (q, i) - 1))
+            (preds_of st x))
+        xs;
+      List.iter
+        (fun x ->
+          Array.iteri (fun i _ -> recompute st (x, i)) (st.answers x);
+          List.iter (recompute st) (preds_of st x))
+        xs
+    ;;
+
+    (** [adopt st p c]: make [p] [c]'s parent in the spanning tree. *)
+    let adopt (st : shrink_state) (p : Pair.t) (c : Pair.t) : unit =
+      Hashtbl.replace st.parent c p;
+      Hashtbl.replace
+        st.children
+        p
+        (c :: Stdlib.Option.value ~default:[] (Hashtbl.find_opt st.children p))
+    ;;
+
+    (** [alive_successors st u]: the alive answers of [u]'s obligations, in
+        order. *)
+    let alive_successors (st : shrink_state) (u : Pair.t) : Pair.t list =
+      Array.to_list (st.answers u)
+      |> List.concat_map (fun a -> List.filter (is_alive st) (Array.to_list a))
+    ;;
+
+    (** [span_from_root st]: the spanning tree of what the root reaches over
+        alive answers, breadth-first, each pair adopted by the first pair
+        that reaches it. *)
+    let span_from_root (st : shrink_state) : unit =
+      let seen : (Pair.t, unit) Hashtbl.t = Hashtbl.create 1024 in
+      (* one level at a time *)
+      let rec bfs (frontier : Pair.t list) : unit =
+        match frontier with
+        | [] -> ()
+        | _ ->
+          let next =
+            List.concat_map
+              (fun u ->
+                List.filter_map
+                  (fun v ->
+                    if Hashtbl.mem seen v
+                    then None
+                    else (
+                      Hashtbl.replace seen v ();
+                      adopt st u v;
+                      Some v))
+                  (alive_successors st u))
+              frontier
+          in
+          bfs next
+      in
+      Hashtbl.replace seen st.root ();
+      bfs [ st.root ]
+    ;;
+
+    (** [subtree st p]: [p]'s descendants in the spanning tree (current
+        parent links only), forgetting their children lists on the way. *)
+    let subtree (st : shrink_state) (p : Pair.t) : Pair.t list =
+      let rec go acc = function
+        | [] -> acc
+        | u :: rest ->
+          let cs =
+            Stdlib.Option.value ~default:[] (Hashtbl.find_opt st.children u)
+            |> List.filter (fun c ->
+              match Hashtbl.find_opt st.parent c with
+              | Some u' -> Pair.equal u u'
+              | None -> false)
+          in
+          Hashtbl.remove st.children u;
+          go (List.rev_append cs acc) (List.rev_append cs rest)
+      in
+      go [] [ p ]
+    ;;
+
+    (** [remove_pair st p]: take [p] out, then detach its subtree, re-attach
+        what another remaining predecessor still reaches (from any such
+        predecessor, spreading through the subtree), and kill the rest, which
+        the root no longer reaches. *)
+    let remove_pair (st : shrink_state) (p : Pair.t) : unit =
+      let s = subtree st p in
+      Hashtbl.remove st.parent p;
+      kill st [ p ];
+      let in_s : (Pair.t, unit) Hashtbl.t = Hashtbl.create 64 in
+      List.iter
+        (fun u ->
+          Hashtbl.replace in_s u ();
+          Hashtbl.remove st.parent u)
+        s;
+      let reattached : (Pair.t, unit) Hashtbl.t = Hashtbl.create 64 in
+      let seeds =
+        List.filter_map
+          (fun u ->
+            match
+              List.find_opt
+                (fun ((q, _) : Pair.t * int) ->
+                  is_alive st q
+                  && (not (Hashtbl.mem in_s q))
+                  && (Pair.equal q st.root || Hashtbl.mem st.parent q))
+                (preds_of st u)
+            with
+            | Some (q, _) ->
+              adopt st q u;
+              Hashtbl.replace reattached u ();
+              Some u
+            | None -> None)
+          s
+      in
+      (* re-attach what the re-attached pairs reach within the subtree *)
+      let rec spread = function
+        | [] -> ()
+        | u :: rest ->
+          let fresh =
+            List.filter
+              (fun v ->
+                Hashtbl.mem in_s v && Bool.not (Hashtbl.mem reattached v))
+              (alive_successors st u)
+          in
+          List.iter
+            (fun v ->
+              if Bool.not (Hashtbl.mem reattached v)
+              then (
+                Hashtbl.replace reattached v ();
+                adopt st u v))
+            fresh;
+          spread (List.rev_append fresh rest)
+      in
+      spread seeds;
+      kill st (List.filter (fun u -> Bool.not (Hashtbl.mem reattached u)) s)
+    ;;
+
+    (** [shrink st]: remove the first removable pair, in [Pair.Set] order,
+        until none is left. *)
+    let rec shrink (st : shrink_state) : unit =
+      match Pair.Set.min_elt_opt st.removable with
+      | None -> ()
+      | Some p ->
+        remove_pair st p;
+        shrink st
+    ;;
+
     (* From every pair any answer reaches, delete pairs while every remaining
        pair can still answer all its moves within what remains: repeatedly
        the first removable pair, in [Pair.Set] order, then whatever [root] no
@@ -1043,32 +1344,18 @@ struct
        [Proc/Test4]'s [weak_bisimilar] (6592 pairs, every state bisimilar,
        so many answers per move) planning took 19.5 minutes. The removals and
        their order are the same, so the relation is the same ([tests.exe]
-       checks it against the original algorithm). *)
+       checks it against the original algorithm).
+
+       In steps: {!memo_answers}, the valid relation [all], then
+       {!init_shrink}, {!span_from_root} and {!shrink} (by {!remove_pair}). *)
     let minimal_relation (game_of : game_of) (root : Pair.t) : Pair.Set.t =
-      let memo : (Pair.t, Pair.t array array) Hashtbl.t = Hashtbl.create 256 in
-      (* per pair, per obligation, its distinct answers *)
-      let answers (p : Pair.t) : Pair.t array array =
-        match Hashtbl.find_opt memo p with
-        | Some a -> a
-        | None ->
-          let a =
-            Array.of_list
-              (List.map
-                 (fun (o : obligation) ->
-                   Array.of_list
-                     (List.sort_uniq
-                        Pair.compare
-                        (List.map (fun (c : choice) -> c.next) o.candidates)))
-                 (game_of p))
-          in
-          Hashtbl.add memo p a;
-          a
-      in
+      let answers = memo_answers game_of in
       let all : Pair.Set.t =
         reachable_by
           (fun p -> Array.to_list (answers p) |> List.concat_map Array.to_list)
           root
       in
+      (* not even [all] answers every move: nothing to shrink *)
       if
         Bool.not
           (Pair.Set.for_all
@@ -1076,213 +1363,10 @@ struct
              all)
       then all
       else (
-        let alive : (Pair.t, unit) Hashtbl.t = Hashtbl.create 1024 in
-        Pair.Set.iter (fun p -> Hashtbl.replace alive p ()) all;
-        let is_alive p = Hashtbl.mem alive p in
-        (* reverse edges: p -> the obligations (q, i) that p answers *)
-        let preds : (Pair.t, (Pair.t * int) list) Hashtbl.t =
-          Hashtbl.create 1024
-        in
-        let rem : (Pair.t * int, int) Hashtbl.t = Hashtbl.create 1024 in
-        Pair.Set.iter
-          (fun q ->
-            Array.iteri
-              (fun i a ->
-                Hashtbl.replace rem (q, i) (Array.length a);
-                Array.iter
-                  (fun p ->
-                    Hashtbl.replace
-                      preds
-                      p
-                      ((q, i)
-                       :: Stdlib.Option.value
-                            ~default:[]
-                            (Hashtbl.find_opt preds p)))
-                  a)
-              (answers q))
-          all;
-        let preds_of p =
-          Stdlib.Option.value ~default:[] (Hashtbl.find_opt preds p)
-        in
-        (* the pair an obligation pins: its only remaining answer, unless the
-           obligation's own pair is gone or is that answer *)
-        let contrib : (Pair.t * int, Pair.t) Hashtbl.t = Hashtbl.create 1024 in
-        let blocking : (Pair.t, int) Hashtbl.t = Hashtbl.create 1024 in
-        let removable : Pair.Set.t ref = ref Pair.Set.empty in
-        let refresh (s : Pair.t) : unit =
-          if
-            is_alive s
-            && (not (Pair.equal s root))
-            && Stdlib.Option.value ~default:0 (Hashtbl.find_opt blocking s) = 0
-          then removable := Pair.Set.add s !removable
-          else removable := Pair.Set.remove s !removable
-        in
-        let recompute ((q, i) : Pair.t * int) : unit =
-          let now : Pair.t option =
-            if is_alive q && Hashtbl.find rem (q, i) = 1
-            then (
-              match Array.find_opt is_alive (answers q).(i) with
-              | Some s when Bool.not (Pair.equal s q) -> Some s
-              | _ -> None)
-            else None
-          in
-          let before = Hashtbl.find_opt contrib (q, i) in
-          if Stdlib.Option.equal Pair.equal before now
-          then ()
-          else (
-            (match before with
-             | Some s ->
-               Hashtbl.replace blocking s (Hashtbl.find blocking s - 1);
-               refresh s
-             | None -> ());
-            match now with
-            | Some s ->
-              Hashtbl.replace
-                blocking
-                s
-                (1
-                 + Stdlib.Option.value ~default:0 (Hashtbl.find_opt blocking s)
-                );
-              Hashtbl.replace contrib (q, i) s;
-              refresh s
-            | None -> Hashtbl.remove contrib (q, i))
-        in
-        Pair.Set.iter
-          (fun q -> Array.iteri (fun i _ -> recompute (q, i)) (answers q))
-          all;
-        Pair.Set.iter refresh all;
-        (* a batch of pairs leaves the relation *)
-        let kill (xs : Pair.t list) : unit =
-          List.iter (fun x -> Hashtbl.remove alive x) xs;
-          List.iter
-            (fun x ->
-              removable := Pair.Set.remove x !removable;
-              List.iter
-                (fun (q, i) ->
-                  Hashtbl.replace rem (q, i) (Hashtbl.find rem (q, i) - 1))
-                (preds_of x))
-            xs;
-          List.iter
-            (fun x ->
-              Array.iteri (fun i _ -> recompute (x, i)) (answers x);
-              List.iter recompute (preds_of x))
-            xs
-        in
-        (* reachability from [root]: a spanning tree over remaining answers *)
-        let parent : (Pair.t, Pair.t) Hashtbl.t = Hashtbl.create 1024 in
-        let children : (Pair.t, Pair.t list) Hashtbl.t = Hashtbl.create 1024 in
-        let adopt (p : Pair.t) (c : Pair.t) : unit =
-          Hashtbl.replace parent c p;
-          Hashtbl.replace
-            children
-            p
-            (c :: Stdlib.Option.value ~default:[] (Hashtbl.find_opt children p))
-        in
-        let succ (u : Pair.t) : Pair.t list =
-          Array.to_list (answers u)
-          |> List.concat_map (fun a -> List.filter is_alive (Array.to_list a))
-        in
-        let seen : (Pair.t, unit) Hashtbl.t = Hashtbl.create 1024 in
-        let rec bfs (frontier : Pair.t list) : unit =
-          match frontier with
-          | [] -> ()
-          | _ ->
-            let next =
-              List.concat_map
-                (fun u ->
-                  List.filter_map
-                    (fun v ->
-                      if Hashtbl.mem seen v
-                      then None
-                      else (
-                        Hashtbl.replace seen v ();
-                        adopt u v;
-                        Some v))
-                    (succ u))
-                frontier
-            in
-            bfs next
-        in
-        Hashtbl.replace seen root ();
-        bfs [ root ];
-        (* the tree's descendants of [p], through current parent links *)
-        let subtree (p : Pair.t) : Pair.t list =
-          let rec go acc = function
-            | [] -> acc
-            | u :: rest ->
-              let cs =
-                Stdlib.Option.value ~default:[] (Hashtbl.find_opt children u)
-                |> List.filter (fun c ->
-                  match Hashtbl.find_opt parent c with
-                  | Some u' -> Pair.equal u u'
-                  | None -> false)
-              in
-              Hashtbl.remove children u;
-              go (List.rev_append cs acc) (List.rev_append cs rest)
-          in
-          go [] [ p ]
-        in
-        let remove (p : Pair.t) : unit =
-          let s = subtree p in
-          Hashtbl.remove parent p;
-          kill [ p ];
-          (* detach the subtree, then re-attach what another remaining
-             predecessor still reaches *)
-          let in_s : (Pair.t, unit) Hashtbl.t = Hashtbl.create 64 in
-          List.iter
-            (fun u ->
-              Hashtbl.replace in_s u ();
-              Hashtbl.remove parent u)
-            s;
-          let reattached : (Pair.t, unit) Hashtbl.t = Hashtbl.create 64 in
-          let seeds =
-            List.filter_map
-              (fun u ->
-                match
-                  List.find_opt
-                    (fun ((q, _) : Pair.t * int) ->
-                      is_alive q
-                      && (not (Hashtbl.mem in_s q))
-                      && (Pair.equal q root || Hashtbl.mem parent q))
-                    (preds_of u)
-                with
-                | Some (q, _) ->
-                  adopt q u;
-                  Hashtbl.replace reattached u ();
-                  Some u
-                | None -> None)
-              s
-          in
-          let rec spread = function
-            | [] -> ()
-            | u :: rest ->
-              let fresh =
-                List.filter
-                  (fun v ->
-                    Hashtbl.mem in_s v && Bool.not (Hashtbl.mem reattached v))
-                  (succ u)
-              in
-              List.iter
-                (fun v ->
-                  if Bool.not (Hashtbl.mem reattached v)
-                  then (
-                    Hashtbl.replace reattached v ();
-                    adopt u v))
-                fresh;
-              spread (List.rev_append fresh rest)
-          in
-          spread seeds;
-          kill (List.filter (fun u -> Bool.not (Hashtbl.mem reattached u)) s)
-        in
-        let rec shrink () : unit =
-          match Pair.Set.min_elt_opt !removable with
-          | None -> ()
-          | Some p ->
-            remove p;
-            shrink ()
-        in
-        shrink ();
-        Pair.Set.filter is_alive all)
+        let st = init_shrink answers root all in
+        span_from_root st;
+        shrink st;
+        Pair.Set.filter (is_alive st) all)
     ;;
 
     (* See the [.mli]. [Default] takes each obligation's default; [Greedy]
