@@ -201,28 +201,31 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
 
     exception Rocq_bindings_CannotFindBindingName of EConstr.t
 
-    (* See the [.mli]. A search through [name_pairs], stopping at the first match. *)
+    (** [first_named x name_pairs] is the name paired with the first evar
+        in [name_pairs] equal to [x] (compared without encoding), or [None]
+        if there is none. Raises nothing. *)
+    let rec first_named (x : EConstr.t)
+      : (EConstr.t * Names.Name.t) list -> Names.Name.t option mm
+      =
+      let open Syntax in
+      function
+      | [] -> return None
+      | (y, z) :: name_pairs ->
+        let* eq = econstr_eq ~enc:false x y in
+        if eq
+        then (
+          Logger.thing ~__FUNCTION__ Trace "eq x" z Rocq_utils.Strfy.name;
+          return (Some z))
+        else first_named x name_pairs
+    ;;
+
+    (* See the [.mli]. {!first_named}, raising if there is no match. *)
     let find_name (name_pairs : (EConstr.t * Names.Name.t) list) (x : EConstr.t)
       : Names.Name.t mm
       =
-      (* Logger.trace __FUNCTION__; *)
       Logger.thing ~__FUNCTION__ Trace "x" x Strfy.econstr;
       let open Syntax in
-      let f (i : int) : Names.Name.t option -> Names.Name.t option mm = function
-        | Some n ->
-          Logger.thing ~__FUNCTION__ Trace "Some" n Rocq_utils.Strfy.name;
-          Some n |> return
-        | None ->
-          Logger.trace ~__FUNCTION__ "None";
-          let y, z = List.nth name_pairs i in
-          let* eq = econstr_eq ~enc:false x y in
-          if eq
-          then (
-            Logger.thing ~__FUNCTION__ Trace "eq x" z Rocq_utils.Strfy.name;
-            Some z |> return)
-          else return None
-      in
-      let* matches = iterate 0 (List.length name_pairs - 1) None f in
+      let* matches = first_named x name_pairs in
       match matches with
       | None ->
         Logger.trace
