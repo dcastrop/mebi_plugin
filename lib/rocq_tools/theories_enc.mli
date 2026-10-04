@@ -13,29 +13,6 @@ module type S = sig
                        here). *)
   val get_theory_enc : (Evd.econstr -> bool im) -> enc mm
 
-  (** Meant to be raised by {!get_None_enc}; see there. *)
-  exception NoEncodingFoundFor_TheoriesNone
-
-  (** [get_None_enc ()] is the encoding of [None].
-
-      @raise Not_found
-        when run, if [None] has no encoding (propagated from
-        {!get_theory_enc}). The handler meant to turn it into
-        {!NoEncodingFoundFor_TheoriesNone} surrounds only the construction
-        of the value, so it does not see it ([TODO.md], "try around a
-        monadic value"). Unused. *)
-  val get_None_enc : unit -> enc mm
-
-  (** Meant to be raised by {!get_Some_enc}; see there. *)
-  exception NoEncodingFoundFor_TheoriesSome
-
-  (** [get_Some_enc ()] is the encoding of [Some]; as {!get_None_enc}.
-
-      @raise Not_found
-        when run, if [Some] has no encoding (propagated; not
-        converted, as for {!get_None_enc}). Unused. *)
-  val get_Some_enc : unit -> enc mm
-
   (** Raised by the [_if_eq] lookups when the term is not the theory term
       asked about. *)
   exception NotEqTheory

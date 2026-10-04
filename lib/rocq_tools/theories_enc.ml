@@ -6,14 +6,6 @@ module type S = sig
 
   val get_theory_enc : (Evd.econstr -> bool im) -> enc mm
 
-  exception NoEncodingFoundFor_TheoriesNone
-
-  val get_None_enc : unit -> enc mm
-
-  exception NoEncodingFoundFor_TheoriesSome
-
-  val get_Some_enc : unit -> enc mm
-
   exception NotEqTheory
 
   val get_theory_enc_if_eq : Evd.econstr -> (Evd.econstr -> bool im) -> enc mm
@@ -45,24 +37,6 @@ struct
         if is_match then M.return y else find_theory tl
     in
     M.F.to_seq fm |> List.of_seq |> find_theory
-  ;;
-
-  exception NoEncodingFoundFor_TheoriesNone
-
-  (* See the [.mli], including why the handler cannot fire. *)
-  let get_None_enc () : Enc.t M.mm =
-    Logger.trace __FUNCTION__;
-    try get_theory_enc is_None with
-    | Not_found -> raise NoEncodingFoundFor_TheoriesNone
-  ;;
-
-  exception NoEncodingFoundFor_TheoriesSome
-
-  (* See the [.mli], including why the handler cannot fire. *)
-  let get_Some_enc () : Enc.t M.mm =
-    Logger.trace __FUNCTION__;
-    try get_theory_enc is_Some with
-    | Not_found -> raise NoEncodingFoundFor_TheoriesSome
   ;;
 
   exception NotEqTheory

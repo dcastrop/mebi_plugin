@@ -434,14 +434,3 @@ val is_constant : Evd.evar_map -> Evd.econstr -> (unit -> Evd.econstr) -> bool
     @raise Not_found if one refers to nothing (propagated from
                      [Nametab.global]). *)
 val libnames_to_globrefs : Libnames.qualid list -> Names.GlobRef.t list
-
-(** [extract_benchmark_args env sigma e] is [e] interpreted and
-    externalised again, as a one-element list (the name suggests a list of
-    terms, which it does not split), and the evar map after.
-
-    Raises Rocq's interpretation errors (propagated). *)
-val extract_benchmark_args
-  :  Environ.env
-  -> Evd.evar_map
-  -> Constrexpr.constr_expr
-  -> Evd.evar_map * Constrexpr.constr_expr list
