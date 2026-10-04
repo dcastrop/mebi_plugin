@@ -190,6 +190,49 @@ module Make
         c
   ;;
 
+  (** [visible_steps old_edges s] is every visible step out of [s] in
+      [old_edges], as (action, destination) pairs, in the order the actions
+      and their destinations are stored (that order decides arrival indices
+      in {!visible_sources}, and so ties).
+
+      Raises nothing. *)
+  let visible_steps (old_edges : EdgeMap.t') (s : State.t)
+    : (Action.t * State.t) list
+    =
+    match EdgeMap.find_opt old_edges s with
+    | None -> []
+    | Some actions ->
+      ActionMap.fold
+        (fun (a : Action.t) (ds : States.t) (acc : (Action.t * State.t) list) ->
+          if Action.is_silent a
+          then acc
+          else States.fold (fun (t : State.t) acc -> (a, t) :: acc) ds acc)
+        actions
+        []
+      |> List.rev
+  ;;
+
+  (** [offer_source tbl (s, pre_rev, pre_len) (a, t)] offers [tbl] the path
+      to [t] made of the silent prefix [pre_rev] (length [pre_len]) then
+      [s -a-> t], keeping it only if it is strictly shorter than [t]'s
+      current path. A state seen for the first time gets the next arrival
+      index; a shorter path keeps the old index.
+
+      Raises nothing. *)
+  let offer_source
+        (tbl : (Note.t list * int * int) StateTbl.t)
+        ((s, pre_rev, pre_len) : State.t * Note.t list * int)
+        ((a, t) : Action.t * State.t)
+    : unit
+    =
+    let len = pre_len + 1 in
+    match StateTbl.find_opt tbl t with
+    | Some (_, len', _) when len' <= len -> ()
+    | Some (_, _, k) -> StateTbl.replace tbl t (note_of s a t :: pre_rev, len, k)
+    | None ->
+      StateTbl.replace tbl t (note_of s a t :: pre_rev, len, StateTbl.length tbl)
+  ;;
+
   (** [visible_sources closure_of from old_edges] is the table of states [t]
       with [from -tau*-> s -a-> t], each mapped to its shortest path (most
       recent step first), that path's length, and its arrival index, for
@@ -197,8 +240,8 @@ module Make
       the order first met).
 
       It walks [from]'s silent closure ([closure_of from]) in order, and
-      offers every visible step out of each state of it to its label's
-      table, which keeps the shorter path. The arrival index breaks ties
+      offers every visible step out of each state of it ({!visible_steps})
+      to its label's table ({!offer_source}). The arrival index breaks ties
       between equally short paths later, in {!silent_bfs}.
 
       Raises nothing directly; propagates whatever [closure_of] raises. *)
@@ -211,8 +254,8 @@ module Make
     let labels : (C.Label.t * (Note.t list * int * int) StateTbl.t) list ref =
       ref []
     in
-    (* [sources_of l] is [l]'s table, added (at the end) if new *)
-    let sources_of (l : C.Label.t) : (Note.t list * int * int) StateTbl.t =
+    (* [table_for l] is [l]'s table, added (at the end) if new *)
+    let table_for (l : C.Label.t) : (Note.t list * int * int) StateTbl.t =
       match List.find_opt (fun (l', _) -> C.Label.equal l l') !labels with
       | Some (_, tbl) -> tbl
       | None ->
@@ -221,63 +264,41 @@ module Make
         tbl
     in
     List.iter
-      (fun ((s, pre_rev, pre_len) : State.t * Note.t list * int) ->
-        match EdgeMap.find_opt old_edges s with
-        | None -> ()
-        | Some actions ->
-          ActionMap.fold
-            (fun (a : Action.t) (ds : States.t) () ->
-              if Bool.not (Action.is_silent a)
-              then (
-                let tbl = sources_of a.label in
-                States.iter
-                  (fun (t : State.t) ->
-                    let len = pre_len + 1 in
-                    match StateTbl.find_opt tbl t with
-                    | Some (_, len', _) when len' <= len -> ()
-                    | Some (_, _, k) ->
-                      StateTbl.replace tbl t (note_of s a t :: pre_rev, len, k)
-                    | None ->
-                      StateTbl.replace
-                        tbl
-                        t
-                        (note_of s a t :: pre_rev, len, StateTbl.length tbl))
-                  ds))
-            actions
-            ())
+      (fun ((s, _, _) as prefix : State.t * Note.t list * int) ->
+        List.iter
+          (fun ((a, _) as step : Action.t * State.t) ->
+            offer_source (table_for a.label) prefix step)
+          (visible_steps old_edges s))
       (closure_of from);
     !labels
   ;;
 
-  (** [silent_bfs old_edges sources] is every state reachable by silent
-      steps of [old_edges] from one label's [sources] ({!visible_sources}),
-      each mapped to the path that first reached it (most recent step
-      first) and its length, the shortest there is.
+  (** A breadth-first search by distance over silent steps: [best] maps each
+      state reached to the path that first reached it (most recent step
+      first) and that path's length; [buckets] holds the frontier by
+      distance, each distance in arrival order. *)
+  type search =
+    { best : (Note.t list * int) StateTbl.t
+    ; buckets : (int, (State.t * Note.t list) Queue.t) Hashtbl.t
+    }
 
-      A search by distance: the sources are queued at their own lengths, in
-      order of length then arrival index, and each distance is settled
-      before the next, so of equally short paths the one met first wins.
+  (** [push_at search d x] queues [x] at distance [d] of [search]'s
+      frontier. Raises nothing. *)
+  let push_at (search : search) (d : int) (x : State.t * Note.t list) : unit =
+    match Hashtbl.find_opt search.buckets d with
+    | Some q -> Queue.push x q
+    | None ->
+      let q = Queue.create () in
+      Queue.push x q;
+      Hashtbl.replace search.buckets d q
+  ;;
 
-      Raises nothing. *)
-  let silent_bfs
-        (old_edges : EdgeMap.t')
-        (sources : (Note.t list * int * int) StateTbl.t)
-    : (Note.t list * int) StateTbl.t
+  (** [seed search sources] records and queues each of one label's
+      [sources] ({!visible_sources}) at its own length, in order of length
+      then arrival index. Raises nothing. *)
+  let seed (search : search) (sources : (Note.t list * int * int) StateTbl.t)
+    : unit
     =
-    let best : (Note.t list * int) StateTbl.t = StateTbl.create 256 in
-    (* frontier by distance; within a distance, in arrival order *)
-    let buckets : (int, (State.t * Note.t list) Queue.t) Hashtbl.t =
-      Hashtbl.create 16
-    in
-    (* [push d x] queues [x] at distance [d] *)
-    let push (d : int) (x : State.t * Note.t list) : unit =
-      match Hashtbl.find_opt buckets d with
-      | Some q -> Queue.push x q
-      | None ->
-        let q = Queue.create () in
-        Queue.push x q;
-        Hashtbl.replace buckets d q
-    in
     StateTbl.fold
       (fun (t : State.t) ((path, len, k) : Note.t list * int * int) acc ->
         (len, k, t, path) :: acc)
@@ -286,39 +307,91 @@ module Make
     |> List.sort (fun (l, k, _, _) (l', k', _, _) ->
       match Int.compare l l' with 0 -> Int.compare k k' | n -> n)
     |> List.iter (fun ((len, _, t, path) : int * int * State.t * Note.t list) ->
-      StateTbl.replace best t (path, len);
-      push len (t, path));
-    let d = ref (Hashtbl.fold (fun k _ acc -> min k acc) buckets max_int) in
-    while Hashtbl.length buckets > 0 do
-      (match Hashtbl.find_opt buckets !d with
+      StateTbl.replace search.best t (path, len);
+      push_at search len (t, path))
+  ;;
+
+  (** [relax search d (u, path) (a, v)] records the step [u -a-> v], taken
+      at distance [d] after [path], as [v]'s path at distance [d + 1] and
+      queues it there, unless [v] already has a path that short. Raises
+      nothing. *)
+  let relax
+        (search : search)
+        (d : int)
+        ((u, path) : State.t * Note.t list)
+        ((a, v) : Action.t * State.t)
+    : unit
+    =
+    match StateTbl.find_opt search.best v with
+    | Some (_, dv) when dv <= d + 1 -> ()
+    | _ ->
+      let p = note_of u a v :: path in
+      StateTbl.replace search.best v (p, d + 1);
+      push_at search (d + 1) (v, p)
+  ;;
+
+  (** [settle search old_edges d (u, path)] relaxes every silent step out of
+      [u] ({!relax}), [u] having been reached at distance [d] by [path];
+      nothing if [u] has since been reached by a shorter path. Raises
+      nothing. *)
+  let settle
+        (search : search)
+        (old_edges : EdgeMap.t')
+        (d : int)
+        ((u, _) as reached : State.t * Note.t list)
+    : unit
+    =
+    match StateTbl.find_opt search.best u with
+    | Some (_, du) when du < d -> ()
+    | _ -> List.iter (relax search d reached) (silent_steps old_edges u)
+  ;;
+
+  (** [silent_bfs old_edges sources] is every state reachable by silent
+      steps of [old_edges] from one label's [sources] ({!visible_sources}),
+      each mapped to the path that first reached it (most recent step
+      first) and its length, the shortest there is.
+
+      A search by distance ({!type-search}): the sources are queued at
+      their own lengths ({!seed}), and each distance is settled
+      ({!settle}) before the next, so of equally short paths the one met
+      first wins.
+
+      Raises nothing. *)
+  let silent_bfs
+        (old_edges : EdgeMap.t')
+        (sources : (Note.t list * int * int) StateTbl.t)
+    : (Note.t list * int) StateTbl.t
+    =
+    let search = { best = StateTbl.create 256; buckets = Hashtbl.create 16 } in
+    seed search sources;
+    let d =
+      ref (Hashtbl.fold (fun k _ acc -> min k acc) search.buckets max_int)
+    in
+    while Hashtbl.length search.buckets > 0 do
+      (match Hashtbl.find_opt search.buckets !d with
        | None -> ()
        | Some q ->
-         Hashtbl.remove buckets !d;
-         Queue.iter
-           (fun ((u, path) : State.t * Note.t list) ->
-             (* settled at a shorter distance by now: skip *)
-             match StateTbl.find_opt best u with
-             | Some (_, du) when du < !d -> ()
-             | _ ->
-               List.iter
-                 (fun ((a, v) : Action.t * State.t) ->
-                   match StateTbl.find_opt best v with
-                   | Some (_, dv) when dv <= !d + 1 -> ()
-                   | _ ->
-                     let p = note_of u a v :: path in
-                     StateTbl.replace best v (p, !d + 1);
-                     push (!d + 1) (v, p))
-                 (silent_steps old_edges u))
-           q);
+         Hashtbl.remove search.buckets !d;
+         Queue.iter (settle search old_edges !d) q);
       incr d
     done;
-    best
+    search.best
+  ;;
+
+  (** [weak_action label path] is the weak action under [label] with [path]
+      (most recent step first) as its annotation, or [None] for the empty
+      path. Raises nothing. *)
+  let weak_action (label : C.Label.t) (path : Note.t list) : Action.t option =
+    Stdlib.Option.map
+      (fun (ann : Annotation.t) : Action.t ->
+        { label; annotation = Some ann; trees = Base.Trees.empty })
+      (annotation_of_notes (List.rev path))
   ;;
 
   (** [emit_weak_actions new_actions label best] adds to [new_actions] one
       weak action under [label] for each state of [best] ({!silent_bfs}),
       with that state as its only destination and its path as the
-      annotation.
+      annotation ({!weak_action}).
 
       Raises nothing. *)
   let emit_weak_actions
@@ -329,13 +402,9 @@ module Make
     =
     StateTbl.fold
       (fun (goto : State.t) ((path, _) : Note.t list * int) acc ->
-        match annotation_of_notes (List.rev path) with
+        match weak_action label path with
         | None -> acc
-        | Some ann ->
-          ( ({ label; annotation = Some ann; trees = Base.Trees.empty }
-             : Action.t)
-          , States.singleton goto )
-          :: acc)
+        | Some a -> (a, States.singleton goto) :: acc)
       best
       []
     |> ActionPairs.of_list
