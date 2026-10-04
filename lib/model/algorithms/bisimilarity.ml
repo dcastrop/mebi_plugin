@@ -227,6 +227,7 @@ module Make
   module Move = Set.Make (struct
       type t = C.Label.t * C.State.t
 
+      (* label first, then target *)
       let compare ((l, s) : t) ((l', s') : t) : int =
         match C.Label.compare l l' with 0 -> C.State.compare s s' | n -> n
       ;;

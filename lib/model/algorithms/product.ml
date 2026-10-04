@@ -838,6 +838,7 @@ struct
       else
         List.map
           (fun ((label, x') : C.Label.t * C.State.t) ->
+            (* a candidate [(y', cost, answer)] as the choice it makes *)
             let choice ((y', cost, answer) : C.State.t * int * answer) =
               { next = x', y'; cost; answer }
             in
@@ -1242,6 +1243,7 @@ struct
     (** [subtree st p]: [p]'s descendants in the spanning tree (current
         parent links only), forgetting their children lists on the way. *)
     let subtree (st : shrink_state) (p : Pair.t) : Pair.t list =
+      (* [go acc queue]: [acc] plus the descendants of the pairs in [queue] *)
       let rec go acc = function
         | [] -> acc
         | u :: rest ->
