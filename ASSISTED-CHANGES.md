@@ -6056,6 +6056,59 @@ re-verified there (see the PR).
 **Session tally (2026-10-04), cont.:** New feature 3 · Refactor 1 (review)
 · Docs 1 · Tooling 1 · Optimization 1 · Bug fix 1.
 
+## 2026-10-04 — Documentation pass, part 1: `lib/model/algorithms`
+
+**Docs + Refactor.** On branch `docs/model-algorithms`. The first library
+of the codebase-wide pass Jonah asked for after reviewing
+`Premise_search.bounded_universal`: every function gets a comment at its
+definition saying what it does with its arguments, and large or convoluted
+functions are split into single-purpose ones. His choices for the whole
+pass: a function documented in its `.mli` keeps the contract there and
+gets a short "how" or a pointer at the definition (no duplicated
+contracts); per library, one comments-only commit, then one commit per
+split, each verified.
+
+Before: of 131 functions in the library, 106 had no comment directly above
+them (82% across the whole codebase: 1,021 of 1,240).
+
+**Comments** (`f091a80`, `a7c406a`; with comments stripped the code is
+identical, checked file by file). Also corrected stale text: two comments
+that my `respond` speed-up (PR #36) had separated from `respond` and
+`respond_silently`; `Policy` described as "measurement only" though the
+solver answers from plans; `respond`'s tie-break and `estimate_by`'s step
+cost out of date; `Saturation` pointing at "the enumeration above", long
+removed.
+
+**Splits**, one commit each, the code inside each step moved unchanged:
+- `Saturation.edge_bfs` -> `visible_sources`, `silent_bfs`,
+  `emit_weak_actions` (`satdiff` byte-identical; matrix identical);
+- `Saturation_estimate.quotient` and `partition` -> `number_states`,
+  `split_edges`, `scc_dag`, `tau_reach`, `scc_moves`, `refine_blocks`,
+  `expand_blocks` (tests: quotient partition = saturated, estimate =
+  saturated count, on 300 random LTSs);
+- `Product.Policy.candidates` -> `stay_candidate`,
+  `silent_move_candidates`, `visible_move_candidates`;
+- `Product.Policy.walk`: a 7-tuple fold accumulator -> a record,
+  `walk_state`, and `answer_pair`;
+- `Product.Policy.minimal_relation`: ~240 lines of closures over a dozen
+  tables -> a record, `shrink_state`, and eleven documented functions
+  (test: same relation as the original algorithm on 400 random games).
+
+**Verification.** Each commit: build, `tests.exe` 103/103, `Test.v`
+counts identical. The two saturation splits: the proof matrix in all three
+modes, each in its own worktree. The final commit: the matrix in all three
+modes, and the `Test4` normalised suite (its `weak_bisimilar` runs under
+`Answers Minimal`, which exercises the three `Policy` splits). `make`
+clean. Mistake on the way: I queued one verification with a mistyped
+commit hash; it failed at checkout and was re-run.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/model-algorithms main`); or a single split,
+by its commit.
+
+**Session tally (2026-10-04), cont.:** New feature 3 · Refactor 6 (1
+review, 5 splits) · Docs 2 · Tooling 1 · Optimization 1 · Bug fix 1.
+
 ---
 
 ## Outstanding
