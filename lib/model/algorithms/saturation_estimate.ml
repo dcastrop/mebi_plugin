@@ -63,24 +63,33 @@ module Make
   (** Sets of SCC ids. One bit short of [Sys.int_size] per word, so no word
       ever has its sign bit set. *)
   module Bits = struct
-    (** Bits used per word. *)
+    (** The bits used per word. *)
     let w : int = Sys.int_size - 1
 
-    (** [create k]: the empty set over ids [0 .. k - 1]. *)
+    (** [create k] is the empty set over the ids [0 .. k - 1].
+
+        Raises nothing. *)
     let create (k : int) : int array = Array.make ((k + w - 1) / w) 0
 
-    (** [add b i]: put [i] in [b], in place. *)
+    (** [add b i] puts [i] in [b], in place.
+
+        Raises nothing. *)
     let add (b : int array) (i : int) : unit =
       b.(i / w) <- b.(i / w) lor (1 lsl (i mod w))
     ;;
 
-    (** [union_into dst src]: add every member of [src] to [dst], in place
-        ([dst] and [src] over the same ids). *)
+    (** [union_into dst src] adds every member of [src] to [dst], in place
+        ([dst] and [src] over the same ids).
+
+        Raises nothing. *)
     let union_into (dst : int array) (src : int array) : unit =
       Array.iteri (fun j x -> if x <> 0 then dst.(j) <- dst.(j) lor x) src
     ;;
 
-    (** The sum of [size.(i)] over the members [i] of [b]. *)
+    (** [weight size b] is the sum of [size.(i)] over the members [i] of
+        [b].
+
+        Raises nothing. *)
     let weight (size : int array) (b : int array) : int =
       let total : int ref = ref 0 in
       Array.iteri
@@ -95,11 +104,15 @@ module Make
     ;;
   end
 
-  (** Tarjan's algorithm over the silent edges [adj], iteratively (a silent
-      chain can be as long as the LTS). Returns each state's SCC id and the
-      number of SCCs. SCCs are numbered in the order they complete, which is
+  (** [silent_sccs adj] is each node's SCC id, and the number of SCCs, of
+      the graph of silent edges [adj] (node [v]'s successors at [adj.(v)]).
+
+      Tarjan's algorithm, run iteratively, as a silent chain can be as long
+      as the LTS. SCCs are numbered in the order they complete, which is
       reverse topological: every SCC reachable from [c] has an id below
-      [c]'s. *)
+      [c]'s.
+
+      Raises nothing. *)
   let silent_sccs (adj : int list array) : int array * int =
     let n : int = Array.length adj in
     let index : int array = Array.make n (-1) in
@@ -109,7 +122,7 @@ module Make
     let stack : int list ref = ref [] in
     let counter : int ref = ref 0 in
     let nc : int ref = ref 0 in
-    (* [visit v]: number [v] and push it on the stack *)
+    (* [visit v] numbers [v] and pushes it on the stack *)
     let visit (v : int) : unit =
       index.(v) <- !counter;
       low.(v) <- !counter;
@@ -117,7 +130,7 @@ module Make
       stack := v :: !stack;
       on_stack.(v) <- true
     in
-    (* [pop_scc v]: pop the stack down to [v], all of it one SCC *)
+    (* [pop_scc v] pops the stack down to [v], all of it one SCC *)
     let rec pop_scc (v : int) : unit =
       match !stack with
       | [] -> ()
@@ -172,22 +185,26 @@ module Make
     ; strong : int
     }
 
-  (** [number_states x]: each of [x]'s states with a dense id, [0 .. n - 1],
-      in [States] order. *)
+  (** [number_states x] is a table giving each of [x]'s states a dense id,
+      [0 .. n - 1], in [States] order.
+
+      Raises nothing. *)
   let number_states (x : FSM.t) : int StateTbl.t =
     let ids : int StateTbl.t = StateTbl.create 64 in
     States.iter (fun s -> StateTbl.add ids s (StateTbl.length ids)) x.states;
     ids
   ;;
 
-  (** [split_edges ids x]: [x]'s transitions by id, silent ones as
-      [(from, goto)] and visible ones as [(from, label, goto)], and how many
-      transitions there are in all. A state missing from [ids] is numbered
-      on the way. *)
+  (** [split_edges ids x] is [x]'s transitions by id, the silent ones as
+      [(from, goto)] and the visible ones as [(from, label, goto)], with the
+      number of transitions in all. A state missing from [ids] is given the
+      next id on the way.
+
+      Raises nothing. *)
   let split_edges (ids : int StateTbl.t) (x : FSM.t)
     : (int * int) list * (int * Label.t * int) list * int
     =
-    (* [id s]: [s]'s id, numbering it if new *)
+    (* [id s] is [s]'s id, numbering it if new *)
     let id (s : State.t) : int =
       match StateTbl.find_opt ids s with
       | Some i -> i
@@ -219,9 +236,12 @@ module Make
     !silent, !visible, !strong
   ;;
 
-  (** [scc_dag comp k silent visible]: per SCC (of [k], [comp] giving each
-      state's), its silent successor SCCs (other than itself, sorted,
-      without duplicates) and its visible moves as (label, target SCC). *)
+  (** [scc_dag comp k silent visible] is, for each of the [k] SCCs ([comp]
+      giving each node's), its silent successor SCCs (other than itself,
+      sorted, without duplicates) and its visible moves as (label, target
+      SCC).
+
+      Raises nothing. *)
   let scc_dag
         (comp : int array)
         (k : int)
@@ -243,9 +263,11 @@ module Make
     succ, vout
   ;;
 
-  (** [tau_reach k succ]: per SCC [c], the SCCs reachable from it by
-      [tau*] ([c] included), as bitsets. Successors first: their ids are
-      lower ({!silent_sccs}), so each set is [c] plus its successors'. *)
+  (** [tau_reach k succ] is, for each of the [k] SCCs, the set of SCCs it
+      reaches by [tau*] (itself included). Successors have lower ids
+      ({!silent_sccs}), so each set is built from theirs in one pass.
+
+      Raises nothing. *)
   let tau_reach (k : int) (succ : int list array) : int array array =
     let reach : int array array = Array.make k [||] in
     for c = 0 to k - 1 do
@@ -257,9 +279,11 @@ module Make
     reach
   ;;
 
-  (** [quotient x]: [x] quotiented by its silent SCCs ({!type-quotient}):
+  (** [quotient x] is [x] quotiented by its silent SCCs ({!type-quotient}):
       {!number_states}, {!split_edges}, the SCCs by {!silent_sccs}, their
-      sizes, {!scc_dag} and {!tau_reach}. *)
+      sizes, {!scc_dag} and {!tau_reach}.
+
+      Raises nothing. *)
   let quotient (x : FSM.t) : quotient =
     let ids : int StateTbl.t = number_states x in
     let silent, visible, strong = split_edges ids x in
@@ -280,9 +304,11 @@ module Make
     { ids; comp; k; size; succ; vout; reach; labels; strong }
   ;;
 
-  (** [weak_of q a] is, per SCC [c], the SCCs reachable from [c] by
-      [tau* a tau*]: [c]'s own [a]-moves closed under [tau*], plus those of
-      every silent successor. *)
+  (** [weak_of q a] is, for each SCC [c] of [q], the set of SCCs reachable
+      from [c] by [tau* a tau*]: [c]'s own [a]-moves closed under [tau*],
+      plus those of every silent successor.
+
+      Raises nothing. *)
   let weak_of (q : quotient) (a : Label.t) : int array array =
     let weak : int array array = Array.make q.k [||] in
     for c = 0 to q.k - 1 do
@@ -297,7 +323,7 @@ module Make
     weak
   ;;
 
-  (* See the [.mli]. Per visible label [a]: every SCC [c] contributes
+  (* See the [.mli]. For each visible label [a], every SCC [c] contributes
      [|c|] times the number of states in its [weak_a] SCCs. *)
   let fsm (x : FSM.t) : t =
     Logger.trace __FUNCTION__;
@@ -323,7 +349,9 @@ module Make
     }
   ;;
 
-  (** The members of a bitset, ascending. *)
+  (** [members b] is the members of the bitset [b], ascending.
+
+      Raises nothing. *)
   let members (b : int array) : int list =
     let acc : int list ref = ref [] in
     for j = Array.length b - 1 downto 0 do
@@ -337,10 +365,13 @@ module Make
     !acc
   ;;
 
-  (** [scc_moves q]: per SCC, its weak moves as (label index, target SCC)
-      and its [=eps=>] targets: all a refinement round reads. Kept as lists,
-      so the memory is the number of SCC-level moves, not states. Label
-      indices are positions in [labels], [q]'s visible labels in order. *)
+  (** [scc_moves q] is, for each SCC of [q], its weak moves as (label index,
+      target SCC) and its [=eps=>] targets: all a refinement round reads.
+      Label indices are positions in [q]'s visible labels, in order. Kept
+      as lists, so the memory is the number of SCC-level moves, not of
+      states.
+
+      Raises nothing. *)
   let scc_moves (q : quotient) : (int * int) list array * int list array =
     let labels : Label.t array = Array.of_list (Labels.elements q.labels) in
     let moves : (int * int) list array = Array.make q.k [] in
@@ -357,10 +388,17 @@ module Make
     moves, Array.map members q.reach
   ;;
 
-  (** [refine_blocks k moves eps]: each of the [k] SCCs' block, by signature
-      refinement: from one block, a block is split by (label, block reached)
-      over its weak [moves] and ([-1], block) over its [=eps=>] moves ([eps]),
-      until the number of blocks stops growing. *)
+  (** [refine_blocks k moves eps] is the block of each of the [k] SCCs in
+      the coarsest partition in which SCCs of one block reach the same
+      blocks by each label of their weak [moves] and by their [=eps=>]
+      moves ([eps]).
+
+      Signature refinement: from one block, each SCC's (block, signature)
+      is renumbered, the signature being its (label, block reached) pairs
+      and ([-1], block) for [=eps=>], until the number of blocks stops
+      growing.
+
+      Raises nothing. *)
   let refine_blocks
         (k : int)
         (moves : (int * int) list array)
@@ -397,8 +435,10 @@ module Make
     block
   ;;
 
-  (** [expand_blocks q block]: the partition of [q]'s states that puts each
-      state in its SCC's block. *)
+  (** [expand_blocks q block] is the partition of [q]'s states that puts
+      each state in its SCC's block.
+
+      Raises nothing. *)
   let expand_blocks (q : quotient) (block : int array) : C.Partition.t =
     let by_block : (int, States.t) Hashtbl.t = Hashtbl.create 16 in
     StateTbl.iter
@@ -417,7 +457,7 @@ module Make
       C.Partition.empty
   ;;
 
-  (* See the [.mli]: {!scc_moves}, {!refine_blocks} over SCCs, then
+  (* See the [.mli]: {!scc_moves}, {!refine_blocks} over the SCCs, then
      {!expand_blocks}. *)
   let partition (x : FSM.t) : C.Partition.t =
     Logger.trace __FUNCTION__;

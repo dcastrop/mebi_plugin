@@ -38,10 +38,11 @@ module type S = sig
   module Pair : sig
     type t = state * state
 
-    (** Lexicographic: the left state, then the right one. *)
+    (** [compare p q] is [p] against [q] lexicographically: the left
+        states, then the right ones. Raises nothing. *)
     val compare : t -> t -> int
 
-    (** [compare] is [0]. *)
+    (** [equal p q] is whether [compare p q] is [0]. Raises nothing. *)
     val equal : t -> t -> bool
 
     module Set : Set.S with type elt = t
@@ -60,38 +61,43 @@ module type S = sig
   (** See {!Model.S.EdgeMap.t'}. *)
   type edgemap
 
-  (** [respond ?silent m from label bisimilar] is the transition [m] takes in
-      response to a [label]-move by the other system, from [m]'s state
-      [from], landing somewhere in [bisimilar].
+  (** [respond ?silent m from label bisimilar] is the transition [m] takes
+      from its state [from] in answer to a [label]-move by the other system,
+      landing in [bisimilar].
 
-      Among the actions out of [from] carrying [label], only those whose
+      Among the weak actions out of [from] under [label], only those whose
       destinations meet [bisimilar] are kept, each restricted to that
       intersection; of those, the one with the shortest annotation wins
       {i (fewest steps left to perform)}, ties going to the least action by
-      [Action.compare], and its least destination is the answer.
+      [Action.compare], and its least destination is the answer. [from] is
+      saturated first if [m] is saturated on demand.
 
       A {e silent} [label] is answered differently when [silent] is given
       (the {b unsaturated} FSM's edges, which still hold the silent steps):
       by the nearest state in [bisimilar] that [from] reaches by {e one or
       more} silent steps, annotated with that path. Zero steps -- standing
-      still -- is the caller's case, decided before asking. Without [silent],
-      a silent [label] finds nothing, since saturation keeps only weak moves
-      with a visible action.
+      still -- is the caller's case, decided before asking. Without
+      [silent], a silent [label] finds nothing, since saturation keeps only
+      weak moves with a visible action.
 
-      @raise NoBisimilarResponse when nothing qualifies. *)
+      @raise NoBisimilarResponse when nothing qualifies (raised here). *)
   val respond : ?silent:edgemap -> fsm -> state -> label -> states -> transition
 
-  (** [simulation a b b_saturated root] is the greatest weak simulation from
-      [a]'s states to [b]'s, restricted to the pairs reachable from [root]
-      in the simulation game: [(x, y)] is in it when every strong move
+  (** [simulation a b b_saturated root] is the greatest weak simulation
+      from [a]'s states to [b]'s among the pairs reachable from [root] in
+      the simulation game: [(x, y)] is in it when every strong move
       [x -l-> x'] of [a] has an answer [y =l=> y'] ([=ε=>], zero steps
       included, for a silent [l]) with [(x', y')] in it again -- [weak_sim]'s
       own definition. So [root] is in it iff [fst root] is weakly simulated
-      by [snd root]. [b] is the unsaturated FSM (for silent closures),
-      [b_saturated] gives the visible weak moves. Coarser than
-      bisimilarity: [a.b] is simulated by [a.(b + c)], not bisimilar to it.
-      The walk counts against {!val:with_cap}'s cap.
-      @raise Game_too_large past that cap. *)
+      by [snd root].
+
+      [b] is the unsaturated FSM (for silent closures) and [b_saturated]
+      gives the visible weak moves. Coarser than bisimilarity: [a.b] is
+      simulated by [a.(b + c)], not bisimilar to it.
+
+      @raise Game_too_large
+        past {!val:with_cap}'s cap (propagated from the
+        game walk). *)
   val simulation : fsm -> fsm -> fsm -> Pair.t -> Pair.Set.t
 
   (** How [b] answers a move: by standing still (a silent move, when [b]'s
@@ -101,12 +107,16 @@ module type S = sig
     | Move of transition
 
   (** [answer ?silent ?sim b pi y label x'] is how [b], at [y], answers the
-      other system's move [-label-> x'] -- for the proof solver and for
-      {!val:successors} alike, the single place answers are chosen. A silent
-      move is answered by standing still if [y] is bisimilar to [x'] (by
-      [pi]); otherwise {!val:respond} into [x']'s bisimilarity class. Failing
-      both and given [sim], the same two tries against [x']'s simulators.
-      [None] when nothing qualifies. *)
+      other system's move [-label-> x'], or [None] if it cannot: the single
+      place answers are chosen, for the proof solver and {!val:successors}
+      alike.
+
+      A silent move is answered by standing still if [y] is bisimilar to
+      [x'] (by [pi]); otherwise by {!val:respond} into [x']'s bisimilarity
+      class. Failing both, and given [sim], the same two tries against
+      [x']'s simulators.
+
+      Raises nothing ({!val:respond}'s [NoBisimilarResponse] is caught). *)
   val answer
     :  ?silent:edgemap
     -> ?sim:(state -> states)
@@ -117,28 +127,25 @@ module type S = sig
     -> state
     -> answer option
 
-  (** [successors a b pi p] is every game state reachable from [p] in one
-      move, where [a] is the {b unsaturated} left-hand FSM {i (its
-      transitions are the obligations, one per move the left-hand system can
-      make)}, [b] is the {b saturated} right-hand FSM {i (its actions are the
-      weak transitions available in reply)} and [pi] is the bisimilar
-      partition.
+  (** [successors ?silent ?sim ~refl a b pi p] is every game state
+      reachable from [p] in one move: for each move of [p]'s left state in
+      [a], the pair it leads to with {!val:answer}'s answer from [b].
 
-      Mirrors what the proof solver does with one [weak_sim] goal: a silent
-      move to a state already bisimilar to the right-hand one is answered by
-      standing still, and everything else by {!val:respond}, given [silent]
-      so that a silent move can also be answered by moving silently. An
-      answer bisimilar to the obligation's target is preferred; failing one,
-      and given [sim] (a state's simulators, from {!val:simulation}), any
-      state that simulates it -- the same fallback the solver takes for a
-      [weak_sim] goal between states that are not bisimilar. An obligation
-      with no bisimilar response is dropped rather than raising -- in a
-      genuine bisimulation there are none, and a caller that wants to know
-      should compare the lengths.
+      [a] is the {b unsaturated} left-hand FSM {i (its transitions are the
+      obligations, one per move the left-hand system can make)}, [b] the
+      {b saturated} right-hand FSM {i (its weak transitions are the
+      answers)}, and [pi] the bisimilarity partition. This mirrors what the
+      proof solver does with one [weak_sim] goal; [silent] lets a silent
+      move be answered by moving silently, and [sim] (a state's simulators,
+      from {!val:simulation}) is the fallback for a [weak_sim] goal between
+      states that are not bisimilar. A move with no answer is dropped, not
+      an error: in a genuine bisimulation there are none.
 
-      [refl] says whether both sides use the same LTS. If so, a pair of equal
-      states has no successors: the solver closes [weak_sim x x] by
-      [weak_sim_refl] before anything else, so nothing past it is visited. *)
+      [refl] says whether both sides use the same LTS. If so, a pair of
+      equal states has no successors: the solver closes [weak_sim x x] by
+      [weak_sim_refl] before anything else, so nothing past it is visited.
+
+      Raises nothing. *)
   val successors
     :  ?silent:edgemap
     -> ?sim:(state -> states)
@@ -153,20 +160,26 @@ module type S = sig
       more pairs than the cap {!val:with_cap} set. *)
   exception Game_too_large of int
 
-  (** [with_cap n f] runs [f] with every game walk capped at [n] pairs:
-      past it, the walk raises {!exception:Game_too_large}. For FSMs
-      saturated on demand, whose walks saturate as they go
-      ([MeBi Config Bounds Game]). *)
+  (** [with_cap n f] is [f ()], run with every game walk capped at [n]
+      pairs. For FSMs saturated on demand, whose walks saturate as they go
+      ([MeBi Config Bounds Game]). The previous cap is restored afterwards.
+
+      @raise Game_too_large
+        if a walk inside [f] passes [n] pairs
+        (propagated, like anything else [f] raises). *)
   val with_cap : int -> (unit -> 'a) -> 'a
 
-  (** [reachable ~refl a b pi root] is the set of game states reachable from
-      [root], by breadth-first closure over {!val:successors}.
+  (** [reachable ?silent ?sim ~refl a b pi root] is the set of game states
+      reachable from [root] ([root] included), by breadth-first closure over
+      {!val:successors}.
 
       This is the whole relation the proof needs, computed once, before any
       proof step runs. The proof solver instead discovers it depth-first
       while building the proof term, which is why it re-derives pairs it has
       already proved whenever the product is not a tree. See
-      [ASSISTED-CHANGES.md], 2026-09-29, and backlog item B2. *)
+      [ASSISTED-CHANGES.md], 2026-09-29, and backlog item B2.
+
+      @raise Game_too_large past {!val:with_cap}'s cap (raised by the walk). *)
   val reachable
     :  ?silent:edgemap
     -> ?sim:(state -> states)
@@ -189,15 +202,19 @@ module type S = sig
 
   (** [successors_bisim ~refl g pi p] is {!val:successors} for a
       [weak_bisimilar] goal, which has two obligations ([bisim_l] and
-      [bisim_r]): [p]'s left state's moves answered by [b], as in
-      {!val:successors}, and its right state's moves answered by [a], which is
-      the same game with the systems swapped, its pairs swapped back. Silent
-      moves can be answered by moving silently on either side. *)
+      [bisim_r]): the moves of [p]'s left state answered by [b], as in
+      {!val:successors}, then the moves of its right state answered by [a]
+      (the same game with the systems swapped, its pairs swapped back).
+      Silent moves can be answered by moving silently on either side.
+
+      Raises nothing. *)
   val successors_bisim : refl:bool -> game -> partition -> Pair.t -> Pair.t list
 
-  (** [reachable_bisim ~refl g pi root]: {!val:reachable} over
-      {!val:successors_bisim}, the relation a mutual cofix for a
-      [weak_bisimilar] goal needs. *)
+  (** [reachable_bisim ~refl g pi root] is {!val:reachable} over
+      {!val:successors_bisim}: the relation a mutual cofix for a
+      [weak_bisimilar] goal needs.
+
+      @raise Game_too_large past {!val:with_cap}'s cap (raised by the walk). *)
   val reachable_bisim : refl:bool -> game -> partition -> Pair.t -> Pair.Set.t
 
   (** Policies for choosing answers. [Default] is {!val:answer}'s choice,
@@ -219,7 +236,8 @@ module type S = sig
       | Greedy
       | Minimal
 
-    (** [name p]: [p] in lower case ("default", "greedy", "minimal"). *)
+    (** [name p] is [p] in lower case: "default", "greedy" or "minimal".
+        Raises nothing. *)
     val name : t -> string
 
     (** One possible answer: the pair it leads to, its witness length (weak
@@ -252,7 +270,12 @@ module type S = sig
     (** A game, as each pair's obligations. *)
     type game_of = Pair.t -> obligation list
 
-    (** The [weak_sim] game, as {!val:successors} plays it. *)
+    (** [sim_game ?silent ?sim ~refl a b pi] is the [weak_sim] game as
+        {!val:successors} plays it: each pair's obligations, with
+        {!val:answer}'s choice as the default and every valid answer as a
+        candidate.
+
+        Raises nothing (as a function, nor when applied). *)
     val sim_game
       :  ?silent:edgemap
       -> ?sim:(state -> states)
@@ -262,7 +285,11 @@ module type S = sig
       -> partition
       -> game_of
 
-    (** The [weak_bisimilar] game, as {!val:successors_bisim} plays it. *)
+    (** [bisim_game ~refl g pi] is the [weak_bisimilar] game as
+        {!val:successors_bisim} plays it: the left-hand obligations, then
+        the right-hand ones, keyed as swapped.
+
+        Raises nothing (as a function, nor when applied). *)
     val bisim_game : refl:bool -> game -> partition -> game_of
 
     (** Pairs reached, moves answered (one closure each), total witness
@@ -289,35 +316,52 @@ module type S = sig
       ; measure : measure
       }
 
-    (** [plan p game_of root]: policy [p]'s answers to every move of the game
-        reachable from [root] (breadth first), with the pairs and measure
-        they make. Counted against {!val:with_cap}'s cap. *)
+    (** [plan p game_of root] is policy [p]'s answer to every move of the
+        game reachable from [root] (breadth first), with the pairs and
+        measure they make.
+
+        @raise Game_too_large past {!val:with_cap}'s cap (raised by the
+                              walk). *)
     val plan : t -> game_of -> Pair.t -> plan
 
-    (** The relation [Minimal] answers within: from every pair any answer
-        reaches, pairs removed while every remaining pair can still answer
-        all its moves within what remains (the first removable in [Pair.Set]
-        order each time), then trimmed to what the root reaches. Exposed for
-        [tests.exe]'s check against the original algorithm. *)
+    (** [minimal_relation game_of root] is the relation [Minimal] answers
+        within: from every pair any answer reaches, pairs removed while
+        every remaining pair can still answer all its moves within what
+        remains (the first removable in [Pair.Set] order each time), then
+        trimmed to what [root] reaches. If even that starting relation
+        leaves some move unanswered, it is returned as is. Exposed for
+        [tests.exe]'s check against the original algorithm.
+
+        @raise Game_too_large
+          past {!val:with_cap}'s cap (raised by the walk
+          over the starting relation). *)
     val minimal_relation : game_of -> Pair.t -> Pair.Set.t
 
-    (** [measure p game_of root]: the {!type:measure} of [plan p game_of root].
-    *)
+    (** [measure p game_of root] is the {!type:measure} of
+        [plan p game_of root].
+
+        @raise Game_too_large as {!val:plan} (propagated). *)
     val measure : t -> game_of -> Pair.t -> measure
 
-    (** Iterations a plan is predicted to cost: [3 pairs + 6 moves + 3.3 witness], fitted to the 41 checked-in proofs' real counts.
-    *)
+    (** [predicted m] is the iterations a plan with measure [m] is predicted
+        to cost: [3 pairs + 6 moves + 3.3 witness], fitted to the 41
+        checked-in proofs' real counts. Raises nothing. *)
     val predicted : measure -> float
 
-    (** The plan with the lowest {!val:predicted} cost among the three
-        policies; [Default] unless another is strictly cheaper. *)
+    (** [best game_of root] is the plan with the lowest {!val:predicted}
+        cost among the three policies, among those answering every move:
+        [Default] unless another is strictly cheaper.
+
+        @raise Game_too_large as {!val:plan} (propagated). *)
     val best : game_of -> Pair.t -> plan
 
-    (** The answer a plan gives to a move, if the plan reaches it. *)
+    (** [choose p k] is the answer plan [p] gives to the move [k], or [None]
+        if [p] does not reach it. Raises nothing. *)
     val choose : plan -> key -> answer option
 
-    (** [successors p x]: the pairs [p]'s answers lead to from [x] (none if
-        [p] does not reach [x]); a game step, for {!val:estimate_plan}. *)
+    (** [successors p x] is the pairs [p]'s answers lead to from [x] (none
+        if [p] does not reach [x]): a game step, for {!val:estimate_plan}.
+        Raises nothing. *)
     val successors : plan -> Pair.t -> Pair.t list
   end
 
@@ -333,8 +377,9 @@ module type S = sig
           will not finish in any useful time. *)
     }
 
-  (** [estimate ?cap_factor ~refl a b pi root] measures both strategies on the
-      product reachable from [root], without running a single proof step.
+  (** [estimate ?cap_factor ?silent ?sim ~refl a b pi root] is what a proof
+      of the product reachable from [root] costs under each strategy,
+      measured without running a single proof step.
 
       A mutual cofix over the whole relation visits each game state once and
       each move once: [pairs + moves]. A fresh nested cofix per newly-seen
@@ -342,12 +387,12 @@ module type S = sig
       branch, so it re-derives any state reachable by a second route -- it
       walks the tree of simple paths, which is exponential on a product that
       is not a tree. [nested] counts exactly that walk, stopping once it
-      passes [cap_factor] times the mutual cost (default 4) -- the exact
-      figure past that point does not matter, only that it is larger.
+      passes [cap_factor] times the mutual cost (default 4): past that point
+      only the fact that it is larger matters. Equal means the product is a
+      tree and the two strategies do identical work; [None] means only the
+      mutual cofix will finish.
 
-      The ratio is what the caller wants: equal means the product is a tree
-      and the two strategies do identical work; [None] means only the mutual
-      cofix will finish. *)
+      @raise Game_too_large past {!val:with_cap}'s cap (raised by the walk). *)
   val estimate
     :  ?cap_factor:int
     -> ?silent:edgemap
@@ -359,8 +404,10 @@ module type S = sig
     -> Pair.t
     -> cost
 
-  (** [estimate_bisim ?cap_factor ~refl g pi root]: {!val:estimate} over
-      {!val:successors_bisim}. *)
+  (** [estimate_bisim ?cap_factor ~refl g pi root] is {!val:estimate} over
+      {!val:successors_bisim}.
+
+      @raise Game_too_large past {!val:with_cap}'s cap (raised by the walk). *)
   val estimate_bisim
     :  ?cap_factor:int
     -> refl:bool
@@ -369,12 +416,16 @@ module type S = sig
     -> Pair.t
     -> cost
 
-  (** [estimate_plan ?cap_factor p]: {!val:estimate} over a plan's own
-      successors. *)
+  (** [estimate_plan ?cap_factor p] is {!val:estimate} over the plan's own
+      successors.
+
+      @raise Game_too_large
+        past {!val:with_cap}'s cap (raised by the walk,
+        which re-walks the plan's pairs). *)
   val estimate_plan : ?cap_factor:int -> Policy.plan -> cost
 
-  (** [prefer_mutual c] is [true] when the nested walk costs more than a
-      mutual cofix would, [c.nested = None] included. *)
+  (** [prefer_mutual c] is whether the nested walk costs more than a mutual
+      cofix would, [c.nested = None] included. Raises nothing. *)
   val prefer_mutual : cost -> bool
 end
 

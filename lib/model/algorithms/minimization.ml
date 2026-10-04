@@ -120,8 +120,8 @@ module Make
     | Assert_failure _ -> raise (CannotSplitEmptyBlock ())
   ;;
 
-  (** [split_block_by reach s block] splits [block] into the states that
-      [reach] maps to the same set of blocks as [s], and the rest. *)
+  (* See the [.mli]. One pass over [block], comparing each state's [reach]
+     with [s]'s. *)
   let split_block_by
         (reach : State.t -> Partition.t)
         (s : State.t)
@@ -148,7 +148,7 @@ module Make
       (States.empty, None)
   ;;
 
-  (* See the [.mli]. {!split_block_by}, with [reach] the blocks of [pi]
+  (* See the [.mli]: {!split_block_by}, with [reach] the blocks of [pi]
      each state reaches by one step of [edges]. *)
   let split_block
         (pi : Partition.t)
@@ -169,9 +169,7 @@ module Make
     | Assert_failure _ -> raise (Split_OnlyReturnedOneBlock_ButNeqBlock (a, b))
   ;;
 
-  (* See the [.mli]. Splits by [block]'s least state, on [edges] restricted
-     to [label]; on a split, [pi] gets the two halves and [block] becomes the
-     half containing that state. *)
+  (* See the [.mli]. *)
   let for_each_label
         (pi : Partition.t ref)
         (changed : bool ref)
@@ -195,14 +193,11 @@ module Make
       changed := true
   ;;
 
-  (** [silent_closures edges] is a function from a state to the states it
-      reaches by {e zero} or more silent steps in [edges]: Milner's [=ε=>],
-      reflexive by definition. Memoised, so each closure is computed once per
-      partition. Only the silent edges of [edges] are read, so it can be given
-      an unsaturated FSM's edges. *)
+  (* See the [.mli]. A breadth-first search over silent steps per state,
+     memoised by state. *)
   let silent_closures (edges : EdgeMap.t') : State.t -> States.t =
     let memo : States.t StateTbl.t = StateTbl.create 64 in
-    (* [bfs frontier seen]: [seen] grown by everything reachable by silent
+    (* [bfs frontier seen] is [seen] grown by everything reachable by silent
        steps from [frontier] (whose states are already in [seen]). *)
     let rec bfs (frontier : State.t list) (seen : States.t) : States.t =
       match frontier with
@@ -239,8 +234,16 @@ module Make
         c
   ;;
 
-  (** The silent half of weak bisimilarity: split [block] by which blocks
-      each state reaches by [=ε=>] ([closure]). See [for_each_block]. *)
+  (** [for_silent_closure pi changed closure block] refines [block] once by
+      [=ε=>]: it splits [block] by the blocks each state reaches by
+      [closure], updating [pi], [block] and [changed] as {!for_each_label}
+      does. The silent half of weak bisimilarity; see {!for_each_block}.
+
+      @raise Not_found if [block] is empty (propagated from
+                       [States.min_elt]).
+      @raise Split_OnlyReturnedOneBlock_ButNeqBlock
+        as {!for_each_label}
+        (propagated from {!ensure_equal}). *)
   let for_silent_closure
         (pi : Partition.t ref)
         (changed : bool ref)
@@ -249,7 +252,7 @@ module Make
     : unit
     =
     Logger.trace __FUNCTION__;
-    (* [reach x]: the blocks of [pi] that [x] reaches by [=eps=>] *)
+    (* [reach x] is the blocks of [pi] that [x] reaches by [=eps=>] *)
     let reach (x : State.t) : Partition.t =
       Partition.filter_reachable (closure x) !pi
     in
@@ -261,15 +264,11 @@ module Make
       changed := true
   ;;
 
-  (** Refines [block] once by every visible label of the (saturated) [edges]
-      and, given [closure], by [=ε=>] as well.
-
-      Weak bisimilarity on an LTS is strong bisimilarity on its saturation
-      with {e both} kinds of weak move: [=a=>] for each visible [a], and
-      [=ε=>], zero or more silent steps (Milner 1989, ch. 5). Saturation
-      builds only the first, so without [closure] this computes something
-      coarser: it cannot tell [τ.a + b] from [a + b]. See
-      [ASSISTED-CHANGES.md], 2026-10-02 (second session). *)
+  (* See the [.mli]. Weak bisimilarity on an LTS is strong bisimilarity on
+     its saturation with both kinds of weak move: [=a=>] for each visible
+     [a], and [=ε=>] (Milner 1989, ch. 5). Saturation builds only the
+     first, so without [closure] the result is coarser. See
+     [ASSISTED-CHANGES.md], 2026-10-02 (second session). *)
   let for_each_block
         ?(closure : (State.t -> States.t) option)
         (pi : Partition.t ref)
@@ -289,11 +288,8 @@ module Make
       closure
   ;;
 
-  (** [partition_states ?silent fsm] partitions [fsm]'s states by
-      bisimilarity over its visible labels. Given [silent] -- edges holding
-      the silent steps, normally the {e unsaturated} FSM's -- it also splits
-      by [=ε=>], which is what makes the result weak bisimilarity when [fsm]
-      is saturated. *)
+  (* See the [.mli]. Each round refines every block; rounds repeat while
+     any block split. *)
   let partition_states ?(silent : EdgeMap.t' option) (fsm : FSM.t) : Partition.t
     =
     Logger.trace __FUNCTION__;

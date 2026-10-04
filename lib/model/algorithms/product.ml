@@ -129,6 +129,7 @@ module type S = sig
       ; unanswered : int
       }
 
+    (** Moves as map keys, compared field by field. *)
     module KeyMap : Map.S with type key = key
 
     type plan =
@@ -205,12 +206,12 @@ struct
   module Pair = struct
     type t = C.State.t * C.State.t
 
-    (* Lexicographic: left state first. *)
+    (* See the [.mli]. *)
     let compare ((a, b) : t) ((x, y) : t) : int =
       match C.State.compare a x with 0 -> C.State.compare b y | n -> n
     ;;
 
-    (* [compare] is [0]. *)
+    (* See the [.mli]. *)
     let equal (a : t) (b : t) : bool = Int.equal (compare a b) 0
 
     module Set = Set.Make (struct
@@ -232,21 +233,21 @@ struct
       ; label : label
       }
 
-  (* [best_response actions label bisimilar]: the weak move [respond]
-     answers with, among [actions] (one state's weak actions, each with its
-     destinations): those under [label] whose destinations meet [bisimilar],
-     the one with the shortest annotation ([None] counting as 0), ties going
-     to the least action by [Action.compare]; returned with its destinations
-     cut down to [bisimilar], or [None] if there is none.
+  (** [best_response actions label bisimilar] is the weak move {!respond}
+      answers with, among [actions] (one state's weak actions, each with
+      its destinations), cut down to [bisimilar], or [None] if there is
+      none: of the actions under [label] whose destinations meet
+      [bisimilar], the one with the shortest annotation ([None] counting as
+      0), ties going to the least action by [Action.compare].
 
-     One pass over [actions]. Until 2026-10-04 [respond] built the same
-     choice as a set: [reduce_by_label] (a copy of the table), then
-     [to_actionpairs] (an ordered set of (action, destinations) pairs), then
-     a [filter_map] and [shortest_annotation], which keeps the first of the
-     shortest in that set's order -- the least action, as here, since two
-     distinct actions never compare equal. Building that set cost ~85% of
-     ~165ms per answer on [Proc/Test4] saturated on demand (~8,000 weak
-     actions a state; notes/15). *)
+      One pass over [actions]. Until 2026-10-04, [respond] built the same
+      choice as a set ([reduce_by_label], [to_actionpairs], [filter_map],
+      [shortest_annotation]), which keeps the first of the shortest in the
+      set's order -- the least action, as here, since two distinct actions
+      never compare equal. Building that set was ~85% of ~165ms per answer
+      on [Proc/Test4] saturated on demand (notes/15).
+
+      Raises nothing. *)
   let best_response
         (actions : C.Action.Map.t')
         (label : C.Label.t)
@@ -278,14 +279,17 @@ struct
     |> Stdlib.Option.map (fun (a, ds) -> a, C.State.Set.inter bisimilar ds)
   ;;
 
-  (* [respond_silently silent from label bisimilar]: a silent move answered
-     by moving silently: the nearest state, by one or
-     more silent steps of [silent], that lies in [bisimilar]. Standing still
-     (zero steps) is the caller's case, decided before [respond] is asked.
-     Saturation keeps only weak moves with a visible action, so without this
-     a silent move whose target is not bisimilar to [from] had no answer at
-     all, though [=ε=>] allows one. See [ASSISTED-CHANGES.md], 2026-10-02
-     (second session). *)
+  (** [respond_silently silent from label bisimilar] is a silent move
+      answered by moving silently: the transition to the nearest state of
+      [bisimilar] that [from] reaches by one or more silent steps of
+      [silent] (ties to the least state), annotated with that path.
+      Standing still (zero steps) is the caller's case, decided before
+      [respond] is asked. Saturation keeps only weak moves with a visible
+      action, so without this a silent move whose target is not bisimilar
+      to [from] had no answer at all, though [=ε=>] allows one
+      ([ASSISTED-CHANGES.md], 2026-10-02, second session).
+
+      @raise NoBisimilarResponse if no such state exists (raised here). *)
   let respond_silently
         (silent : C.EdgeMap.t')
         (from : C.State.t)
@@ -310,15 +314,12 @@ struct
   ;;
 
   (* See the [.mli]. A silent [label] with [silent] goes to
-     {!respond_silently}; anything else to {!best_response} over [from]'s weak
-     actions (saturating [from] first if [m] is saturated on demand), its
-     least destination being the answer.
-
-     Originally lifted verbatim out of
-     [Proof_solver_step.try_get_visible_transition], whose two preceding
-     lines resolved [from] and [label] out of the Rocq goal; everything here
-     is, and always was, pure model code. Keep it that way -- the caller
-     resolves, this decides. *)
+     {!respond_silently}; anything else to {!best_response} over [from]'s
+     weak actions, its least destination being the answer. Originally
+     lifted verbatim out of [Proof_solver_step.try_get_visible_transition],
+     whose two preceding lines resolved [from] and [label] out of the Rocq
+     goal; everything here is, and always was, pure model code. Keep it
+     that way -- the caller resolves, this decides. *)
   let respond
         ?(silent : C.EdgeMap.t' option)
         (m : FSM.t)
@@ -349,15 +350,17 @@ struct
          { from; goto; label; annotation; tree })
   ;;
 
-  (** [bisimilar_with pi x]: [x]'s block of [pi], or the empty set if [x] is
-      in none. *)
+  (** [bisimilar_with pi x] is [x]'s block of [pi], or the empty set if [x]
+      is in none. Raises nothing. *)
   let bisimilar_with (pi : C.Partition.t) (x : C.State.t) : C.State.Set.t =
     try C.Partition.get_bisimilar x pi with Not_found -> C.State.Set.empty
   ;;
 
-  (* The obligations on the left-hand system: one per transition out of [x].
-     Read from the UNSATURATED fsm, because that is what the proof solver sees
-     -- its hypothesis comes from inverting the LTS relation itself. *)
+  (** [obligations a x] is every strong move out of [x] in [a], as (label,
+      target) pairs, one per destination: what the left-hand system can do,
+      and so what must be answered. Read from the {e unsaturated} FSM,
+      because that is what the proof solver sees: its hypothesis comes from
+      inverting the LTS relation itself. Raises nothing. *)
   let obligations (a : FSM.t) (x : C.State.t) : (C.Label.t * C.State.t) list =
     match C.EdgeMap.find_opt a.edges x with
     | None -> []
@@ -376,17 +379,11 @@ struct
     | Stay
     | Move of C.Transition.t
 
-  (* See the [.mli]. THE choice of answer, for the solver and the product alike: the one place
-     a policy for choosing answers would go. [y] must answer the other
-     system's move [-label-> x'].
-
-     A silent move to somewhere already bisimilar to [y] is answered by
-     standing still, and everything else by [respond] into [x']'s
-     bisimilarity class. Failing both, given [sim] (a [weak_sim] goal between
-     states that are similar but not bisimilar), the same two tries against
-     [x']'s simulators. Before 2026-10-02 this was written out twice, here
-     and in [Proof_solver_step.handle_wk_concl]/[handle_visible_transition],
-     which had to be kept in step by hand: a mismatch is a pair outside the
+  (* See the [.mli]: THE choice of answer, for the solver and the product
+     alike, and the one place a policy for choosing answers would go.
+     Before 2026-10-02 this was written out twice, here and in
+     [Proof_solver_step.handle_wk_concl]/[handle_visible_transition], which
+     had to be kept in step by hand: a mismatch is a pair outside the
      mutual block. *)
   let answer
         ?(silent : C.EdgeMap.t' option)
@@ -399,8 +396,9 @@ struct
     : answer option
     =
     Logger.trace __FUNCTION__;
-    (* [into target]: standing still if the move is silent and [y] is already
-       in [target], else [respond]'s move into [target]; [None] if neither. *)
+    (* [into target] is standing still if the move is silent and [y] is
+       already in [target], else [respond]'s move into [target], or [None]
+       if neither. *)
     let into (target : C.State.Set.t) : answer option =
       if C.Label.is_silent label && C.State.Set.mem y target
       then Some Stay
@@ -415,14 +413,12 @@ struct
     | None, None -> None
   ;;
 
-  (* See the [.mli]: one successor per obligation of [x] that {!answer}
-     answers. [refl] says whether both sides of the game use the same LTS. When they do,
-     a pair of equal states is closed outright by [weak_sim_refl] -- mirrors
+  (* See the [.mli]. The [refl] leaf mirrors
      [Proof_solver_step.handle_weaksim]'s [is_weak_refl] test, which runs
-     before anything else -- so it is a leaf with no obligations. Without
-     this, a game whose two sides converge on a common state (e.g. [r] is one
-     step of [q]'s unfolding, [Proc/Test1]'s [wsim_pr]) went on to enumerate
-     that state's whole loop as surplus pairs the solver never visits. *)
+     before anything else. Without it, a game whose two sides converge on a
+     common state (e.g. [r] is one step of [q]'s unfolding, [Proc/Test1]'s
+     [wsim_pr]) went on to enumerate that state's whole loop as surplus
+     pairs the solver never visits. *)
   let successors
         ?(silent : C.EdgeMap.t' option)
         ?(sim : (C.State.t -> C.State.Set.t) option)
@@ -448,31 +444,37 @@ struct
 
   exception Game_too_large of int
 
-  (* The cap on game walks, set by [with_cap] (notes/13, 2026-10-03). *)
+  (** The cap on game walks, set by {!with_cap} (notes/13, 2026-10-03). *)
   let walk_cap : int option ref = ref None
 
-  (* See the [.mli]. The previous cap is restored afterwards, even if [f]
-     raises. *)
+  (* See the [.mli]. The previous cap is restored even if [f] raises. *)
   let with_cap (n : int) (f : unit -> 'a) : 'a =
     let before = !walk_cap in
     walk_cap := Some n;
     Fun.protect ~finally:(fun () -> walk_cap := before) f
   ;;
 
-  (* [count] pairs reached so far: past the cap, stop. *)
+  (** [check_cap count] checks a walk that has reached [count] pairs
+      against {!walk_cap}.
+
+      @raise Game_too_large if [count] passes the cap (raised here). *)
   let check_cap (count : int) : unit =
     match !walk_cap with
     | Some n when count > n -> raise (Game_too_large n)
     | _ -> ()
   ;;
 
-  (* [reachable_by step root]: every pair reachable from [root] by repeatedly
-     applying [step] ([root] included), breadth-first. The one game walk
-     every other walk here goes through, so the [with_cap] cap applies to all
-     of them: past it, {!Game_too_large}. *)
+  (** [reachable_by step root] is every pair reachable from [root] by
+      repeatedly applying [step] ([root] included), breadth-first. The one
+      game walk every other walk here goes through, so the {!with_cap} cap
+      applies to all of them.
+
+      @raise Game_too_large
+        past the cap (propagated from {!check_cap}); and
+        whatever [step] raises (propagated). *)
   let reachable_by (step : Pair.t -> Pair.t list) (root : Pair.t) : Pair.Set.t =
     let count : int ref = ref 1 in
-    (* [go seen queue]: [seen] grown by everything reachable from [queue],
+    (* [go seen queue] is [seen] grown by everything reachable from [queue],
        which holds pairs already in [seen] still to be stepped. *)
     let rec go (seen : Pair.Set.t) : Pair.t list -> Pair.Set.t = function
       | [] -> seen
@@ -489,17 +491,18 @@ struct
     go (Pair.Set.singleton root) [ root ]
   ;;
 
-  (* [weak_answers b b_saturated]: a function giving, for a state [y] of [b]
-     and a label [l], every state [y] can answer a move [-l->] with, as
-     [weak_sim] allows: [y =l=> y'] for a visible [l] (read off
-     [b_saturated], saturating [y] first if [b] is saturated on demand), and
-     [y =eps=> y'] for a silent one ([b]'s own silent closure, zero steps
-     included, so [y] itself). Silent closures are computed once per state. *)
+  (** [weak_answers b b_saturated] is a function from a state [y] of [b]
+      and a label [l] to every state [y] can answer a move [-l->] with, as
+      [weak_sim] allows: [y =l=> y'] for a visible [l] (read off
+      [b_saturated], saturating [y] first if it is saturated on demand),
+      and [y =eps=> y'] for a silent one ([b]'s own silent closure, zero
+      steps included, so [y] itself). Silent closures are computed once per
+      state. Raises nothing. *)
   let weak_answers (b : FSM.t) (b_saturated : FSM.t)
     : C.State.t -> C.Label.t -> C.State.Set.t
     =
     let closures : (C.State.t, C.State.Set.t) Hashtbl.t = Hashtbl.create 64 in
-    (* [closure y]: the states [y] reaches by [=eps=>], memoised. *)
+    (* [closure y] is the states [y] reaches by [=eps=>], memoised. *)
     let closure (y : C.State.t) : C.State.Set.t =
       match Hashtbl.find_opt closures y with
       | Some c -> c
@@ -524,17 +527,21 @@ struct
           C.Action.Map.destinations (C.Action.Map.reduce_by_label actions l))
   ;;
 
-  (* [simulation_game a answers root]: the pairs of the simulation game
-     reachable from [root]: from [(x, y)], every strong move [x -l-> x'] of
-     [a] ({!obligations}) paired with every answer [y'] in [answers y l].
-     Counted against [with_cap]'s cap, like every game walk. *)
+  (** [simulation_game a answers root] is the set of pairs of the
+      simulation game reachable from [root]: from [(x, y)], every strong
+      move [x -l-> x'] of [a] ({!obligations}) paired with every answer [y']
+      in [answers y l].
+
+      @raise Game_too_large
+        past the {!with_cap} cap (propagated from
+        {!reachable_by}). *)
   let simulation_game
         (a : FSM.t)
         (answers : C.State.t -> C.Label.t -> C.State.Set.t)
         (root : Pair.t)
     : Pair.Set.t
     =
-    (* [step (x, y)]: every [(x', y')] with [x -l-> x'] and [y'] an answer. *)
+    (* [step (x, y)] is every [(x', y')] with [x -l-> x'] and [y'] an answer. *)
     let step ((x, y) : Pair.t) : Pair.t list =
       List.concat_map
         (fun ((l, x') : C.Label.t * C.State.t) ->
@@ -544,18 +551,19 @@ struct
     reachable_by step root
   ;;
 
-  (* [refine_simulation a answers r]: the greatest weak simulation within
-     the pairs [r]: repeatedly drop a pair [(x, y)] with a move [x -l-> x']
-     that no answer [y'] in [answers y l] matches with [(x', y')] still in,
-     until nothing changes. Naive: each round re-checks every pair. *)
+  (** [refine_simulation a answers r] is the greatest weak simulation
+      within the pairs [r]: pairs [(x, y)] with a move [x -l-> x'] that no
+      answer [y'] in [answers y l] matches with [(x', y')] still in are
+      dropped, round after round, until none is. Naive: each round
+      re-checks every pair. Raises nothing. *)
   let refine_simulation
         (a : FSM.t)
         (answers : C.State.t -> C.Label.t -> C.State.Set.t)
         (r : Pair.Set.t)
     : Pair.Set.t
     =
-    (* [answered r (x, y)]: every move of [x] has an answer [y'] with
-       [(x', y')] in [r]. *)
+    (* [answered r (x, y)] is whether every move of [x] has an answer [y']
+       with [(x', y')] in [r]. *)
     let answered (r : Pair.Set.t) ((x, y) : Pair.t) : bool =
       List.for_all
         (fun ((l, x') : C.Label.t * C.State.t) ->
@@ -572,13 +580,11 @@ struct
     go r
   ;;
 
-  (* The greatest weak simulation from [a] to [b], as [weak_sim] defines it,
-     restricted to the pairs reachable from [root] in the simulation game
-     ({!simulation_game}, then {!refine_simulation}). That is exactly the
-     greatest simulation's own pairs among them (any successor of a pair in
-     it is reachable too), so [root] is in it iff [fst root] is weakly
-     simulated by [snd root]. Until 2026-10-04 this started from all
-     |a| x |b| pairs: ~94M for [Proc/Test4], ~6GB a copy. *)
+  (* See the [.mli]: {!simulation_game}, then {!refine_simulation}. Exactly
+     the greatest simulation's own pairs among those reachable (any
+     successor of a pair in it is reachable too). Until 2026-10-04 this
+     started from all |a| x |b| pairs: ~94M for [Proc/Test4], ~6GB a
+     copy. *)
   let simulation (a : FSM.t) (b : FSM.t) (b_saturated : FSM.t) (root : Pair.t)
     : Pair.Set.t
     =
@@ -609,11 +615,8 @@ struct
     ; b_saturated : FSM.t
     }
 
-  (* A bisimulation game state [(x, y)] has the obligations of both sides:
-     [x]'s moves answered by [b] (as in [successors]), and [y]'s moves answered
-     by [a] -- the same game with the two systems swapped, its pairs swapped
-     back. Mirrors the two goals [Pack_bisim] leaves, [bisim_l] and
-     [bisim_r]. *)
+  (* See the [.mli]. Mirrors the two goals [Pack_bisim] leaves, [bisim_l]
+     and [bisim_r]. *)
   let successors_bisim
         ~(refl : bool)
         (g : game)
@@ -666,8 +669,7 @@ struct
       | Greedy
       | Minimal
 
-    (* [name p]: the policy as [MeBi Config Solver Answers] spells it, in
-       lower case. *)
+    (* See the [.mli]. *)
     let name : t -> string = function
       | Default -> "default"
       | Greedy -> "greedy"
@@ -699,19 +701,21 @@ struct
 
     type game_of = Pair.t -> obligation list
 
-    (* [annotation_length a]: the number of steps in the witness [a]. *)
+    (** [annotation_length a] is the number of steps in the witness [a].
+        Raises nothing. *)
     let rec annotation_length (a : C.Annotation.t) : int =
       match a.next with None -> 1 | Some n -> 1 + annotation_length n
     ;;
 
-    (* [transition_length t]: the weak transitions [t] stands for: its
-       witness's length, or 1 for a plain step. *)
+    (** [transition_length t] is the number of weak transitions [t] stands
+        for: its witness's length, or 1 for a plain step. Raises nothing. *)
     let transition_length (t : C.Transition.t) : int =
       match t.annotation with None -> 1 | Some a -> annotation_length a
     ;;
 
-    (** [stay_candidate y label target]: standing still, at no cost, if
-        [label] is silent and [y] is already in [target]. *)
+    (** [stay_candidate y label target] is standing still, at no cost, if
+        [label] is silent and [y] is already in [target]; nothing otherwise.
+        Raises nothing. *)
     let stay_candidate
           (y : C.State.t)
           (label : C.Label.t)
@@ -723,10 +727,10 @@ struct
       else []
     ;;
 
-    (** [silent_move_candidates silent y label target]: for a silent
-        [label], every state of [target] that [y] reaches by one or more
-        silent steps of [silent], with the path's length and the move
-        (annotated with the path); none without [silent]. *)
+    (** [silent_move_candidates silent y label target] is every move of [y]
+        into [target] by one or more silent steps of [silent], with the
+        path's length, each annotated with its path; none without [silent].
+        Raises nothing. *)
     let silent_move_candidates
           (silent : C.EdgeMap.t' option)
           (y : C.State.t)
@@ -754,10 +758,10 @@ struct
           | _ -> None)
     ;;
 
-    (** [visible_move_candidates b y label target]: for a visible [label],
-        every weak move of [b] from [y] under [label] into [target] (one per
-        destination), in the order of [y]'s actions, with its witness length
-        (1 for a plain step); [y] is saturated first if [b] is on demand. *)
+    (** [visible_move_candidates b y label target] is every weak move of [b]
+        from [y] under [label] into [target] (one per destination), in the
+        order of [y]'s actions, with its witness length (1 for a plain
+        step); [y] is saturated first if [b] is on demand. Raises nothing. *)
     let visible_move_candidates
           (b : FSM.t)
           (y : C.State.t)
@@ -792,12 +796,12 @@ struct
                 } )))
     ;;
 
-    (* Every way [b], at [y], can answer [-label-> x'], with the answer itself
-       -- the same targets, in the same order, as [answer] tries them -- and
-       its witness length: standing still, then moves
-       ({!silent_move_candidates} or {!visible_move_candidates}), into
-       [x']'s bisimilarity class; failing any, and given [sim], into [x']'s
-       simulators. *)
+    (** [candidates ?silent ?sim b pi y label x'] is every way [b], at [y],
+        can answer [-label-> x'], with the answer itself and its witness
+        length -- the same targets, in the same order, as {!answer} tries
+        them: standing still, then moves ({!silent_move_candidates} or
+        {!visible_move_candidates}), into [x']'s bisimilarity class; failing
+        any, and given [sim], into [x']'s simulators. Raises nothing. *)
     let candidates
           ?(silent : C.EdgeMap.t' option)
           ?(sim : (C.State.t -> C.State.Set.t) option)
@@ -808,7 +812,7 @@ struct
           (x' : C.State.t)
       : (C.State.t * int * answer) list
       =
-      (* [into target]: every candidate into [target] *)
+      (* [into target] is every candidate into [target] *)
       let into (target : C.State.Set.t) : (C.State.t * int * answer) list =
         stay_candidate y label target
         @
@@ -822,7 +826,7 @@ struct
       | [], None -> []
     ;;
 
-    (* The simulation game: [x]'s moves answered by [b]. *)
+    (* See the [.mli]. *)
     let sim_game
           ?(silent : C.EdgeMap.t' option)
           ?(sim : (C.State.t -> C.State.Set.t) option)
@@ -856,8 +860,7 @@ struct
           (obligations a x)
     ;;
 
-    (* The bisimulation game: both sides' obligations, the right-hand ones as
-       the simulation game with the systems swapped, pairs swapped back. *)
+    (* See the [.mli]. *)
     let bisim_game ~(refl : bool) (g : game) (pi : C.Partition.t) : game_of =
       let left = sim_game ~silent:g.b.edges ~refl g.a g.b_saturated pi in
       let right = sim_game ~silent:g.a.edges ~refl g.b g.a_saturated pi in
@@ -922,13 +925,16 @@ struct
       ; unanswered_moves : int
       }
 
-    (** [answer_pair choose st p obligations]: [st] after answering each of
-        [p]'s [obligations] with [choose] (given the pairs reached so far): a
-        choice is recorded and its move and witness counted, and a pair not
-        reached before is added (checked against the [with_cap] cap first);
-        an obligation [choose] leaves unanswered is only counted. [p]'s
-        successors are recorded in order. Also returns the newly reached
-        pairs, in order. *)
+    (** [answer_pair choose st p obligations] is [st] after answering each
+        of [p]'s [obligations] with [choose] (given the pairs reached so
+        far), with the pairs newly reached, in order. A choice is recorded
+        and its move and witness counted, and a pair not reached before is
+        added; an obligation [choose] leaves unanswered is only counted.
+        [p]'s successors are recorded in order.
+
+        @raise Game_too_large
+          if a new pair passes the {!with_cap} cap
+          (propagated from {!check_cap}). *)
     let answer_pair
           (choose : Pair.Set.t -> obligation -> choice option)
           (st : walk_state)
@@ -969,9 +975,13 @@ struct
       , List.rev fresh )
     ;;
 
-    (* [walk policy game_of choose root]: the plan [policy] makes: [root]
-       closed breadth-first under [choose] ({!answer_pair} per pair), then
-       read off as a {!type-plan}. *)
+    (** [walk policy game_of choose root] is the plan [policy] makes:
+        [root] closed breadth-first under [choose] ({!answer_pair} per
+        pair), then read off as a {!type-plan}.
+
+        @raise Game_too_large
+          past the {!with_cap} cap (propagated from
+          {!answer_pair}). *)
     let walk
           (policy : t)
           (game_of : game_of)
@@ -979,8 +989,8 @@ struct
           (root : Pair.t)
       : plan
       =
-      (* [go st queue]: step the pairs in [queue], appending each one's newly
-         reached pairs to it *)
+      (* [go st queue] steps the pairs in [queue], appending each one's newly
+         reached pairs to it, and is the final [st] *)
       let rec go (st : walk_state) : Pair.t list -> walk_state = function
         | [] -> st
         | p :: rest ->
@@ -1012,8 +1022,9 @@ struct
       }
     ;;
 
-    (* [cheapest cs]: the choice of least witness length in [cs], the first
-       of them on a tie; [None] if [cs] is empty. *)
+    (** [cheapest cs] is the choice of least witness length in [cs], the
+        first of them on a tie, or [None] if [cs] is empty. Raises
+        nothing. *)
     let cheapest (cs : choice list) : choice option =
       List.fold_left
         (fun acc (c : choice) ->
@@ -1024,9 +1035,9 @@ struct
         cs
     ;;
 
-    (** [memo_answers game_of]: per pair, per obligation, its distinct
-        answers (the pairs its candidates lead to, sorted), computed once per
-        pair. *)
+    (** [memo_answers game_of] is a function from a pair to the distinct
+        answers (sorted) of each of its obligations, computed once per pair.
+        Raises nothing. *)
     let memo_answers (game_of : game_of) : Pair.t -> Pair.t array array =
       let memo : (Pair.t, Pair.t array array) Hashtbl.t = Hashtbl.create 256 in
       fun (p : Pair.t) ->
@@ -1071,18 +1082,20 @@ struct
       ; children : (Pair.t, Pair.t list) Hashtbl.t
       }
 
-    (** [is_alive st p]: [p] is still in the relation. *)
+    (** [is_alive st p] is whether [p] is still in the relation. Raises nothing.
+    *)
     let is_alive (st : shrink_state) (p : Pair.t) : bool =
       Hashtbl.mem st.alive p
     ;;
 
-    (** [preds_of st p]: the obligations [p] answers. *)
+    (** [preds_of st p] is the obligations [p] answers. Raises nothing. *)
     let preds_of (st : shrink_state) (p : Pair.t) : (Pair.t * int) list =
       Stdlib.Option.value ~default:[] (Hashtbl.find_opt st.preds p)
     ;;
 
-    (** [refresh st s]: put [s] in or out of [removable]: in iff alive, not
-        the root, and pinned by no obligation. *)
+    (** [refresh st s] puts [s] in [removable] if it is alive, not the
+        root, and pinned by no obligation, and takes it out otherwise.
+        Raises nothing. *)
     let refresh (st : shrink_state) (s : Pair.t) : unit =
       if
         is_alive st s
@@ -1092,10 +1105,14 @@ struct
       else st.removable <- Pair.Set.remove s st.removable
     ;;
 
-    (** [recompute st (q, i)]: bring obligation [i] of [q]'s pin up to date
-        (its only remaining answer, unless [q] is gone or is that answer),
-        moving the [blocking] count from the old pinned pair to the new one
-        and refreshing both. *)
+    (** [recompute st (q, i)] brings the pin of [q]'s obligation [i] up to
+        date (its only remaining answer, unless [q] is gone or is that
+        answer), moving the [blocking] count from the old pinned pair to the
+        new one and refreshing both.
+
+        @raise Not_found
+          only if [st]'s tables are inconsistent (propagated
+          from [Hashtbl.find]); never when built by {!init_shrink}. *)
     let recompute (st : shrink_state) ((q, i) : Pair.t * int) : unit =
       let now : Pair.t option =
         if is_alive st q && Hashtbl.find st.rem (q, i) = 1
@@ -1125,10 +1142,10 @@ struct
         | None -> Hashtbl.remove st.contrib (q, i))
     ;;
 
-    (** [init_shrink answers root all]: the bookkeeping for the valid
-        relation [all]: every pair alive, the reverse edges and answer counts,
-        every obligation's pin, and [removable]. The spanning tree is built
-        separately ({!span_from_root}). *)
+    (** [init_shrink answers root all] is the bookkeeping for the valid
+        relation [all]: every pair alive, the reverse edges and answer
+        counts, every obligation's pin, and [removable]. The spanning tree
+        is built separately ({!span_from_root}). Raises nothing. *)
     let init_shrink
           (answers : Pair.t -> Pair.t array array)
           (root : Pair.t)
@@ -1173,10 +1190,14 @@ struct
       st
     ;;
 
-    (** [kill st xs]: take the pairs [xs] out of the relation, as a batch:
+    (** [kill st xs] takes the pairs [xs] out of the relation as a batch:
         out of [alive] and [removable], one fewer remaining answer for each
         obligation they answer, then every pin they or their predecessors
-        hold recomputed. *)
+        hold recomputed.
+
+        @raise Not_found
+          only if [st]'s tables are inconsistent (propagated
+          from [Hashtbl.find] and {!recompute}). *)
     let kill (st : shrink_state) (xs : Pair.t list) : unit =
       List.iter (fun x -> Hashtbl.remove st.alive x) xs;
       List.iter
@@ -1194,7 +1215,8 @@ struct
         xs
     ;;
 
-    (** [adopt st p c]: make [p] [c]'s parent in the spanning tree. *)
+    (** [adopt st p c] makes [p] [c]'s parent in the spanning tree. Raises nothing.
+    *)
     let adopt (st : shrink_state) (p : Pair.t) (c : Pair.t) : unit =
       Hashtbl.replace st.parent c p;
       Hashtbl.replace
@@ -1203,16 +1225,16 @@ struct
         (c :: Stdlib.Option.value ~default:[] (Hashtbl.find_opt st.children p))
     ;;
 
-    (** [alive_successors st u]: the alive answers of [u]'s obligations, in
-        order. *)
+    (** [alive_successors st u] is the alive answers of [u]'s obligations,
+        in order. Raises nothing. *)
     let alive_successors (st : shrink_state) (u : Pair.t) : Pair.t list =
       Array.to_list (st.answers u)
       |> List.concat_map (fun a -> List.filter (is_alive st) (Array.to_list a))
     ;;
 
-    (** [span_from_root st]: the spanning tree of what the root reaches over
-        alive answers, breadth-first, each pair adopted by the first pair
-        that reaches it. *)
+    (** [span_from_root st] builds the spanning tree of what the root
+        reaches over alive answers, breadth-first, each pair adopted by the
+        first pair that reaches it. Raises nothing. *)
     let span_from_root (st : shrink_state) : unit =
       let seen : (Pair.t, unit) Hashtbl.t = Hashtbl.create 1024 in
       (* one level at a time *)
@@ -1240,10 +1262,11 @@ struct
       bfs [ st.root ]
     ;;
 
-    (** [subtree st p]: [p]'s descendants in the spanning tree (current
-        parent links only), forgetting their children lists on the way. *)
+    (** [subtree st p] is [p]'s descendants in the spanning tree (through
+        current parent links only), whose children lists it forgets on the
+        way. Raises nothing. *)
     let subtree (st : shrink_state) (p : Pair.t) : Pair.t list =
-      (* [go acc queue]: [acc] plus the descendants of the pairs in [queue] *)
+      (* [go acc queue] is [acc] plus the descendants of the pairs in [queue] *)
       let rec go acc = function
         | [] -> acc
         | u :: rest ->
@@ -1260,10 +1283,14 @@ struct
       go [] [ p ]
     ;;
 
-    (** [remove_pair st p]: take [p] out, then detach its subtree, re-attach
-        what another remaining predecessor still reaches (from any such
-        predecessor, spreading through the subtree), and kill the rest, which
-        the root no longer reaches. *)
+    (** [remove_pair st p] takes [p] out of the relation, then detaches its
+        subtree, re-attaches what another remaining predecessor still
+        reaches (from any such predecessor, spreading through the subtree),
+        and kills the rest, which the root no longer reaches.
+
+        @raise Not_found
+          only if [st]'s tables are inconsistent (propagated
+          from {!kill}). *)
     let remove_pair (st : shrink_state) (p : Pair.t) : unit =
       let s = subtree st p in
       Hashtbl.remove st.parent p;
@@ -1316,8 +1343,12 @@ struct
       kill st (List.filter (fun u -> Bool.not (Hashtbl.mem reattached u)) s)
     ;;
 
-    (** [shrink st]: remove the first removable pair, in [Pair.Set] order,
-        until none is left. *)
+    (** [shrink st] removes the first removable pair, in [Pair.Set] order,
+        until none is left.
+
+        @raise Not_found
+          only if [st]'s tables are inconsistent (propagated
+          from {!remove_pair}). *)
     let rec shrink (st : shrink_state) : unit =
       match Pair.Set.min_elt_opt st.removable with
       | None -> ()
@@ -1409,18 +1440,16 @@ struct
       (plan policy game_of root).measure
     ;;
 
-    (* Iterations predicted from a plan's measure, by the linear fit to all
-       41 checked-in proofs' real counts (2026-10-02, [ASSISTED-CHANGES.md]):
-       about 3 per pair, 6 per move and 3.3 per weak transition of witness. *)
+    (* See the [.mli]. The fit is to all 41 checked-in proofs' real counts
+       (2026-10-02, [ASSISTED-CHANGES.md]): about 3 iterations per pair, 6
+       per move and 3.3 per weak transition of witness. *)
     let predicted (m : measure) : float =
       (3.0 *. float_of_int m.pairs)
       +. (6.0 *. float_of_int m.moves)
       +. (3.3 *. float_of_int m.witness)
     ;;
 
-    (* The cheapest plan by [predicted]; ties go to the earlier policy in
-       [Default; Greedy; Minimal], so [Default] wins unless another is
-       strictly cheaper. *)
+    (* See the [.mli]. Ties go to the earlier policy in [Default; Greedy; Minimal]. *)
     let best (game_of : game_of) (root : Pair.t) : plan =
       let plans =
         List.map (fun p -> plan p game_of root) [ Default; Greedy; Minimal ]
@@ -1443,8 +1472,7 @@ struct
         (KeyMap.find_opt k p.chosen)
     ;;
 
-    (* See the [.mli]: [x]'s successors as recorded by the plan, none if it
-       does not reach [x]. *)
+    (* See the [.mli]. *)
     let successors (p : plan) (x : Pair.t) : Pair.t list =
       Stdlib.Option.value ~default:[] (Pair.Map.find_opt x p.next)
     ;;
@@ -1456,14 +1484,17 @@ struct
     ; nested : int option
     }
 
-  (* Raised inside {!estimate_by} when the simulated nested walk passes its
-     cap; never escapes. *)
+  (** Raised inside {!estimate_by} when the simulated nested walk passes its
+      cap; caught there, never escapes. *)
   exception Capped
 
-  (* [memo_step step]: [step], computing each pair's successors once and
-     then returning them from a table. [step] is a function of the pair (an
-     FSM saturated on demand only fills a cache underneath it), so the
-     results are the same; the table holds one list per pair stepped. *)
+  (** [memo_step step] is [step], computing each pair's successors once and
+      then returning them from a table. [step] is a function of the pair (an
+      FSM saturated on demand only fills a cache underneath it), so the
+      results are the same; the table holds one list per pair stepped.
+
+      Raises whatever [step] raises, the first time it steps a pair
+      (propagated). *)
   let memo_step (step : Pair.t -> Pair.t list) : Pair.t -> Pair.t list =
     let table : Pair.t list Pair.Map.t ref = ref Pair.Map.empty in
     fun (p : Pair.t) ->
@@ -1475,12 +1506,16 @@ struct
         next
   ;;
 
-  (* The cost of a proof of the game reachable from [root] under [step]; see
-     [estimate]. [step] is memoised ({!memo_step}): the walk below steps
-     every pair three times (to reach it, to count its moves, and in the
-     simulated nested walk, which may revisit it many times), and a step can
-     be costly on an FSM saturated on demand (notes/15: ~165ms an answer on
-     [Proc/Test4] until 2026-10-04's one-pass [respond]). *)
+  (** [estimate_by ?cap_factor step root] is the cost, under each strategy,
+      of a proof of the game reachable from [root] under [step]; see
+      {!estimate}. [step] is memoised ({!memo_step}): the walk steps every
+      pair three or more times (to reach it, to count its moves, and in the
+      simulated nested walk), and a step can be costly on an FSM saturated
+      on demand (notes/15).
+
+      @raise Game_too_large
+        past the {!with_cap} cap (propagated from
+        {!reachable_by}). *)
   let estimate_by
         ?(cap_factor : int = 4)
         (step : Pair.t -> Pair.t list)
@@ -1499,8 +1534,8 @@ struct
        walked again. *)
     let cap : int = cap_factor * (Pair.Set.cardinal pairs + moves) in
     let seen : int ref = ref 0 in
-    (* [walk path p]: visit [p] below the ancestors [path], counting every
-       visit in [seen]; raises [Capped] past [cap]. *)
+    (* [walk path p] visits [p] below the ancestors [path], counting every
+       visit in [seen]; raises [Capped] (directly) past [cap]. *)
     let rec walk (path : Pair.Set.t) (p : Pair.t) : unit =
       incr seen;
       if !seen > cap then raise Capped;

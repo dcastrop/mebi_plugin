@@ -67,8 +67,10 @@ module Make
      traversal explored, only the shortest per destination ever survived. A
      breadth-first closure produces exactly those survivors directly. *)
 
-  (** Silent steps leaving [s], each silent action paired with one of its
-      destinations. *)
+  (** [silent_steps old_edges s] is every silent step out of [s] in
+      [old_edges], as (action, destination) pairs, one per destination.
+
+      Raises nothing. *)
   let silent_steps (old_edges : EdgeMap.t') (s : State.t)
     : (Action.t * State.t) list
     =
@@ -84,15 +86,20 @@ module Make
         []
   ;;
 
-  (** [note_of from a goto]: one step of a witness path, [from -a-> goto],
-      recording [a]'s label and its derivation trees. *)
+  (** [note_of from a goto] is the witness step [from -a-> goto], recording
+      [a]'s label and derivation trees.
+
+      Raises nothing. *)
   let note_of (from : State.t) (a : Action.t) (goto : State.t) : Note.t =
     { from; label = a.label; using = a.trees; goto }
   ;;
 
-  (** Reflexive-transitive silent closure of [src], breadth-first, pairing
-      each reachable state with a shortest silent path to it. Paths are
-      accumulated most-recent-first and reversed at the point of use. *)
+  (** [silent_closure old_edges src] is every state [src] reaches by zero or
+      more silent steps of [old_edges] ([src] first), each paired with a
+      shortest such path, most recent step first (reversed at the point of
+      use). Breadth-first, so each state is met first by a shortest path.
+
+      Raises nothing. *)
   let silent_closure (old_edges : EdgeMap.t') (src : State.t)
     : (State.t * Note.t list) list
     =
@@ -126,16 +133,19 @@ module Make
     bfs start (States.singleton src) start
   ;;
 
-  (** [annotation_of_notes notes]: the witness path [notes] (first step
-      first) as an annotation, linked step to step; [None] for the empty
-      path. *)
+  (** [annotation_of_notes notes] is the witness path [notes] (first step
+      first) as an annotation, linked step to step, or [None] for the empty
+      path.
+
+      Raises nothing. *)
   let rec annotation_of_notes : Note.t list -> Annotation.t option = function
     | [] -> None
     | x :: tl -> Some { this = x; next = annotation_of_notes tl }
   ;;
 
-  (** [with_lengths closure]: each [(state, path)] of a silent closure with
-      its path's length added. *)
+  (** [with_lengths closure] is [closure] with each path's length added.
+
+      Raises nothing. *)
   let with_lengths
     : (State.t * Note.t list) list -> (State.t * Note.t list * int) list
     =
@@ -143,8 +153,8 @@ module Make
       s, path, List.length path)
   ;;
 
-  (* See the [.mli]. {!silent_closure}'s paths, reversed into first-step-first
-     order and turned into annotations. *)
+  (* See the [.mli]. {!silent_closure}'s paths, reversed into first-step-
+     first order and turned into annotations. *)
   let silent_paths (old_edges : EdgeMap.t') (src : State.t)
     : (State.t * Annotation.t option * int) list
     =
@@ -154,11 +164,14 @@ module Make
       (with_lengths (silent_closure old_edges src))
   ;;
 
-  (** A silent-closure lookup over [old_edges], memoised. A state's silent
+  (** [closures_of ?cap old_edges] is a memoised lookup of silent closures
+      over [old_edges] ({!silent_closure}, with lengths). A state's silent
       closure does not depend on where the weak step started, so each is
       computed once rather than once per visible move into it (backlog item
       3b). With [cap], the memo is emptied whenever it reaches [cap] states,
-      bounding its memory for on-demand use. *)
+      bounding its memory for on-demand use.
+
+      Raises nothing. *)
   let closures_of ?(cap : int option) (old_edges : EdgeMap.t')
     : State.t -> (State.t * Note.t list * int) list
     =
@@ -177,12 +190,18 @@ module Make
         c
   ;;
 
-  (** [visible_sources closure_of from old_edges]: for each visible label
-      [a] of a step [from -tau*-> s -a-> t], in the order first met, the
-      states [t] so reached, each with its shortest path (most recent step
-      first), that path's length, and the order in which it was first
-      reached (its arrival index, which breaks ties between equally short
-      paths later). [closure_of] gives [from]'s silent closure. *)
+  (** [visible_sources closure_of from old_edges] is the table of states [t]
+      with [from -tau*-> s -a-> t], each mapped to its shortest path (most
+      recent step first), that path's length, and its arrival index, for
+      each visible label [a] reachable from [from] by [tau* a] (labels in
+      the order first met).
+
+      It walks [from]'s silent closure ([closure_of from]) in order, and
+      offers every visible step out of each state of it to its label's
+      table, which keeps the shorter path. The arrival index breaks ties
+      between equally short paths later, in {!silent_bfs}.
+
+      Raises nothing directly; propagates whatever [closure_of] raises. *)
   let visible_sources
         (closure_of : State.t -> (State.t * Note.t list * int) list)
         (from : State.t)
@@ -192,7 +211,7 @@ module Make
     let labels : (C.Label.t * (Note.t list * int * int) StateTbl.t) list ref =
       ref []
     in
-    (* [sources_of l]: [l]'s table, added (at the end) if new *)
+    (* [sources_of l] is [l]'s table, added (at the end) if new *)
     let sources_of (l : C.Label.t) : (Note.t list * int * int) StateTbl.t =
       match List.find_opt (fun (l', _) -> C.Label.equal l l') !labels with
       | Some (_, tbl) -> tbl
@@ -230,12 +249,16 @@ module Make
     !labels
   ;;
 
-  (** [silent_bfs old_edges sources]: every state reachable by silent steps
-      from the [sources] of one label ({!visible_sources}), each with its
-      shortest distance and the path that first reached it (most recent step
-      first). The search goes distance by distance; within a distance,
-      sources in order of length then arrival index, so ties go to the path
-      met first. *)
+  (** [silent_bfs old_edges sources] is every state reachable by silent
+      steps of [old_edges] from one label's [sources] ({!visible_sources}),
+      each mapped to the path that first reached it (most recent step
+      first) and its length, the shortest there is.
+
+      A search by distance: the sources are queued at their own lengths, in
+      order of length then arrival index, and each distance is settled
+      before the next, so of equally short paths the one met first wins.
+
+      Raises nothing. *)
   let silent_bfs
         (old_edges : EdgeMap.t')
         (sources : (Note.t list * int * int) StateTbl.t)
@@ -246,7 +269,7 @@ module Make
     let buckets : (int, (State.t * Note.t list) Queue.t) Hashtbl.t =
       Hashtbl.create 16
     in
-    (* [push d x]: queue [x] at distance [d] *)
+    (* [push d x] queues [x] at distance [d] *)
     let push (d : int) (x : State.t * Note.t list) : unit =
       match Hashtbl.find_opt buckets d with
       | Some q -> Queue.push x q
@@ -292,10 +315,12 @@ module Make
     best
   ;;
 
-  (** [emit_weak_actions new_actions label best]: add to [new_actions] one
-      weak action under [label] per state of [best] ({!silent_bfs}), with
-      that single state as its destination and the state's path as its
-      annotation. *)
+  (** [emit_weak_actions new_actions label best] adds to [new_actions] one
+      weak action under [label] for each state of [best] ({!silent_bfs}),
+      with that state as its only destination and its path as the
+      annotation.
+
+      Raises nothing. *)
   let emit_weak_actions
         (new_actions : ActionMap.t')
         (label : C.Label.t)
@@ -318,25 +343,22 @@ module Make
       ActionMap.update new_actions x ds)
   ;;
 
-  (** [edge_bfs closure_of new_actions from old_edges] computes [from]'s
-      weak actions, in time linear in its output rather than in the number
-      of witnesses (backlog item 3b, 2026-10-03; it replaces [edge_closure],
-      see git history). For
-      each visible label [a]: the states [t] with [from -tau*-> s -a-> t],
-      each at its shortest distance (ties: the first met, in the order
-      [edge_closure] met them), are the sources of one breadth-first search
-      over silent steps, and every state it reaches is a weak [a]-target, at
-      its shortest distance, with the path that reached it first as its
-      witness. [edge_closure] instead proposed one witness per (s, visible
-      step, state reachable from t) -- 2.3M-4.7M per state on [Proc/Test4],
-      for 5,280-7,680 weak actions: 2.9s a state, now 35ms.
+  (** [edge_bfs closure_of new_actions from old_edges] adds [from]'s weak
+      actions to [new_actions], in time linear in their number rather than
+      in the number of witnesses: {!visible_sources}, then per label
+      {!silent_bfs} and {!emit_weak_actions}.
 
-      Same targets and lengths as [edge_closure]; among witnesses of equal
-      length it may keep a different one (2 of the 2426 in [satdiff]; no
-      proof count changed).
+      Every state the search reaches from a label's sources is a weak
+      target under that label, at its shortest distance, with the path
+      that reached it first as its witness. It replaced [edge_closure]
+      (backlog item 3b, 2026-10-03; see git history), which proposed one
+      witness per (s, visible step, state reachable from t): 2.3M-4.7M per
+      state on [Proc/Test4], for 5,280-7,680 weak actions; 2.9s a state,
+      now 35ms. Same targets and lengths as [edge_closure]; among witnesses
+      of equal length it may keep a different one (2 of the 2426 in
+      [satdiff]; no proof count changed).
 
-      In three steps: {!visible_sources}, then per label {!silent_bfs} and
-      {!emit_weak_actions}. *)
+      Raises nothing directly; propagates whatever [closure_of] raises. *)
   let edge_bfs
         (closure_of : State.t -> (State.t * Note.t list * int) list)
         (new_actions : ActionMap.t')
@@ -351,9 +373,11 @@ module Make
       (visible_sources closure_of from old_edges)
   ;;
 
-  (** [from]'s weak actions, or [None] if it has none. The one place a
-      state is saturated: [edges] and [on_demand] both use it, so they agree
-      by construction. *)
+  (** [state_actions closure_of old_edges from] is [from]'s weak actions,
+      or [None] if it has none. The one place a state is saturated: {!edges}
+      and {!on_demand} both use it, so they agree by construction.
+
+      Raises nothing directly; propagates whatever [closure_of] raises. *)
   let state_actions
         (closure_of : State.t -> (State.t * Note.t list * int) list)
         (old_edges : EdgeMap.t')
