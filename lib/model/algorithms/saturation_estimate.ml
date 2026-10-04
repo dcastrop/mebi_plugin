@@ -195,10 +195,29 @@ module Make
     ids
   ;;
 
+  (** [transitions x] is every transition of [x], as (source, action,
+      destination), in the order [x]'s edges are stored: by source, then
+      action, then destination.
+
+      Raises nothing. *)
+  let transitions (x : FSM.t) : (State.t * Action.t * State.t) list =
+    EdgeMap.fold
+      (fun (from : State.t) (actions : ActionMap.t') acc ->
+        ActionMap.fold
+          (fun (a : Action.t) (ds : States.t) acc ->
+            States.fold (fun (d : State.t) acc -> (from, a, d) :: acc) ds acc)
+          actions
+          acc)
+      x.edges
+      []
+    |> List.rev
+  ;;
+
   (** [split_edges ids x] is [x]'s transitions by id, the silent ones as
-      [(from, goto)] and the visible ones as [(from, label, goto)], with the
-      number of transitions in all. A state missing from [ids] is given the
-      next id on the way.
+      [(from, goto)] and the visible ones as [(from, label, goto)] (each
+      list in reverse order of {!transitions}), with the number of
+      transitions in all. A state missing from [ids] is given the next id
+      on the way.
 
       Raises nothing. *)
   let split_edges (ids : int StateTbl.t) (x : FSM.t)
@@ -213,27 +232,16 @@ module Make
         StateTbl.add ids s i;
         i
     in
-    let silent : (int * int) list ref = ref [] in
-    let visible : (int * Label.t * int) list ref = ref [] in
-    let strong : int ref = ref 0 in
-    EdgeMap.fold
-      (fun (from : State.t) (actions : ActionMap.t') () ->
+    List.fold_left
+      (fun (silent, visible, strong)
+        ((from, a, d) : State.t * Action.t * State.t) ->
         let f : int = id from in
-        ActionMap.fold
-          (fun (a : Action.t) (ds : States.t) () ->
-            States.iter
-              (fun (d : State.t) ->
-                incr strong;
-                let g : int = id d in
-                if Action.is_silent a
-                then silent := (f, g) :: !silent
-                else visible := (f, a.label, g) :: !visible)
-              ds)
-          actions
-          ())
-      x.edges
-      ();
-    !silent, !visible, !strong
+        let g : int = id d in
+        if Action.is_silent a
+        then (f, g) :: silent, visible, strong + 1
+        else silent, (f, a.label, g) :: visible, strong + 1)
+      ([], [], 0)
+      (transitions x)
   ;;
 
   (** [scc_dag comp k silent visible] is, for each of the [k] SCCs ([comp]
