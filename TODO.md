@@ -51,6 +51,9 @@ they are in the code (the comments point here); each needs a fix with a test.
 - [ ] `Rocq_utils.extract_benchmark_args` returns a one-element list, not the list of terms its name suggests.
 - [ ] `Mebi_theories.find_reference` raises `ErrorWithGlobalOfPath`, which the interface does not export, so callers can only catch it generically.
 - [ ] Unused: `Mebi_theories.constants`, `get_proof_from_pstate`, `get_partial_proof`.
+- [ ] `Rocq_monad_utils.econstr_to_constr` takes `?abort_on_undefined_evars` but does not pass it on, so the flag does nothing.
+- [ ] `Rocq_monad_utils.Unification.Problem`'s JSON writes the `act` pair under `"goto"` as well as `"act"` (only dumps and logs are affected).
+- [ ] `Rocq_monad_utils.Unification.Pair.unify` catches only the `CannotUnify` kind of `PretypeError`; `w_unify`'s other failures (an occur-check, `UnifOccurCheck`, say) escape instead of meaning "does not unify".
 
 ## To discuss with @dcastrop
 
