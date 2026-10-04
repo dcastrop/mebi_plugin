@@ -34,36 +34,24 @@ VERNAC COMMAND EXTEND MeBi_Sim CLASSIFIED AS QUERY
   { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.init pstate rs (x,a) (y,b)) }
 END
 
-(* Bisimilarity, opening the proof: [... As Bisim <name>] states
-   [weak_bisimilar], [... As Sim <name>] states [weak_sim], and begins the
-   proof search on it ([Proof_solver.start]); [MeBi Sim Solve] follows.
-   [As] comes before [Using]: grammar words are not reserved, so a
-   [reference_list] would read [As Bisim <name>] as three more relations. *)
+(* Bisimilarity, opening the proof: [... As <name>] states
+   [weak_bisimilar] as the Example <name> and begins the proof search on it
+   ([Proof_solver.start]); [MeBi Sim Solve] follows. [As] comes before
+   [Using]: grammar words are not reserved, so a [reference_list] would read
+   [As <name>] as two more relations. *)
 VERNAC COMMAND EXTEND MeBi_Run_Bisim_As
 | ![ open_proof ] ["MeBi" "Run"
    "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
-   "As" "Bisim" identref(n)]
+   "As" identref(n)]
   => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
   -> { Proof_solver.guard (fun () ->
          Proof_solver.start ~kind:Proof_solver.Bisim ~name:n.CAst.v [] (x, a) (y, b)) }
 | ![ open_proof ] ["MeBi" "Run"
    "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
-   "As" "Bisim" identref(n) "Using" reference_list(rs)]
+   "As" identref(n) "Using" reference_list(rs)]
   => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
   -> { Proof_solver.guard (fun () ->
          Proof_solver.start ~kind:Proof_solver.Bisim ~name:n.CAst.v rs (x, a) (y, b)) }
-| ![ open_proof ] ["MeBi" "Run"
-   "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
-   "As" "Sim" identref(n)]
-  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
-  -> { Proof_solver.guard (fun () ->
-         Proof_solver.start ~kind:Proof_solver.Sim ~name:n.CAst.v [] (x, a) (y, b)) }
-| ![ open_proof ] ["MeBi" "Run"
-   "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
-   "As" "Sim" identref(n) "Using" reference_list(rs)]
-  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
-  -> { Proof_solver.guard (fun () ->
-         Proof_solver.start ~kind:Proof_solver.Sim ~name:n.CAst.v rs (x, a) (y, b)) }
 END
 
 (* Bisimilarity *)

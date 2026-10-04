@@ -56,8 +56,8 @@ val init
   -> Constrexpr.constr_expr * Libnames.qualid
   -> Declare.Proof.t
 
-(** Which goal [MeBi Run Bisim ... As] states: [weak_bisimilar] ([Bisim])
-    or [weak_sim] ([Sim]). *)
+(** Which goal {!start} states: [weak_bisimilar] ([Bisim], for [MeBi Run Bisim ... As]) or [weak_sim] ([Sim]).
+*)
 type goal_kind =
   | Bisim
   | Sim

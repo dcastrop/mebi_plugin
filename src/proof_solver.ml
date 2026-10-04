@@ -562,15 +562,15 @@ let init
   pstate
 ;;
 
-(** Which goal [MeBi Run Bisim ... As] states: [weak_bisimilar] ([Bisim])
-    or [weak_sim] ([Sim]). *)
+(** Which goal {!start} states: [weak_bisimilar] ([Bisim], for [MeBi Run Bisim ... As]) or [weak_sim] ([Sim]).
+*)
 type goal_kind =
   | Bisim
   | Sim
 
 (** [goal_statement kind (x, a) (y, b)]: the statement to prove, as an
-    expression to interpret: [weak_bisimilar a b x y] or [weak_sim a b x
-    y], [x] stepping by the relation [a] and [y] by [b]. *)
+    expression to interpret: [weak_bisimilar a b x y] or [weak_sim a b x y], [x] stepping by the relation [a] and [y] by [b].
+*)
 let goal_statement
       (kind : goal_kind)
       ((x, a) : Constrexpr.constr_expr * Libnames.qualid)
@@ -604,7 +604,9 @@ let start
   Logger.trace __FUNCTION__;
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let typ, uctx = Constrintern.interp_type env sigma (goal_statement kind a b) in
+  let typ, uctx =
+    Constrintern.interp_type env sigma (goal_statement kind a b)
+  in
   let pstate =
     Declare.Proof.start
       ~info:(Declare.Info.make ~kind:Decls.(IsDefinition Example) ())
