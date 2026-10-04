@@ -6049,8 +6049,12 @@ Help Run`; `TODO.md`'s similarity item closed.
 **How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
 --merges --oneline --grep feature/run-sim main`).
 
+**Rebased** onto `main` after the `respond` speed-up (PR #36) and the
+dumps fix (PR #37), which merged first while this PR was on hold, and
+re-verified there (see the PR).
+
 **Session tally (2026-10-04), cont.:** New feature 3 · Refactor 1 (review)
-· Docs 1 · Tooling 1.
+· Docs 1 · Tooling 1 · Optimization 1 · Bug fix 1.
 
 ---
 
