@@ -1807,6 +1807,44 @@ module Make (Enc : Encoding.S) :
       walk []
     ;;
 
+    (** [enumerate_sources env sigma (name, args) lhs] is the distinct
+        sources (the instances of [lhs], fully normalised) for which the LTS
+        premise [name args] holds, in the order the premise search
+        ({!Premise_search.enumerate}) finds them, with whether that search
+        was complete, and one solution, if any, whose source is still open
+        (the premise under it, for a warning). Raises nothing. *)
+    let enumerate_sources
+          (env : Environ.env)
+          (sigma : Evd.evar_map)
+          ((name, args) : EConstr.t * EConstr.t array)
+          (lhs : EConstr.t)
+      : EConstr.t list * bool * EConstr.t option
+      =
+      let premise = Reductionops.nf_evar sigma (EConstr.mkApp (name, args)) in
+      let sols, complete = Premise_search.enumerate env sigma premise in
+      let source s = Reductionops.nf_all env s lhs in
+      let closed, open_ =
+        List.partition (fun s -> Bool.not (has_evars s (source s))) sols
+      in
+      (* closed terms: comparing them under any evar map is sound *)
+      let sources =
+        List.fold_left
+          (fun acc s ->
+            let l = source s in
+            if List.exists (EConstr.eq_constr sigma l) acc
+            then acc
+            else l :: acc)
+          []
+          closed
+      in
+      let undetermined =
+        match open_ with
+        | s :: _ -> Some (Reductionops.nf_evar s (EConstr.mkApp (name, args)))
+        | [] -> None
+      in
+      List.rev sources, complete, undetermined
+    ;;
+
     (* See the [.mli]. *)
     let check_constructor_args_unify
           (lhs : EConstr.t)
@@ -2013,32 +2051,7 @@ module Make (Enc : Encoding.S) :
            explored from the open source, with a warning. *)
         let explore_sources () =
           let$+ found env sigma =
-            let premise =
-              Reductionops.nf_evar sigma (EConstr.mkApp (name, raw_args))
-            in
-            let sols, complete = Premise_search.enumerate env sigma premise in
-            let source s = Reductionops.nf_all env s lhs_raw in
-            let closed, open_ =
-              List.partition (fun s -> Bool.not (has_evars s (source s))) sols
-            in
-            (* closed terms: comparing them under any evar map is sound *)
-            let sources =
-              List.fold_left
-                (fun acc s ->
-                  let l = source s in
-                  if List.exists (EConstr.eq_constr sigma l) acc
-                  then acc
-                  else l :: acc)
-                []
-                closed
-            in
-            let undetermined =
-              match open_ with
-              | s :: _ ->
-                Some (Reductionops.nf_evar s (EConstr.mkApp (name, raw_args)))
-              | [] -> None
-            in
-            List.rev sources, complete, undetermined
+            enumerate_sources env sigma (name, raw_args) lhs_raw
           in
           let sources, complete, undetermined = found in
           let* () =
@@ -2073,9 +2086,7 @@ module Make (Enc : Encoding.S) :
           if lhs_open then explore_sources () else explore_closed ()
         in
         let$+ lhs_open _ sigma =
-          Bool.not
-            (Evar.Set.is_empty
-               (Evd.evars_of_term sigma (Reductionops.nf_evar sigma lhs_raw)))
+          has_evars sigma (Reductionops.nf_evar sigma lhs_raw)
         in
         let deferred : Problems.deferred list =
           match acc with (p : Problems.t) :: _ -> p.deferred | [] -> []
