@@ -171,7 +171,26 @@ module Make
          raise (BindingInstruction_Undefined (x, y)))
   ;;
 
-  (* See the [.mli]. *)
+  (** [explicit_binding x (name, path)] is the [with] binding of the binder
+      [name] to its subterm of [x] at [path] ({!get_bound_term}).
+
+      Raises whatever {!get_bound_term} raises (propagated). *)
+  let explicit_binding
+        (x : EConstr.t)
+        ((name, path) : Bindings.NamedInstructions.t)
+    : (Tactypes.quantified_hypothesis * EConstr.t) CAst.t mm
+    =
+    Logger.trace __FUNCTION__;
+    Logger.thing ~__FUNCTION__ Debug "name" name Rocq_utils.Strfy.name;
+    Bindings.Instructions.log ~__FUNCTION__ path;
+    let open Syntax in
+    let q = get_quantified_hyp name in
+    let* bs = get_bound_term x path in
+    return (CAst.make (q, bs))
+  ;;
+
+  (* See the [.mli]. One {!explicit_binding} per binder in [xmap], in
+     reverse order. *)
   let get_explicit_bindings
     :  EConstr.t * Bindings.ConstrMap.t' option
     -> EConstr.t Tactypes.explicit_bindings mm
@@ -182,16 +201,13 @@ module Make
     | x, Some xmap ->
       let open Syntax in
       let ys = Bindings.ConstrMap.to_seq_values xmap |> Array.of_seq in
-      let f (i : int) (acc : EConstr.t Tactypes.explicit_bindings) =
-        Logger.trace __FUNCTION__;
-        let name, inst = ys.(i) in
-        Logger.thing ~__FUNCTION__ Debug "name" name Rocq_utils.Strfy.name;
-        Bindings.Instructions.log ~__FUNCTION__ inst;
-        let q = get_quantified_hyp name in
-        let* bs = get_bound_term x inst in
-        CAst.make (q, bs) :: acc |> return
-      in
-      iterate 0 (Array.length ys - 1) [] f
+      iterate
+        0
+        (Array.length ys - 1)
+        []
+        (fun i acc ->
+          let* b = explicit_binding x ys.(i) in
+          return (b :: acc))
   ;;
 
   (* See the [.mli]. *)
