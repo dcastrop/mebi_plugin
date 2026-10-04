@@ -909,11 +909,68 @@ struct
       ; measure : measure
       }
 
+    (** What a {!walk} has recorded so far: the pairs reached, the choice
+        made for each move, each stepped pair's successors, and the
+        measure's running counts. *)
+    type walk_state =
+      { reached : Pair.Set.t
+      ; choices : choice KeyMap.t
+      ; successors_of : Pair.t list Pair.Map.t
+      ; moves_answered : int
+      ; witness_total : int
+      ; unanswered_moves : int
+      }
+
+    (** [answer_pair choose st p obligations]: [st] after answering each of
+        [p]'s [obligations] with [choose] (given the pairs reached so far): a
+        choice is recorded and its move and witness counted, and a pair not
+        reached before is added (checked against the [with_cap] cap first);
+        an obligation [choose] leaves unanswered is only counted. [p]'s
+        successors are recorded in order. Also returns the newly reached
+        pairs, in order. *)
+    let answer_pair
+          (choose : Pair.Set.t -> obligation -> choice option)
+          (st : walk_state)
+          (p : Pair.t)
+          (obligations : obligation list)
+      : walk_state * Pair.t list
+      =
+      let st, fresh, succ =
+        List.fold_left
+          (fun ((st, fresh, succ) : walk_state * Pair.t list * Pair.t list) o ->
+            match choose st.reached o with
+            | None ->
+              ( { st with unanswered_moves = st.unanswered_moves + 1 }
+              , fresh
+              , succ )
+            | Some c ->
+              let st =
+                { st with
+                  choices = KeyMap.add o.key c st.choices
+                ; moves_answered = st.moves_answered + 1
+                ; witness_total = st.witness_total + c.cost
+                }
+              in
+              if Pair.Set.mem c.next st.reached
+              then st, fresh, c.next :: succ
+              else (
+                if Stdlib.Option.is_some !walk_cap
+                then check_cap (Pair.Set.cardinal st.reached + 1);
+                ( { st with reached = Pair.Set.add c.next st.reached }
+                , c.next :: fresh
+                , c.next :: succ )))
+          (st, [], [])
+          obligations
+      in
+      ( { st with
+          successors_of = Pair.Map.add p (List.rev succ) st.successors_of
+        }
+      , List.rev fresh )
+    ;;
+
     (* [walk policy game_of choose root]: the plan [policy] makes: [root]
-       closed breadth-first under [choose] (given the pairs reached so far and
-       an obligation, the choice to make, or [None] to leave it unanswered),
-       recording every choice, each pair's successors, and the measure.
-       Counted against the [with_cap] cap. *)
+       closed breadth-first under [choose] ({!answer_pair} per pair), then
+       read off as a {!type-plan}. *)
     let walk
           (policy : t)
           (game_of : game_of)
@@ -921,59 +978,37 @@ struct
           (root : Pair.t)
       : plan
       =
-      let rec go seen frontier chosen next moves witness unanswered =
-        match frontier with
-        | [] ->
-          { policy
-          ; root
-          ; relation = seen
-          ; chosen
-          ; next
-          ; measure =
-              { pairs = Pair.Set.cardinal seen; moves; witness; unanswered }
-          }
+      (* [go st queue]: step the pairs in [queue], appending each one's newly
+         reached pairs to it *)
+      let rec go (st : walk_state) : Pair.t list -> walk_state = function
+        | [] -> st
         | p :: rest ->
-          let seen, fresh, succ, chosen, moves, witness, unanswered =
-            List.fold_left
-              (fun (seen, fresh, succ, chosen, moves, witness, unanswered) o ->
-                match choose seen o with
-                | None ->
-                  seen, fresh, succ, chosen, moves, witness, unanswered + 1
-                | Some c ->
-                  let chosen = KeyMap.add o.key c chosen in
-                  let succ = c.next :: succ in
-                  if Pair.Set.mem c.next seen
-                  then
-                    ( seen
-                    , fresh
-                    , succ
-                    , chosen
-                    , moves + 1
-                    , witness + c.cost
-                    , unanswered )
-                  else (
-                    if Stdlib.Option.is_some !walk_cap
-                    then check_cap (Pair.Set.cardinal seen + 1);
-                    ( Pair.Set.add c.next seen
-                    , c.next :: fresh
-                    , succ
-                    , chosen
-                    , moves + 1
-                    , witness + c.cost
-                    , unanswered )))
-              (seen, [], [], chosen, moves, witness, unanswered)
-              (game_of p)
-          in
-          go
-            seen
-            (rest @ List.rev fresh)
-            chosen
-            (Pair.Map.add p (List.rev succ) next)
-            moves
-            witness
-            unanswered
+          let st, fresh = answer_pair choose st p (game_of p) in
+          go st (rest @ fresh)
       in
-      go (Pair.Set.singleton root) [ root ] KeyMap.empty Pair.Map.empty 0 0 0
+      let st =
+        go
+          { reached = Pair.Set.singleton root
+          ; choices = KeyMap.empty
+          ; successors_of = Pair.Map.empty
+          ; moves_answered = 0
+          ; witness_total = 0
+          ; unanswered_moves = 0
+          }
+          [ root ]
+      in
+      { policy
+      ; root
+      ; relation = st.reached
+      ; chosen = st.choices
+      ; next = st.successors_of
+      ; measure =
+          { pairs = Pair.Set.cardinal st.reached
+          ; moves = st.moves_answered
+          ; witness = st.witness_total
+          ; unanswered = st.unanswered_moves
+          }
+      }
     ;;
 
     (* [cheapest cs]: the choice of least witness length in [cs], the first
