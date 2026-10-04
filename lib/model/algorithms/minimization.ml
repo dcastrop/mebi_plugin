@@ -120,8 +120,22 @@ module Make
     | Assert_failure _ -> raise (CannotSplitEmptyBlock ())
   ;;
 
-  (* See the [.mli]. One pass over [block], comparing each state's [reach]
-     with [s]'s. *)
+  (** [goes_with reach s reachable_from_s t] is whether [t] stays in [s]'s
+      block: [t] is [s], or [reach t] is the same set of blocks as [s]'s,
+      [reachable_from_s]. Raises nothing directly; propagates whatever
+      [reach] raises. *)
+  let goes_with
+        (reach : State.t -> Partition.t)
+        (s : State.t)
+        (reachable_from_s : Partition.t)
+        (t : State.t)
+    : bool
+    =
+    State.equal s t || Partition.equal reachable_from_s (reach t)
+  ;;
+
+  (* See the [.mli]. One pass over [block], each state kept with [s] or
+     split off by {!goes_with}. *)
   let split_block_by
         (reach : State.t -> Partition.t)
         (s : State.t)
@@ -134,16 +148,11 @@ module Make
     Partition.log ~__FUNCTION__ ~s:"reachable from state" reachable_from_s;
     States.fold
       (fun (t : State.t) ((b1, b2) : States.t * States.t option) ->
-        if State.equal s t
-        then States.add s b1, b2
+        if goes_with reach s reachable_from_s t
+        then States.add t b1, b2
         else (
-          let reachable_from_t : Partition.t = reach t in
-          (* NOTE: split if [s] and [t] can reach different blocks *)
-          if Partition.equal reachable_from_s reachable_from_t
-          then States.add t b1, b2
-          else (
-            State.log ~__FUNCTION__ ~s:"splitting" t;
-            b1, Some (States.add_to_opt t b2))))
+          State.log ~__FUNCTION__ ~s:"splitting" t;
+          b1, Some (States.add_to_opt t b2)))
       block
       (States.empty, None)
   ;;
@@ -193,37 +202,42 @@ module Make
       changed := true
   ;;
 
-  (* See the [.mli]. A breadth-first search over silent steps per state,
-     memoised by state. *)
+  (** [silent_successors edges s] is the destination of every silent step
+      out of [s] in [edges], in storage order (repeats possible). Raises
+      nothing. *)
+  let silent_successors (edges : EdgeMap.t') (s : State.t) : State.t list =
+    match EdgeMap.find_opt edges s with
+    | None -> []
+    | Some actions ->
+      ActionMap.fold
+        (fun (a : Action.t) (ds : States.t) acc ->
+          if Action.is_silent a
+          then States.fold (fun (d : State.t) acc -> d :: acc) ds acc
+          else acc)
+        actions
+        []
+      |> List.rev
+  ;;
+
+  (* See the [.mli]. A breadth-first search over silent steps
+     ({!silent_successors}) per state, memoised by state. *)
   let silent_closures (edges : EdgeMap.t') : State.t -> States.t =
     let memo : States.t StateTbl.t = StateTbl.create 64 in
     (* [bfs frontier seen] is [seen] grown by everything reachable by silent
-       steps from [frontier] (whose states are already in [seen]). *)
+       steps from [frontier] (whose states are already in [seen]); a state's
+       new successors go to the front of the frontier. *)
     let rec bfs (frontier : State.t list) (seen : States.t) : States.t =
       match frontier with
       | [] -> seen
       | s :: rest ->
-        (match EdgeMap.find_opt edges s with
-         | None -> bfs rest seen
-         | Some actions ->
-           let frontier, seen =
-             ActionMap.fold
-               (fun (a : Action.t) (ds : States.t) acc ->
-                 if Action.is_silent a
-                 then
-                   States.fold
-                     (fun (d : State.t)
-                       ((fr, seen) : State.t list * States.t) ->
-                       if States.mem d seen
-                       then fr, seen
-                       else d :: fr, States.add d seen)
-                     ds
-                     acc
-                 else acc)
-               actions
-               (rest, seen)
-           in
-           bfs frontier seen)
+        let frontier, seen =
+          List.fold_left
+            (fun ((fr, seen) : State.t list * States.t) (d : State.t) ->
+              if States.mem d seen then fr, seen else d :: fr, States.add d seen)
+            (rest, seen)
+            (silent_successors edges s)
+        in
+        bfs frontier seen
     in
     fun (src : State.t) ->
       match StateTbl.find_opt memo src with
