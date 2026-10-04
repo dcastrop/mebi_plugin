@@ -6128,6 +6128,76 @@ review, 9 split commits) · Docs 3 · Tooling 1 · Optimization 1 · Bug fix 1.
 
 ---
 
+## 2026-10-04 — Documentation pass, part 2: `lib/rocq_tools`
+
+**Docs + Refactor.** On branch `docs/rocq-tools`. Same rules as part 1, in
+the style Jonah settled during its review.
+
+**Dead code** (`a05259c`, and inside `5b29806`): 42 commented-out blocks
+in `rocq_utils.ml` and about 400 lines in `mebi_theories.ml`, removed (git
+history keeps them).
+
+**Comments** (`5b29806`, `af2213d`, `5d61271`, `ba18ac9`; comments only,
+checked file by file with comments stripped): every function in the twelve
+files, contracts in the `.mli` and pointers or a short "how" at the
+definitions, internal functions documented where they are defined.
+`Rocq_monad`'s interface now states the rule that its computations defer
+exceptions: a `try` around *building* a monadic value does not catch what
+*running* it raises. Placeholder comments (`(** [] *)`) and separator bars
+are gone, and a stale reference (`sandbox_unify_all_opt`) is fixed.
+
+**Latent bugs found, not fixed** (`8be3944`, `a6e1987`; listed in
+`TODO.md`, "Found by the documentation pass"). Writing down what each
+function raises showed code that does not do what it appears to: 13 `try`
+blocks around monadic values (some harmless), handlers that can never fire,
+an exception raised where another is declared, nine `Strfy` printers that
+print `"TODO"`, a flag that is ignored (`econstr_to_constr`'s
+`?abort_on_undefined_evars`), a JSON field written twice, and `Pair.unify`
+catching only one kind of unification failure. The comments describe the
+code as it is and point to `TODO.md`. Each needs its own fix with a test,
+so none is fixed here.
+
+**Splits**, one commit each:
+- `constructor_bindings`: `constructor_info` (from `extract_info`),
+  `explicit_binding` (from `get_explicit_bindings`), `add_if_known` and
+  `bind_once` (from `get`). Also corrects `extract_info`'s contract: its
+  list is the last constructor first, not "in order".
+- `bindings`: `find_name` searches with a recursive `first_named` instead
+  of threading an option through every index (same comparisons, in the
+  same order); `extract_binding_map`'s inner walk becomes `walk`, using the
+  loop index where it kept a counter that always equalled it, and dropping
+  an accumulator it never read.
+- `rocq_monad_utils`: `warn_each` (one loop, defined twice before),
+  `axioms_per_state`, and, from `handle_app` (~190 lines),
+  `combine_branches`, `premises_ahead` and `enumerate_sources`. The
+  closures left inside `handle_app` depend on most of its scope, so by the
+  rule they stay, with header comments.
+
+**Mistakes on the way.** My comment-replacing helper (local, in `notes/`)
+measured a definition's indentation wrongly, so in `rocq_monad_utils.ml`
+it first stacked new comments on old ones; caught by the diff having no
+deletions, then fixed and re-run. Of the files committed before, none was
+affected (checked). The re-run then replaced a `FIXME` that sat above
+`handle_app` but belongs to `check_updated_ctx`; restored. And two pointer
+comments first landed in the `.ml`'s own copy of the signature (the helper
+takes the first match); moved.
+
+**Verification.** Each split commit, in its own worktree: build and the
+proof matrix in all three solver modes (`bench/proofs.sh -m
+auto,True,False`), every `Solve` identical to the baseline (10 of 10).
+The branch head: `tests.exe` 103/103, `make` clean, and `Test.v`'s 60
+`Solve` counts identical to `main`'s. Not run: ABP and `Test4`, since no
+split touches inversion, dead-step refutation or the model.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/rocq-tools main`), or a single split by its
+commit.
+
+**Session tally (2026-10-04), cont.:** New feature 3 · Refactor 20 (1
+review, 19 split commits) · Docs 5 · Tooling 1 · Optimization 1 · Bug fix 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
