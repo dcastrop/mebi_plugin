@@ -1732,6 +1732,31 @@ module Make (Enc : Encoding.S) :
           warn lts_enc (name, args))
     ;;
 
+    (** [axioms_per_state states (act, tgt) (lts_enc, i) cs] is [cs] with,
+        for each evar map of [states] in turn, the constructor [i] of
+        [lts_enc] as an axiom ({!Constructors.axiom}) from [act] to [tgt],
+        both fully normalised under that map. Each runs in that map, the
+        state left unchanged ({!sandbox}). Raises nothing. *)
+    let axioms_per_state
+          (states : Evd.evar_map list)
+          ((act, tgt) : EConstr.t * EConstr.t)
+          (constructor_index : Enc.t * int)
+          (constructors : Constructors.t)
+      : Constructors.t mm
+      =
+      let open Syntax in
+      let* env = get_env in
+      iterate
+        0
+        (List.length states - 1)
+        constructors
+        (fun k acc ->
+          let sigma = List.nth states k in
+          let act = Reductionops.nf_all env sigma act in
+          let tgt = Reductionops.nf_all env sigma tgt in
+          sandbox ~sigma (Constructors.axiom act tgt constructor_index acc))
+    ;;
+
     (* See the [.mli]. *)
     let check_constructor_args_unify
           (lhs : EConstr.t)
@@ -1835,16 +1860,11 @@ module Make (Enc : Encoding.S) :
           let states, undecided, partial = resolved in
           let* () = warn_each warn_if_skipped_premise undecided in
           let* () = warn_each warn_partial_premise partial in
-          let* env = get_env in
-          iterate
-            0
-            (List.length states - 1)
-            constructors
-            (fun k acc ->
-              let sigma = List.nth states k in
-              let act = Reductionops.nf_all env sigma outer_act in
-              let tgt = Reductionops.nf_all env sigma tgt_term in
-              sandbox ~sigma (Constructors.axiom act tgt (next_lts_enc, i) acc)))
+          axioms_per_state
+            states
+            (outer_act, tgt_term)
+            (next_lts_enc, i)
+            constructors)
         else
           Constructors.retrieve
             i
