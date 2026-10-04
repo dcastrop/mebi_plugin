@@ -20,7 +20,10 @@
    Note what makes the difference: a canonical representative, not merely
    explicit congruence rules. Used as a premise ([p == p' -> p' -a-> q' ->
    q' == q -> p -a-> q]), the rules would let the plugin enumerate every
-   congruent target, and the 9720 states would come back. *)
+   congruent target, and the 9720 states would come back.
+
+   [doc/structural-congruence.md] walks through this file as a recipe for
+   other calculi. *)
 
 From Stdlib Require Import List Permutation Bool Relations.Relation_Operators.
 Import ListNotations.
