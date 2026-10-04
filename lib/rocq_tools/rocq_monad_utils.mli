@@ -418,8 +418,11 @@ module type S = sig
       (** [unify env sigma p] is the evar map with [p.to_check] unified with
           [p.acc] (up to cumulativity), and whether that succeeded.
 
-          Raises Rocq's unification errors other than [CannotUnify]
-          (propagated; only that one is caught, [TODO.md]). *)
+          [false] when Rocq finds no unifier ([CannotUnify], an occur-check,
+          binder types that differ).
+
+          Raises Rocq's other unification errors, where it gives up rather
+          than finds none (propagated). *)
       val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
 
       (** [unifies to_check acc] is {!unify} in the current context, keeping

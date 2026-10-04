@@ -1127,7 +1127,10 @@ module Make (Enc : Encoding.S) :
         else sigma, { to_check; acc }
       ;;
 
-      (* See the [.mli]: only [CannotUnify] is caught. *)
+      (* See the [.mli]. Only failures that show there is no unifier mean
+         [false]; one where Rocq gives up (beyond its capabilities,
+         unsatisfiable constraints) is not a "no", so it stays an error
+         rather than silently dropping a transition. *)
       let unify
             (env : Environ.env)
             (sigma : Evd.evar_map)
@@ -1140,7 +1143,9 @@ module Make (Enc : Encoding.S) :
           in
           sigma, true
         with
-        | Pretype_errors.PretypeError (_, _, CannotUnify (c, d, _e)) ->
+        | Pretype_errors.PretypeError
+            (_, _, (CannotUnify _ | UnifOccurCheck _ | CannotUnifyBindingType _))
+          ->
           sigma, false
       ;;
 
