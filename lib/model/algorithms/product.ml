@@ -241,6 +241,52 @@ struct
      a silent move whose target is not bisimilar to [from] had no answer at
      all, though [=ε=>] allows one. See [ASSISTED-CHANGES.md], 2026-10-02
      (second session). *)
+  (* [best_response actions label bisimilar]: the weak move [respond]
+     answers with, among [actions] (one state's weak actions, each with its
+     destinations): those under [label] whose destinations meet [bisimilar],
+     the one with the shortest annotation ([None] counting as 0), ties going
+     to the least action by [Action.compare]; returned with its destinations
+     cut down to [bisimilar], or [None] if there is none.
+
+     One pass over [actions]. Until 2026-10-04 [respond] built the same
+     choice as a set: [reduce_by_label] (a copy of the table), then
+     [to_actionpairs] (an ordered set of (action, destinations) pairs), then
+     a [filter_map] and [shortest_annotation], which keeps the first of the
+     shortest in that set's order -- the least action, as here, since two
+     distinct actions never compare equal. Building that set cost ~85% of
+     ~165ms per answer on [Proc/Test4] saturated on demand (~8,000 weak
+     actions a state; notes/15). *)
+  let best_response
+        (actions : C.Action.Map.t')
+        (label : C.Label.t)
+        (bisimilar : C.State.Set.t)
+    : (C.Action.t * C.State.Set.t) option
+    =
+    (* [a] answers strictly better than [b]: shorter, or as short and less *)
+    let better (a : C.Action.t) (b : C.Action.t) : bool =
+      match
+        Int.compare
+          (C.Annotation.opt_length a.annotation)
+          (C.Annotation.opt_length b.annotation)
+      with
+      | 0 -> C.Action.compare a b < 0
+      | n -> n < 0
+    in
+    C.Action.Map.fold
+      (fun (a : C.Action.t) (ds : C.State.Set.t) best ->
+        if
+          Bool.not (C.Label.equal a.label label)
+          || C.State.Set.disjoint bisimilar ds
+        then best
+        else (
+          match best with
+          | Some (b, _) when Bool.not (better a b) -> best
+          | _ -> Some (a, ds)))
+      actions
+      None
+    |> Stdlib.Option.map (fun (a, ds) -> a, C.State.Set.inter bisimilar ds)
+  ;;
+
   let respond_silently
         (silent : C.EdgeMap.t')
         (from : C.State.t)
@@ -277,33 +323,21 @@ struct
     | Some silent when C.Label.is_silent label ->
       respond_silently silent from label bisimilar
     | _ ->
-      (try
-         let ({ annotation; trees; _ }, destinations) : C.Action.Pair.t =
-           (* NOTE: get actions [from] with [label] *)
-           (FSM.ensure m from;
-            match C.EdgeMap.find_opt m.edges from with
-            | Some actions -> C.Action.Map.reduce_by_label actions label
-            | None ->
-              (* No weak move at all from [from] (a terminal of the saturated
-                 FSM): the same answer as no move under [label], rather than
-                 [Not_found] escaping to a caller that only expects
-                 [NoBisimilarResponse]. *)
-              raise (NoBisimilarResponse { from; label }))
-           |> C.Action.Map.to_actionpairs
-           (* NOTE: keep only those that are [bisimilar] *)
-           |> C.Action.Pair.Set.filter_map (fun ((x, y) : C.Action.Pair.t) ->
-             if C.State.Set.disjoint bisimilar y
-             then None
-             else Some (x, C.State.Set.inter bisimilar y))
-           (* NOTE: get the pair with the shortest annotation (less steps to do) *)
-           |> C.Action.Pair.Set.shortest_annotation
-         in
+      FSM.ensure m from;
+      (* No weak move at all from [from] (a terminal of the saturated FSM) is
+         the same answer as no move under [label], rather than [Not_found]
+         escaping to a caller that only expects [NoBisimilarResponse]. *)
+      let best : (C.Action.t * C.State.Set.t) option =
+        match C.EdgeMap.find_opt m.edges from with
+        | Some actions -> best_response actions label bisimilar
+        | None -> None
+      in
+      (match best with
+       | None -> raise (NoBisimilarResponse { from; label })
+       | Some ({ annotation; trees; _ }, destinations) ->
          let tree : Base.Tree.t option = Base.Trees.min_opt trees in
          let goto : C.State.t = C.State.Set.min_elt destinations in
-         { from; goto; label; annotation; tree }
-       with
-       | C.Action.Pair.Set.IsEmpty ->
-         raise (NoBisimilarResponse { from; label }))
+         { from; goto; label; annotation; tree })
   ;;
 
   let bisimilar_with (pi : C.Partition.t) (x : C.State.t) : C.State.Set.t =
@@ -1186,14 +1220,33 @@ struct
 
   exception Capped
 
+  (* [memo_step step]: [step], computing each pair's successors once and
+     then returning them from a table. [step] is a function of the pair (an
+     FSM saturated on demand only fills a cache underneath it), so the
+     results are the same; the table holds one list per pair stepped. *)
+  let memo_step (step : Pair.t -> Pair.t list) : Pair.t -> Pair.t list =
+    let table : Pair.t list Pair.Map.t ref = ref Pair.Map.empty in
+    fun (p : Pair.t) ->
+      match Pair.Map.find_opt p !table with
+      | Some next -> next
+      | None ->
+        let next = step p in
+        table := Pair.Map.add p next !table;
+        next
+  ;;
+
   (* The cost of a proof of the game reachable from [root] under [step]; see
-     [estimate]. *)
+     [estimate]. [step] is memoised ({!memo_step}): the walk below steps
+     every pair three times (to reach it, to count its moves, and in the
+     simulated nested walk, which may revisit it many times), and one step
+     can cost ~60ms on [Proc/Test4] saturated on demand (notes/15). *)
   let estimate_by
         ?(cap_factor : int = 4)
         (step : Pair.t -> Pair.t list)
         (root : Pair.t)
     : cost
     =
+    let step : Pair.t -> Pair.t list = memo_step step in
     let pairs : Pair.Set.t = reachable_by step root in
     let moves : int =
       Pair.Set.fold (fun p acc -> acc + List.length (step p)) pairs 0

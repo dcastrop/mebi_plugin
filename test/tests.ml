@@ -286,6 +286,121 @@ let test_product_bisim () : unit =
     (M.Product.Pair.Set.mem (state 1, state 12) pairs)
 ;;
 
+(** [Product.respond] picks its answer in one pass over the state's weak
+    actions (2026-10-04, notes/15); before, it built the same choice as an
+    ordered set. [respond_reference] is that old pipeline, kept here
+    verbatim, and the two must agree on every case: the same transition, or
+    both no answer. Over generated saturated FSMs, every state, every
+    visible label, and as targets every state set of size 0-2 plus all
+    states. Also counts the cases with several equally short candidates, so
+    the tie-break is seen to be exercised. *)
+let respond_reference
+      (m : M.FSM.t)
+      (from : M.State.t)
+      (label : M.Label.t)
+      (bisimilar : M.State.Set.t)
+  : M.Transition.t option
+  =
+  match M.EdgeMap.find_opt m.edges from with
+  | None -> None
+  | Some actions ->
+    (try
+       let ({ annotation; trees; _ }, destinations) : M.Action.Pair.t =
+         M.Action.Map.reduce_by_label actions label
+         |> M.Action.Map.to_actionpairs
+         |> M.Action.Pair.Set.filter_map (fun ((x, y) : M.Action.Pair.t) ->
+           if M.State.Set.disjoint bisimilar y
+           then None
+           else Some (x, M.State.Set.inter bisimilar y))
+         |> M.Action.Pair.Set.shortest_annotation
+       in
+       Some
+         { from
+         ; goto = M.State.Set.min_elt destinations
+         ; label
+         ; annotation
+         ; tree = Base.Trees.min_opt trees
+         }
+     with
+     | M.Action.Pair.Set.IsEmpty -> None)
+;;
+
+let test_respond_matches_reference () : unit =
+  print_endline "product: respond picks the same answer as before (one pass)";
+  let cases = ref 0
+  and mismatches = ref 0
+  and ties = ref 0 in
+  for seed = 1 to 150 do
+    let rng = Random.State.make [| seed |] in
+    let n = 4 + Random.State.int rng 5 in
+    let silent_of (i : int) : bool = i = 0 in
+    let weak_labels = M.Label.Set.singleton (label ~silent:true 0) in
+    let ts = ref [] in
+    for from = 0 to n - 1 do
+      for _ = 1 to 1 + Random.State.int rng 3 do
+        let l = Random.State.int rng 3 in
+        ts
+        := transition
+             from
+             (label ~silent:(silent_of l) l)
+             (Random.State.int rng n)
+           :: !ts
+      done
+    done;
+    let f = fsm ~weak_labels 0 !ts in
+    let sat = M.FSM.saturate f in
+    let states = List.init n state in
+    let targets =
+      M.State.Set.of_list states
+      :: M.State.Set.empty
+      :: List.concat_map
+           (fun x -> List.map (fun y -> M.State.Set.of_list [ x; y ]) states)
+           states
+    in
+    List.iter
+      (fun y ->
+        List.iter
+          (fun l ->
+            List.iter
+              (fun t ->
+                incr cases;
+                let expected = respond_reference sat y l t in
+                let actual =
+                  match M.Product.respond sat y l t with
+                  | tr -> Some tr
+                  | exception M.Product.NoBisimilarResponse _ -> None
+                in
+                if
+                  Bool.not
+                    (Stdlib.Option.equal M.Transition.equal expected actual)
+                then incr mismatches;
+                (* several candidates of the shortest length: a tie *)
+                match M.EdgeMap.find_opt sat.edges y with
+                | None -> ()
+                | Some actions ->
+                  let lens =
+                    M.Action.Map.fold
+                      (fun (a : M.Action.t) ds acc ->
+                        if
+                          M.Label.equal a.label l
+                          && Bool.not (M.State.Set.disjoint t ds)
+                        then M.Annotation.opt_length a.annotation :: acc
+                        else acc)
+                      actions
+                      []
+                  in
+                  (match List.sort Int.compare lens with
+                   | x :: x' :: _ when Int.equal x x' -> incr ties
+                   | _ -> ()))
+              targets)
+          [ label 1; label 2 ])
+      states
+  done;
+  Printf.printf "  (%i cases, %i with a tie on length)\n" !cases !ties;
+  check_int "respond = old pipeline, every case" 0 !mismatches;
+  check "ties exercised" true (!ties > 0)
+;;
+
 (** The weak simulation preorder: [a.b] (0) is simulated by [a.(b + c)] (10),
     not the converse; and with a silent step, [tau.a] (20) and [a] (30)
     simulate each other. *)
@@ -1296,6 +1411,7 @@ let () =
   test_product_respond_silently ();
   test_product_bisim ();
   test_product_simulation ();
+  test_respond_matches_reference ();
   test_product_policies ();
   test_product_estimate ();
   test_saturation_estimate ();
