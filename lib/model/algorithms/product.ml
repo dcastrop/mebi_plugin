@@ -710,9 +710,94 @@ struct
       match t.annotation with None -> 1 | Some a -> annotation_length a
     ;;
 
+    (** [stay_candidate y label target]: standing still, at no cost, if
+        [label] is silent and [y] is already in [target]. *)
+    let stay_candidate
+          (y : C.State.t)
+          (label : C.Label.t)
+          (target : C.State.Set.t)
+      : (C.State.t * int * answer) list
+      =
+      if C.Label.is_silent label && C.State.Set.mem y target
+      then [ y, 0, Stay ]
+      else []
+    ;;
+
+    (** [silent_move_candidates silent y label target]: for a silent
+        [label], every state of [target] that [y] reaches by one or more
+        silent steps of [silent], with the path's length and the move
+        (annotated with the path); none without [silent]. *)
+    let silent_move_candidates
+          (silent : C.EdgeMap.t' option)
+          (y : C.State.t)
+          (label : C.Label.t)
+          (target : C.State.Set.t)
+      : (C.State.t * int * answer) list
+      =
+      match silent with
+      | None -> []
+      | Some silent ->
+        Saturation.silent_paths silent y
+        |> List.filter_map (fun (s, ann, len) ->
+          match ann with
+          | Some ann when len > 0 && C.State.Set.mem s target ->
+            Some
+              ( s
+              , len
+              , Move
+                  { from = y
+                  ; goto = s
+                  ; label
+                  ; annotation = Some ann
+                  ; tree = None
+                  } )
+          | _ -> None)
+    ;;
+
+    (** [visible_move_candidates b y label target]: for a visible [label],
+        every weak move of [b] from [y] under [label] into [target] (one per
+        destination), in the order of [y]'s actions, with its witness length
+        (1 for a plain step); [y] is saturated first if [b] is on demand. *)
+    let visible_move_candidates
+          (b : FSM.t)
+          (y : C.State.t)
+          (label : C.Label.t)
+          (target : C.State.Set.t)
+      : (C.State.t * int * answer) list
+      =
+      FSM.ensure b y;
+      match C.EdgeMap.find_opt b.edges y with
+      | None -> []
+      | Some actions ->
+        C.Action.Map.reduce_by_label actions label
+        |> C.Action.Map.to_actionpairs
+        |> C.Action.Pair.Set.elements
+        |> List.concat_map (fun ((action, ds) : C.Action.t * C.State.Set.t) ->
+          let len =
+            match action.annotation with
+            | None -> 1
+            | Some a -> annotation_length a
+          in
+          let tree = Base.Trees.min_opt action.trees in
+          C.State.Set.elements (C.State.Set.inter ds target)
+          |> List.map (fun d ->
+            ( d
+            , len
+            , Move
+                { from = y
+                ; goto = d
+                ; label
+                ; annotation = action.annotation
+                ; tree
+                } )))
+    ;;
+
     (* Every way [b], at [y], can answer [-label-> x'], with the answer itself
        -- the same targets, in the same order, as [answer] tries them -- and
-       its witness length. *)
+       its witness length: standing still, then moves
+       ({!silent_move_candidates} or {!visible_move_candidates}), into
+       [x']'s bisimilarity class; failing any, and given [sim], into [x']'s
+       simulators. *)
     let candidates
           ?(silent : C.EdgeMap.t' option)
           ?(sim : (C.State.t -> C.State.Set.t) option)
@@ -723,62 +808,13 @@ struct
           (x' : C.State.t)
       : (C.State.t * int * answer) list
       =
+      (* [into target]: every candidate into [target] *)
       let into (target : C.State.Set.t) : (C.State.t * int * answer) list =
-        let stay =
-          if C.Label.is_silent label && C.State.Set.mem y target
-          then [ y, 0, Stay ]
-          else []
-        in
-        let moves =
-          if C.Label.is_silent label
-          then (
-            match silent with
-            | None -> []
-            | Some silent ->
-              Saturation.silent_paths silent y
-              |> List.filter_map (fun (s, ann, len) ->
-                match ann with
-                | Some ann when len > 0 && C.State.Set.mem s target ->
-                  Some
-                    ( s
-                    , len
-                    , Move
-                        { from = y
-                        ; goto = s
-                        ; label
-                        ; annotation = Some ann
-                        ; tree = None
-                        } )
-                | _ -> None))
-          else (
-            FSM.ensure b y;
-            match C.EdgeMap.find_opt b.edges y with
-            | None -> []
-            | Some actions ->
-              C.Action.Map.reduce_by_label actions label
-              |> C.Action.Map.to_actionpairs
-              |> C.Action.Pair.Set.elements
-              |> List.concat_map
-                   (fun ((action, ds) : C.Action.t * C.State.Set.t) ->
-                   let len =
-                     match action.annotation with
-                     | None -> 1
-                     | Some a -> annotation_length a
-                   in
-                   let tree = Base.Trees.min_opt action.trees in
-                   C.State.Set.elements (C.State.Set.inter ds target)
-                   |> List.map (fun d ->
-                     ( d
-                     , len
-                     , Move
-                         { from = y
-                         ; goto = d
-                         ; label
-                         ; annotation = action.annotation
-                         ; tree
-                         } ))))
-        in
-        stay @ moves
+        stay_candidate y label target
+        @
+        if C.Label.is_silent label
+        then silent_move_candidates silent y label target
+        else visible_move_candidates b y label target
       in
       match into (bisimilar_with pi x'), sim with
       | (_ :: _ as cs), _ -> cs
