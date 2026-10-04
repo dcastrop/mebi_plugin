@@ -475,7 +475,7 @@ let unpack_constr_args ((_, tys) : Constr.t kind_pair)
   =
   try tys.(0), tys.(1), tys.(2) with
   (* NOTE: in case [tys.(_)] is out of bounds. *)
-  | Not_found -> raise (Rocq_utils_CouldNotExtractBinding ())
+  | Invalid_argument _ -> raise (Rocq_utils_CouldNotExtractBinding ())
 ;;
 
 (* See the [.mli]. *)

@@ -379,17 +379,13 @@ exception Rocq_utils_InvalidLtsTermKind of Constr.t
       (raised here). *)
 val extract_args : ?substl:EConstr.Vars.substl -> Constr.t -> constructor_args
 
-(** Meant for {!unpack_constr_args}, whose handler can never fire; never
-    raised ([TODO.md]). *)
+(** Raised by {!unpack_constr_args}: fewer than three arguments. *)
 exception Rocq_utils_CouldNotExtractBinding of unit
 
 (** [unpack_constr_args (_, args)] is the first three of [args].
 
-    @raise Invalid_argument
-      if there are fewer than three (propagated from
-      the array access; the handler meant to turn that into
-      {!Rocq_utils_CouldNotExtractBinding} catches [Not_found] instead, so
-      it never fires -- [TODO.md]). *)
+    @raise Rocq_utils_CouldNotExtractBinding
+      if there are fewer than three (raised here). *)
 val unpack_constr_args : Constr.t kind_pair -> Constr.t * Constr.t * Constr.t
 
 (** [econstr_to_constrexpr env sigma x] is [x] externalised, as printing would show it. Raises nothing.
