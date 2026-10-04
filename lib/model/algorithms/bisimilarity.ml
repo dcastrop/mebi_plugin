@@ -110,6 +110,8 @@ module Make
         ;;
       end)
 
+    (* See the [.mli]. With [on_demand], saturated on demand within that
+       budget of weak actions instead of whole. *)
     let get ?(on_demand : int option) (x : FSM.t) : t =
       match on_demand with
       | None -> { original = x; saturated = FSM.saturate ~only_if_weak:true x }
@@ -160,6 +162,8 @@ module Make
       | None -> Partition.is_empty non_bisim_states
     ;;
 
+    (* See the [.mli]. A block goes to [bisim_states] if it has a state of
+       [a] and a state of [b] ([States.has_shared_origin]). *)
     let split
           ?(roots_related : bool option)
           (pi : Partition.t)
@@ -206,6 +210,7 @@ module Make
       ;;
     end)
 
+  (* See the [.mli] for these three. *)
   let the_cached_result : t option ref = ref None
   let set_the_result (x : t) : unit = the_cached_result := Some x
 
@@ -218,6 +223,7 @@ module Make
     | Some x -> x
   ;;
 
+  (** A state's moves, as (label, target) pairs, for {!conflicts}. *)
   module Move = Set.Make (struct
       type t = C.Label.t * C.State.t
 
@@ -226,8 +232,11 @@ module Make
       ;;
     end)
 
+  (* See the [.mli]. Compares, for each shared state, its set of
+     (label, target) moves in [a] and in [b]. *)
   let conflicts (a : FSM.t) (b : FSM.t) : States.t =
     Logger.trace __FUNCTION__;
+    (* [moves x s]: [s]'s (label, target) moves in [x]. *)
     let moves (x : FSM.t) (s : C.State.t) : Move.t =
       match C.EdgeMap.find_opt x.edges s with
       | None -> Move.empty
@@ -266,6 +275,9 @@ module Make
     { fsm_a; fsm_b; merged; result }
   ;;
 
+  (** [fsm_whole a b]: {!fsm} without on-demand saturation: both saturated
+      whole and merged, the merge partitioned with the [=eps=>] split read
+      from the originals' silent steps. *)
   let fsm_whole (a : FSM.t) (b : FSM.t) : t =
     let fsm_a : FSMPair.t = FSMPair.get a in
     let fsm_b : FSMPair.t = FSMPair.get b in
@@ -287,11 +299,14 @@ module Make
     finish fsm_a fsm_b merged pi
   ;;
 
+  (* See the [.mli]: {!fsm_whole}, or, with either FSM on demand, the
+     quotient route. *)
   let fsm ?(on_demand : on_demand option) (a : FSM.t) (b : FSM.t) : t =
     Logger.trace __FUNCTION__;
     match on_demand with
     | Some ({ a = od_a; b = od_b; budget; partition } : on_demand)
       when od_a || od_b ->
+      (* [x] as given and saturated: on demand if [od], else whole *)
       let get (od : bool) (x : FSM.t) : FSMPair.t =
         FSMPair.get ?on_demand:(if od then Some budget else None) x
       in

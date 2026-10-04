@@ -10,9 +10,9 @@
     It is pure model code, so it lives here. {i See [ASSISTED-CHANGES.md],
     2026-09-29: an offline re-implementation of {!val:respond} that mirrored
     the original rather than sharing it got the right pairs but the wrong
-    response in 8 of 16 cases, because the tie-breaks run through
-    {!Components.S.Action.Pair.Set}'s own ordering. Everything that needs
-    this decision must call this function, never reproduce it.} *)
+    response in 8 of 16 cases, because the tie-breaks run through the
+    ordering of actions ([Action.compare]). Everything that needs this
+    decision must call this function, never reproduce it.} *)
 module type S = sig
   (** See {!Model.S.State.t}. *)
   type state
@@ -38,7 +38,10 @@ module type S = sig
   module Pair : sig
     type t = state * state
 
+    (** Lexicographic: the left state, then the right one. *)
     val compare : t -> t -> int
+
+    (** [compare] is [0]. *)
     val equal : t -> t -> bool
 
     module Set : Set.S with type elt = t
@@ -64,8 +67,8 @@ module type S = sig
       Among the actions out of [from] carrying [label], only those whose
       destinations meet [bisimilar] are kept, each restricted to that
       intersection; of those, the one with the shortest annotation wins
-      {i (fewest steps left to perform)}, and its least destination is the
-      answer.
+      {i (fewest steps left to perform)}, ties going to the least action by
+      [Action.compare], and its least destination is the answer.
 
       A {e silent} [label] is answered differently when [silent] is given
       (the {b unsaturated} FSM's edges, which still hold the silent steps):
@@ -216,6 +219,7 @@ module type S = sig
       | Greedy
       | Minimal
 
+    (** [name p]: [p] in lower case ("default", "greedy", "minimal"). *)
     val name : t -> string
 
     (** One possible answer: the pair it leads to, its witness length (weak
@@ -270,6 +274,7 @@ module type S = sig
       ; unanswered : int
       }
 
+    (** Maps keyed by move. *)
     module KeyMap : Map.S with type key = key
 
     (** A policy's answers over a whole game: the [relation] (pairs reached
@@ -284,6 +289,9 @@ module type S = sig
       ; measure : measure
       }
 
+    (** [plan p game_of root]: policy [p]'s answers to every move of the game
+        reachable from [root] (breadth first), with the pairs and measure
+        they make. Counted against {!val:with_cap}'s cap. *)
     val plan : t -> game_of -> Pair.t -> plan
 
     (** The relation [Minimal] answers within: from every pair any answer
@@ -293,6 +301,8 @@ module type S = sig
         [tests.exe]'s check against the original algorithm. *)
     val minimal_relation : game_of -> Pair.t -> Pair.Set.t
 
+    (** [measure p game_of root]: the {!type:measure} of [plan p game_of root].
+    *)
     val measure : t -> game_of -> Pair.t -> measure
 
     (** Iterations a plan is predicted to cost: [3 pairs + 6 moves + 3.3 witness], fitted to the 41 checked-in proofs' real counts.
@@ -306,6 +316,8 @@ module type S = sig
     (** The answer a plan gives to a move, if the plan reaches it. *)
     val choose : plan -> key -> answer option
 
+    (** [successors p x]: the pairs [p]'s answers lead to from [x] (none if
+        [p] does not reach [x]); a game step, for {!val:estimate_plan}. *)
     val successors : plan -> Pair.t -> Pair.t list
   end
 

@@ -51,9 +51,9 @@ module Make
   type annotation = Annotation.t
   type edgemap = EdgeMap.t'
   type actionmap = ActionMap.t'
-  (* Closure-based saturation. Replaces the depth-first path enumeration
-     above, which cost time exponential in the path count rather than the
-     state count -- 101 states took 437 seconds on a grid (see
+  (* Closure-based saturation. It replaced (2026-09-28) a depth-first path
+     enumeration, which cost time exponential in the path count rather than
+     the state count -- 101 states took 437 seconds on a grid (see
      [test/satscale.ml]). The specification it computes is unchanged, and is
      derived in [notes/5-saturation-rewrite.md]:
 
@@ -84,6 +84,8 @@ module Make
         []
   ;;
 
+  (** [note_of from a goto]: one step of a witness path, [from -a-> goto],
+      recording [a]'s label and its derivation trees. *)
   let note_of (from : State.t) (a : Action.t) (goto : State.t) : Note.t =
     { from; label = a.label; using = a.trees; goto }
   ;;
@@ -124,11 +126,16 @@ module Make
     bfs start (States.singleton src) start
   ;;
 
+  (** [annotation_of_notes notes]: the witness path [notes] (first step
+      first) as an annotation, linked step to step; [None] for the empty
+      path. *)
   let rec annotation_of_notes : Note.t list -> Annotation.t option = function
     | [] -> None
     | x :: tl -> Some { this = x; next = annotation_of_notes tl }
   ;;
 
+  (** [with_lengths closure]: each [(state, path)] of a silent closure with
+      its path's length added. *)
   let with_lengths
     : (State.t * Note.t list) list -> (State.t * Note.t list * int) list
     =
@@ -136,6 +143,8 @@ module Make
       s, path, List.length path)
   ;;
 
+  (* See the [.mli]. {!silent_closure}'s paths, reversed into first-step-first
+     order and turned into annotations. *)
   let silent_paths (old_edges : EdgeMap.t') (src : State.t)
     : (State.t * Annotation.t option * int) list
     =
@@ -311,7 +320,9 @@ module Make
     if ActionMap.length new_actions > 0 then Some new_actions else None
   ;;
 
-  (** [] returns a saturated [EdgeMap.t'] paired with a set of terminals states {i (i.e., states that now have no outgoing actions, and if reached)}.*)
+  (* See the [.mli]. Every state with outgoing edges is saturated by
+     {!state_actions}, sharing one closure memo (uncapped: the whole FSM is
+     saturated anyway); a state left with no weak action is a terminal. *)
   let edges (labels : Labels.t) (states : States.t) (old_edges : EdgeMap.t')
     : EdgeMap.t' * States.t
     =
@@ -335,6 +346,8 @@ module Make
     new_edges, terminals
   ;;
 
+  (* See the [.mli]. {!state_actions} with a closure memo capped at
+     [closure_cap] states. *)
   let on_demand ?(closure_cap : int = 4096) (old_edges : EdgeMap.t')
     : State.t -> ActionMap.t' option
     =

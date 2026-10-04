@@ -48,6 +48,7 @@ module Make
     ; weak : int
     }
 
+  (* See the [.mli]. *)
   let to_string (x : t) : string =
     Printf.sprintf
       "%i weak actions from %i states (%i strong transitions, %i silent SCCs, \
@@ -62,13 +63,19 @@ module Make
   (** Sets of SCC ids. One bit short of [Sys.int_size] per word, so no word
       ever has its sign bit set. *)
   module Bits = struct
+    (** Bits used per word. *)
     let w : int = Sys.int_size - 1
+
+    (** [create k]: the empty set over ids [0 .. k - 1]. *)
     let create (k : int) : int array = Array.make ((k + w - 1) / w) 0
 
+    (** [add b i]: put [i] in [b], in place. *)
     let add (b : int array) (i : int) : unit =
       b.(i / w) <- b.(i / w) lor (1 lsl (i mod w))
     ;;
 
+    (** [union_into dst src]: add every member of [src] to [dst], in place
+        ([dst] and [src] over the same ids). *)
     let union_into (dst : int array) (src : int array) : unit =
       Array.iteri (fun j x -> if x <> 0 then dst.(j) <- dst.(j) lor x) src
     ;;
@@ -102,6 +109,7 @@ module Make
     let stack : int list ref = ref [] in
     let counter : int ref = ref 0 in
     let nc : int ref = ref 0 in
+    (* [visit v]: number [v] and push it on the stack *)
     let visit (v : int) : unit =
       index.(v) <- !counter;
       low.(v) <- !counter;
@@ -109,6 +117,7 @@ module Make
       stack := v :: !stack;
       on_stack.(v) <- true
     in
+    (* [pop_scc v]: pop the stack down to [v], all of it one SCC *)
     let rec pop_scc (v : int) : unit =
       match !stack with
       | [] -> ()
@@ -163,6 +172,10 @@ module Make
     ; strong : int
     }
 
+  (** [quotient x]: [x] quotiented by its silent SCCs ({!type-quotient}):
+      states numbered densely, edges split into silent and visible, SCCs by
+      {!silent_sccs}, then each SCC's sizes, silent successors, visible moves
+      and [tau*]-reachable SCCs. *)
   let quotient (x : FSM.t) : quotient =
     let ids : int StateTbl.t = StateTbl.create 64 in
     let id (s : State.t) : int =
@@ -247,6 +260,8 @@ module Make
     weak
   ;;
 
+  (* See the [.mli]. Per visible label [a]: every SCC [c] contributes
+     [|c|] times the number of states in its [weak_a] SCCs. *)
   let fsm (x : FSM.t) : t =
     Logger.trace __FUNCTION__;
     let q : quotient = quotient x in
@@ -285,6 +300,9 @@ module Make
     !acc
   ;;
 
+  (* See the [.mli]. Each SCC's weak moves and [=eps=>] targets as SCC ids,
+     then signature refinement over SCCs, then each block expanded to its
+     states. *)
   let partition (x : FSM.t) : C.Partition.t =
     Logger.trace __FUNCTION__;
     let q : quotient = quotient x in

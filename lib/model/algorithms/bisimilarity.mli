@@ -57,6 +57,7 @@ module type S = sig
       it, every later step reads it). *)
   val the_cached_result : t option ref
 
+  (** [set_the_result r] makes [r] {!the_cached_result}. *)
   val set_the_result : t -> unit
 
   exception NoCachedResult of unit

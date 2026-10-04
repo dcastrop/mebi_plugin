@@ -205,10 +205,12 @@ struct
   module Pair = struct
     type t = C.State.t * C.State.t
 
+    (* Lexicographic: left state first. *)
     let compare ((a, b) : t) ((x, y) : t) : int =
       match C.State.compare a x with 0 -> C.State.compare b y | n -> n
     ;;
 
+    (* [compare] is [0]. *)
     let equal (a : t) (b : t) : bool = Int.equal (compare a b) 0
 
     module Set = Set.Make (struct
@@ -230,17 +232,6 @@ struct
       ; label : label
       }
 
-  (* Lifted verbatim out of [Proof_solver_step.try_get_visible_transition].
-     The two lines that used to precede it there resolved [from] and [label]
-     out of the Rocq goal; everything below is, and always was, pure model
-     code. Keep it that way -- the caller resolves, this decides. *)
-  (* A silent move answered by moving silently: the nearest state, by one or
-     more silent steps of [silent], that lies in [bisimilar]. Standing still
-     (zero steps) is the caller's case, decided before [respond] is asked.
-     Saturation keeps only weak moves with a visible action, so without this
-     a silent move whose target is not bisimilar to [from] had no answer at
-     all, though [=ε=>] allows one. See [ASSISTED-CHANGES.md], 2026-10-02
-     (second session). *)
   (* [best_response actions label bisimilar]: the weak move [respond]
      answers with, among [actions] (one state's weak actions, each with its
      destinations): those under [label] whose destinations meet [bisimilar],
@@ -287,6 +278,14 @@ struct
     |> Stdlib.Option.map (fun (a, ds) -> a, C.State.Set.inter bisimilar ds)
   ;;
 
+  (* [respond_silently silent from label bisimilar]: a silent move answered
+     by moving silently: the nearest state, by one or
+     more silent steps of [silent], that lies in [bisimilar]. Standing still
+     (zero steps) is the caller's case, decided before [respond] is asked.
+     Saturation keeps only weak moves with a visible action, so without this
+     a silent move whose target is not bisimilar to [from] had no answer at
+     all, though [=ε=>] allows one. See [ASSISTED-CHANGES.md], 2026-10-02
+     (second session). *)
   let respond_silently
         (silent : C.EdgeMap.t')
         (from : C.State.t)
@@ -310,6 +309,16 @@ struct
     | [] -> raise (NoBisimilarResponse { from; label })
   ;;
 
+  (* See the [.mli]. A silent [label] with [silent] goes to
+     {!respond_silently}; anything else to {!best_response} over [from]'s weak
+     actions (saturating [from] first if [m] is saturated on demand), its
+     least destination being the answer.
+
+     Originally lifted verbatim out of
+     [Proof_solver_step.try_get_visible_transition], whose two preceding
+     lines resolved [from] and [label] out of the Rocq goal; everything here
+     is, and always was, pure model code. Keep it that way -- the caller
+     resolves, this decides. *)
   let respond
         ?(silent : C.EdgeMap.t' option)
         (m : FSM.t)
@@ -340,6 +349,8 @@ struct
          { from; goto; label; annotation; tree })
   ;;
 
+  (** [bisimilar_with pi x]: [x]'s block of [pi], or the empty set if [x] is
+      in none. *)
   let bisimilar_with (pi : C.Partition.t) (x : C.State.t) : C.State.Set.t =
     try C.Partition.get_bisimilar x pi with Not_found -> C.State.Set.empty
   ;;
@@ -365,7 +376,7 @@ struct
     | Stay
     | Move of C.Transition.t
 
-  (* THE choice of answer, for the solver and the product alike: the one place
+  (* See the [.mli]. THE choice of answer, for the solver and the product alike: the one place
      a policy for choosing answers would go. [y] must answer the other
      system's move [-label-> x'].
 
@@ -388,6 +399,8 @@ struct
     : answer option
     =
     Logger.trace __FUNCTION__;
+    (* [into target]: standing still if the move is silent and [y] is already
+       in [target], else [respond]'s move into [target]; [None] if neither. *)
     let into (target : C.State.Set.t) : answer option =
       if C.Label.is_silent label && C.State.Set.mem y target
       then Some Stay
@@ -402,7 +415,8 @@ struct
     | None, None -> None
   ;;
 
-  (* [refl] says whether both sides of the game use the same LTS. When they do,
+  (* See the [.mli]: one successor per obligation of [x] that {!answer}
+     answers. [refl] says whether both sides of the game use the same LTS. When they do,
      a pair of equal states is closed outright by [weak_sim_refl] -- mirrors
      [Proof_solver_step.handle_weaksim]'s [is_weak_refl] test, which runs
      before anything else -- so it is a leaf with no obligations. Without
@@ -437,6 +451,8 @@ struct
   (* The cap on game walks, set by [with_cap] (notes/13, 2026-10-03). *)
   let walk_cap : int option ref = ref None
 
+  (* See the [.mli]. The previous cap is restored afterwards, even if [f]
+     raises. *)
   let with_cap (n : int) (f : unit -> 'a) : 'a =
     let before = !walk_cap in
     walk_cap := Some n;
@@ -450,9 +466,14 @@ struct
     | _ -> ()
   ;;
 
-  (* Breadth-first closure of [root] under [step]. *)
+  (* [reachable_by step root]: every pair reachable from [root] by repeatedly
+     applying [step] ([root] included), breadth-first. The one game walk
+     every other walk here goes through, so the [with_cap] cap applies to all
+     of them: past it, {!Game_too_large}. *)
   let reachable_by (step : Pair.t -> Pair.t list) (root : Pair.t) : Pair.Set.t =
     let count : int ref = ref 1 in
+    (* [go seen queue]: [seen] grown by everything reachable from [queue],
+       which holds pairs already in [seen] still to be stepped. *)
     let rec go (seen : Pair.Set.t) : Pair.t list -> Pair.Set.t = function
       | [] -> seen
       | p :: rest ->
@@ -478,6 +499,7 @@ struct
     : C.State.t -> C.Label.t -> C.State.Set.t
     =
     let closures : (C.State.t, C.State.Set.t) Hashtbl.t = Hashtbl.create 64 in
+    (* [closure y]: the states [y] reaches by [=eps=>], memoised. *)
     let closure (y : C.State.t) : C.State.Set.t =
       match Hashtbl.find_opt closures y with
       | Some c -> c
@@ -512,6 +534,7 @@ struct
         (root : Pair.t)
     : Pair.Set.t
     =
+    (* [step (x, y)]: every [(x', y')] with [x -l-> x'] and [y'] an answer. *)
     let step ((x, y) : Pair.t) : Pair.t list =
       List.concat_map
         (fun ((l, x') : C.Label.t * C.State.t) ->
@@ -531,12 +554,15 @@ struct
         (r : Pair.Set.t)
     : Pair.Set.t
     =
+    (* [answered r (x, y)]: every move of [x] has an answer [y'] with
+       [(x', y')] in [r]. *)
     let answered (r : Pair.Set.t) ((x, y) : Pair.t) : bool =
       List.for_all
         (fun ((l, x') : C.Label.t * C.State.t) ->
           C.State.Set.exists (fun y' -> Pair.Set.mem (x', y') r) (answers y l))
         (obligations a x)
     in
+    (* one round: drop the unanswered pairs; stop when none was dropped *)
     let rec go (r : Pair.Set.t) : Pair.Set.t =
       let r' = Pair.Set.filter (answered r) r in
       if Int.equal (Pair.Set.cardinal r') (Pair.Set.cardinal r)
@@ -561,6 +587,7 @@ struct
     refine_simulation a answers (simulation_game a answers root)
   ;;
 
+  (* See the [.mli]: {!reachable_by} over {!successors}. *)
   let reachable
         ?(silent : C.EdgeMap.t' option)
         ?(sim : (C.State.t -> C.State.Set.t) option)
@@ -605,6 +632,7 @@ struct
     left @ right
   ;;
 
+  (* See the [.mli]: {!reachable_by} over {!successors_bisim}. *)
   let reachable_bisim
         ~(refl : bool)
         (g : game)
@@ -616,9 +644,9 @@ struct
     reachable_by (successors_bisim ~refl g pi) root
   ;;
 
-  (* Measurement only (step 2 of the answer-selection plan): what other ways
-     of choosing answers would cost, computed on the model. Nothing here is
-     read by the solver, which answers with [answer] alone.
+  (* Answer policies (see the [.mli]). Built first for measurement
+     (2026-10-02); since [MeBi Config Solver Answers] the solver answers from
+     a [plan] whenever the policy is not [Default].
 
      A game is described per state [p] as its obligations, each with every
      [candidate] answer -- the next pair and the witness length, i.e. the
@@ -638,6 +666,8 @@ struct
       | Greedy
       | Minimal
 
+    (* [name p]: the policy as [MeBi Config Solver Answers] spells it, in
+       lower case. *)
     let name : t -> string = function
       | Default -> "default"
       | Greedy -> "greedy"
@@ -669,10 +699,13 @@ struct
 
     type game_of = Pair.t -> obligation list
 
+    (* [annotation_length a]: the number of steps in the witness [a]. *)
     let rec annotation_length (a : C.Annotation.t) : int =
       match a.next with None -> 1 | Some n -> 1 + annotation_length n
     ;;
 
+    (* [transition_length t]: the weak transitions [t] stands for: its
+       witness's length, or 1 for a plain step. *)
     let transition_length (t : C.Transition.t) : int =
       match t.annotation with None -> 1 | Some a -> annotation_length a
     ;;
@@ -791,6 +824,7 @@ struct
     let bisim_game ~(refl : bool) (g : game) (pi : C.Partition.t) : game_of =
       let left = sim_game ~silent:g.b.edges ~refl g.a g.b_saturated pi in
       let right = sim_game ~silent:g.a.edges ~refl g.b g.a_saturated pi in
+      (* a right-hand choice, its pair put back in left-right order *)
       let swap (c : choice) = { c with next = snd c.next, fst c.next } in
       fun ((x, y) : Pair.t) ->
         left (x, y)
@@ -810,6 +844,7 @@ struct
       ; unanswered : int
       }
 
+    (* Moves as map keys, compared field by field. *)
     module KeyMap = Map.Make (struct
         type t = key
 
@@ -838,7 +873,11 @@ struct
       ; measure : measure
       }
 
-    (* Close [root] under a choice function, recording every choice. *)
+    (* [walk policy game_of choose root]: the plan [policy] makes: [root]
+       closed breadth-first under [choose] (given the pairs reached so far and
+       an obligation, the choice to make, or [None] to leave it unanswered),
+       recording every choice, each pair's successors, and the measure.
+       Counted against the [with_cap] cap. *)
     let walk
           (policy : t)
           (game_of : game_of)
@@ -901,6 +940,8 @@ struct
       go (Pair.Set.singleton root) [ root ] KeyMap.empty Pair.Map.empty 0 0 0
     ;;
 
+    (* [cheapest cs]: the choice of least witness length in [cs], the first
+       of them on a tie; [None] if [cs] is empty. *)
     let cheapest (cs : choice list) : choice option =
       List.fold_left
         (fun acc (c : choice) ->
@@ -1173,6 +1214,9 @@ struct
         Pair.Set.filter is_alive all)
     ;;
 
+    (* See the [.mli]. [Default] takes each obligation's default; [Greedy]
+       the cheapest candidate already reached, else the default; [Minimal]
+       the cheapest candidate within {!minimal_relation}. *)
     let plan (policy : t) (game_of : game_of) (root : Pair.t) : plan =
       match policy with
       | Default -> walk policy game_of (fun _ o -> o.default) root
@@ -1203,6 +1247,7 @@ struct
           root
     ;;
 
+    (* See the [.mli]: the measure of {!plan}. *)
     let measure (policy : t) (game_of : game_of) (root : Pair.t) : measure =
       (plan policy game_of root).measure
     ;;
@@ -1234,12 +1279,15 @@ struct
         (List.tl plans)
     ;;
 
+    (* See the [.mli]. *)
     let choose (p : plan) (k : key) : answer option =
       Stdlib.Option.map
         (fun (c : choice) -> c.answer)
         (KeyMap.find_opt k p.chosen)
     ;;
 
+    (* See the [.mli]: [x]'s successors as recorded by the plan, none if it
+       does not reach [x]. *)
     let successors (p : plan) (x : Pair.t) : Pair.t list =
       Stdlib.Option.value ~default:[] (Pair.Map.find_opt x p.next)
     ;;
@@ -1251,6 +1299,8 @@ struct
     ; nested : int option
     }
 
+  (* Raised inside {!estimate_by} when the simulated nested walk passes its
+     cap; never escapes. *)
   exception Capped
 
   (* [memo_step step]: [step], computing each pair's successors once and
@@ -1271,8 +1321,9 @@ struct
   (* The cost of a proof of the game reachable from [root] under [step]; see
      [estimate]. [step] is memoised ({!memo_step}): the walk below steps
      every pair three times (to reach it, to count its moves, and in the
-     simulated nested walk, which may revisit it many times), and one step
-     can cost ~60ms on [Proc/Test4] saturated on demand (notes/15). *)
+     simulated nested walk, which may revisit it many times), and a step can
+     be costly on an FSM saturated on demand (notes/15: ~165ms an answer on
+     [Proc/Test4] until 2026-10-04's one-pass [respond]). *)
   let estimate_by
         ?(cap_factor : int = 4)
         (step : Pair.t -> Pair.t list)
@@ -1291,6 +1342,8 @@ struct
        walked again. *)
     let cap : int = cap_factor * (Pair.Set.cardinal pairs + moves) in
     let seen : int ref = ref 0 in
+    (* [walk path p]: visit [p] below the ancestors [path], counting every
+       visit in [seen]; raises [Capped] past [cap]. *)
     let rec walk (path : Pair.Set.t) (p : Pair.t) : unit =
       incr seen;
       if !seen > cap then raise Capped;
@@ -1310,6 +1363,7 @@ struct
     { pairs = Pair.Set.cardinal pairs; moves; nested }
   ;;
 
+  (* See the [.mli]: {!estimate_by} over {!successors}. *)
   let estimate
         ?(cap_factor : int = 4)
         ?(silent : C.EdgeMap.t' option)
@@ -1325,6 +1379,7 @@ struct
     estimate_by ~cap_factor (successors ?silent ?sim ~refl a b pi) root
   ;;
 
+  (* See the [.mli]: {!estimate_by} over {!successors_bisim}. *)
   let estimate_bisim
         ?(cap_factor : int = 4)
         ~(refl : bool)
@@ -1337,11 +1392,13 @@ struct
     estimate_by ~cap_factor (successors_bisim ~refl g pi) root
   ;;
 
+  (* See the [.mli]: {!estimate_by} over the plan's recorded successors. *)
   let estimate_plan ?(cap_factor : int = 4) (p : Policy.plan) : cost =
     Logger.trace __FUNCTION__;
     estimate_by ~cap_factor (Policy.successors p) p.root
   ;;
 
+  (* See the [.mli]. *)
   let prefer_mutual ({ pairs; moves; nested } : cost) : bool =
     match nested with None -> true | Some n -> n > pairs + moves
   ;;

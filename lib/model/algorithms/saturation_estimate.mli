@@ -29,7 +29,14 @@ module type S = sig
     ; weak : int (** weak (visible) actions {!FSM.saturate} would produce *)
     }
 
+  (** [fsm x] is [x]'s size: states, silent SCCs, transitions, and the
+      exact number of weak actions saturating it would produce (see above),
+      computed on the quotient by silent SCCs without saturating. *)
   val fsm : fsm -> t
+
+  (** [to_string e] describes [e] in one phrase, for notices and warnings:
+      "W weak actions from S states (T strong transitions, K silent SCCs,
+      the largest with L)". *)
   val to_string : t -> string
 
   type partition

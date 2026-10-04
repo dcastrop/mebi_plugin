@@ -113,6 +113,7 @@ module Make
 
   exception CannotSplitEmptyBlock of unit
 
+  (* See the [.mli]. *)
   let ensure_nonempty (a : States.t) : unit =
     Logger.trace __FUNCTION__;
     try assert (States.is_empty a |> Bool.not) with
@@ -147,6 +148,8 @@ module Make
       (States.empty, None)
   ;;
 
+  (* See the [.mli]. {!split_block_by}, with [reach] the blocks of [pi]
+     each state reaches by one step of [edges]. *)
   let split_block
         (pi : Partition.t)
         (s : State.t)
@@ -159,12 +162,16 @@ module Make
 
   exception Split_OnlyReturnedOneBlock_ButNeqBlock of (States.t * States.t)
 
+  (* See the [.mli]. *)
   let ensure_equal (a : States.t) (b : States.t) : unit =
     Logger.trace __FUNCTION__;
     try assert (States.equal a b) with
     | Assert_failure _ -> raise (Split_OnlyReturnedOneBlock_ButNeqBlock (a, b))
   ;;
 
+  (* See the [.mli]. Splits by [block]'s least state, on [edges] restricted
+     to [label]; on a split, [pi] gets the two halves and [block] becomes the
+     half containing that state. *)
   let for_each_label
         (pi : Partition.t ref)
         (changed : bool ref)
@@ -195,6 +202,8 @@ module Make
       an unsaturated FSM's edges. *)
   let silent_closures (edges : EdgeMap.t') : State.t -> States.t =
     let memo : States.t StateTbl.t = StateTbl.create 64 in
+    (* [bfs frontier seen]: [seen] grown by everything reachable by silent
+       steps from [frontier] (whose states are already in [seen]). *)
     let rec bfs (frontier : State.t list) (seen : States.t) : States.t =
       match frontier with
       | [] -> seen
@@ -240,6 +249,7 @@ module Make
     : unit
     =
     Logger.trace __FUNCTION__;
+    (* [reach x]: the blocks of [pi] that [x] reaches by [=eps=>] *)
     let reach (x : State.t) : Partition.t =
       Partition.filter_reachable (closure x) !pi
     in
@@ -301,6 +311,7 @@ module Make
     !pi
   ;;
 
+  (* See the [.mli]. *)
   let fsm (fsm : FSM.t) : t =
     Logger.trace __FUNCTION__;
     let silent : EdgeMap.t' option =
