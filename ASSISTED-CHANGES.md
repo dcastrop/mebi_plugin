@@ -5946,6 +5946,36 @@ where `respond` was cheap). `Test.v` counts identical; `tests.exe`
 **Session tally (2026-10-04), cont.:** New feature 2 (+1 open, PR #35) ·
 Refactor 1 (review) · Docs 1 · Tooling 1 · Optimization 1.
 
+## 2026-10-04 — Result dumps off by default
+
+**Bug fix** (a default that should not have shipped). On branch
+`fix/dumps-off-by-default`. Found while accounting for the probe case of
+notes/15: `DumpResults` was on by default (since `e53a386`, March, "wip:
+file dumps for inspecting"), so every `Run Bisim` / `Sim Begin` wrote JSON
+dumps of its FSMs into `./_dumps/`. Jonah: it was only ever meant to be on
+during active development, and disk writes are opt-in.
+
+**What.** `dump_results` defaults to `false`; `MeBi Config Output
+"DumpResults" True` turns it on. `Api.output_config_default` is now a
+function returning a fresh record: the fields are mutable and the setters
+update the current record in place, so they used to mutate the default
+itself. Documented in `MeBi Help Config Output`, the README, and in
+`CLAUDE.md`, which tells future sessions they may turn dumps on for
+debugging (Jonah's request, as `_dumps/` will no longer be refreshed by
+every run; he deleted the old one, 2.9GB).
+
+**Effect.** The probe case (`Sim Begin`, `Test4`'s `p`, on demand): 55s ->
+**35s**, peak memory 1.84GB -> **0.84GB**, nothing written to disk. Every
+checked-in example already set `DumpResults` explicitly (`False`, or
+`True` in the two CADP `Size2` term tests that inspect a dump), so none
+changes. `Test.v` counts identical; `tests.exe` 101/101; `make` clean.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep fix/dumps-off-by-default main`).
+
+**Session tally (2026-10-04), cont.:** New feature 2 (+1 open, PR #35) ·
+Refactor 1 (review) · Docs 1 · Tooling 1 · Optimization 1 · Bug fix 1.
+
 ---
 
 ## Outstanding

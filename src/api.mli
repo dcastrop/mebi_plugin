@@ -6,7 +6,12 @@ type output_config =
   ; mutable dump_results : bool
   }
 
-val output_config_default : output_config
+(** [output_config_default ()]: a fresh default output configuration
+    (results decoded, not dumped to [./_dumps/]). A fresh record each time,
+    as its fields are mutable: the [MeBi Config Output] setters update the
+    current one in place. *)
+val output_config_default : unit -> output_config
+
 val the_output_config : output_config ref
 val reset_output_config : unit -> unit
 val config_output : bool -> Output.Kind.t -> unit
