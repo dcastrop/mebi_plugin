@@ -1167,7 +1167,7 @@ module Make (Enc : Encoding.S) :
           let json ?as_elt ({ act; goto; tree } : t) : Yojson.t =
             `Assoc
               [ "act", Pair.json ~as_elt:true act
-              ; "goto", Pair.json ~as_elt:true act
+              ; "goto", Pair.json ~as_elt:true goto
               ; "tree", Enc.Tree.json ~as_elt:true tree
               ]
           ;;
