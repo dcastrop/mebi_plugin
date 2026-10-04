@@ -5824,6 +5824,40 @@ there as the next piece of work.
 **Session tally (2026-10-04), cont.:** New feature 1 (with its `Premise
 Range` setting) · Refactor 1 (review) · Docs 1.
 
+## 2026-10-04 — bench/: the proof-suite harness, tracked
+
+**Tooling.** On branch `tooling/bench`. Item 3 of the agenda, agreed as
+tooling, not a plugin command.
+
+The measurements of the last sessions ran on throwaway scripts in the local
+`notes/tools/` (hardcoded scratch paths, and a patch to `api.ml` to force
+the solver strategy that had to be reverted by hand each time). `bench/` now
+holds tracked versions:
+- `proofs.sh` runs the `default` suite (the six `### Success` files, CCS's
+  `PluginProofs.v` and `LawProofs.v`), `abp` or `test4`, under any of
+  `auto`/`True`/`False`, one memory-capped process per file, against the
+  dune build, from a fresh copy of `examples/`; writes `solves.tsv` (one
+  row per `MeBi Sim Solve`) and `runs.tsv` (exit, seconds, peak MB per
+  file).
+- **Forcing without patching the plugin**: the harness drops the copy's own
+  `MutualCofix` lines and sets the mode after `Require Import MEBI.loader`
+  (only a bare `MeBi Config Reset` could undo it, and no proof file has
+  one). Checked: all 24 file/mode results identical to the patch-based run.
+- `compare.sh` diffs two runs (exit 1 on any changed or missing Solve;
+  checked on a doctored copy); `testv-counts.sh` lists `Test.v`'s counts
+  (reproduces the 56 from earlier today).
+
+`CLAUDE.md`'s verification section points to it; the manual `make` route is
+unchanged. Mistake on the way: the first version handed a shell function
+to `systemd-run`, so every file "ran" in 0s with exit 127; caught by the
+first run's table.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep tooling/bench main`).
+
+**Session tally (2026-10-04), cont.:** New feature 1 (with its `Premise
+Range` setting) · Refactor 1 (review) · Docs 1 · Tooling 1.
+
 ---
 
 ## Outstanding
