@@ -6102,12 +6102,29 @@ modes, and the `Test4` normalised suite (its `weak_bisimilar` runs under
 clean. Mistake on the way: I queued one verification with a mistyped
 commit hash; it failed at checkout and was re-run.
 
+**Review (Jonah), same branch.** The comment style was revised: "[f x] is
+..." saying what the value is (a unit function: what it does), an overview
+first for orchestrating functions, the main clause before the qualifiers,
+and every doc comment ending with what it raises, directly or propagated
+("Raises nothing" otherwise). Restyled throughout (`bf4ef1a`, comments
+only). And a split rule: a non-trivial lambda passed to fold/map/iter
+becomes a named, documented function, unless it leans on the enclosing
+scope, in which case values are passed as directly as possible. Applied in
+four more commits: `saturation` (`visible_steps`, `offer_source`; a
+`search` record with `seed`/`settle`/`relax`; `weak_action`),
+`saturation_estimate` (`transitions`), `minimization` (`goes_with`,
+`silent_successors`), `product` (`moves_of_action`, `obligation_of`,
+`answer_obligation`, `index_obligation`). Each: `tests.exe` 103/103 and
+`Test.v` identical (the saturation one also `satdiff` byte-identical); the
+proof matrix in three modes on the saturation and minimization commits and
+on the last, plus the `Test4` suite on the last.
+
 **How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
 --merges --oneline --grep docs/model-algorithms main`); or a single split,
 by its commit.
 
-**Session tally (2026-10-04), cont.:** New feature 3 · Refactor 6 (1
-review, 5 splits) · Docs 2 · Tooling 1 · Optimization 1 · Bug fix 1.
+**Session tally (2026-10-04), cont.:** New feature 3 · Refactor 10 (1
+review, 9 split commits) · Docs 3 · Tooling 1 · Optimization 1 · Bug fix 1.
 
 ---
 
