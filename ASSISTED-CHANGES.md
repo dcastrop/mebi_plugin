@@ -5904,6 +5904,48 @@ Docs: README (`MeBi Sim` section), `MeBi Help Run`.
 **Session tally (2026-10-04), cont.:** New feature 2 · Refactor 1 (review)
 · Docs 1 · Tooling 1.
 
+## 2026-10-04 — One game step, ~10x cheaper on large on-demand FSMs
+
+**Optimization.** On branch `perf/respond-scan`. Jonah held PR #35 until a
+slow case found while measuring it was explored (notes/15). The
+exploration first corrected my own misreading (logged on the PR #35
+branch): the slow case is not a bisimilarity check, it is one *game step*,
+`Product.answer` -> `respond`, at ~165ms per visible answer on `Test4`-sized
+FSMs saturated on demand. Pre-existing on `main`; paid by `Auto`'s estimate
+(with `Bounds Game` set) and by every proof-solver step on such FSMs.
+
+**Measured split** (250 calls, ~8,150 weak actions each): building the
+ordered set of (action, destinations) pairs (`to_actionpairs`) 85%,
+`filter_map` 10%, the rest small.
+
+**What.**
+- `respond` now finds its answer in one pass over the state's actions
+  (`best_response`): shortest annotation, ties to the least action by
+  `Action.compare`. That is exactly the old choice: the fold kept the first
+  of the shortest in ascending `ActionPair.compare` order, and distinct
+  table keys never compare equal. A differential unit test keeps the old
+  pipeline verbatim and compares: 77,652 cases over 150 generated saturated
+  FSMs, 1,680 of them ties; with the tie-break reversed it fails on exactly
+  those 1,680.
+- `estimate_by` memoises its step function (`memo_step`): it stepped every
+  pair three or more times.
+
+**Effect.** The case (`Sim Begin`, `weak_sim compLTS compLTS (a1|a2|b1) p`,
+`Bounds Game 20000000`): `main` did not finish in 20 minutes; one-pass
+`respond` 121s; with the memo 55s, ~20s of it extraction and result dumps.
+Same estimate (2628 pairs, 15768 moves), same strategy chosen. Elsewhere,
+no change: the proof matrix is identical in all three modes (times within
+noise, memory unchanged), ABP 6494/9914 and `Test4` normalised
+48,821/61,161 as before, at the same times (those FSMs are not on demand,
+where `respond` was cheap). `Test.v` counts identical; `tests.exe`
+101/101; `make` clean.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep perf/respond-scan main`).
+
+**Session tally (2026-10-04), cont.:** New feature 2 (+1 open, PR #35) ·
+Refactor 1 (review) · Docs 1 · Tooling 1 · Optimization 1.
+
 ---
 
 ## Outstanding
