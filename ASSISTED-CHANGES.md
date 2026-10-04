@@ -6016,10 +6016,21 @@ most 4 kept. A medium case (`weak_sim compLTS compLTS (a1|a2)
 kept, 0.31s, out of `Sim Begin`'s 18.6s. So for these shapes the saving is
 a constant factor (the right side's silent closure reaches every
 arrangement of its components), not a change in kind; what protects the
-large case is the cap. The large case I tried (`(a1|a2|b1)` against
-`Test4`'s `p`, on demand) never reached the similarity: both `main` and the
-branch were still deciding *bisimilarity* after 20 minutes, a separate
-problem now in `TODO.md`.
+large case is the cap. On a large similar-but-not-bisimilar pair (one `A`
+then stop, against `Test4`'s `p`, on demand), `Run Sim`'s walk took 0.1s
+for 3841 reachable pairs, 26s in all (extraction and dumps).
+
+**Correction (same day).** I first reported a large case, `Sim Begin` on
+`(a1|a2|b1)` against `Test4`'s `p`, as "still deciding bisimilarity of a
+non-bisimilar pair after 20 minutes" and logged that in `TODO.md`. Wrong on
+both counts: the pair is bisimilar (in `Proc` a send and a receive on one
+channel carry the same label), and the check took 0.6s. I had inferred the
+phase from the last line printed, which is printed *before* the check. A
+timestamped trace (Jonah asked for a preliminary exploration before
+merging this PR) put the time in `Auto`'s estimate walk: `Product.answer`
+-> `respond` takes ~165ms per visible answer on such FSMs (2628 pairs in
+368s). Pre-existing on `main`, a performance cost, not in this PR's code;
+`TODO.md` now says so, and the follow-up is planned.
 
 **Tests.** `tests.exe` 101/101 (new: the walk is restricted to reachable
 pairs; a capped walk raises past the cap). `Test.v` `RunSim`: similar,
