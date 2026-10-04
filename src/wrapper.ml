@@ -77,6 +77,14 @@ module type S = sig
     -> Weak.t option
     -> Model.LTS.t M.mm
 
+  (** [similarity r]: for a bisimilarity check's result [r], the greatest
+      weak simulation from FSM a to FSM b among the pairs reachable from
+      their start states ({!Model.Product.simulation}), or [None] if either
+      FSM has no start state. When an FSM is saturated on demand, that walk
+      saturates state after state, so it needs [MeBi Config Bounds Game <n>] and stays within it: without the bound, or past it, it is a user
+      error saying how to allow it. *)
+  val similarity : Model.Bisimilarity.t -> Model.Product.Pair.Set.t option
+
   module Command : sig
     val build_lts
       :  ?weak:Weak.t option
@@ -99,6 +107,7 @@ module type S = sig
       | Minimize of rocq_args
       | Merge of rocq_pair
       | CheckBisim of rocq_pair
+      | CheckSim of rocq_pair
       | BenchmarkGraph of (rocq_args * (int * int))
 
     and rocq_args = Constrexpr.constr_expr * Libnames.qualid
@@ -140,6 +149,16 @@ module type S = sig
       -> Model.Bisimilarity.t option M.mm
 
     val do_check_bisim
+      :  rocq_pair
+      -> Libnames.qualid list
+      -> Model.Bisimilarity.t option M.mm
+
+    (** [do_check_sim { a; b } refs]: decide whether [a]'s term is weakly
+        simulated by [b]'s ([MeBi Run Sim]), reporting the verdict. Bisimilar
+        states are similar outright; otherwise {!similarity} decides. Not
+        similar is an error under [MeBi Config FailIf NotBisimilar True]
+        (the default), else a warning. *)
+    val do_check_sim
       :  rocq_pair
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
@@ -451,6 +470,49 @@ module Make (Enc : Encoding.S) :
     M.return the_lts
   ;;
 
+  let similarity (r : Model.Bisimilarity.t) : Model.Product.Pair.Set.t option =
+    Logger.trace __FUNCTION__;
+    let a : FSM.t = r.fsm_a.original in
+    let b : FSM.t = r.fsm_b.original in
+    let b_saturated : FSM.t = r.fsm_b.saturated in
+    let on_demand : bool =
+      Stdlib.Option.is_some r.fsm_a.saturated.fill
+      || Stdlib.Option.is_some b_saturated.fill
+    in
+    (* a user error naming why the walk is not allowed, and how to allow it *)
+    let refuse (why : string) : 'a =
+      CErrors.user_err
+        (Pp.str
+           (Printf.sprintf
+              "MeBi: deciding weak similarity walks every pair of states \
+               reachable from the two start states, and an FSM here is \
+               saturated on demand (too large to saturate whole; see the \
+               warning above), so that walk saturates state after state as it \
+               goes. %s"
+              why))
+    in
+    match a.init, b.init with
+    | None, _ | _, None -> None
+    | Some ra, Some rb ->
+      let compute () = Model.Product.simulation a b b_saturated (ra, rb) in
+      if Bool.not on_demand
+      then Some (compute ())
+      else (
+        match !Api.the_game_bound with
+        | None ->
+          refuse
+            "Bound it with [MeBi Config Bounds Game <n>] (pairs) to allow it."
+        | Some n ->
+          (try Some (Model.Product.with_cap n compute) with
+           | Model.Product.Game_too_large n ->
+             refuse
+               (Printf.sprintf
+                  "The game has more than %i pairs, the bound set with [MeBi \
+                   Config Bounds Game %i]: raise it to allow it."
+                  n
+                  n)))
+  ;;
+
   module Command = struct
     let build_lts
           ?(weak : Weak.t option = None)
@@ -534,6 +596,7 @@ module Make (Enc : Encoding.S) :
       | Minimize of rocq_args
       | Merge of rocq_pair
       | CheckBisim of rocq_pair
+      | CheckSim of rocq_pair
       | BenchmarkGraph of (rocq_args * (int * int))
 
     and rocq_args = Constrexpr.constr_expr * Libnames.qualid
@@ -656,7 +719,11 @@ module Make (Enc : Encoding.S) :
           M.Err.not_bisimilar ())
     ;;
 
-    let do_check_bisim { a; b } refs : Model.Bisimilarity.t option M.mm =
+    (* [bisimilarity_of { a; b } refs]: build both FSMs, saturate them (on
+       demand above the saturation bound) and check them for weak
+       bisimilarity, logging the FSMs and the result. No verdict check: see
+       {!do_check_bisim} and {!do_check_sim}. *)
+    let bisimilarity_of { a; b } refs : Model.Bisimilarity.t M.mm =
       Logger.trace __FUNCTION__;
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
@@ -682,7 +749,60 @@ module Make (Enc : Encoding.S) :
         (module Model.Bisimilarity.Result)
         (module Decode.Result)
       |> handle_results Result "Finished Merging FSMs" result.result;
+      M.return result
+    ;;
+
+    let do_check_bisim (args : rocq_pair) refs
+      : Model.Bisimilarity.t option M.mm
+      =
+      Logger.trace __FUNCTION__;
+      let open M.Syntax in
+      let* result = bisimilarity_of args refs in
       fail_if_not_bisim result.result;
+      M.return (Some result)
+    ;;
+
+    let do_check_sim (args : rocq_pair) refs : Model.Bisimilarity.t option M.mm =
+      Logger.trace __FUNCTION__;
+      let open M.Syntax in
+      let* result = bisimilarity_of args refs in
+      (* the two terms as the user wrote them, for the verdict *)
+      let term ((x, _) : rocq_args) : string M.mm =
+        let* e = M.constrexpr_to_econstr x in
+        M.state (fun env sigma -> sigma, Rocq_utils.Strfy.econstr env sigma e)
+      in
+      let* left = term args.a in
+      let* right = term args.b in
+      let similar : bool =
+        Model.Bisimilarity.Result.are_bisimilar result.result
+        ||
+        match similarity result with
+        | Some sim ->
+          (match result.fsm_a.original.init, result.fsm_b.original.init with
+           | Some ra, Some rb -> Model.Product.Pair.Set.mem (ra, rb) sim
+           | _ -> false)
+        | None -> false
+      in
+      if similar
+      then
+        Logger.info
+          (Printf.sprintf "(Similar: %s is weakly simulated by %s.)" left right)
+      else (
+        let msg =
+          Printf.sprintf
+            "%s is not weakly simulated by %s: no weak simulation relates them."
+            left
+            right
+        in
+        if !Api.the_fail_flags.non_bisimilar
+        then
+          CErrors.user_err
+            (Pp.str
+               ("MeBi: "
+                ^ msg
+                ^ " [MeBi Config FailIf NotBisimilar False] makes this a \
+                   warning."))
+        else Logger.warning msg);
       M.return (Some result)
     ;;
 
@@ -762,6 +882,7 @@ module Make (Enc : Encoding.S) :
       | Minimize args -> do_minimize args refs
       | Merge args -> do_merge args refs
       | CheckBisim args -> do_check_bisim args refs
+      | CheckSim args -> do_check_sim args refs
       | BenchmarkGraph args -> do_benchmark_graph args refs
     ;;
   end

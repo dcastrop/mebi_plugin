@@ -77,6 +77,14 @@ module type S = sig
     -> Weak.t option
     -> Model.LTS.t M.mm
 
+  (** [similarity r]: for a bisimilarity check's result [r], the greatest
+      weak simulation from FSM a to FSM b among the pairs reachable from
+      their start states ({!Model.Product.simulation}), or [None] if either
+      FSM has no start state. When an FSM is saturated on demand, that walk
+      saturates state after state, so it needs [MeBi Config Bounds Game <n>] and stays within it: without the bound, or past it, it is a user
+      error saying how to allow it. *)
+  val similarity : Model.Bisimilarity.t -> Model.Product.Pair.Set.t option
+
   module Command : sig
     val build_lts
       :  ?weak:Weak.t option
@@ -99,6 +107,7 @@ module type S = sig
       | Minimize of rocq_args
       | Merge of rocq_pair
       | CheckBisim of rocq_pair
+      | CheckSim of rocq_pair
       | BenchmarkGraph of (rocq_args * (int * int))
 
     and rocq_args = Constrexpr.constr_expr * Libnames.qualid
@@ -140,6 +149,16 @@ module type S = sig
       -> Model.Bisimilarity.t option M.mm
 
     val do_check_bisim
+      :  rocq_pair
+      -> Libnames.qualid list
+      -> Model.Bisimilarity.t option M.mm
+
+    (** [do_check_sim { a; b } refs]: decide whether [a]'s term is weakly
+        simulated by [b]'s ([MeBi Run Sim]), reporting the verdict. Bisimilar
+        states are similar outright; otherwise {!similarity} decides. Not
+        similar is an error under [MeBi Config FailIf NotBisimilar True]
+        (the default), else a warning. *)
+    val do_check_sim
       :  rocq_pair
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm

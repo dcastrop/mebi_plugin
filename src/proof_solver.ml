@@ -268,14 +268,12 @@ let init
      let module Model = Solver.W.Model in
      let fsm_a = Solver.W.get_fsm_a () in
      let fsm_b = Solver.W.get_fsm_b () in
-     let sim : Model.Product.Pair.Set.t =
-       Model.Product.simulation
-         fsm_a
-         fsm_b
-         (Solver.W.get_fsm_b ~saturated:true ())
-     in
-     match fsm_a.init, fsm_b.init with
-     | Some ra, Some rb ->
+     (* only the pairs reachable from the two start states, and on demand
+        only within [MeBi Config Bounds Game] ([Wrapper.similarity]) *)
+     match
+       Solver.W.similarity (Solver.W.get_the_result ()), fsm_a.init, fsm_b.init
+     with
+     | Some sim, Some ra, Some rb ->
        if Model.Product.Pair.Set.mem (ra, rb) sim
        then (
          let table : (Model.State.t, Model.State.Set.t) Hashtbl.t =
@@ -311,7 +309,7 @@ let init
          Logger.warning
            "The left state is not weakly simulated by the right one; the proof \
             search will not close."
-     | _ -> ());
+     | _, _, _ -> ());
   (* The answer policy. [Default] answers move by move with
      [Model.Product.answer], as the solver always has, and builds nothing.
      Anything else is planned here, once: the answer to every move the game

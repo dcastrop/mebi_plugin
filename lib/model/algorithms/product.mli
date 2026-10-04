@@ -78,14 +78,18 @@ module type S = sig
       @raise NoBisimilarResponse when nothing qualifies. *)
   val respond : ?silent:edgemap -> fsm -> state -> label -> states -> transition
 
-  (** [simulation a b b_saturated] is the greatest weak simulation from [a]'s
-      states to [b]'s: [(x, y)] is in it when every strong move
+  (** [simulation a b b_saturated root] is the greatest weak simulation from
+      [a]'s states to [b]'s, restricted to the pairs reachable from [root]
+      in the simulation game: [(x, y)] is in it when every strong move
       [x -l-> x'] of [a] has an answer [y =l=> y'] ([=ε=>], zero steps
       included, for a silent [l]) with [(x', y')] in it again -- [weak_sim]'s
-      own definition. [b] is the unsaturated FSM (for silent closures),
+      own definition. So [root] is in it iff [fst root] is weakly simulated
+      by [snd root]. [b] is the unsaturated FSM (for silent closures),
       [b_saturated] gives the visible weak moves. Coarser than
-      bisimilarity: [a.b] is simulated by [a.(b + c)], not bisimilar to it. *)
-  val simulation : fsm -> fsm -> fsm -> Pair.Set.t
+      bisimilarity: [a.b] is simulated by [a.(b + c)], not bisimilar to it.
+      The walk counts against {!val:with_cap}'s cap.
+      @raise Game_too_large past that cap. *)
+  val simulation : fsm -> fsm -> fsm -> Pair.t -> Pair.Set.t
 
   (** How [b] answers a move: by standing still (a silent move, when [b]'s
       state already qualifies), or by making a transition. *)
