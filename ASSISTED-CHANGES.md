@@ -6056,6 +6056,76 @@ re-verified there (see the PR).
 **Session tally (2026-10-04), cont.:** New feature 3 · Refactor 1 (review)
 · Docs 1 · Tooling 1 · Optimization 1 · Bug fix 1.
 
+## 2026-10-04 — Documentation pass, part 1: `lib/model/algorithms`
+
+**Docs + Refactor.** On branch `docs/model-algorithms`. The first library
+of the codebase-wide pass Jonah asked for after reviewing
+`Premise_search.bounded_universal`: every function gets a comment at its
+definition saying what it does with its arguments, and large or convoluted
+functions are split into single-purpose ones. His choices for the whole
+pass: a function documented in its `.mli` keeps the contract there and
+gets a short "how" or a pointer at the definition (no duplicated
+contracts); per library, one comments-only commit, then one commit per
+split, each verified.
+
+Before: of 131 functions in the library, 106 had no comment directly above
+them (82% across the whole codebase: 1,021 of 1,240).
+
+**Comments** (`f091a80`, `a7c406a`; with comments stripped the code is
+identical, checked file by file). Also corrected stale text: two comments
+that my `respond` speed-up (PR #36) had separated from `respond` and
+`respond_silently`; `Policy` described as "measurement only" though the
+solver answers from plans; `respond`'s tie-break and `estimate_by`'s step
+cost out of date; `Saturation` pointing at "the enumeration above", long
+removed.
+
+**Splits**, one commit each, the code inside each step moved unchanged:
+- `Saturation.edge_bfs` -> `visible_sources`, `silent_bfs`,
+  `emit_weak_actions` (`satdiff` byte-identical; matrix identical);
+- `Saturation_estimate.quotient` and `partition` -> `number_states`,
+  `split_edges`, `scc_dag`, `tau_reach`, `scc_moves`, `refine_blocks`,
+  `expand_blocks` (tests: quotient partition = saturated, estimate =
+  saturated count, on 300 random LTSs);
+- `Product.Policy.candidates` -> `stay_candidate`,
+  `silent_move_candidates`, `visible_move_candidates`;
+- `Product.Policy.walk`: a 7-tuple fold accumulator -> a record,
+  `walk_state`, and `answer_pair`;
+- `Product.Policy.minimal_relation`: ~240 lines of closures over a dozen
+  tables -> a record, `shrink_state`, and eleven documented functions
+  (test: same relation as the original algorithm on 400 random games).
+
+**Verification.** Each commit: build, `tests.exe` 103/103, `Test.v`
+counts identical. The two saturation splits: the proof matrix in all three
+modes, each in its own worktree. The final commit: the matrix in all three
+modes, and the `Test4` normalised suite (its `weak_bisimilar` runs under
+`Answers Minimal`, which exercises the three `Policy` splits). `make`
+clean. Mistake on the way: I queued one verification with a mistyped
+commit hash; it failed at checkout and was re-run.
+
+**Review (Jonah), same branch.** The comment style was revised: "[f x] is
+..." saying what the value is (a unit function: what it does), an overview
+first for orchestrating functions, the main clause before the qualifiers,
+and every doc comment ending with what it raises, directly or propagated
+("Raises nothing" otherwise). Restyled throughout (`bf4ef1a`, comments
+only). And a split rule: a non-trivial lambda passed to fold/map/iter
+becomes a named, documented function, unless it leans on the enclosing
+scope, in which case values are passed as directly as possible. Applied in
+four more commits: `saturation` (`visible_steps`, `offer_source`; a
+`search` record with `seed`/`settle`/`relax`; `weak_action`),
+`saturation_estimate` (`transitions`), `minimization` (`goes_with`,
+`silent_successors`), `product` (`moves_of_action`, `obligation_of`,
+`answer_obligation`, `index_obligation`). Each: `tests.exe` 103/103 and
+`Test.v` identical (the saturation one also `satdiff` byte-identical); the
+proof matrix in three modes on the saturation and minimization commits and
+on the last, plus the `Test4` suite on the last.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/model-algorithms main`); or a single split,
+by its commit.
+
+**Session tally (2026-10-04), cont.:** New feature 3 · Refactor 10 (1
+review, 9 split commits) · Docs 3 · Tooling 1 · Optimization 1 · Bug fix 1.
+
 ---
 
 ## Outstanding

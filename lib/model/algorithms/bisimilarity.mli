@@ -14,7 +14,11 @@ module type S = sig
 
     include Json.S with type k = t (** @closed *)
 
-    (** [get x] saturates [x], keeping the original alongside. *)
+    (** [get ?on_demand x] is [x] with its saturation alongside: whole, or,
+        with [on_demand], saturated on demand holding at most that many weak
+        actions ({!FSM.saturate_on_demand}).
+
+        Raises nothing. *)
     val get : ?on_demand:int -> fsm -> t
   end
 
@@ -31,14 +35,20 @@ module type S = sig
 
     include Json.S with type k = t (** @closed *)
 
-    (** [are_bisimilar r]: the two initial states share a block, which is what
-        bisimilarity of two systems means. Only when an FSM has no initial
-        state does it fall back to "no block holds states from only one FSM",
-        which is necessary but not sufficient: [a.b.x] and [b.a.y] pass it. *)
+    (** [are_bisimilar r] is whether the two systems are bisimilar: their
+        initial states share a block, which is what bisimilarity of two
+        systems means. Only when an FSM has no initial state does it fall
+        back to "no block holds states from only one FSM", which is
+        necessary but not sufficient: [a.b.x] and [b.a.y] pass it.
+
+        Raises nothing. *)
     val are_bisimilar : t -> bool
 
-    (** [split ?roots_related pi a b] sorts the blocks of [pi] into those with
-        states from both [a] and [b] ([bisim_states]) and the rest. *)
+    (** [split ?roots_related pi a b] is [pi]'s blocks sorted into those with
+        states from both [a] and [b] ([bisim_states]) and the rest, with
+        [roots_related] recorded as given.
+
+        Raises nothing. *)
     val split : ?roots_related:bool -> partition -> states -> states -> t
   end
 
@@ -53,15 +63,20 @@ module type S = sig
 
   include Json.S with type k = t (** @closed *)
 
-  (** The last result, kept for the proof solver ([MeBi Sim Begin] computes
-      it, every later step reads it). *)
+  (** The last result, kept for the proof solver: [MeBi Sim Begin]
+      computes it, and every later step reads it. *)
   val the_cached_result : t option ref
 
+  (** [set_the_result r] makes [r] {!the_cached_result}.
+
+      Raises nothing. *)
   val set_the_result : t -> unit
 
   exception NoCachedResult of unit
 
-  (** @raise NoCachedResult if no check has run. *)
+  (** [get_the_result ()] is {!the_cached_result}.
+
+      @raise NoCachedResult if no check has run (raised here). *)
   val get_the_result : unit -> t
 
   (** For FSMs too large to saturate whole (notes/13): which of the two to
@@ -76,23 +91,31 @@ module type S = sig
     ; partition : fsm -> partition
     }
 
-  (** [fsm a b] checks [a] and [b] for (weak) bisimilarity: saturates both,
-      merges them ({!FSM.merge}; their states must be disjoint, as the
-      plugin's encoding makes them), partitions the merged FSM by
-      {!Minimization.partition_states}, and splits the result. With
-      [on_demand] and either FSM on demand, that FSM is saturated on demand,
-      [merged] is the merge of the originals, and the partition is
+  (** [fsm ?on_demand a b] is the result of checking [a] and [b] for (weak)
+      bisimilarity: both saturated, merged ({!FSM.merge}; their states must
+      be disjoint, as the plugin's encoding makes them), the merge
+      partitioned by {!Minimization.partition_states}, and the result split.
+
+      With [on_demand] and either FSM on demand, that FSM is saturated on
+      demand, [merged] is the merge of the originals, and the partition is
       [on_demand.partition merged]: the same partition, by a different route
-      (checked in [tests.exe]). *)
+      (checked in [tests.exe]).
+
+      Raises nothing in practice; would propagate
+      {!Minimization.partition_states}'s exceptions. *)
   val fsm : ?on_demand:on_demand -> fsm -> fsm -> t
 
-  (** [conflicts a b] are the states [a] and [b] share (the same term,
-      hence the same encoding) whose moves differ between the two: labels
-      or targets. {!fsm} merges [a] and [b] assuming a shared state is one
-      state, which is exact when both sides use the same relation (so the
-      same term has the same moves) and wrong otherwise: two relations over
-      [nat], both from [0], conflate their [0]s. Empty in every checked-in
-      example. Found 2026-10-03 (notes/13). *)
+  (** [conflicts a b] is the set of states [a] and [b] share (the same
+      term, hence the same encoding) whose moves differ between the two:
+      labels or targets.
+
+      {!fsm} merges [a] and [b] assuming a shared state is one state, which
+      is exact when both sides use the same relation (so the same term has
+      the same moves) and wrong otherwise: two relations over [nat], both
+      from [0], conflate their [0]s. Empty in every checked-in example.
+      Found 2026-10-03 (notes/13).
+
+      Raises nothing. *)
   val conflicts : fsm -> fsm -> states
 end
 

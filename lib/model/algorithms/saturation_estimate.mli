@@ -29,19 +29,33 @@ module type S = sig
     ; weak : int (** weak (visible) actions {!FSM.saturate} would produce *)
     }
 
+  (** [fsm x] is [x]'s size: its states, silent SCCs, strong transitions,
+      and the exact number of weak actions saturating it would produce (see
+      above), computed on the quotient by silent SCCs, without saturating.
+
+      Raises nothing. *)
   val fsm : fsm -> t
+
+  (** [to_string e] is [e] in one phrase, for notices and warnings: "W weak
+      actions from S states (T strong transitions, K silent SCCs, the
+      largest with L)".
+
+      Raises nothing. *)
   val to_string : t -> string
 
   type partition
 
   (** [partition x] is the weak bisimilarity partition of [x]'s states,
-      computed on the quotient by silent SCCs rather than on [x] saturated:
-      states in one silent SCC have the same weak moves and are weakly
-      bisimilar, so the quotient is refined, by weak moves and [=eps=>] moves
-      into blocks, and each block expanded to its states. Memory is the
-      number of SCC-level weak moves, not of saturated ones ([Proc/Test4]:
-      5,184 for 9720 states, against 74.6M). For FSMs too large to saturate
-      whole; see [notes/13]. *)
+      computed on the quotient by silent SCCs rather than on [x] saturated.
+
+      States in one silent SCC have the same weak moves and are weakly
+      bisimilar, so the SCCs are refined, by their weak moves and their
+      [=eps=>] moves into blocks, and each block is expanded to its states.
+      The memory is the number of SCC-level weak moves, not of saturated
+      ones ([Proc/Test4]: 5,184 for 9720 states, against 74.6M). For FSMs
+      too large to saturate whole; see [notes/13].
+
+      Raises nothing. *)
   val partition : fsm -> partition
 end
 

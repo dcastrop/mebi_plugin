@@ -52,13 +52,7 @@ module type S = sig
 
   val fsm : ?on_demand:on_demand -> fsm -> fsm -> t
 
-  (** [conflicts a b] are the states [a] and [b] share (the same term,
-      hence the same encoding) whose moves differ between the two: labels
-      or targets. {!fsm} merges [a] and [b] assuming a shared state is one
-      state, which is exact when both sides use the same relation (so the
-      same term has the same moves) and wrong otherwise: two relations over
-      [nat], both from [0], conflate their [0]s. Empty in every checked-in
-      example. Found 2026-10-03 (notes/13). *)
+  (* See [bisimilarity.mli]. *)
   val conflicts : fsm -> fsm -> states
 end
 
@@ -110,6 +104,7 @@ module Make
         ;;
       end)
 
+    (* See the [.mli]. *)
     let get ?(on_demand : int option) (x : FSM.t) : t =
       match on_demand with
       | None -> { original = x; saturated = FSM.saturate ~only_if_weak:true x }
@@ -148,11 +143,11 @@ module Make
         ;;
       end)
 
-    (* Bisimilarity of two systems is bisimilarity of their initial states.
-       "Every block holds states of both systems" is not it: [a.b.x] against
-       [b.a.y] partitions into two shared blocks, {x, b.y} and {b.x, y}, with
-       the two initial states in different ones. It survives only as the
-       fallback when an FSM has no initial state. *)
+    (* See the [.mli]. Bisimilarity of two systems is bisimilarity of their
+       initial states. "Every block holds states of both systems" is not it:
+       [a.b.x] against [b.a.y] partitions into two shared blocks, {x, b.y}
+       and {b.x, y}, with the two initial states in different ones. It
+       survives only as the fallback when an FSM has no initial state. *)
     let are_bisimilar ({ non_bisim_states; roots_related; _ } : t) : bool =
       Logger.trace __FUNCTION__;
       match roots_related with
@@ -160,6 +155,8 @@ module Make
       | None -> Partition.is_empty non_bisim_states
     ;;
 
+    (* See the [.mli]. A block goes to [bisim_states] if it has a state of
+       [a] and a state of [b] ([States.has_shared_origin]). *)
     let split
           ?(roots_related : bool option)
           (pi : Partition.t)
@@ -206,6 +203,7 @@ module Make
       ;;
     end)
 
+  (* See the [.mli] for these three. *)
   let the_cached_result : t option ref = ref None
   let set_the_result (x : t) : unit = the_cached_result := Some x
 
@@ -218,16 +216,21 @@ module Make
     | Some x -> x
   ;;
 
+  (** A state's moves, as (label, target) pairs, for {!conflicts}. *)
   module Move = Set.Make (struct
       type t = C.Label.t * C.State.t
 
+      (* label first, then target *)
       let compare ((l, s) : t) ((l', s') : t) : int =
         match C.Label.compare l l' with 0 -> C.State.compare s s' | n -> n
       ;;
     end)
 
+  (* See the [.mli]. For each shared state, its set of (label, target)
+     moves in [a] against that in [b]. *)
   let conflicts (a : FSM.t) (b : FSM.t) : States.t =
     Logger.trace __FUNCTION__;
+    (* [moves x s] is [s]'s (label, target) moves in [x]. *)
     let moves (x : FSM.t) (s : C.State.t) : Move.t =
       match C.EdgeMap.find_opt x.edges s with
       | None -> Move.empty
@@ -243,7 +246,11 @@ module Make
       (States.inter a.states b.states)
   ;;
 
-  (** Whether the roots share a block, and the result split by [pi]. *)
+  (** [finish fsm_a fsm_b merged pi] is the bisimilarity result for the two
+      FSMs and their [merged] FSM partitioned by [pi]: whether their initial
+      states share a block of [pi], and [pi] split by {!Result.split}.
+
+      Raises nothing. *)
   let finish
         (fsm_a : FSMPair.t)
         (fsm_b : FSMPair.t)
@@ -266,6 +273,12 @@ module Make
     { fsm_a; fsm_b; merged; result }
   ;;
 
+  (** [fsm_whole a b] is {!fsm} without on-demand saturation: [a] and [b]
+      saturated whole and merged, and the merge partitioned with the
+      [=eps=>] split read from the originals' silent steps.
+
+      Raises nothing in practice; would propagate
+      {!Minimization.partition_states}'s exceptions. *)
   let fsm_whole (a : FSM.t) (b : FSM.t) : t =
     let fsm_a : FSMPair.t = FSMPair.get a in
     let fsm_b : FSMPair.t = FSMPair.get b in
@@ -287,11 +300,14 @@ module Make
     finish fsm_a fsm_b merged pi
   ;;
 
+  (* See the [.mli]: {!fsm_whole}, or, with either FSM on demand, the
+     quotient route. *)
   let fsm ?(on_demand : on_demand option) (a : FSM.t) (b : FSM.t) : t =
     Logger.trace __FUNCTION__;
     match on_demand with
     | Some ({ a = od_a; b = od_b; budget; partition } : on_demand)
       when od_a || od_b ->
+      (* [x] as given and saturated: on demand if [od], else whole *)
       let get (od : bool) (x : FSM.t) : FSMPair.t =
         FSMPair.get ?on_demand:(if od then Some budget else None) x
       in

@@ -113,14 +113,29 @@ module Make
 
   exception CannotSplitEmptyBlock of unit
 
+  (* See the [.mli]. *)
   let ensure_nonempty (a : States.t) : unit =
     Logger.trace __FUNCTION__;
     try assert (States.is_empty a |> Bool.not) with
     | Assert_failure _ -> raise (CannotSplitEmptyBlock ())
   ;;
 
-  (** [split_block_by reach s block] splits [block] into the states that
-      [reach] maps to the same set of blocks as [s], and the rest. *)
+  (** [goes_with reach s reachable_from_s t] is whether [t] stays in [s]'s
+      block: [t] is [s], or [reach t] is the same set of blocks as [s]'s,
+      [reachable_from_s]. Raises nothing directly; propagates whatever
+      [reach] raises. *)
+  let goes_with
+        (reach : State.t -> Partition.t)
+        (s : State.t)
+        (reachable_from_s : Partition.t)
+        (t : State.t)
+    : bool
+    =
+    State.equal s t || Partition.equal reachable_from_s (reach t)
+  ;;
+
+  (* See the [.mli]. One pass over [block], each state kept with [s] or
+     split off by {!goes_with}. *)
   let split_block_by
         (reach : State.t -> Partition.t)
         (s : State.t)
@@ -133,20 +148,17 @@ module Make
     Partition.log ~__FUNCTION__ ~s:"reachable from state" reachable_from_s;
     States.fold
       (fun (t : State.t) ((b1, b2) : States.t * States.t option) ->
-        if State.equal s t
-        then States.add s b1, b2
+        if goes_with reach s reachable_from_s t
+        then States.add t b1, b2
         else (
-          let reachable_from_t : Partition.t = reach t in
-          (* NOTE: split if [s] and [t] can reach different blocks *)
-          if Partition.equal reachable_from_s reachable_from_t
-          then States.add t b1, b2
-          else (
-            State.log ~__FUNCTION__ ~s:"splitting" t;
-            b1, Some (States.add_to_opt t b2))))
+          State.log ~__FUNCTION__ ~s:"splitting" t;
+          b1, Some (States.add_to_opt t b2)))
       block
       (States.empty, None)
   ;;
 
+  (* See the [.mli]: {!split_block_by}, with [reach] the blocks of [pi]
+     each state reaches by one step of [edges]. *)
   let split_block
         (pi : Partition.t)
         (s : State.t)
@@ -159,12 +171,14 @@ module Make
 
   exception Split_OnlyReturnedOneBlock_ButNeqBlock of (States.t * States.t)
 
+  (* See the [.mli]. *)
   let ensure_equal (a : States.t) (b : States.t) : unit =
     Logger.trace __FUNCTION__;
     try assert (States.equal a b) with
     | Assert_failure _ -> raise (Split_OnlyReturnedOneBlock_ButNeqBlock (a, b))
   ;;
 
+  (* See the [.mli]. *)
   let for_each_label
         (pi : Partition.t ref)
         (changed : bool ref)
@@ -188,38 +202,42 @@ module Make
       changed := true
   ;;
 
-  (** [silent_closures edges] is a function from a state to the states it
-      reaches by {e zero} or more silent steps in [edges]: Milner's [=ε=>],
-      reflexive by definition. Memoised, so each closure is computed once per
-      partition. Only the silent edges of [edges] are read, so it can be given
-      an unsaturated FSM's edges. *)
+  (** [silent_successors edges s] is the destination of every silent step
+      out of [s] in [edges], in storage order (repeats possible). Raises
+      nothing. *)
+  let silent_successors (edges : EdgeMap.t') (s : State.t) : State.t list =
+    match EdgeMap.find_opt edges s with
+    | None -> []
+    | Some actions ->
+      ActionMap.fold
+        (fun (a : Action.t) (ds : States.t) acc ->
+          if Action.is_silent a
+          then States.fold (fun (d : State.t) acc -> d :: acc) ds acc
+          else acc)
+        actions
+        []
+      |> List.rev
+  ;;
+
+  (* See the [.mli]. A breadth-first search over silent steps
+     ({!silent_successors}) per state, memoised by state. *)
   let silent_closures (edges : EdgeMap.t') : State.t -> States.t =
     let memo : States.t StateTbl.t = StateTbl.create 64 in
+    (* [bfs frontier seen] is [seen] grown by everything reachable by silent
+       steps from [frontier] (whose states are already in [seen]); a state's
+       new successors go to the front of the frontier. *)
     let rec bfs (frontier : State.t list) (seen : States.t) : States.t =
       match frontier with
       | [] -> seen
       | s :: rest ->
-        (match EdgeMap.find_opt edges s with
-         | None -> bfs rest seen
-         | Some actions ->
-           let frontier, seen =
-             ActionMap.fold
-               (fun (a : Action.t) (ds : States.t) acc ->
-                 if Action.is_silent a
-                 then
-                   States.fold
-                     (fun (d : State.t)
-                       ((fr, seen) : State.t list * States.t) ->
-                       if States.mem d seen
-                       then fr, seen
-                       else d :: fr, States.add d seen)
-                     ds
-                     acc
-                 else acc)
-               actions
-               (rest, seen)
-           in
-           bfs frontier seen)
+        let frontier, seen =
+          List.fold_left
+            (fun ((fr, seen) : State.t list * States.t) (d : State.t) ->
+              if States.mem d seen then fr, seen else d :: fr, States.add d seen)
+            (rest, seen)
+            (silent_successors edges s)
+        in
+        bfs frontier seen
     in
     fun (src : State.t) ->
       match StateTbl.find_opt memo src with
@@ -230,8 +248,16 @@ module Make
         c
   ;;
 
-  (** The silent half of weak bisimilarity: split [block] by which blocks
-      each state reaches by [=ε=>] ([closure]). See [for_each_block]. *)
+  (** [for_silent_closure pi changed closure block] refines [block] once by
+      [=ε=>]: it splits [block] by the blocks each state reaches by
+      [closure], updating [pi], [block] and [changed] as {!for_each_label}
+      does. The silent half of weak bisimilarity; see {!for_each_block}.
+
+      @raise Not_found if [block] is empty (propagated from
+                       [States.min_elt]).
+      @raise Split_OnlyReturnedOneBlock_ButNeqBlock
+        as {!for_each_label}
+        (propagated from {!ensure_equal}). *)
   let for_silent_closure
         (pi : Partition.t ref)
         (changed : bool ref)
@@ -240,6 +266,7 @@ module Make
     : unit
     =
     Logger.trace __FUNCTION__;
+    (* [reach x] is the blocks of [pi] that [x] reaches by [=eps=>] *)
     let reach (x : State.t) : Partition.t =
       Partition.filter_reachable (closure x) !pi
     in
@@ -251,15 +278,11 @@ module Make
       changed := true
   ;;
 
-  (** Refines [block] once by every visible label of the (saturated) [edges]
-      and, given [closure], by [=ε=>] as well.
-
-      Weak bisimilarity on an LTS is strong bisimilarity on its saturation
-      with {e both} kinds of weak move: [=a=>] for each visible [a], and
-      [=ε=>], zero or more silent steps (Milner 1989, ch. 5). Saturation
-      builds only the first, so without [closure] this computes something
-      coarser: it cannot tell [τ.a + b] from [a + b]. See
-      [ASSISTED-CHANGES.md], 2026-10-02 (second session). *)
+  (* See the [.mli]. Weak bisimilarity on an LTS is strong bisimilarity on
+     its saturation with both kinds of weak move: [=a=>] for each visible
+     [a], and [=ε=>] (Milner 1989, ch. 5). Saturation builds only the
+     first, so without [closure] the result is coarser. See
+     [ASSISTED-CHANGES.md], 2026-10-02 (second session). *)
   let for_each_block
         ?(closure : (State.t -> States.t) option)
         (pi : Partition.t ref)
@@ -279,11 +302,8 @@ module Make
       closure
   ;;
 
-  (** [partition_states ?silent fsm] partitions [fsm]'s states by
-      bisimilarity over its visible labels. Given [silent] -- edges holding
-      the silent steps, normally the {e unsaturated} FSM's -- it also splits
-      by [=ε=>], which is what makes the result weak bisimilarity when [fsm]
-      is saturated. *)
+  (* See the [.mli]. Each round refines every block; rounds repeat while
+     any block split. *)
   let partition_states ?(silent : EdgeMap.t' option) (fsm : FSM.t) : Partition.t
     =
     Logger.trace __FUNCTION__;
@@ -301,6 +321,7 @@ module Make
     !pi
   ;;
 
+  (* See the [.mli]. *)
   let fsm (fsm : FSM.t) : t =
     Logger.trace __FUNCTION__;
     let silent : EdgeMap.t' option =
