@@ -415,25 +415,39 @@ let test_product_simulation () : unit =
       10
       [ transition 10 a 11; transition 11 b 12; transition 11 c 12 ]
   in
-  let sim f g = M.Product.simulation f g (M.FSM.saturate g) in
-  check
-    "a.b <= a.(b + c)"
-    true
-    (M.Product.Pair.Set.mem (state 0, state 10) (sim x y));
-  check
-    "not a.(b + c) <= a.b"
-    false
-    (M.Product.Pair.Set.mem (state 10, state 0) (sim y x));
+  (* [f]'s [p] is simulated by [g]'s [q]: the root is in the simulation
+     computed from it *)
+  let sim f g p q =
+    M.Product.Pair.Set.mem
+      (state p, state q)
+      (M.Product.simulation f g (M.FSM.saturate g) (state p, state q))
+  in
+  check "a.b <= a.(b + c)" true (sim x y 0 10);
+  check "not a.(b + c) <= a.b" false (sim y x 10 0);
   let u = fsm ~weak_labels 20 [ transition 20 tau 21; transition 21 a 22 ] in
   let v = fsm ~weak_labels 30 [ transition 30 a 31 ] in
+  check "tau.a <= a" true (sim u v 20 30);
+  check "a <= tau.a" true (sim v u 30 20);
+  (* only the pairs reachable from the root are computed: from (0, 10),
+     never (1, 10), which no move leads to *)
+  let from_root =
+    M.Product.simulation x y (M.FSM.saturate y) (state 0, state 10)
+  in
   check
-    "tau.a <= a"
-    true
-    (M.Product.Pair.Set.mem (state 20, state 30) (sim u v));
+    "restricted to reachable pairs"
+    false
+    (M.Product.Pair.Set.mem (state 1, state 10) from_root);
+  (* and the walk counts against the game cap *)
   check
-    "a <= tau.a"
+    "capped walk raises past the cap"
     true
-    (M.Product.Pair.Set.mem (state 30, state 20) (sim v u))
+    (try
+       ignore
+         (M.Product.with_cap 1 (fun () ->
+            M.Product.simulation x y (M.FSM.saturate y) (state 0, state 10)));
+       false
+     with
+     | M.Product.Game_too_large 1 -> true)
 ;;
 
 (** Answer policies (measurement only). On the bisimulation game of

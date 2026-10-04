@@ -5976,6 +5976,71 @@ changes. `Test.v` counts identical; `tests.exe` 101/101; `make` clean.
 **Session tally (2026-10-04), cont.:** New feature 2 (+1 open, PR #35) ·
 Refactor 1 (review) · Docs 1 · Tooling 1 · Optimization 1 · Bug fix 1.
 
+## 2026-10-04 — `MeBi Run Sim`, and similarity over reachable pairs only
+
+**New feature.** On branch `feature/run-sim`. Agenda item 6 (deferred
+this morning), taken up after Jonah's review of PR #34: `Run Bisim ... As
+Sim` ran a similarity check under the name Bisim, so `weak_sim` gets its
+own command. Agreed scope: the verdict command, `As <name>`, and the
+scaling fix underneath.
+
+**What.**
+- `MeBi Run Sim x With a And y With b [Using rs]` reports whether `x` is
+  weakly simulated by `y` (a preorder: the order matters). Bisimilar states
+  are similar outright; otherwise the similarity below decides. Not similar
+  is an error under `FailIf NotBisimilar` (the default), else a warning.
+- `MeBi Run Sim ... As <name> [Using rs]` states `weak_sim` and opens its
+  proof, as `Run Bisim ... As` does for `weak_bisimilar` (same
+  `Proof_solver.start`).
+- **The scaling fix, which also changes `Sim Begin`.**
+  `Product.simulation` started from all |A| x |B| pairs (`Test4`: ~94M,
+  ~6GB a copy), and `Sim Begin` ran it unguarded for any non-bisimilar
+  `weak_sim` goal. It now takes the two start states and computes the
+  greatest weak simulation among the pairs *reachable* from them in the
+  simulation game. That is exactly the greatest simulation's pairs among
+  them, so the verdict is unchanged, and the proof search's choices are
+  unchanged too (`Product.answer` only consults a state's simulators among
+  a pair's own answers, all reachable). Split into documented helpers
+  (`weak_answers`, `simulation_game`, `refine_simulation`).
+  `Wrapper.similarity` applies the on-demand rule of PRs #27/#30: when an
+  FSM is saturated on demand the walk needs `MeBi Config Bounds Game` and
+  stays within it, else a user error saying how to allow it. Both `Run
+  Sim` and `Sim Begin` go through it.
+- `do_check_bisim` is split into `bisimilarity_of` (the shared pipeline)
+  and its verdict check; `do_check_sim` reuses the pipeline.
+
+**Measured.** The existing similarity uses (four in `CCS/PluginProofs.v`,
+`Test.v`'s `SimilarNotBisimilar`) are tiny: at most 12 pairs in all, at
+most 4 kept. A medium case (`weak_sim compLTS compLTS (a1|a2)
+(a1|a2|b1)`, `Test4`'s components): 5832 pairs in all, 3888 reachable and
+kept, 0.31s, out of `Sim Begin`'s 18.6s. So for these shapes the saving is
+a constant factor (the right side's silent closure reaches every
+arrangement of its components), not a change in kind; what protects the
+large case is the cap. The large case I tried (`(a1|a2|b1)` against
+`Test4`'s `p`, on demand) never reached the similarity: both `main` and the
+branch were still deciding *bisimilarity* after 20 minutes, a separate
+problem now in `TODO.md`.
+
+**Tests.** `tests.exe` 101/101 (new: the walk is restricted to reachable
+pairs; a capped walk raises past the cap). `Test.v` `RunSim`: similar,
+bisimilar-hence-similar and not-similar verdicts (error, and warning with
+`FailIf NotBisimilar False`); `As <name>` proved (9, the same as `Sim
+Begin`) and refused for a non-similar pair (nothing declared); on demand,
+refused without `Bounds Game`, allowed within it (`Sim Begin` proves, 13),
+refused past it. Every `Fail` checked for its reason. Other `Test.v`
+counts identical (`SimilarNotBisimilar` included); proof matrix in all
+three modes identical to the previous run (`bench/compare.sh`); `make`
+clean. Mistake on the way: my first on-demand test used an LTS with no
+silent steps, which is never saturated, so the "refused" check passed
+the walk instead; caught by the `Fail` not failing. Docs: README, `MeBi
+Help Run`; `TODO.md`'s similarity item closed.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep feature/run-sim main`).
+
+**Session tally (2026-10-04), cont.:** New feature 3 · Refactor 1 (review)
+· Docs 1 · Tooling 1.
+
 ---
 
 ## Outstanding

@@ -59,6 +59,8 @@ let text : string list -> string option = function
        MeBi Run Bisim <term> With <lts> And <term> With <lts> Using <lts>...\n\
        MeBi Run Merge <term> With <lts> And <term> With <lts> Using <lts>...\n\
        MeBi Run Bisim <term> With <lts> And <term> With <lts> As <name> [Using \
+       <lts>...]\n\
+       MeBi Run Sim <term> With <lts> And <term> With <lts> [As <name>] [Using \
        <lts>...]\n\n\
        Build the LTS reachable from <term>, then optionally saturate it (weak \
        transitions across silent steps), minimize it, or check two for (weak) \
@@ -67,8 +69,12 @@ let text : string list -> string option = function
        (layered LTSs). With As <name>, Run Bisim also states weak_bisimilar as \
        the Example <name>, opens its proof and begins the proof search, as \
        MeBi Sim Begin would: continue with MeBi Sim Solve <n>, then Qed. \
-       Nothing opens if the two are not bisimilar. See: MeBi Help Premises, \
-       MeBi Help Sim."
+       Nothing opens if the two are not bisimilar. Run Sim asks whether the \
+       first term is weakly simulated by the second (a preorder, so the order \
+       matters); with As <name> it states weak_sim and opens its proof the \
+       same way. It walks the pairs of states reachable from the two terms; \
+       when an FSM is saturated on demand that walk needs MeBi Config Bounds \
+       Game <n>. See: MeBi Help Premises, MeBi Help Sim."
   | [ "Sim" ] ->
     Some
       "MeBi Sim Begin <lts> <term> And <lts> <term> Using <lts>...\n\

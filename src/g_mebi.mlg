@@ -54,6 +54,51 @@ VERNAC COMMAND EXTEND MeBi_Run_Bisim_As
          Proof_solver.start ~kind:Proof_solver.Bisim ~name:n.CAst.v rs (x, a) (y, b)) }
 END
 
+(* Weak similarity: is <x> weakly simulated by <y>? ([Wrapper.similarity]:
+   only pairs reachable from the two start states, and on demand within
+   [MeBi Config Bounds Game].) *)
+VERNAC COMMAND EXTEND MeBi_Run_Sim CLASSIFIED AS QUERY
+| ["MeBi" "Run"
+   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] ->
+  {
+    let module W : Wrapper.S = (val Wrapper.get ()) in
+    let _ = W.Command.run [] (W.Command.CheckSim {a=(x, a); b=(y, b)})
+            |> W.M.run ~reset_encoding:true
+    in
+    Logger.info "(Finished Checking Similarity.)";
+    ()
+  }
+| ["MeBi" "Run"
+   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
+   "Using" reference_list(rs)] ->
+  {
+    let module W : Wrapper.S = (val Wrapper.get ()) in
+    let _ = W.Command.run rs (W.Command.CheckSim {a=(x, a); b=(y, b)})
+            |> W.M.run ~reset_encoding:true
+    in
+    Logger.info "(Finished Checking Similarity.)";
+    ()
+  }
+END
+
+(* Weak similarity, opening the proof: [... As <name>] states [weak_sim] as
+   the Example <name> and begins the proof search on it, as [MeBi Run Bisim
+   ... As] does for [weak_bisimilar]. *)
+VERNAC COMMAND EXTEND MeBi_Run_Sim_As
+| ![ open_proof ] ["MeBi" "Run"
+   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
+   "As" identref(n)]
+  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
+  -> { Proof_solver.guard (fun () ->
+         Proof_solver.start ~kind:Proof_solver.Sim ~name:n.CAst.v [] (x, a) (y, b)) }
+| ![ open_proof ] ["MeBi" "Run"
+   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
+   "As" identref(n) "Using" reference_list(rs)]
+  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
+  -> { Proof_solver.guard (fun () ->
+         Proof_solver.start ~kind:Proof_solver.Sim ~name:n.CAst.v rs (x, a) (y, b)) }
+END
+
 (* Bisimilarity *)
 VERNAC COMMAND EXTEND MeBi_Run_Bisim CLASSIFIED AS QUERY
 | ["MeBi" "Run" 

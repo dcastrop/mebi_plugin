@@ -1605,6 +1605,49 @@ Module RunBisimAs.
   MeBi Config Reset Weak.
 End RunBisimAs.
 
+(* [MeBi Run Sim x With a And y With b]: is [x] weakly simulated by [y]?
+   Bisimilar states are similar outright; otherwise the greatest weak
+   simulation among the pairs reachable from the two start states decides
+   (until 2026-10-04 computed over all pairs). Not similar is an error under
+   [FailIf NotBisimilar] (default), else a warning. [... As <name>] states
+   [weak_sim] and opens its proof, as [Sim Begin] would (same count, 9).
+   When an FSM is saturated on demand, the walk needs [Bounds Game] and
+   stays within it. *)
+MeBi Divider "Theories.Test.RunSim".
+Module RunSim.
+  Inductive st : nat -> option bool -> nat -> Prop :=
+  | p0 : st 0 (Some true) 1 | p1 : st 1 (Some false) 0
+  | q0 : st 10 (Some true) 11 | q1 : st 11 (Some false) 12
+  | q2 : st 12 (Some true) 11
+  | r0 : st 20 (Some true) 21
+  | t0 : st 30 None 31 | t1 : st 31 (Some true) 32.
+  MeBi Config Weak As Option bool.
+  MeBi Run Sim 20 With st And 0 With st Using st.
+  MeBi Run Sim 0 With st And 10 With st.
+  (* not similar: [0] can do [false] after [true], [20] cannot *)
+  Fail MeBi Run Sim 0 With st And 20 With st Using st.
+  MeBi Config FailIf NotBisimilar False.
+  MeBi Run Sim 0 With st And 20 With st Using st.
+  MeBi Config FailIf NotBisimilar True.
+  MeBi Run Sim 20 With st And 0 With st As rp_sim Using st.
+  MeBi Sim Solve 100. Qed.
+  Check rp_sim : weak_sim st st 20 0.
+  Fail MeBi Run Sim 0 With st And 20 With st As pr_sim.
+  Fail Check pr_sim.
+  (* on demand ([30] has a silent step): refused without [Bounds Game],
+     allowed within it, refused past it *)
+  MeBi Config Saturation OnDemand True.
+  Fail MeBi Run Sim 30 With st And 0 With st Using st.
+  MeBi Config Bounds Game 1000.
+  MeBi Run Sim 30 With st And 0 With st Using st.
+  Example tp_od : weak_sim st st 30 0.
+  Proof. MeBi Sim Begin st 30 And st 0 Using st. MeBi Sim Solve 100. Qed.
+  MeBi Config Bounds Game 1.
+  Fail MeBi Run Sim 30 With st And 0 With st Using st.
+  MeBi Config Reset Bounds.
+  MeBi Config Reset Weak.
+End RunSim.
+
 (* Premises that are not an application: an implication or a [forall]. Until
    2026-10-02 extraction took them for a variable's type and dropped them
    without a warning, so the LTS silently gained transitions. *)

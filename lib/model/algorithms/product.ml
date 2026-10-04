@@ -25,7 +25,7 @@ module type S = sig
   type edgemap
 
   val respond : ?silent:edgemap -> fsm -> state -> label -> states -> transition
-  val simulation : fsm -> fsm -> fsm -> Pair.Set.t
+  val simulation : fsm -> fsm -> fsm -> Pair.t -> Pair.Set.t
 
   type answer =
     | Stay
@@ -361,66 +361,6 @@ struct
         []
   ;;
 
-  (* The greatest weak simulation from [a] to [b], as [weak_sim] defines it:
-     every strong move [x -l-> x'] of [a] is answered by a weak move of [b],
-     [y =l=> y'] for a visible [l] (read off [b_saturated]) and [y =eps=> y']
-     for a silent one ([b]'s own silent closure, zero steps included), with
-     [(x', y')] again related. Naive refinement from all pairs: drop a pair
-     with an unanswerable move until nothing changes. Quadratic in the pairs
-     at worst; it is only computed for a [weak_sim] goal whose two states are
-     not bisimilar. *)
-  let simulation (a : FSM.t) (b : FSM.t) (b_saturated : FSM.t) : Pair.Set.t =
-    Logger.trace __FUNCTION__;
-    let closures : (C.State.t, C.State.Set.t) Hashtbl.t = Hashtbl.create 64 in
-    let closure (y : C.State.t) : C.State.Set.t =
-      match Hashtbl.find_opt closures y with
-      | Some c -> c
-      | None ->
-        let c =
-          Saturation.silent_paths b.edges y
-          |> List.fold_left
-               (fun acc (s, _, _) -> C.State.Set.add s acc)
-               C.State.Set.empty
-        in
-        Hashtbl.add closures y c;
-        c
-    in
-    let answers (y : C.State.t) (l : C.Label.t) : C.State.Set.t =
-      if C.Label.is_silent l
-      then closure y
-      else (
-        FSM.ensure b_saturated y;
-        match C.EdgeMap.find_opt b_saturated.edges y with
-        | None -> C.State.Set.empty
-        | Some actions ->
-          C.Action.Map.destinations (C.Action.Map.reduce_by_label actions l))
-    in
-    let all : Pair.Set.t =
-      C.State.Set.fold
-        (fun x acc ->
-          C.State.Set.fold (fun y acc -> Pair.Set.add (x, y) acc) b.states acc)
-        a.states
-        Pair.Set.empty
-    in
-    let rec refine (r : Pair.Set.t) : Pair.Set.t =
-      let r' =
-        Pair.Set.filter
-          (fun ((x, y) : Pair.t) ->
-            List.for_all
-              (fun ((l, x') : C.Label.t * C.State.t) ->
-                C.State.Set.exists
-                  (fun y' -> Pair.Set.mem (x', y') r)
-                  (answers y l))
-              (obligations a x))
-          r
-      in
-      if Int.equal (Pair.Set.cardinal r') (Pair.Set.cardinal r)
-      then r
-      else refine r'
-    in
-    refine all
-  ;;
-
   type answer =
     | Stay
     | Move of C.Transition.t
@@ -526,6 +466,99 @@ struct
           (List.rev_append next rest)
     in
     go (Pair.Set.singleton root) [ root ]
+  ;;
+
+  (* [weak_answers b b_saturated]: a function giving, for a state [y] of [b]
+     and a label [l], every state [y] can answer a move [-l->] with, as
+     [weak_sim] allows: [y =l=> y'] for a visible [l] (read off
+     [b_saturated], saturating [y] first if [b] is saturated on demand), and
+     [y =eps=> y'] for a silent one ([b]'s own silent closure, zero steps
+     included, so [y] itself). Silent closures are computed once per state. *)
+  let weak_answers (b : FSM.t) (b_saturated : FSM.t)
+    : C.State.t -> C.Label.t -> C.State.Set.t
+    =
+    let closures : (C.State.t, C.State.Set.t) Hashtbl.t = Hashtbl.create 64 in
+    let closure (y : C.State.t) : C.State.Set.t =
+      match Hashtbl.find_opt closures y with
+      | Some c -> c
+      | None ->
+        let c =
+          Saturation.silent_paths b.edges y
+          |> List.fold_left
+               (fun acc (s, _, _) -> C.State.Set.add s acc)
+               C.State.Set.empty
+        in
+        Hashtbl.add closures y c;
+        c
+    in
+    fun (y : C.State.t) (l : C.Label.t) ->
+      if C.Label.is_silent l
+      then closure y
+      else (
+        FSM.ensure b_saturated y;
+        match C.EdgeMap.find_opt b_saturated.edges y with
+        | None -> C.State.Set.empty
+        | Some actions ->
+          C.Action.Map.destinations (C.Action.Map.reduce_by_label actions l))
+  ;;
+
+  (* [simulation_game a answers root]: the pairs of the simulation game
+     reachable from [root]: from [(x, y)], every strong move [x -l-> x'] of
+     [a] ({!obligations}) paired with every answer [y'] in [answers y l].
+     Counted against [with_cap]'s cap, like every game walk. *)
+  let simulation_game
+        (a : FSM.t)
+        (answers : C.State.t -> C.Label.t -> C.State.Set.t)
+        (root : Pair.t)
+    : Pair.Set.t
+    =
+    let step ((x, y) : Pair.t) : Pair.t list =
+      List.concat_map
+        (fun ((l, x') : C.Label.t * C.State.t) ->
+          C.State.Set.fold (fun y' acc -> (x', y') :: acc) (answers y l) [])
+        (obligations a x)
+    in
+    reachable_by step root
+  ;;
+
+  (* [refine_simulation a answers r]: the greatest weak simulation within
+     the pairs [r]: repeatedly drop a pair [(x, y)] with a move [x -l-> x']
+     that no answer [y'] in [answers y l] matches with [(x', y')] still in,
+     until nothing changes. Naive: each round re-checks every pair. *)
+  let refine_simulation
+        (a : FSM.t)
+        (answers : C.State.t -> C.Label.t -> C.State.Set.t)
+        (r : Pair.Set.t)
+    : Pair.Set.t
+    =
+    let answered (r : Pair.Set.t) ((x, y) : Pair.t) : bool =
+      List.for_all
+        (fun ((l, x') : C.Label.t * C.State.t) ->
+          C.State.Set.exists (fun y' -> Pair.Set.mem (x', y') r) (answers y l))
+        (obligations a x)
+    in
+    let rec go (r : Pair.Set.t) : Pair.Set.t =
+      let r' = Pair.Set.filter (answered r) r in
+      if Int.equal (Pair.Set.cardinal r') (Pair.Set.cardinal r)
+      then r
+      else go r'
+    in
+    go r
+  ;;
+
+  (* The greatest weak simulation from [a] to [b], as [weak_sim] defines it,
+     restricted to the pairs reachable from [root] in the simulation game
+     ({!simulation_game}, then {!refine_simulation}). That is exactly the
+     greatest simulation's own pairs among them (any successor of a pair in
+     it is reachable too), so [root] is in it iff [fst root] is weakly
+     simulated by [snd root]. Until 2026-10-04 this started from all
+     |a| x |b| pairs: ~94M for [Proc/Test4], ~6GB a copy. *)
+  let simulation (a : FSM.t) (b : FSM.t) (b_saturated : FSM.t) (root : Pair.t)
+    : Pair.Set.t
+    =
+    Logger.trace __FUNCTION__;
+    let answers = weak_answers b b_saturated in
+    refine_simulation a answers (simulation_game a answers root)
   ;;
 
   let reachable

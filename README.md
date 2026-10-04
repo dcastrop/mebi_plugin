@@ -190,7 +190,9 @@ MeBi Run Bisim p With termLTS And q With termLTS As wbis_pq Using termLTS.
 MeBi Sim Solve 1000. Qed.
 ```
 
-It states `weak_bisimilar`; if the two are not bisimilar, nothing is opened. `As` comes before `Using`. (`weak_sim` goals use `Example ... MeBi Sim Begin`.)
+It states `weak_bisimilar`; if the two are not bisimilar, nothing is opened. `As` comes before `Using`.
+
+`MeBi Run Sim x With r1 And y With r2 [As <name>] [Using ...]` is the same for weak *similarity*: is `x` weakly simulated by `y`? Similarity is a preorder, so the order matters. With `As <name>` it states `weak_sim` and opens its proof. It decides by walking the pairs of states reachable from `x` and `y`; when an FSM is saturated on demand, that walk needs `MeBi Config Bounds Game <n>` and is refused without it.
 
 **When structural congruence blows up the state space.** A semantics that reorders and rebrackets parallel components with silent steps makes every arrangement a state of its own (`Proc/Test4`: 9720 states, beyond any proof). [`doc/structural-congruence.md`](doc/structural-congruence.md) is a recipe for proving such systems through a normalised semantics with one canonical state per class (`Test4`: 82 states), plus a one-off transfer theorem, with no change to the plugin.
 
