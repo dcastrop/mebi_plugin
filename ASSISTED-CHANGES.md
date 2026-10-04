@@ -5758,11 +5758,43 @@ other `Test.v` count identical to `main`. Proof matrix: `Auto` and forced
 `ABPBisimProofs.v` 9914, as before (221s, 227s). `tests.exe`
 99/99; `make` clean. Docs: README and `MeBi Help Premises`.
 
+**Review (Jonah), same branch.** `bounded_universal` was one dense,
+uncommented nest of matches. Rewritten as a short `Option` pipeline over
+helpers with one job each (`split_forall_implies`, `is_nat`, `as_le`,
+`strictness`, `to_int`), and the proof tactic split the same way
+(`bounded_lemmas`, `subproof`, `bounded_le_chain`, `bounded_proof`); every
+new function now has a header comment saying what it does with its
+arguments. Two flaws in my first version, found while doing so: `n` was
+fully normalised *before* the cap was checked, so a bound like `2 ^ 30`
+would have been computed in full (now read one `S` at a time, giving up
+past the cap); and refuting a hypothesis ran the counterexample search
+twice (now once). `Test.v` counts identical before and after.
+
+**Cost, measured** (one premise, one state, `weak_sim` to a copy). With
+`P k := k = k`: n = 100 0.2s / 0.3GB in all, n = 1000 6s / 0.4GB. With
+`P k := k <> 5000` (each instance refuted by inversion over unary
+numerals): extraction 0.24s / 0.88s / 9.1s at n = 100 / 300 / 1000; the
+whole proof 12s / 37s / 190s, peak 0.6 / 1.3 / 3.9GB. So the cost is
+dominated by each instance's own decision, and the fixed cap of 1024 is a
+crude guard: fine for cheap predicates, far too generous for dear ones.
+Raised with Jonah, who chose a setting with a lower default: **`MeBi
+Config Premise Range <n>`** (default 256; reset by `Reset Premise` and
+`Reset Bounds`, as `Premise Depth` is) caps the values of `k`, and a
+premise over it now gets its own warning naming the range (it used to fall
+into the generic "not closed, opaque, or deeper search" warning, none of
+which was the reason). `Test.v` checks the edge: `univ` at state 3 needs 3
+values, decided with `Range 3`, refused as incomplete with `Range 2` (the
+`Fail` checked for that reason). After the refactor the proof matrix is
+identical to the first run in all three modes; after the range, under
+`Auto` (forced modes not rerun: the change only applies to bounded
+universals, which no example has).
+
 **How to revert:** delete the branch before merging; after merging with a
 merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 `git log --merges --oneline --grep feature/bounded-universals main`).
 
-**Session tally (2026-10-04):** New feature 1.
+**Session tally (2026-10-04):** New feature 1 (with its `Premise Range`
+setting) · Refactor 1 (review).
 
 ---
 

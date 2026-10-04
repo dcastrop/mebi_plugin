@@ -189,7 +189,8 @@ let reset_bounds_args () : unit =
   the_saturation_bound := default_saturation_bound;
   the_game_bound := None;
   the_saturation_mode := Saturation_auto;
-  Premise_search.max_depth := Premise_search.default_depth
+  Premise_search.max_depth := Premise_search.default_depth;
+  Premise_search.max_range := Premise_search.default_range
 ;;
 
 (** A tactic tried on premises the search leaves undecided
@@ -201,8 +202,9 @@ let set_premise_tactic (t : unit Proofview.tactic) : unit =
 
 let reset_premise () : unit =
   Premise_search.max_depth := Premise_search.default_depth;
+  Premise_search.max_range := Premise_search.default_range;
   Premise_search.user_tactic := None;
-  Logger.show "(MeBi Config: Reset Premise depth and tactic.)"
+  Logger.show "(MeBi Config: Reset Premise depth, range and tactic.)"
 ;;
 
 (** How deep the bounded proof search for constructor premises may go
@@ -210,6 +212,16 @@ let reset_premise () : unit =
 let set_premise_depth (x : int) : unit =
   Premise_search.max_depth := x;
   Printf.sprintf "(MeBi Config: Set Premise search depth to: %i.)" x
+  |> Logger.show
+;;
+
+(** [set_premise_range x]: decide bounded universal premises
+    ([forall k, k < n -> P k]) ranging over at most [x] values of [k]
+    ([Premise_search.max_range]). Reset by [Reset Premise] and [Reset Bounds].
+*)
+let set_premise_range (x : int) : unit =
+  Premise_search.max_range := x;
+  Printf.sprintf "(MeBi Config: Set Premise range to: %i values.)" x
   |> Logger.show
 ;;
 

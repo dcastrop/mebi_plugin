@@ -1623,6 +1623,17 @@ Module ProductPremises.
   MeBi Config Bounds As Num States 2.
   Fail MeBi Run LTS 3 Using univ_neg.
   MeBi Config Reset Bounds.
+  (* [MeBi Config Premise Range]: [univ] at state 3 ranges over 3 values
+     ([k < 3]). Within a range of 3 it is decided (4 states, as above); with
+     2 it is left undecided, with a warning naming the range, so the LTS is
+     incomplete and refused. *)
+  MeBi Config Premise Range 3.
+  MeBi Config Bounds As Num States 4.
+  MeBi Run LTS 0 Using univ.
+  MeBi Config Premise Range 2.
+  Fail MeBi Run LTS 0 Using univ.
+  MeBi Config Reset Premise.
+  MeBi Config Reset Bounds.
 
   (* In proofs: a true universal premise is proved instance by instance
      ([MEBI.Premises]' lemmas), and a false one in a hypothesis (state 3 of

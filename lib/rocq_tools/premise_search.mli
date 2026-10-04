@@ -46,10 +46,22 @@ val refute_hyp_tac : ?depth:int -> Names.Id.t -> unit Proofview.tactic
 (** Prove a goal [~ P] whose [P] [prove] refutes. *)
 val negation_tac : unit Proofview.tactic
 
+(** The default for {!max_range}: 256. *)
+val default_range : int
+
+(** The most values of [k] a bounded universal may range over to be
+    decided ([MeBi Config Premise Range]). *)
+val max_range : int ref
+
 (** [is_bounded_universal env sigma t]: [t] is [forall k, k < n -> P k]
-    or [forall k, k <= n -> P k] over [nat], [n] a numeral once normalized
-    (at most 1024): {!prove} decides it instance by instance. *)
+    or [forall k, k <= n -> P k] over [nat], [n] a numeral once normalized,
+    ranging over at most {!max_range} values: {!prove} decides it instance
+    by instance. *)
 val is_bounded_universal : Environ.env -> Evd.evar_map -> EConstr.t -> bool
+
+(** [above_range env sigma t]: [t] has that shape but ranges over more than
+    {!max_range} values, so it is left undecided. *)
+val above_range : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 
 (** [premise_tac ()] proves the closed premise in focus the way {!prove}
     decided it holds (bounded universals need [MEBI.Premises]). *)

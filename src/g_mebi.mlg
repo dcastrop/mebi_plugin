@@ -222,6 +222,8 @@ VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
   { Api.set_game_bound x }
 | ["MeBi" "Config" "Premise" "Depth" int(x)] -> 
   { Api.set_premise_depth x }
+| ["MeBi" "Config" "Premise" "Range" int(x)] -> 
+  { Api.set_premise_range x }
 | ["MeBi" "Config" "Premise" "Tactic" tactic(t)] -> 
   { Api.set_premise_tactic (Tacinterp.interp t) }
 | ["MeBi" "Config" "Reset" "Premise"] -> 

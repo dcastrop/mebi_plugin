@@ -113,10 +113,13 @@ let text : string list -> string option = function
          \  - a negation [~ P] holds iff P is refuted by a complete search, \
           and is proved by refuting P;\n\
          \  - a bounded universal over nat, [forall k, k < n -> P k] or [k <= \
-          n] (also [n > k]), [n] a number up to 1024 once the premise is \
-          closed, holds iff every [P i] does: each is decided as above, and \
-          the proof is assembled from theirs with the lemmas in MEBI.Premises; \
-          a false one is refuted at a false [P i];\n\
+          n] (also [n > k]), [n] a number once the premise is closed, holds \
+          iff every [P i] does: each is decided as above, and the proof is \
+          assembled from theirs with the lemmas in MEBI.Premises; a false one \
+          is refuted at a false [P i]. Only up to %i values of [k] (MeBi \
+          Config Premise Range <n>): each costs a search, and the proof grows \
+          with the square of the range; a wider one is left undecided, with a \
+          warning saying so;\n\
          \  - with [MeBi Config Premise Tactic <tactic>], a premise the search \
           leaves undecided is tried with that tactic (proving it, or its \
           negation);\n\
@@ -125,7 +128,8 @@ let text : string list -> string option = function
           premise held, with a warning, so the LTS may contain transitions \
           that do not exist. A Run Bisim verdict on it may be wrong; a proof \
           cannot be, since Qed checks the premise."
-         !Premise_search.max_depth)
+         !Premise_search.max_depth
+         !Premise_search.max_range)
   | [ "Config" ] ->
     Some
       "MeBi Config Reset [Bounds | Weak | FailIf | Output].\n\n\
@@ -146,6 +150,7 @@ let text : string list -> string option = function
           MeBi Config Bounds Saturation <n>.\n\
           MeBi Config Bounds Game <n>.\n\
           MeBi Config Premise Depth <n>.\n\
+          MeBi Config Premise Range <n>.\n\
           MeBi Config Reset Bounds.\n\n\
           Exploration stops after <n> states (default %s) or transitions; an \
           LTS cut short is an error unless [MeBi Config FailIf Incomplete \
@@ -154,7 +159,7 @@ let text : string list -> string option = function
           Logging the result (Output \"Result\" / \"DecodeResults\" / \
           \"DumpResults\") costs far more, ~0.65MB per state. For the \
           saturation bound see MeBi Help Config Bounds Saturation; for the \
-          premise search depth, MeBi Help Premises."
+          premise search depth and range, MeBi Help Premises."
          (match Api.default_bounds with
           | Api.States n -> Printf.sprintf "%i states" n
           | Api.Transitions n -> Printf.sprintf "%i transitions" n)
