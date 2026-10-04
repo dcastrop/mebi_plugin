@@ -1,40 +1,32 @@
+(** Unused: a leftover of an earlier way of loading the theory terms. *)
 val constants : EConstr.t list ref
+
+(** [find_reference path id] is the global reference [id] in the library
+    module [path] (e.g. [["MEBI"; "Bisimilarity"]], ["weak_sim"]).
+
+    @raise ErrorWithGlobalOfPath
+      if no such reference is loaded (raised
+      here, after logging the path). The exception is not exported, so a
+      caller can only catch it generically. *)
 val find_reference : string list -> string -> Names.GlobRef.t
 
-(* val collect_bisimilarity_theories : unit -> EConstr.t list *)
+(** [get_constants ()] is every theory term the plugin uses, by name
+    ([weak_sim], [tau], [Some], ...), looked up once on first use and kept.
+
+    @raise ErrorWithGlobalOfPath
+      (unexported) if one is not loaded
+      (propagated from {!find_reference}). *)
 val get_constants : unit -> (string, EConstr.t) Hashtbl.t
+
+(** [get k] is the theory term named [k] ({!get_constants}).
+
+    @raise Failure if [k] is not one of them (raised here).
+    @raise ErrorWithGlobalOfPath (unexported) as {!get_constants}
+                                 (propagated). *)
 val get : string -> EConstr.t
 
-(* val indexed_c : int * EConstr.t list -> EConstr.t option *)
-(* val c_LTS : unit -> EConstr.t
-val c_tau : unit -> EConstr.t
-val c_silent : unit -> EConstr.t
-val c_silent1 : unit -> EConstr.t
-val c_weak : unit -> EConstr.t
-val c_wk_some : unit -> EConstr.t
-val c_wk_none : unit -> EConstr.t
-val c_simF : unit -> EConstr.t
-val c_Pack_sim : unit -> EConstr.t
-val c_sim_weak : unit -> EConstr.t
-val c_weak_sim : unit -> EConstr.t
-val c_In_sim : unit -> EConstr.t
-val c_out_sim : unit -> EConstr.t
-val c_weak_bisim : unit -> EConstr.t
-val c_relation : unit -> EConstr.t
-val c_clos_refl_trans_1n : unit -> EConstr.t
-val c_rt1n_refl : unit -> EConstr.t
-val c_rt1n_trans : unit -> EConstr.t
-val c_clos_trans_1n : unit -> EConstr.t
-val c_option : unit -> EConstr.t
-val c_None : unit -> EConstr.t
-val c_Some : unit -> EConstr.t
-val c_ex : unit -> EConstr.t
-val c_ex_intro : unit -> EConstr.t
-val c_prod : unit -> EConstr.t
-val c_pair : unit -> EConstr.t
-val c_weak_sim_refl : unit -> EConstr.t
-val c_wk_bisim_refl : unit -> EConstr.t
-val c_cons : unit -> EConstr.t
-val c_nil : unit -> EConstr.t *)
+(** [get_proof_from_pstate p] is [Declare.Proof.get p]. Unused. *)
 val get_proof_from_pstate : Declare.Proof.t -> Proof.t
+
+(** [get_partial_proof p] is [Proof.partial_proof p]. Unused. *)
 val get_partial_proof : Proof.t -> EConstr.t list

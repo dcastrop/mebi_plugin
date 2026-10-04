@@ -73,6 +73,7 @@ module Make
       ;;
     end)
 
+  (* See the [.mli]. *)
   let extract_info (x : Ind.t) : t list mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -108,8 +109,7 @@ module Make
     iterate 0 (Array.length tys - 1) [] f
   ;;
 
-  (***********************************************************************)
-
+  (* See the [.mli]. *)
   let get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis =
     Logger.trace __FUNCTION__;
     function
@@ -122,6 +122,7 @@ module Make
   exception BindingInstruction_IndexOutOfBounds of EConstr.t * int
   exception BindingInstruction_NEQ of EConstr.t * Constr.t
 
+  (* See the [.mli], including why the outer handler cannot fire. *)
   let rec get_bound_term (x : EConstr.t)
     : Bindings.Instructions.t -> EConstr.t mm
     =
@@ -153,6 +154,7 @@ module Make
          raise (BindingInstruction_Undefined (x, y)))
   ;;
 
+  (* See the [.mli]. *)
   let get_explicit_bindings
     :  EConstr.t * Bindings.ConstrMap.t' option
     -> EConstr.t Tactypes.explicit_bindings mm
@@ -175,6 +177,7 @@ module Make
       iterate 0 (Array.length ys - 1) [] f
   ;;
 
+  (* See the [.mli]. *)
   let get
         (from' : EConstr.t)
         (action' : EConstr.t option)

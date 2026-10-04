@@ -111,6 +111,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
 
     exception CannotAppendDone of unit
 
+    (* See the [.mli]. *)
     let rec append (x : t) : t -> t
       =
       (* Logger.trace __FUNCTION__; *)
@@ -120,6 +121,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
       | Done -> raise (CannotAppendDone ())
     ;;
 
+    (* See the [.mli]. *)
     let rec length : t -> int =
       (* Logger.trace __FUNCTION__; *)
       function
@@ -183,6 +185,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
           let compare a b : int = 0
         end)
 
+    (* See the [.mli]. *)
     let update (cmap : t') (k : Constr.t) ((name, inst) : NamedInstructions.t)
       : unit
       =
@@ -198,6 +201,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
 
     exception Rocq_bindings_CannotFindBindingName of EConstr.t
 
+    (* See the [.mli]. A search through [name_pairs], stopping at the first match. *)
     let find_name (name_pairs : (EConstr.t * Names.Name.t) list) (x : EConstr.t)
       : Names.Name.t mm
       =
@@ -230,6 +234,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
         return n
     ;;
 
+    (* See the [.mli]. *)
     let extract_binding_map
           (name_pairs : (EConstr.t * Names.Name.t) list)
           (x : EConstr.t)
@@ -276,12 +281,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
       return m
     ;;
 
-    (** [~keep_var]: also keep a position that is just a variable. For the
-        source that binding is redundant (matching the goal fixes it), so it
-        is dropped; for the target it is not -- in a proof the step's target
-        is still open when the constructor is applied, and a premise that
-        mentions it ([succ_rel n m -> lts n a m]) would stay open (backlog
-        I2, stage 2). *)
+    (* See the [.mli]. *)
     let make_opt
           ?(keep_var : bool = false)
           (name_pairs : (EConstr.t * Names.Name.t) list)
@@ -322,14 +322,13 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
       ;;
     end)
 
+  (* See the [.mli]. *)
   let use_no_bindings (xs : ConstrMap.t' option list) : bool =
     Logger.trace __FUNCTION__;
     List.filter (function None -> false | _ -> true) xs |> List.is_empty
   ;;
 
-  (** [] ...
-      @param name_map is a tuple list of evars and corresponding binding_names
-  *)
+  (* See the [.mli]. *)
   let extract
         (name_pairs : (EConstr.t * Names.Name.t) list)
         (from : EConstr.t * Constr.t)

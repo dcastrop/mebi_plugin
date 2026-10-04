@@ -14,9 +14,7 @@ exception
 
 exception Rocq_utils_EConstrIsNotA_Type of (Evd.evar_map * EConstr.t * string)
 
-(** [econstr_to_atomic sigma x]
-    @raise Rocq_utils_EConstrIsNotA_Type
-      if [EConstr.kind_of_type sigma x] is not [AtomicType (ty, tys)]. *)
+(* See the [.mli]. *)
 let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t)
   : EConstr.t kind_pair
   =
@@ -48,6 +46,7 @@ exception
         , Sorts.relevance )
         Constr.kind_of_term)
 
+(* See the [.mli]. *)
 let constr_to_app (x : Constr.t) : Constr.t kind_pair =
   match Constr.kind x with
   | App (ty, tys) -> ty, tys
@@ -65,6 +64,7 @@ type econstr_kind =
 exception
   Rocq_utils_EConstrIsNot_App of (Evd.evar_map * EConstr.t * econstr_kind)
 
+(* See the [.mli]. *)
 let econstr_to_app (sigma : Evd.evar_map) (x : EConstr.t) : EConstr.t kind_pair =
   match EConstr.kind sigma x with
   | App (ty, tys) -> ty, tys
@@ -77,6 +77,7 @@ type lambda_triple =
 exception
   Rocq_utils_EConstrIsNot_Lambda of (Evd.evar_map * EConstr.t * econstr_kind)
 
+(* See the [.mli]. *)
 let econstr_to_lambda (sigma : Evd.evar_map) (x : EConstr.t) : lambda_triple =
   match EConstr.kind sigma x with
   | Lambda (binder, types, constr) -> binder, types, constr
@@ -88,6 +89,7 @@ type hyp = (EConstr.t, EConstr.t, Evd.erelevance) Context.Named.Declaration.pt
 exception
   Rocq_utils_HypIsNot_Atomic of (Evd.evar_map * hyp * EConstr.kind_of_type)
 
+(* See the [.mli]. *)
 let hyp_to_atomic (sigma : Evd.evar_map) (h : hyp) : EConstr.t kind_pair =
   let h_ty : EConstr.t = Context.Named.Declaration.get_type h in
   try econstr_to_atomic sigma h_ty with
@@ -99,10 +101,12 @@ type ind_constr = Constr.rel_context * Constr.t
 type constr_decl = Constr.rel_declaration
 type econstr_decl = EConstr.rel_declaration
 
+(* See the [.mli]. *)
 let get_econstr_decls (ctx : Constr.rel_context) : econstr_decl list =
   List.map EConstr.of_rel_decl ctx
 ;;
 
+(* See the [.mli]. *)
 let list_of_constr_kinds : Constr.t -> (string * bool) list =
   fun (x : Constr.t) ->
   [ "App", Constr.isApp x
@@ -126,6 +130,7 @@ let list_of_constr_kinds : Constr.t -> (string * bool) list =
   ]
 ;;
 
+(* See the [.mli]. *)
 let list_of_econstr_kinds sigma (x : EConstr.t) : (string * bool) list =
   [ "App", EConstr.isApp sigma x
   ; "Arity", EConstr.isArity sigma x
@@ -150,6 +155,7 @@ let list_of_econstr_kinds sigma (x : EConstr.t) : (string * bool) list =
   ]
 ;;
 
+(* See the [.mli]. *)
 let list_of_econstr_kinds_of_type sigma (x : EConstr.t) : (string * bool) list =
   [ ( "SortType"
     , try
@@ -189,6 +195,7 @@ let list_of_econstr_kinds_of_type sigma (x : EConstr.t) : (string * bool) list =
   ]
 ;;
 
+(* See the [.mli]. *)
 let list_of_kinds
       sigma
       (f : Evd.evar_map -> 'a -> (string * bool) list)
@@ -198,17 +205,19 @@ let list_of_kinds
   List.filter_map (function y, true -> Some y | _, false -> None) (f sigma x)
 ;;
 
+(* See the [.mli]. *)
 let get_decl_type_of_constr (x : constr_decl) : EConstr.t =
   Log.trace __FUNCTION__;
   Context.Rel.Declaration.get_type x |> EConstr.of_constr
 ;;
 
+(* See the [.mli]. *)
 let get_decl_type_of_econstr (x : econstr_decl) : EConstr.t =
   Log.trace __FUNCTION__;
   Context.Rel.Declaration.get_type x
 ;;
 
-(** [get_ind_ty ind mib] *)
+(* See the [.mli]. *)
 let get_ind_ty
       (ind : Names.inductive)
       (mib : Declarations.mutual_inductive_body)
@@ -218,6 +227,7 @@ let get_ind_ty
   EConstr.mkIndU (ind, EConstr.EInstance.make mib.mind_univ_hyps)
 ;;
 
+(* See the [.mli]. *)
 let type_of_econstr_rel ?(substl : EConstr.t list option) (t : econstr_decl)
   : EConstr.t
   =
@@ -225,6 +235,7 @@ let type_of_econstr_rel ?(substl : EConstr.t list option) (t : econstr_decl)
   match substl with None -> ty | Some substl -> EConstr.Vars.substl substl ty
 ;;
 
+(* See the [.mli]. *)
 let type_of_econstr env sigma (x : EConstr.t) : Evd.evar_map * EConstr.t =
   Typing.type_of env sigma x
 ;;
@@ -324,17 +335,19 @@ module Strfy = struct
   let goal (x : Proofview.Goal.t) : string = "TODO: goal"
 end
 
-(* Evar names are only ever required to be fresh: the counter never goes
-   back, so a name is never handed out twice in a session. This produces the
-   same [UnifEvar0], [UnifEvar1], ... sequence as the previous cache, which kept
-   the set of every name issued and asked [Namegen.next_ident_away] for one
-   not in it. That call restarts its search from the base name whenever the
-   candidate is taken -- which it always was -- so each new name probed every
-   name before it. With about 80 evars per state, extracting [Proc/Test4]'s
-   first 600 states took 34s, of which ~33s was this. See ASSISTED-CHANGES.md,
-   2026-10-01 (backlog item B3). *)
+(* The counter behind {!the_next}. Evar names are only ever required to be
+   fresh: the counter never goes back, so a name is never handed out twice
+   in a session. This produces the same [UnifEvar0], [UnifEvar1], ...
+   sequence as the previous cache, which kept the set of every name issued
+   and asked [Namegen.next_ident_away] for one not in it. That call restarts
+   its search from the base name whenever the candidate is taken -- which it
+   always was -- so each new name probed every name before it. With about 80
+   evars per state, extracting [Proc/Test4]'s first 600 states took 34s, of
+   which ~33s was this. See ASSISTED-CHANGES.md, 2026-10-01 (backlog item
+   B3). *)
 let the_counter : int ref = ref 0
 
+(* See the [.mli]. *)
 let the_next () : Names.Id.t =
   let n : int = !the_counter in
   incr the_counter;
@@ -343,6 +356,7 @@ let the_next () : Names.Id.t =
 
 exception CouldNotGetNextFreshEvarName of unit
 
+(* See the [.mli]. *)
 let get_next_evar
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -360,6 +374,7 @@ type evar_source =
   | TypeOf of EConstr.t
   | OfType of EConstr.t
 
+(* See the [.mli]. *)
 let get_next (env : Environ.env) (sigma : Evd.evar_map)
   : evar_source -> Evd.evar_map * EConstr.t
   = function
@@ -369,6 +384,7 @@ let get_next (env : Environ.env) (sigma : Evd.evar_map)
   | OfType a_type -> get_next_evar env sigma a_type
 ;;
 
+(* See the [.mli]. *)
 let get_fresh_evar
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -378,17 +394,13 @@ let get_fresh_evar
   get_next env sigma original
 ;;
 
+(* See the [.mli]. *)
 let subst_of_decl (substl : EConstr.Vars.substl) x : EConstr.t =
   let ty : EConstr.t = Context.Rel.Declaration.get_type x in
   EConstr.Vars.substl substl ty
 ;;
 
-(** [mk_ctx_subst ?substl x] returns a new [evar] made from the type of [x], using any [substl] provided.
-    @param ?substl
-      is a list of substitutions, (* TODO: provided so that collisions don't occur? *)
-    @param x
-      corresponds to a (* TODO: universally? *) quantified term of a constructor.
-    @return a new [evar] for [x]. *)
+(* See the [.mli]. *)
 let mk_ctx_subst
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -400,12 +412,7 @@ let mk_ctx_subst
   Evarutil.new_evar env sigma subst
 ;;
 
-(** [mk_ctx_substl acc ts] makes an [evar] for each term declaration in [ts].
-    @param acc
-      contains the substitutions accumulated so far, and is returned once [ts=[]]
-    @param ts
-      is an [EConstr.rel_declaration list] (obtained from the context of a constructor).
-    @return [acc] of [evars] once [ts] is empty. *)
+(* See the [.mli]. *)
 let rec mk_ctx_substl
           (env : Environ.env)
           (sigma : Evd.evar_map)
@@ -419,8 +426,7 @@ let rec mk_ctx_substl
     mk_ctx_substl env sigma (vt :: acc) ts
 ;;
 
-(** returns tuple list of [(binding_name * evar)] -- TODO: map these to the [_UNBOUND_REL_X] and
-*)
+(* See the [.mli]. *)
 let map_decl_evar_pairs (xs : econstr_decl list) (ys : EConstr.Vars.substl)
   : (EConstr.t * Names.Name.t) list
   =
@@ -435,6 +441,7 @@ type constructor_args =
   ; rhs : EConstr.t
   }
 
+(* See the [.mli]. *)
 let constructor_args (args : EConstr.t array) : constructor_args =
   if Int.equal (Array.length args) 3
   then { lhs = args.(0); act = args.(1); rhs = args.(2) }
@@ -444,12 +451,7 @@ let constructor_args (args : EConstr.t array) : constructor_args =
 exception Rocq_utils_InvalidLtsArgLength of int
 exception Rocq_utils_InvalidLtsTermKind of Constr.t
 
-(** [extract_args ?substl term] returns an [EConstr.t] triple of arguments of an inductively defined LTS, e.g., [term -> option action -> term -> Prop].
-    @param ?substl
-      is a list of substitutions applied to the terms prior to being returned.
-    @param term
-      must be of [Constr.kind] [App(fn, args)] (i.e., the application of some inductively defined LTS, e.g., [termLTS (tpar (tact (Send A) tend) (tact (Recv A) tend)) (Some A) (tpar tend tend)]).
-    @return a triple of [lhs_term, action, rhs_term]. *)
+(* See the [.mli]. *)
 let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
   : constructor_args
   =
@@ -467,6 +469,7 @@ let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
 
 exception Rocq_utils_CouldNotExtractBinding of unit
 
+(* See the [.mli]. *)
 let unpack_constr_args ((_, tys) : Constr.t kind_pair)
   : Constr.t * Constr.t * Constr.t
   =
@@ -475,40 +478,48 @@ let unpack_constr_args ((_, tys) : Constr.t kind_pair)
   | Not_found -> raise (Rocq_utils_CouldNotExtractBinding ())
 ;;
 
+(* See the [.mli]. *)
 let econstr_to_constrexpr env sigma : EConstr.t -> Constrexpr.constr_expr =
   Constrextern.extern_constr ~flags:(PrintingFlags.current ()) env sigma
 ;;
 
+(* See the [.mli]. *)
 let constrexpr_to_econstr env sigma
   : Constrexpr.constr_expr -> Evd.evar_map * EConstr.t
   =
   Constrintern.interp_constr_evars env sigma
 ;;
 
+(* See the [.mli]. *)
 let econstr_to_constr ?(abort_on_undefined_evars : bool = false) sigma
   : EConstr.t -> Constr.t
   =
   EConstr.to_constr ~abort_on_undefined_evars sigma
 ;;
 
+(* See the [.mli]. *)
 let econstr_to_constr_opt sigma : EConstr.t -> Constr.t option =
   EConstr.to_constr_opt sigma
 ;;
 
+(* See the [.mli]. *)
 let globref_to_econstr env : Names.GlobRef.t -> EConstr.t =
   fun x -> EConstr.of_constr (UnivGen.constr_of_monomorphic_global env x)
 ;;
 
+(* See the [.mli]. *)
 let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
   match Constr.kind (econstr_to_constr sigma x) with
   | App (x, _) -> Constr.equal x (econstr_to_constr sigma (c ()))
   | _ -> false
 ;;
 
+(* See the [.mli]. *)
 let libnames_to_globrefs (xs : Libnames.qualid list) : Names.GlobRef.t list =
   List.map Nametab.global xs
 ;;
 
+(* See the [.mli]. *)
 let extract_benchmark_args
       (env : Environ.env)
       (sigma : Evd.evar_map)

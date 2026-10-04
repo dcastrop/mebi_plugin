@@ -33,6 +33,7 @@ struct
 
   include Theories
 
+  (* See the [.mli]. A linear search of the forward map. *)
   let get_theory_enc (f : EConstr.t -> bool I.mm) : Enc.t M.mm =
     Logger.trace __FUNCTION__;
     let open M.Syntax in
@@ -48,6 +49,7 @@ struct
 
   exception NoEncodingFoundFor_TheoriesNone
 
+  (* See the [.mli], including why the handler cannot fire. *)
   let get_None_enc () : Enc.t M.mm =
     Logger.trace __FUNCTION__;
     try get_theory_enc is_None with
@@ -56,6 +58,7 @@ struct
 
   exception NoEncodingFoundFor_TheoriesSome
 
+  (* See the [.mli], including why the handler cannot fire. *)
   let get_Some_enc () : Enc.t M.mm =
     Logger.trace __FUNCTION__;
     try get_theory_enc is_Some with
@@ -64,7 +67,8 @@ struct
 
   exception NotEqTheory
 
-  (** *)
+  (* See the [.mli]. [f x] is run here, while building the value, which is
+     why [NotEqTheory] reaches a handler around the call. *)
   let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool I.mm)
     : Enc.t M.mm
     =
@@ -74,6 +78,7 @@ struct
     | Not_found -> raise NotEqTheory
   ;;
 
+  (* See the [.mli] for these two. *)
   let get_None_enc_if_eq (x : EConstr.t) : Enc.t M.mm =
     Logger.trace __FUNCTION__;
     get_theory_enc_if_eq x is_None
