@@ -24,9 +24,10 @@
       - [x] Original vs Glued (`examples/CADP_Glued.v`)
       - [ ] Properties (E.g., mutual exclusion, no starvation -- ***see example in draft-paper***) -- mutual exclusion done; no starvation is a liveness/fairness property needing a spec LTS that encodes fairness, left for the authors (2026-10-01)
     - [ ] ~~***Size 2***~~ *(this may be infeasible -- state explosion)*
-- [ ] Solve both directions in main bisimilarity proof
+- [x] ~~Solve both directions in main bisimilarity proof~~ -- **closed 2026-10-04** as covered: `weak_bisimilar` (`theories/Bisimilarity.v`) is one coinductive relation proved in both directions by one `MeBi Sim` proof (since 2026-10-02; `examples/Bisimilarity/**/PluginProofs.v` end with such proofs). No separate command is planned.
 
 ## Documenting (`odoc`)
+- [ ] **Comment and function-size pass over the codebase** (Jonah, 2026-10-04): every function gets a header comment saying what it does with its arguments, and large or convoluted functions are split into smaller single-purpose ones. Prompted by review of `Premise_search.bounded_universal` (fixed in PR #31). Planned after the structural-congruence guide, on its own branch, one library per PR so each stays reviewable.
 - [x] `lib/model/...` -- every interface has doc comments (2026-10-01; `Bisimilarity` and `Minimization` were the gaps). Not yet rendered: `odoc` is not installed in the local switch.
   - [x] `lib/model/`
   

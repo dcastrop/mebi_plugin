@@ -5796,6 +5796,34 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 **Session tally (2026-10-04):** New feature 1 (with its `Premise Range`
 setting) · Refactor 1 (review).
 
+## 2026-10-04 — Structural congruence as a recipe (docs)
+
+**Docs.** On branch `docs/congruence-recipe`. Item 8 of the agenda, agreed
+as documentation only (no plugin hook until a second calculus needs one).
+
+`doc/structural-congruence.md` turns `examples/ProcCongruence.v` (PRs #26,
+#29) into a recipe: split off the core semantics, choose an invariant and a
+*computable* canonical representative, normalise every step's target, prove
+the link between the two semantics once by coinduction, derive the
+transfer theorems, and let the plugin prove over the small semantics. It
+explains why it works (a congruence step is silent and keeps the
+invariant, so the other side answers it by standing still, which is also
+when it does not apply) and the pitfall (congruence as a *premise* brings
+the state space back). Includes `Test4`'s figures (9720 -> 82 states, the
+two proofs' steps, time and memory) and a checklist. Linked from the README
+(`MeBi Sim` section) and the example's header comment.
+
+Also: `TODO.md`'s "Solve both directions in main bisimilarity proof" is
+closed as covered by `weak_bisimilar` (agenda item 5), and the
+codebase-wide comment and function-size pass Jonah asked for is logged
+there as the next piece of work.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/congruence-recipe main`).
+
+**Session tally (2026-10-04), cont.:** New feature 1 (with its `Premise
+Range` setting) · Refactor 1 (review) · Docs 1.
+
 ---
 
 ## Outstanding
