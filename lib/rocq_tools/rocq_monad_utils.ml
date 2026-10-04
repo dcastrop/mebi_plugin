@@ -424,14 +424,15 @@ module Make (Enc : Encoding.S) :
     state (fun env sigma -> sigma, EConstr.isEvar sigma x)
   ;;
 
-  (* See the [.mli]: [abort_on_undefined_evars] is not passed on. *)
+  (* See the [.mli]. *)
   let econstr_to_constr
         ?(abort_on_undefined_evars : bool = false)
         (x : EConstr.t)
     : Constr.t mm
     =
     Logger.trace __FUNCTION__;
-    state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr sigma x)
+    state (fun env sigma ->
+      sigma, Rocq_utils.econstr_to_constr ~abort_on_undefined_evars sigma x)
   ;;
 
   (* See the [.mli]. *)

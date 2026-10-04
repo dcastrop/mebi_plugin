@@ -36,9 +36,9 @@ module type S = sig
   (** [econstr_is_evar x] is whether [x] is an evar. Raises nothing. *)
   val econstr_is_evar : EConstr.t -> bool mm
 
-  (** [econstr_to_constr ?abort_on_undefined_evars x] is [x] as a [Constr],
-      undefined evars kept. Raises nothing. [abort_on_undefined_evars] is
-      ignored ([TODO.md]). *)
+  (** [econstr_to_constr ?abort_on_undefined_evars x] is [x] as a [Constr];
+      undefined evars are kept unless [abort_on_undefined_evars], in which
+      case Rocq raises, when run (propagated). *)
   val econstr_to_constr
     :  ?abort_on_undefined_evars:bool
     -> EConstr.t
