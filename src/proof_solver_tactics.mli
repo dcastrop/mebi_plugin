@@ -44,6 +44,10 @@ module type S = sig
   (** [prove_negation ()] proves a goal [~ P] whose [P] is refutable. *)
   val prove_negation : unit -> tactic mm
 
+  (** [prove_bounded ()] proves a bounded universal premise
+      ([forall k, k < n -> P k]) instance by instance. *)
+  val prove_bounded : unit -> tactic mm
+
   val cofix : unit -> tactic mm
 
   (** [mutual_cofix root others] opens a mutual cofixpoint. [root]'s type is

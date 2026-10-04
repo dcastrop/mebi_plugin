@@ -1303,28 +1303,49 @@ module Make (Enc : Encoding.S) :
                 contain transitions that do not exist"
                head
                (fst key));
+          let premise_str : string =
+            Rocq_utils.Strfy.econstr
+              env
+              sigma
+              (Reductionops.nf_evar sigma premise)
+          in
           if Bool.not (Hashtbl.mem skipped_premises key)
           then (
             Hashtbl.add skipped_premises key ();
-            Logger.warning
-              (Printf.sprintf
-                 "A constructor of %s has a premise headed by [%s] (first met \
-                  as [%s]) that MeBi cannot decide: premises over the LTSs \
-                  given in [Using], equations, negations and inductive \
-                  propositions are decided, by a proof search at most [MeBi \
-                  Config Premise Depth] deep, but this one is not closed, \
-                  mentions something opaque, or needs a deeper search. So the \
-                  constructor is applied whether or not it holds: the \
-                  extracted LTS may contain transitions that do not exist, and \
-                  a [MeBi Run Bisim] verdict on it may be wrong (a proof \
-                  cannot be: [Qed] still checks the premise). See [MeBi Help \
-                  Premises]."
-                 (Rocq_utils.Strfy.econstr env sigma (decode lts_enc))
-                 head
-                 (Rocq_utils.Strfy.econstr
-                    env
-                    sigma
-                    (Reductionops.nf_evar sigma premise)))))
+            if Premise_search.above_range env sigma premise
+            then
+              (* undecided only because of [MeBi Config Premise Range]:
+                 say that, not the generic reasons below *)
+              Logger.warning
+                (Printf.sprintf
+                   "A constructor of %s has a premise [%s] that ranges over \
+                    more than %i values of its bound variable, the most [MeBi \
+                    Config Premise Range] allows: deciding it costs a premise \
+                    search per value, and its proof grows with the square of \
+                    the range. So it is left undecided and the constructor \
+                    applied whether or not it holds: the extracted LTS may \
+                    contain transitions that do not exist. Raise the range to \
+                    decide it. See [MeBi Help Premises]."
+                   (Rocq_utils.Strfy.econstr env sigma (decode lts_enc))
+                   premise_str
+                   !Premise_search.max_range)
+            else
+              Logger.warning
+                (Printf.sprintf
+                   "A constructor of %s has a premise headed by [%s] (first \
+                    met as [%s]) that MeBi cannot decide: premises over the \
+                    LTSs given in [Using], equations, negations and inductive \
+                    propositions are decided, by a proof search at most [MeBi \
+                    Config Premise Depth] deep, but this one is not closed, \
+                    mentions something opaque, or needs a deeper search. So \
+                    the constructor is applied whether or not it holds: the \
+                    extracted LTS may contain transitions that do not exist, \
+                    and a [MeBi Run Bisim] verdict on it may be wrong (a proof \
+                    cannot be: [Qed] still checks the premise). See [MeBi Help \
+                    Premises]."
+                   (Rocq_utils.Strfy.econstr env sigma (decode lts_enc))
+                   head
+                   premise_str)))
       in
       return ()
     ;;

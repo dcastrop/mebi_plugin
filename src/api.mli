@@ -97,6 +97,11 @@ val default_saturation_bound : int
 val the_saturation_bound : int ref
 val set_saturation_bound : int -> unit
 val set_premise_depth : int -> unit
+
+(** [set_premise_range x]: decide bounded universal premises
+    ([forall k, k < n -> P k]) ranging over at most [x] values of [k]. *)
+val set_premise_range : int -> unit
+
 val set_premise_tactic : unit Proofview.tactic -> unit
 val reset_premise : unit -> unit
 

@@ -153,6 +153,7 @@ An LTS is an inductive relation `term -> label -> term -> Prop`. For each constr
 - **Any other premise** is decided once it is closed, either immediately or after the LTS premises have fixed what it mentions (a label, say). An equation `l = r` holds when its sides are convertible and fails when they differ in a constructor. Any other inductive proposition (`<=`, `<`, `In`, `Forall`, `/\`, `\/`, your own) is decided by a bounded proof search over its constructors, after unfolding definitions and fixpoints. The bound is `MeBi Config Premise Depth <n>` (default 16). A false premise means that transition is not in the LTS. In a proof, a true premise is closed with the proof the search found, and a false one in a hypothesis is refuted. "False" is only concluded when the search was complete: nothing opaque, no depth cut.
 - **Premises that compute something** (the target in `succ_rel n m -> lts n a m`, or a value an LTS premise needs, as in `In q l -> lts q a q'`) are enumerated: each solution is a transition of its own. The plugin warns if the solutions found may be incomplete (depth bound, solution cap, something opaque), and if an LTS premise has to be explored from a source nothing determines. The latter gives only some of its steps, so put whatever fixes the source among the premises.
 - **Negations** `~ P` hold exactly when `P` is refuted by a complete search; in a proof they are proved by refuting `P`.
+- **Bounded universals** over `nat`, `forall k, k < n -> P k` or `forall k, k <= n -> P k` (also `n > k`), where `n` is a number once the premise is closed: they hold exactly when every `P i` does, each decided as above. Only up to `MeBi Config Premise Range <n>` values of `k` (default 256): each value costs a search and the proof grows with the square of the range, so a wider premise is left undecided, with a warning saying why. In a proof they are assembled from the instances' proofs with the lemmas in `MEBI.Premises` (exported by `MEBI.loader`), and a false one in a hypothesis is refuted at a false instance.
 - **A tactic of your own** for what the search cannot decide: `MeBi Config Premise Tactic <tactic>` (e.g. `(rewrite f_def; lia)`). It is tried on the premise and on its negation, both at extraction and in the proof. `MeBi Config Reset Premise` clears it and the depth.
 - **Anything else** cannot be decided: opaque functions or axioms without a user tactic, or a search cut off by the depth bound. The constructor is applied as if the premise held, with a warning, so the LTS may contain transitions that do not exist. A `Run Bisim` verdict on such an LTS may be wrong, but a proof cannot be: `Qed` still checks the premise.
 
@@ -190,6 +191,7 @@ MeBi Config Bounds As Num States <n>.
 MeBi Config Bounds As Num Transitions <n>.
 MeBi Config Bounds Saturation <n>.
 MeBi Config Premise Depth <n>.
+MeBi Config Premise Range <n>.                     (* values of k a bounded universal premise may range over *)
 MeBi Config Premise Tactic <tactic>.
 MeBi Config Reset Premise.
 MeBi Config Weak As Option <term>.

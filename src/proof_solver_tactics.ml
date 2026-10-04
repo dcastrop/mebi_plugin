@@ -44,6 +44,10 @@ module type S = sig
   (** [prove_negation ()] proves a goal [~ P] whose [P] is refutable. *)
   val prove_negation : unit -> tactic mm
 
+  (** [prove_bounded ()] proves a bounded universal premise
+      ([forall k, k < n -> P k]) instance by instance. *)
+  val prove_bounded : unit -> tactic mm
+
   val cofix : unit -> tactic mm
   val mutual_cofix : Names.Id.t -> (Names.Id.t * Evd.econstr) list -> tactic mm
   val all_goals : tactic -> tactic
@@ -237,6 +241,12 @@ module Make
   let prove_negation () : Tactic.t mm =
     Premise_search.negation_tac
     |> Tactic.create ~msg:"(prove negated premise)"
+    |> return
+  ;;
+
+  let prove_bounded () : Tactic.t mm =
+    Premise_search.premise_tac ()
+    |> Tactic.create ~msg:"(prove bounded universal premise)"
     |> return
   ;;
 

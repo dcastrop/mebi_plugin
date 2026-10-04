@@ -597,8 +597,13 @@ struct
            | _ -> false)
         | _ -> false
       in
+      (* [forall k, k < n -> P k], [n] a numeral: proved by cases *)
+      let is_bounded : bool =
+        Premise_search.is_bounded_universal env sigma concl
+      in
       return
         (is_negation
+         || is_bounded
          ||
          match EConstr.kind sigma h with
          | Ind ((mind, _), _) ->
@@ -1464,6 +1469,7 @@ struct
       | Premise_search.Proved (Premise_search.Term p) -> Tacs.exact_term p
       | Premise_search.Proved (Premise_search.ByRefutation _) ->
         Tacs.prove_negation ()
+      | Premise_search.Proved Premise_search.ByCases -> Tacs.prove_bounded ()
       | Premise_search.Refuted | Premise_search.Unknown ->
         CErrors.user_err
           (Pp.str
