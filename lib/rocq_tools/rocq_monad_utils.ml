@@ -1769,6 +1769,44 @@ module Make (Enc : Encoding.S) :
       | (enc, _) :: _ as found -> Some (enc, List.concat_map snd found)
     ;;
 
+    (** [premises_ahead env sigma lts_enc indmap (substl, binders)] is the
+        premises among [binders] that are not over an LTS (heads not in
+        [indmap]), each as a deferred premise of [lts_enc], in order:
+        applications and other propositions alike, as
+        {!check_updated_ctx} sees them. Data binders and LTS premises are
+        skipped. Raises nothing. *)
+    let premises_ahead
+          (env : Environ.env)
+          (sigma : Evd.evar_map)
+          (lts_enc : Enc.t)
+          (indmap : Ind.t F.t)
+      :  EConstr.Vars.substl * EConstr.rel_declaration list
+      -> Problems.deferred list
+      =
+      let rec walk acc = function
+        | _ :: substl, t :: tl ->
+          let ty =
+            EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
+          in
+          let acc =
+            match EConstr.kind sigma ty with
+            | App (h, a)
+              when Option.is_empty (F.find_opt indmap h)
+                   && Premise_search.is_prop env sigma ty ->
+              (lts_enc, h, a) :: acc
+            | App _ -> acc
+            (* a premise that is not an application, as in
+               [check_updated_ctx] *)
+            | _ when Premise_search.is_prop env sigma ty ->
+              (lts_enc, ty, [||]) :: acc
+            | _ -> acc
+          in
+          walk acc (substl, tl)
+        | _ -> List.rev acc
+      in
+      walk []
+    ;;
+
     (* See the [.mli]. *)
     let check_constructor_args_unify
           (lhs : EConstr.t)
@@ -2048,28 +2086,7 @@ module Make (Enc : Encoding.S) :
            them too. They are decided again when the walk reaches them, which
            is harmless (in each branch they are closed by then, and hold). *)
         let$+ ahead env sigma =
-          let rec walk acc = function
-            | _ :: substl, t :: tl ->
-              let ty =
-                EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
-              in
-              let acc =
-                match EConstr.kind sigma ty with
-                | App (h, a)
-                  when Option.is_empty (F.find_opt indmap h)
-                       && Premise_search.is_prop env sigma ty ->
-                  (lts_enc, h, a) :: acc
-                | App _ -> acc
-                (* a premise that is not an application, as in
-                   [check_updated_ctx] *)
-                | _ when Premise_search.is_prop env sigma ty ->
-                  (lts_enc, ty, [||]) :: acc
-                | _ -> acc
-              in
-              walk acc (substl, tl)
-            | _ -> List.rev acc
-          in
-          walk [] (substl, tl)
+          premises_ahead env sigma lts_enc indmap (substl, tl)
         in
         let deferred = deferred @ ahead in
         if Bool.not lhs_open || List.is_empty deferred
