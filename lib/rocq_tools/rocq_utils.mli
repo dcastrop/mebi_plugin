@@ -170,11 +170,7 @@ val type_of_econstr
   -> Evd.econstr
   -> Evd.evar_map * Evd.econstr
 
-(** Rocq values as strings, for logs and messages. Each raises nothing.
-    Several are still placeholders that return "TODO: ..." instead of the
-    value: [ind_constr], [ind_constrs], [constr_kind], [econstr_type],
-    [econstr_types], [econstr_kind], [concl] (via [econstr_types]), [hyp]
-    and [goal] ([TODO.md]). *)
+(** Rocq values as strings, for logs and messages. Each raises nothing. *)
 module Strfy : sig
   (** [pp ?clean x] is [x] as a string, whitespace cleaned up unless [~clean:false].
   *)
@@ -211,14 +207,17 @@ module Strfy : sig
     -> Constr.rel_context
     -> string
 
-  (** Placeholder: "TODO: ind_constr". *)
-  val ind_constr : 'a -> 'b -> ind_constr -> string
+  (** [ind_constr env sigma (ctx, t)] is the constructor type [t] printed
+      under its binders [ctx], as [ctx |- t]. Raises nothing. *)
+  val ind_constr : Environ.env -> Evd.evar_map -> ind_constr -> string
 
-  (** Placeholder: "TODO: ind_constrs". *)
-  val ind_constrs : 'a -> 'b -> ind_constr array -> string
+  (** [ind_constrs env sigma cs] is each of [cs] printed ({!ind_constr}),
+      as a list. Raises nothing. *)
+  val ind_constrs : Environ.env -> Evd.evar_map -> ind_constr array -> string
 
-  (** Placeholder: "TODO: constr_kind". *)
-  val constr_kind : 'a -> 'b -> Constr.t -> string
+  (** [constr_kind env sigma x] is the name of [x]'s kind ([App], [Rel],
+      ...) and [x] printed. Raises nothing. *)
+  val constr_kind : Environ.env -> Evd.evar_map -> Constr.t -> string
 
   (** [econstr env sigma x] is [x] printed. *)
   val econstr : Environ.env -> Evd.evar_map -> Evd.econstr -> string
@@ -226,21 +225,17 @@ module Strfy : sig
   (** [econstr_rel_decl env sigma d] is the declaration [d] printed. *)
   val econstr_rel_decl : Environ.env -> Evd.evar_map -> econstr_decl -> string
 
-  (** Placeholder: "TODO: econstr_type". *)
-  val econstr_type
-    :  'a
-    -> 'b
-    -> string * Evd.econstr * Evd.econstr * Evd.econstr array
-    -> string
+  (** [econstr_types env sigma t] is the type [t] printed, as {!econstr}.
+      Raises nothing. *)
+  val econstr_types : Environ.env -> Evd.evar_map -> Evd.econstr -> string
 
-  (** Placeholder: "TODO: econstr_types". *)
-  val econstr_types : 'a -> 'b -> Evd.econstr -> string
+  (** [econstr_kind env sigma x] is the name of [x]'s kind ([App], [Rel],
+      ...) and [x] printed. Raises nothing. *)
+  val econstr_kind : Environ.env -> Evd.evar_map -> Evd.econstr -> string
 
-  (** Placeholder: "TODO: econstr_kind". *)
-  val econstr_kind : 'a -> 'b -> Evd.econstr -> string
-
-  (** Placeholder, as {!econstr_types}: "TODO: econstr_types". *)
-  val concl : 'a -> 'b -> Evd.econstr -> string
+  (** [concl env sigma c] is the conclusion [c] printed, as
+      {!econstr_types}. Raises nothing. *)
+  val concl : Environ.env -> Evd.evar_map -> Evd.econstr -> string
 
   (** [erel env sigma r] is "relevant" or "irrelevant". *)
   val erel : 'a -> Evd.evar_map -> Evd.erelevance -> string
@@ -254,10 +249,12 @@ module Strfy : sig
   (** [hyp_type env sigma h] is the hypothesis' type printed. *)
   val hyp_type : Environ.env -> Evd.evar_map -> hyp -> string
 
-  (** Placeholder: "TODO: hyp". *)
-  val hyp : 'a -> 'b -> hyp -> string
+  (** [hyp env sigma h] is the hypothesis printed as [name : type], or
+      [name := body : type] if it has a body. Raises nothing. *)
+  val hyp : Environ.env -> Evd.evar_map -> hyp -> string
 
-  (** Placeholder: "TODO: goal". *)
+  (** [goal g] is the goal [g] printed, hypotheses and conclusion, with
+      Rocq's debug printer. Raises nothing. *)
   val goal : Proofview.Goal.t -> string
 end
 

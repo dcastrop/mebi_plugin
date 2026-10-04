@@ -281,13 +281,52 @@ module Strfy = struct
     pp (Printer.pr_rel_context env sigma x)
   ;;
 
-  let ind_constr enc sigma ((x, y) : ind_constr) : string = "TODO: ind_constr"
-
-  let ind_constrs env sigma (xs : ind_constr array) : string =
-    "TODO: ind_constrs"
+  (* See the [.mli]. *)
+  let ind_constr env sigma ((ctx, x) : ind_constr) : string =
+    Printf.sprintf
+      "%s |- %s"
+      (constr_rel_context env sigma ctx)
+      (constr env sigma x)
   ;;
 
-  let constr_kind env sigma (x : Constr.t) : string = "TODO: constr_kind"
+  (* See the [.mli]. *)
+  let ind_constrs env sigma (xs : ind_constr array) : string =
+    Array.to_list xs
+    |> List.map (ind_constr env sigma)
+    |> String.concat "; "
+    |> Printf.sprintf "[%s]"
+  ;;
+
+  (** [kind_name k] is the name of [k]'s constructor ([App], [Rel], ...).
+      Raises nothing. *)
+  let kind_name : ('c, 't, 's, 'u, 'r) Constr.kind_of_term -> string = function
+    | Rel _ -> "Rel"
+    | Var _ -> "Var"
+    | Meta _ -> "Meta"
+    | Evar _ -> "Evar"
+    | Sort _ -> "Sort"
+    | Cast _ -> "Cast"
+    | Prod _ -> "Prod"
+    | Lambda _ -> "Lambda"
+    | LetIn _ -> "LetIn"
+    | App _ -> "App"
+    | Const _ -> "Const"
+    | Ind _ -> "Ind"
+    | Construct _ -> "Construct"
+    | Case _ -> "Case"
+    | Fix _ -> "Fix"
+    | CoFix _ -> "CoFix"
+    | Proj _ -> "Proj"
+    | Int _ -> "Int"
+    | Float _ -> "Float"
+    | String _ -> "String"
+    | Array _ -> "Array"
+  ;;
+
+  (* See the [.mli]. *)
+  let constr_kind env sigma (x : Constr.t) : string =
+    Printf.sprintf "%s: %s" (kind_name (Constr.kind x)) (constr env sigma x)
+  ;;
 
   let econstr env sigma (x : EConstr.t) : string =
     pp (Printer.pr_econstr_env env sigma x)
@@ -297,20 +336,17 @@ module Strfy = struct
     pp (Printer.pr_erel_decl env sigma x)
   ;;
 
-  let econstr_type
-        env
-        sigma
-        ((name, x, ty, tys) : string * EConstr.t * EConstr.t * EConstr.t array)
-    : string
-    =
-    "TODO: econstr_type"
+  (* See the [.mli]. *)
+  let econstr_types env sigma (x : EConstr.types) : string = econstr env sigma x
+
+  (* See the [.mli]. *)
+  let econstr_kind env sigma (x : EConstr.t) : string =
+    Printf.sprintf
+      "%s: %s"
+      (kind_name (EConstr.kind sigma x))
+      (econstr env sigma x)
   ;;
 
-  let econstr_types env sigma (x : EConstr.types) : string =
-    "TODO: econstr_types"
-  ;;
-
-  let econstr_kind env sigma (x : EConstr.t) : string = "TODO: econstr_kind"
   let concl env sigma : EConstr.constr -> string = econstr_types env sigma
 
   let erel _env sigma : EConstr.ERelevance.t -> string =
@@ -331,8 +367,20 @@ module Strfy = struct
     econstr env sigma (Context.Named.Declaration.get_type x)
   ;;
 
-  let hyp env sigma (x : hyp) : string = "TODO: hyp"
-  let goal (x : Proofview.Goal.t) : string = "TODO: goal"
+  (* See the [.mli]. *)
+  let hyp env sigma (x : hyp) : string =
+    match Context.Named.Declaration.get_value x with
+    | None -> Printf.sprintf "%s : %s" (hyp_name x) (hyp_type env sigma x)
+    | Some _ ->
+      Printf.sprintf
+        "%s := %s : %s"
+        (hyp_name x)
+        (hyp_value env sigma x)
+        (hyp_type env sigma x)
+  ;;
+
+  (* See the [.mli]. *)
+  let goal (x : Proofview.Goal.t) : string = pp (Printer.Debug.pr_goal x)
 end
 
 (* The counter behind {!the_next}. Evar names are only ever required to be
