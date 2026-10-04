@@ -96,6 +96,8 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
   (* encoding -> the aliases made for it ([alias]); cleared with the maps *)
   let the_aliases : Enc.t list B.t = B.create 0
 
+  (** [alloc ()] makes a fresh, empty table and clears the aliases.
+      Raises nothing. *)
   let alloc () : unit =
     B.reset the_aliases;
     let fwd : Enc.t F.t = F.create 0 in
@@ -103,21 +105,17 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     the_maps := Some (ref { fwd; bck })
   ;;
 
-  (** Clears this instance's table {b and} the counter behind it.
-
-      [Enc] is shared by every [Bi_encoding] instance, so [Enc.reset] is a
-      global act: it hands the next [Enc.incr] an encoding some other instance
-      is already using, and [B.add] then shadows that instance's binding.
-      Resetting is therefore reserved for [~reset_encoding:true] -- a new
-      command, where clearing everything is the point. *)
+  (* See the [.mli]. [Enc] is shared by every [Bi_encoding] instance, so
+     [Enc.reset] is a global act: it hands the next [Enc.incr] an encoding
+     some other instance is already using, and [B.add] then shadows that
+     instance's binding. Hence reserved for [~reset_encoding:true]. *)
   let reset () : unit =
     Logger.trace __FUNCTION__;
     Enc.reset ();
     alloc ()
   ;;
 
-  (** Bring the table up if it isn't already. Deliberately {e not} [reset]: an
-      instance coming into existence must not reset the shared counter. *)
+  (* See the [.mli]. *)
   let initialize () : unit =
     Logger.trace __FUNCTION__;
     match !the_maps with None -> alloc () | Some _ -> ()
@@ -125,6 +123,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
 
   exception MapsNotInitialised of unit
 
+  (* See the [.mli] for [get_the_maps], [fwdmap] and [bckmap]. *)
   let get_the_maps () : maps ref =
     Logger.trace __FUNCTION__;
     match !the_maps with None -> raise (MapsNotInitialised ()) | Some x -> x
@@ -171,12 +170,13 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
 
   exception EncodingNotFound of EConstr.t
 
-  (* *)
+  (* See the [.mli]. *)
   let get_encoding (x : EConstr.t) : Enc.t =
     Logger.trace __FUNCTION__;
     try F.find (fwdmap ()) x with Not_found -> raise (EncodingNotFound x)
   ;;
 
+  (* See the [.mli]. *)
   let encode (x : EConstr.t) : Enc.t =
     Logger.trace __FUNCTION__;
     try get_encoding x with
@@ -191,6 +191,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
       new_enc
   ;;
 
+  (* See the [.mli]. *)
   let encoded (x : EConstr.t) : bool =
     Logger.trace __FUNCTION__;
     F.mem (fwdmap ()) x
@@ -198,7 +199,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
 
   exception DecodingNotFound of Enc.t
 
-  (* *)
+  (* See the [.mli]. *)
   let get_econstr (x : Enc.t) : EConstr.t =
     Logger.trace __FUNCTION__;
     try B.find (bckmap ()) x with Not_found -> raise (DecodingNotFound x)
@@ -206,6 +207,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
 
   exception CannotDecode of Enc.t
 
+  (* See the [.mli]. *)
   let decode (x : Enc.t) : EConstr.t =
     Logger.trace __FUNCTION__;
     try get_econstr x with
@@ -214,6 +216,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
       raise (CannotDecode x)
   ;;
 
+  (* See the [.mli]. *)
   let alias (x : Enc.t) : Enc.t =
     Logger.trace __FUNCTION__;
     let term : EConstr.t = get_econstr x in
@@ -224,10 +227,12 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     fresh
   ;;
 
+  (* See the [.mli]. *)
   let aliases_of (x : Enc.t) : Enc.t list =
     try B.find the_aliases x with Not_found -> []
   ;;
 
+  (* See the [.mli] for [decode_opt] and [opt_decode]. *)
   let decode_opt (x : Enc.t) : EConstr.t option =
     Logger.trace __FUNCTION__;
     try Some (decode x) with CannotDecode _ -> None
@@ -238,7 +243,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     | Some x -> (try Some (decode x) with CannotDecode _ -> None)
   ;;
 
-  (* *)
+  (* See the [.mli] for [decode_map] and [encode_map]. *)
   let decode_map (bmap : 'a B.t) : 'a F.t =
     Logger.trace __FUNCTION__;
     let fmap : 'a F.t = F.create (B.length bmap) in
@@ -253,7 +258,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     bmap
   ;;
 
-  (* *)
+  (* See the [.mli]. *)
   let to_list () : (Enc.t * EConstr.t) list =
     Logger.trace __FUNCTION__;
     B.to_seq (bckmap ())

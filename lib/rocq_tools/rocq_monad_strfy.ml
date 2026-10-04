@@ -11,6 +11,8 @@ module type S = sig
   val econstr_bindings : EConstr.t Tactypes.bindings -> string
 end
 
+(* See the [.mli]. Each printer is {!Rocq_utils.Strfy}'s, given the
+   current environment and evar map by [M.fstring]. *)
 module Make (M : Rocq_monad.S) : S = struct
   open M
 

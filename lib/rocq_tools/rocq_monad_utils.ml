@@ -373,13 +373,13 @@ module Make (Enc : Encoding.S) :
 
   type tree = Enc.Tree.t
 
-  (*****************************************)
-
+  (* See the [.mli]. *)
   let fresh_evar (x : Rocq_utils.evar_source) : EConstr.t mm =
     Logger.trace __FUNCTION__;
     state (fun env sigma -> Rocq_utils.get_next env sigma x)
   ;;
 
+  (* See the [.mli]. *)
   let econstr_eq ?(enc : bool = true) (a : EConstr.t) (b : EConstr.t) : bool mm =
     Logger.trace __FUNCTION__;
     if enc
@@ -393,12 +393,14 @@ module Make (Enc : Encoding.S) :
       EConstr.eq_constr sigma a b |> return
   ;;
 
+  (* See the [.mli]. *)
   let econstr_compare (a : EConstr.t) (b : EConstr.t) : int =
     let a = encode a in
     let b = encode b in
     Enc.compare a b
   ;;
 
+  (* See the [.mli]. *)
   let get_encoding (x : EConstr.t) : Enc.t =
     Logger.trace __FUNCTION__;
     run
@@ -407,6 +409,7 @@ module Make (Enc : Encoding.S) :
        get_encoding x |> return)
   ;;
 
+  (* See the [.mli]. *)
   let econstr_kind (x : EConstr.t) : Rocq_utils.econstr_kind mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -415,13 +418,13 @@ module Make (Enc : Encoding.S) :
     EConstr.kind sigma x |> return
   ;;
 
+  (* See the [.mli]. *)
   let econstr_is_evar (x : EConstr.t) : bool mm =
     Logger.trace __FUNCTION__;
     state (fun env sigma -> sigma, EConstr.isEvar sigma x)
   ;;
 
-  (*********************************************************)
-
+  (* See the [.mli]: [abort_on_undefined_evars] is not passed on. *)
   let econstr_to_constr
         ?(abort_on_undefined_evars : bool = false)
         (x : EConstr.t)
@@ -431,18 +434,19 @@ module Make (Enc : Encoding.S) :
     state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr sigma x)
   ;;
 
+  (* See the [.mli]. *)
   let econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
     Logger.trace __FUNCTION__;
     state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr_opt sigma x)
   ;;
 
+  (* See the [.mli]. *)
   let constrexpr_to_econstr (x : Constrexpr.constr_expr) : EConstr.t mm =
     Logger.trace __FUNCTION__;
     state (fun env sigma -> Rocq_utils.constrexpr_to_econstr env sigma x)
   ;;
 
-  (*********************************************************)
-
+  (* See the [.mli] for [to_atomic], [to_lambda] and [to_app]. *)
   let to_atomic (x : EConstr.t) : EConstr.t Rocq_utils.kind_pair mm =
     let open Syntax in
     let* sigma = get_sigma in
@@ -461,8 +465,7 @@ module Make (Enc : Encoding.S) :
     Rocq_utils.econstr_to_app sigma x |> return
   ;;
 
-  (*********************************************************)
-
+  (* See the [.mli]. One comparison per element, in order. *)
   let exists_eq (x : EConstr.t) (ys : 'a list) (decoder : 'a -> EConstr.t)
     : bool mm
     =
@@ -477,8 +480,7 @@ module Make (Enc : Encoding.S) :
     iterate 0 (List.length ys - 1) false f
   ;;
 
-  (*********************************************************)
-
+  (* See the [.mli]. *)
   let type_of_econstr (x : EConstr.t) : EConstr.t mm =
     (* Logger.trace __FUNCTION__; *)
     let open Syntax in
@@ -486,6 +488,7 @@ module Make (Enc : Encoding.S) :
     state (fun env sigma -> Typing.type_of env sigma t)
   ;;
 
+  (* See the [.mli]. *)
   let type_of_constrexpr (x : Constrexpr.constr_expr) : EConstr.t mm =
     (* Logger.trace __FUNCTION__; *)
     let open Syntax in
@@ -497,6 +500,7 @@ module Make (Enc : Encoding.S) :
 
   module Strfy = Rocq_monad_strfy.Make (M)
 
+  (* See the [.mli] for the four loggers. *)
   let log_econstr
         ?(__FUNCTION__ : string = "")
         ?(m : Output.Kind.t = Output.Kind.Debug)
@@ -599,6 +603,7 @@ module Make (Enc : Encoding.S) :
     val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
   end
 
+  (* See the [.mli]. *)
   module Errors : SErrors = struct
     type t =
       (* NOTE: *)
@@ -666,6 +671,8 @@ module Make (Enc : Encoding.S) :
       MEBI_exn (InvalidLTSTermKind (env, sigma, x))
     ;;
 
+    (** [mebi_handler e] is the message a user sees for the error [e]
+        (registered with Rocq below). Raises nothing. *)
     let mebi_handler : t -> string = function
       (* NOTE: *)
       | LTS_Empty -> "LTS_Empty"
@@ -743,6 +750,7 @@ module Make (Enc : Encoding.S) :
     val invalid_lts_term_kind : Constr.t -> 'a mm
   end
 
+  (* See the [.mli]. *)
   module Err : SErr = struct
     let lts_empty () = raise (Errors.lts_empty ())
     let lts_incomplete (msg : string) = raise (Errors.lts_incomplete msg)
@@ -866,6 +874,7 @@ module Make (Enc : Encoding.S) :
         ;;
       end)
 
+    (* See the [.mli] for [get_lts] and the [get_lts_*] accessors. *)
     let get_lts : t -> LTS.t = function
       | { kind = LTS x; _ } -> x
       | { kind = Type x; _ } -> Err.invalid_ind_kind_type x
@@ -890,7 +899,7 @@ module Make (Enc : Encoding.S) :
       |> Array.map (fun ({ constructor; _ } : LTS.constructor) -> constructor)
     ;;
 
-    (** [lookup x] is a wrapper for [Inductive.lookup_mind_specif] *)
+    (* See the [.mli]. *)
     let lookup (x : Names.inductive) : Declarations.mind_specif mm =
       (* Logger.trace __FUNCTION__; *)
       let open Syntax in
@@ -898,9 +907,7 @@ module Make (Enc : Encoding.S) :
       Inductive.lookup_mind_specif env x |> return
     ;;
 
-    (** []
-        @raise Errors.Invalid_Sort_Type if [x.mind_sort] is not [Type] or [Set]
-    *)
+    (* See the [.mli]. *)
     let assert_mip_arity_is_type_or_set (mip : Declarations.one_inductive_body)
       : unit mm
       =
@@ -911,8 +918,7 @@ module Make (Enc : Encoding.S) :
       | _ -> Err.invalid_sort_type (Sorts.quality mip.mind_sort)
     ;;
 
-    (** []
-        @raise Errors.Invalid_Sort_LTS if [x.mind_sort] is not [Prop] *)
+    (* See the [.mli]. *)
     let assert_mip_arity_is_prop (mip : Declarations.one_inductive_body)
       : unit mm
       =
@@ -922,8 +928,7 @@ module Make (Enc : Encoding.S) :
       | _ -> Err.invalid_sort_lts (Sorts.quality mip.mind_sort)
     ;;
 
-    (** []
-        @raise Errors.Invalid_Ref_LTS if [x] is not [Names.GlobRef.IndRef] *)
+    (* See the [.mli]. *)
     let lts_mind
       : Names.GlobRef.t -> (Names.inductive * Declarations.mind_specif) mm
       =
@@ -936,7 +941,7 @@ module Make (Enc : Encoding.S) :
       | x -> Err.invalid_ref_lts x
     ;;
 
-    (** [] *)
+    (* See the [.mli]. *)
     let lts_type_mind (x : Names.GlobRef.t)
       : (Names.inductive * Declarations.mind_specif) mm
       =
@@ -947,7 +952,7 @@ module Make (Enc : Encoding.S) :
       (ind, (mib, mip)) |> return
     ;;
 
-    (** [] *)
+    (* See the [.mli]. *)
     let lts_prop_mind (x : Names.GlobRef.t)
       : (Names.inductive * Declarations.mind_specif) mm
       =
@@ -958,8 +963,7 @@ module Make (Enc : Encoding.S) :
       (ind, (mib, mip)) |> return
     ;;
 
-    (** []
-        @raise Errors.Invalid_Arity if ... *)
+    (* See the [.mli]. *)
     let lts_labels_and_terms ((mib, mip) : Declarations.mind_specif)
       : (Constr.rel_declaration * Constr.rel_declaration) mm
       =
@@ -975,8 +979,15 @@ module Make (Enc : Encoding.S) :
       | _ -> Err.invalid_arity typ
     ;;
 
+    (** Raised by {!mip_to_lts_constructors}. *)
     exception Mip_InconsistentNumConstructors of Declarations.one_inductive_body
 
+    (** [mip_to_lts_constructors mip] is the constructors of the inductive
+        [mip], each with its name, in order.
+
+        @raise Mip_InconsistentNumConstructors
+          if [mip] has different numbers of constructor names and types
+          (raised here). *)
     let mip_to_lts_constructors (mip : Declarations.one_inductive_body)
       : LTS.constructor array
       =
@@ -994,7 +1005,7 @@ module Make (Enc : Encoding.S) :
       | Invalid_argument _ -> raise (Mip_InconsistentNumConstructors mip)
     ;;
 
-    (** [] *)
+    (* See the [.mli]. *)
     let lts (x : Names.GlobRef.t) : t mm =
       (* Logger.trace __FUNCTION__; *)
       let open Syntax in
@@ -1015,8 +1026,7 @@ module Make (Enc : Encoding.S) :
     ;;
   end
 
-  (*********************************************************)
-
+  (* See the [.mli]. *)
   let mk_ctx_substl
         (acc : EConstr.Vars.substl)
         (xs : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list)
@@ -1025,12 +1035,7 @@ module Make (Enc : Encoding.S) :
     state (fun env sigma -> Rocq_utils.mk_ctx_substl env sigma acc xs)
   ;;
 
-  (** [extract_args ?substl term] returns an [EConstr.t] triple of arguments of an inductively defined LTS, e.g., [term -> option action -> term -> Prop].
-      @param ?substl
-        is a list of substitutions applied to the terms prior to being returned.
-      @param term
-        must be of [Constr.kind] [App(fn, args)] (i.e., the application of some inductively defined LTS, e.g., [termLTS (tpar (tact (Send A) tend) (tact (Recv A) tend)) (Some A) (tpar tend tend)]).
-      @return a triple of [lhs_term, action, rhs_term]. *)
+  (* See the [.mli]. *)
   let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
     : Rocq_utils.constructor_args mm
     =
@@ -1058,6 +1063,7 @@ module Make (Enc : Encoding.S) :
     ;;
   end
 
+  (* See the [.mli]. *)
   let make_state_tree_pair_set ()
     : (module Set.S with type elt = Enc.t * Enc.Tree.t)
     =
@@ -1096,6 +1102,7 @@ module Make (Enc : Encoding.S) :
           ;;
         end)
 
+      (* See the [.mli]. *)
       let fresh
             (env : Environ.env)
             (sigma : Evd.evar_map)
@@ -1106,6 +1113,7 @@ module Make (Enc : Encoding.S) :
         sigma, { to_check; acc }
       ;;
 
+      (* See the [.mli]. *)
       let make
             (env : Environ.env)
             (sigma : Evd.evar_map)
@@ -1118,7 +1126,7 @@ module Make (Enc : Encoding.S) :
         else sigma, { to_check; acc }
       ;;
 
-      (** [unify a b] tries to unify [a] and [b] within the context of the [env] and [sigma] of [mm]. @returns [true] if successful, [false] otherwise. *)
+      (* See the [.mli]: only [CannotUnify] is caught. *)
       let unify
             (env : Environ.env)
             (sigma : Evd.evar_map)
@@ -1135,6 +1143,7 @@ module Make (Enc : Encoding.S) :
           sigma, false
       ;;
 
+      (* See the [.mli]. *)
       let unifies (to_check : EConstr.t) (acc : EConstr.t) : bool mm =
         state (fun env sigma -> unify env sigma { to_check; acc })
       ;;
@@ -1163,10 +1172,12 @@ module Make (Enc : Encoding.S) :
           ;;
         end)
 
+      (* See the [.mli]. *)
       let unify_pair_opt (pair : Pair.t) : bool mm =
         state (fun env sigma -> Pair.unify env sigma pair)
       ;;
 
+      (* See the [.mli]. *)
       let unify_opt ({ act; goto; tree } : t) : Enc.Tree.t option mm =
         let open Syntax in
         let* unified_act_opt = unify_pair_opt act in
@@ -1176,9 +1187,7 @@ module Make (Enc : Encoding.S) :
         | _, _ -> return None
       ;;
 
-      (** creates unification problems between the rhs of the current constructor and the lhs of the next, along with the actions of both.
-          (* NOTE: this is only relevant when deciding whether to explore a given constructor from a premise of another *)
-      *)
+      (* See the [.mli]. Relevant only when deciding whether to explore a constructor from a premise of another. *)
       let of_constructor
             (args : Rocq_utils.constructor_args)
             ((act, rhs, tree) : Constructor.t)
@@ -1190,23 +1199,23 @@ module Make (Enc : Encoding.S) :
       ;;
     end
 
-    (** Premise heads already warned about by [warn_if_skipped_premise], keyed
-        by LTS and head. *)
+    (** Premise heads already warned about by {!warn_if_skipped_premise},
+        keyed by LTS and head (by name: encodings are renumbered by every
+        command). *)
     let skipped_premises : (string * string, unit) Hashtbl.t = Hashtbl.create 8
 
-    (** Decides a premise that is not over an LTS, where that can be done
-        soundly (backlog item I2): [Some b] if it is known to hold ([true])
-        or not ([false]), [None] if not decided -- never a guess. Any other
-        closed proposition goes to [Premise_search] (bounded proof search over
-        its inductive's constructors). Equations [l = r] whose sides are
-        {e closed} once fully normalized (no evars: typically guards on the
-        source state, which matching has already instantiated) are decided:
+    (** [decide_premise env sigma (name, args)] is whether the premise
+        [name args], not over an LTS, holds: [Some b] when that can be
+        decided soundly (backlog item I2), [None] when not -- never a guess.
+        An equation [l = r] whose sides are closed once fully normalised (no
+        evars: typically guards on the source state, which matching has
+        already instantiated) is decided directly: convertible sides hold;
+        sides that differ in a constructor, at the head or under matching
+        constructors, are false (constructors of an inductive type are
+        disjoint); anything else is undecided. Any other proposition goes to
+        {!Premise_search.prove} once closed; an open one is undecided.
 
-        - convertible sides hold;
-        - sides that differ in a constructor, at the head or under matching
-          constructors, are false (constructors of an inductive type are
-          disjoint);
-        - anything else is undecided. *)
+        Raises nothing. *)
     let decide_premise
           (env : Environ.env)
           (sigma : Evd.evar_map)
@@ -1260,13 +1269,14 @@ module Make (Enc : Encoding.S) :
           decide l r))
     ;;
 
-    (** A binder whose head is not one of the [Using] LTSs is not checked at
-        all. For a data binder ([xs : list nat]) that is right. For a
-        {e premise} ([n = 0], any [Prop]) it means the constructor is treated
-        as if the premise held, so the extracted LTS can contain transitions
-        that do not exist (backlog item I2). Until such premises are
-        supported, say so -- once per LTS and premise head, not once per
-        state. *)
+    (** [warn_if_skipped_premise lts_enc (name, args)] warns, once per LTS
+        and premise head, that a premise of a constructor of [lts_enc] was
+        left undecided, so the constructor was applied as if it held and the
+        LTS may contain transitions that do not exist (backlog item I2), and
+        notes the approximation ({!Approximations}). A premise over the
+        bounded-universal range ({!Premise_search.above_range}) gets its own
+        message. Only for a proposition; a data binder ([xs : list nat]) is
+        left alone. Raises nothing. *)
     let warn_if_skipped_premise
           (lts_enc : Enc.t)
           ((name, args) : EConstr.t * EConstr.t array)
@@ -1350,13 +1360,15 @@ module Make (Enc : Encoding.S) :
       return ()
     ;;
 
-    (** Premises warned about as possibly incomplete, keyed like
-        [skipped_premises]. *)
+    (** Premises already warned about as possibly incomplete, keyed like
+        {!skipped_premises}. *)
     let partial_premises : (string * string, unit) Hashtbl.t = Hashtbl.create 8
 
-    (** An open premise whose solutions were enumerated, but perhaps not all
-        of them (depth bound, solution cap, something opaque): transitions
-        may be missing -- an under-approximation. Once per LTS and head. *)
+    (** [warn_partial_premise lts_enc (name, args)] warns, once per LTS and
+        head, that an open premise's solutions were enumerated but perhaps
+        not all of them (depth bound, solution cap, something opaque), so
+        transitions may be missing -- an under-approximation -- and notes it
+        ({!Approximations}). Raises nothing. *)
     let warn_partial_premise
           (lts_enc : Enc.t)
           ((name, args) : EConstr.t * EConstr.t array)
@@ -1392,17 +1404,18 @@ module Make (Enc : Encoding.S) :
       return ()
     ;;
 
-    (** LTSs warned about for transitions MeBi could not determine. *)
+    (** LTSs already warned about for transitions MeBi could not determine. *)
     let undetermined : (string, unit) Hashtbl.t = Hashtbl.create 8
 
-    (** A transition whose label or target still has an unknown in it once
-        everything that could fix it has been tried: a constructor binder
-        nothing determines ([u n : lts (S n) None n], met from an open source),
-        or an LTS premise whose sources the search leaves open. It stands for a
-        family of transitions, possibly infinite, that MeBi cannot enumerate,
-        so it is dropped: the LTS may be missing transitions. Until 2026-10-03
-        these were dropped (or, with a target like [S ?n], kept as one state)
-        without a word. Once per LTS. *)
+    (** [warn_undetermined lts_enc what] warns, once per LTS, that a
+        transition whose label or target still has an unknown in it
+        ([what]) once everything that could fix it has been tried was left
+        out: a constructor binder nothing determines
+        ([u n : lts (S n) None n], met from an open source), or an LTS
+        premise whose sources the search leaves open. It stands for a
+        family of transitions, possibly infinite, so the LTS may be missing
+        transitions. Notes the approximation ({!Approximations}). Raises
+        nothing. *)
     let warn_undetermined (lts_enc : Enc.t) (what : EConstr.t) : unit mm =
       let open Syntax in
       let$+ _warned env sigma =
@@ -1435,17 +1448,22 @@ module Make (Enc : Encoding.S) :
       return ()
     ;;
 
+    (** [has_evars sigma x] is whether [x] has evars under [sigma]. Raises
+        nothing. *)
     let has_evars (sigma : Evd.evar_map) (x : EConstr.t) : bool =
       Bool.not (Evar.Set.is_empty (Evd.evars_of_term sigma x))
     ;;
 
-    (** Decide a constructor's deferred premises, left to right, over every
-        evar map reached so far (backlog item I2, stage 2): each map is
-        dropped where a premise is refuted, multiplied where an open premise
-        has several solutions (each instantiating what it computes -- a
-        target, say), and kept unchanged where a premise stays undecided
-        (today's over-approximation). Returns the final maps, the premises
-        left undecided, and those whose solutions may be incomplete. *)
+    (** [resolve_deferred env sigma deferred] is the evar maps in which a
+        constructor's deferred premises hold, with the premises left
+        undecided and those whose solutions may be incomplete. The premises
+        are decided left to right over every map reached so far (backlog
+        item I2, stage 2): a map is dropped where a premise is refuted,
+        multiplied where an open premise has several solutions (each
+        instantiating what it computes, a target say), and kept unchanged
+        where a premise stays undecided (an over-approximation).
+
+        Raises nothing. *)
     let resolve_deferred
           (env : Environ.env)
           (sigma : Evd.evar_map)
@@ -1492,7 +1510,7 @@ module Make (Enc : Encoding.S) :
           not be decided when the constructor was matched -- typically because
           they mention what its LTS premises will instantiate (a label, a
           target). They are decided once those are unified, in
-          [sandbox_unify_all_opt] (backlog item I2). *)
+          [sandbox_unify_all] (backlog item I2). *)
       type t =
         { sigma : Evd.evar_map
         ; to_unify : Problem.t list
@@ -1512,6 +1530,7 @@ module Make (Enc : Encoding.S) :
           ;;
         end)
 
+      (* See the [.mli]. *)
       let empty () : t mm =
         let open Syntax in
         let* sigma = get_sigma in
@@ -1523,6 +1542,7 @@ module Make (Enc : Encoding.S) :
         | _ -> false
       ;;
 
+      (* See the [.mli]. *)
       let rec unify_list_opt : Problem.t list -> Enc.Tree.t list option mm =
         let open Syntax in
         function
@@ -1538,6 +1558,7 @@ module Make (Enc : Encoding.S) :
               | Some acc -> return (Some (constructor_tree :: acc))))
       ;;
 
+      (* See the [.mli]. *)
       let sandbox_unify_all
             (lts_enc : Enc.t)
             (act : EConstr.t)
@@ -1610,6 +1631,7 @@ module Make (Enc : Encoding.S) :
         function [] -> true | [ p ] -> Problems.is_empty p | _ :: _ -> false
       ;;
 
+      (* See the [.mli]. *)
       let cross_product ({ sigma; to_unify; _ } : Problems.t) : t -> t =
         Logger.trace __FUNCTION__;
         List.concat_map
@@ -1625,6 +1647,7 @@ module Make (Enc : Encoding.S) :
     module Constructors = struct
       include Enc.Constructor_trees
 
+      (* See the [.mli]. *)
       let rec retrieve
                 (constructor_index : int)
                 (acc : t)
@@ -1655,6 +1678,7 @@ module Make (Enc : Encoding.S) :
           return (List.rev_append found acc)
       ;;
 
+      (* See the [.mli]. *)
       let to_problems args (constructors : t) : Problems.t mm =
         Logger.trace __FUNCTION__;
         let open Syntax in
@@ -1666,6 +1690,7 @@ module Make (Enc : Encoding.S) :
         return p
       ;;
 
+      (* See the [.mli]. *)
       let axiom
             (act : EConstr.t)
             (tgt : EConstr.t)
@@ -1690,8 +1715,137 @@ module Make (Enc : Encoding.S) :
       ;;
     end
 
-    (*********************************************************)
+    (** [warn_each warn ds] is [warn lts_enc (name, args)] for each deferred
+        premise [(lts_enc, name, args)] of [ds], in order (one of the
+        [warn_*] functions above). Raises nothing. *)
+    let warn_each
+          (warn : Enc.t -> EConstr.t * EConstr.t array -> unit mm)
+          (ds : Problems.deferred list)
+      : unit mm
+      =
+      iterate
+        0
+        (List.length ds - 1)
+        ()
+        (fun i () ->
+          let lts_enc, name, args = List.nth ds i in
+          warn lts_enc (name, args))
+    ;;
 
+    (** [axioms_per_state states (act, tgt) (lts_enc, i) cs] is [cs] with,
+        for each evar map of [states] in turn, the constructor [i] of
+        [lts_enc] as an axiom ({!Constructors.axiom}) from [act] to [tgt],
+        both fully normalised under that map. Each runs in that map, the
+        state left unchanged ({!sandbox}). Raises nothing. *)
+    let axioms_per_state
+          (states : Evd.evar_map list)
+          ((act, tgt) : EConstr.t * EConstr.t)
+          (constructor_index : Enc.t * int)
+          (constructors : Constructors.t)
+      : Constructors.t mm
+      =
+      let open Syntax in
+      let* env = get_env in
+      iterate
+        0
+        (List.length states - 1)
+        constructors
+        (fun k acc ->
+          let sigma = List.nth states k in
+          let act = Reductionops.nf_all env sigma act in
+          let tgt = Reductionops.nf_all env sigma tgt in
+          sandbox ~sigma (Constructors.axiom act tgt constructor_index acc))
+    ;;
+
+    (** [combine_branches branches] is the alternatives found in
+        [branches] (one per way an LTS premise was explored; [None] where it
+        led nowhere) as one: the first one's encoding with every one's
+        problems, in order, or [None] if all are [None]. Raises nothing. *)
+    let combine_branches (branches : (Enc.t * ListOfProblems.t) option list)
+      : (Enc.t * ListOfProblems.t) option
+      =
+      match List.filter_map Fun.id branches with
+      | [] -> None
+      | (enc, _) :: _ as found -> Some (enc, List.concat_map snd found)
+    ;;
+
+    (** [premises_ahead env sigma lts_enc indmap (substl, binders)] is the
+        premises among [binders] that are not over an LTS (heads not in
+        [indmap]), each as a deferred premise of [lts_enc], in order:
+        applications and other propositions alike, as
+        {!check_updated_ctx} sees them. Data binders and LTS premises are
+        skipped. Raises nothing. *)
+    let premises_ahead
+          (env : Environ.env)
+          (sigma : Evd.evar_map)
+          (lts_enc : Enc.t)
+          (indmap : Ind.t F.t)
+      :  EConstr.Vars.substl * EConstr.rel_declaration list
+      -> Problems.deferred list
+      =
+      let rec walk acc = function
+        | _ :: substl, t :: tl ->
+          let ty =
+            EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
+          in
+          let acc =
+            match EConstr.kind sigma ty with
+            | App (h, a)
+              when Option.is_empty (F.find_opt indmap h)
+                   && Premise_search.is_prop env sigma ty ->
+              (lts_enc, h, a) :: acc
+            | App _ -> acc
+            (* a premise that is not an application, as in
+               [check_updated_ctx] *)
+            | _ when Premise_search.is_prop env sigma ty ->
+              (lts_enc, ty, [||]) :: acc
+            | _ -> acc
+          in
+          walk acc (substl, tl)
+        | _ -> List.rev acc
+      in
+      walk []
+    ;;
+
+    (** [enumerate_sources env sigma (name, args) lhs] is the distinct
+        sources (the instances of [lhs], fully normalised) for which the LTS
+        premise [name args] holds, in the order the premise search
+        ({!Premise_search.enumerate}) finds them, with whether that search
+        was complete, and one solution, if any, whose source is still open
+        (the premise under it, for a warning). Raises nothing. *)
+    let enumerate_sources
+          (env : Environ.env)
+          (sigma : Evd.evar_map)
+          ((name, args) : EConstr.t * EConstr.t array)
+          (lhs : EConstr.t)
+      : EConstr.t list * bool * EConstr.t option
+      =
+      let premise = Reductionops.nf_evar sigma (EConstr.mkApp (name, args)) in
+      let sols, complete = Premise_search.enumerate env sigma premise in
+      let source s = Reductionops.nf_all env s lhs in
+      let closed, open_ =
+        List.partition (fun s -> Bool.not (has_evars s (source s))) sols
+      in
+      (* closed terms: comparing them under any evar map is sound *)
+      let sources =
+        List.fold_left
+          (fun acc s ->
+            let l = source s in
+            if List.exists (EConstr.eq_constr sigma l) acc
+            then acc
+            else l :: acc)
+          []
+          closed
+      in
+      let undetermined =
+        match open_ with
+        | s :: _ -> Some (Reductionops.nf_evar s (EConstr.mkApp (name, args)))
+        | [] -> None
+      in
+      List.rev sources, complete, undetermined
+    ;;
+
+    (* See the [.mli]. *)
     let check_constructor_args_unify
           (lhs : EConstr.t)
           (act : EConstr.t)
@@ -1704,7 +1858,7 @@ module Make (Enc : Encoding.S) :
       if lhs_unifies then Pair.unifies args.act act else return false
     ;;
 
-    (** Checks possible transitions for this term: *)
+    (* See the [.mli]. *)
     let rec check_valid_constructors
               (constructors : Ind.LTS.constructor array)
               (indmap : Ind.t F.t)
@@ -1742,7 +1896,7 @@ module Make (Enc : Encoding.S) :
       in
       iterate 0 (Array.length constructors - 1) [] iter_body
 
-    (** *)
+    (* See the [.mli]. *)
     and explore_valid_constructor
           (indmap : Ind.t F.t)
           (from_term : EConstr.t)
@@ -1769,6 +1923,7 @@ module Make (Enc : Encoding.S) :
         constructors
         next_constructor_problems
 
+    (* See the [.mli]. *)
     and check_for_next_constructors
           (i : int)
           (outer_act : EConstr.t)
@@ -1791,27 +1946,13 @@ module Make (Enc : Encoding.S) :
           let open Syntax in
           let$+ resolved env sigma = resolve_deferred env sigma deferred in
           let states, undecided, partial = resolved in
-          let warn f (ds : Problems.deferred list) =
-            iterate
-              0
-              (List.length ds - 1)
-              ()
-              (fun i () ->
-                let lts_enc, name, args = List.nth ds i in
-                f lts_enc (name, args))
-          in
-          let* () = warn warn_if_skipped_premise undecided in
-          let* () = warn warn_partial_premise partial in
-          let* env = get_env in
-          iterate
-            0
-            (List.length states - 1)
-            constructors
-            (fun k acc ->
-              let sigma = List.nth states k in
-              let act = Reductionops.nf_all env sigma outer_act in
-              let tgt = Reductionops.nf_all env sigma tgt_term in
-              sandbox ~sigma (Constructors.axiom act tgt (next_lts_enc, i) acc)))
+          let* () = warn_each warn_if_skipped_premise undecided in
+          let* () = warn_each warn_partial_premise partial in
+          axioms_per_state
+            states
+            (outer_act, tgt_term)
+            (next_lts_enc, i)
+            constructors)
         else
           Constructors.retrieve
             i
@@ -1820,7 +1961,7 @@ module Make (Enc : Encoding.S) :
             tgt_term
             (next_lts_enc, next_problems)
 
-    (* Should return a list of unification problems *)
+    (* See the [.mli]. *)
     and check_updated_ctx
           (lts_enc : Enc.t)
           (acc : ListOfProblems.t)
@@ -1854,6 +1995,16 @@ module Make (Enc : Encoding.S) :
     (* ! Impossible ! *)
     (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
+    (** [handle_app lts_enc acc indmap (substl, binders) (name, args)] is
+        {!check_updated_ctx} on the remaining [binders], after the premise
+        [name args]: if [name] is not one of the LTSs given in [Using], it
+        is decided or deferred ({!check_unknown_app}); if it is, it is an LTS
+        step, explored for its solutions, which become problems. A step
+        whose source is still open is explored once per source that its
+        earlier premises fix (resolving them first), or, if none does, once
+        per source a bounded search enumerates for it.
+
+        Raises as {!check_valid_constructors}, when run. *)
     and handle_app
           (lts_enc : Enc.t)
           (acc : ListOfProblems.t)
@@ -1868,15 +2019,11 @@ module Make (Enc : Encoding.S) :
         let open Syntax in
         let raw_args = args in
         let lhs_raw = (Rocq_utils.constructor_args raw_args).lhs in
-        (* the alternatives found, each in its own branch, as one result *)
-        let combine branches =
-          match List.filter_map Fun.id branches with
-          | [] -> return None
-          | (enc, _) :: _ as found ->
-            return (Some (enc, List.concat_map snd found))
-        in
-        (* Explore this LTS premise from the current evar map, its source
-           closed, then carry on with the remaining binders. *)
+        (* [explore_closed ()] is this LTS premise explored from the current
+           evar map, its source closed: the constructors of [c] that can take
+           the step ({!check_valid_constructors}), their problems crossed
+           with [acc], then {!check_updated_ctx} on the remaining binders;
+           [None] if no constructor can. *)
         let explore_closed () =
           let args = Rocq_utils.constructor_args raw_args in
           let$+ lhs env sigma = Reductionops.nf_evar sigma args.lhs in
@@ -1897,42 +2044,19 @@ module Make (Enc : Encoding.S) :
             let acc = ListOfProblems.cross_product problems acc in
             check_updated_ctx lts_enc acc indmap (substl, tl)
         in
-        (* The premise's source is open and nothing fixes it. Matching
-           constructors against an open source cannot be trusted: the first
-           match fixes it for all its siblings, so only the first constructor
-           was ever found, and a recursive one could recurse without bound.
-           Instead the premise search, which is bounded and knows when it is
-           complete, enumerates the premise, and each distinct source it finds
-           is explored as usual (note 9, option B). Until 2026-10-03 this
-           explored from the open source, with a warning. *)
+        (* [explore_sources ()] is {!explore_closed} once per source the
+           premise search finds for this premise, whose source is open and
+           fixed by nothing, each in its own sandbox, the results combined
+           ({!combine_branches}); it warns if the search was incomplete or
+           left a source open. Matching constructors against an open source
+           cannot be trusted: the first match fixes it for all its siblings,
+           so only the first constructor was ever found, and a recursive one
+           could recurse without bound. The premise search is bounded and
+           knows when it is complete (note 9, option B). Until 2026-10-03
+           this explored from the open source, with a warning. *)
         let explore_sources () =
           let$+ found env sigma =
-            let premise =
-              Reductionops.nf_evar sigma (EConstr.mkApp (name, raw_args))
-            in
-            let sols, complete = Premise_search.enumerate env sigma premise in
-            let source s = Reductionops.nf_all env s lhs_raw in
-            let closed, open_ =
-              List.partition (fun s -> Bool.not (has_evars s (source s))) sols
-            in
-            (* closed terms: comparing them under any evar map is sound *)
-            let sources =
-              List.fold_left
-                (fun acc s ->
-                  let l = source s in
-                  if List.exists (EConstr.eq_constr sigma l) acc
-                  then acc
-                  else l :: acc)
-                []
-                closed
-            in
-            let undetermined =
-              match open_ with
-              | s :: _ ->
-                Some (Reductionops.nf_evar s (EConstr.mkApp (name, raw_args)))
-              | [] -> None
-            in
-            List.rev sources, complete, undetermined
+            enumerate_sources env sigma (name, raw_args) lhs_raw
           in
           let sources, complete, undetermined = found in
           let* () =
@@ -1958,8 +2082,10 @@ module Make (Enc : Encoding.S) :
                 in
                 return (r :: acc))
           in
-          combine branches
+          return (combine_branches branches)
         in
+        (* [explore ()] is {!explore_sources} if the premise's source is
+           open under the current evar map, else {!explore_closed}. *)
         let explore () =
           let$+ lhs_open _ sigma =
             has_evars sigma (Reductionops.nf_evar sigma lhs_raw)
@@ -1967,9 +2093,7 @@ module Make (Enc : Encoding.S) :
           if lhs_open then explore_sources () else explore_closed ()
         in
         let$+ lhs_open _ sigma =
-          Bool.not
-            (Evar.Set.is_empty
-               (Evd.evars_of_term sigma (Reductionops.nf_evar sigma lhs_raw)))
+          has_evars sigma (Reductionops.nf_evar sigma lhs_raw)
         in
         let deferred : Problems.deferred list =
           match acc with (p : Problems.t) :: _ -> p.deferred | [] -> []
@@ -1980,28 +2104,7 @@ module Make (Enc : Encoding.S) :
            them too. They are decided again when the walk reaches them, which
            is harmless (in each branch they are closed by then, and hold). *)
         let$+ ahead env sigma =
-          let rec walk acc = function
-            | _ :: substl, t :: tl ->
-              let ty =
-                EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
-              in
-              let acc =
-                match EConstr.kind sigma ty with
-                | App (h, a)
-                  when Option.is_empty (F.find_opt indmap h)
-                       && Premise_search.is_prop env sigma ty ->
-                  (lts_enc, h, a) :: acc
-                | App _ -> acc
-                (* a premise that is not an application, as in
-                   [check_updated_ctx] *)
-                | _ when Premise_search.is_prop env sigma ty ->
-                  (lts_enc, ty, [||]) :: acc
-                | _ -> acc
-              in
-              walk acc (substl, tl)
-            | _ -> List.rev acc
-          in
-          walk [] (substl, tl)
+          premises_ahead env sigma lts_enc indmap (substl, tl)
         in
         let deferred = deferred @ ahead in
         if Bool.not lhs_open || List.is_empty deferred
@@ -2013,17 +2116,8 @@ module Make (Enc : Encoding.S) :
              from an open source finds only some of its steps. *)
           let$+ resolved env sigma = resolve_deferred env sigma deferred in
           let states, undecided, partial = resolved in
-          let warn f (ds : Problems.deferred list) =
-            iterate
-              0
-              (List.length ds - 1)
-              ()
-              (fun i () ->
-                let lts_enc, name, args = List.nth ds i in
-                f lts_enc (name, args))
-          in
-          let* () = warn warn_if_skipped_premise undecided in
-          let* () = warn warn_partial_premise partial in
+          let* () = warn_each warn_if_skipped_premise undecided in
+          let* () = warn_each warn_partial_premise partial in
           let* branches =
             iterate
               0
@@ -2033,8 +2127,15 @@ module Make (Enc : Encoding.S) :
                 let* r = sandbox ~sigma:(List.nth states k) (explore ()) in
                 return (r :: acc))
           in
-          combine branches
+          return (combine_branches branches)
 
+    (** [check_unknown_app lts_enc acc indmap (substl, binders) (name, args)]
+        is {!check_updated_ctx} on the remaining [binders] after a premise not
+        over an LTS: [None] if {!decide_premise} finds it false, the problems
+        unchanged if true, and, if undecided, the premise deferred on every
+        problem set, to be decided once the LTS premises are unified.
+
+        Raises as {!check_valid_constructors}, when run. *)
     and check_unknown_app
           (lts_enc : Enc.t)
           (acc : ListOfProblems.t)
@@ -2065,6 +2166,7 @@ module Make (Enc : Encoding.S) :
         check_updated_ctx lts_enc acc indmap (substl, tl)
     ;;
 
+    (* See the [.mli]. *)
     let collect_valid_constructors
           (constructors : Ind.LTS.constructor array)
           (indmap : Ind.t F.t)
@@ -2080,6 +2182,7 @@ module Make (Enc : Encoding.S) :
     ;;
   end
 
+  (* See the [.mli] for the three set and table makers. *)
   let make_enc_hashtbl () : (module Hashtbl.S with type key = Enc.t) =
     (module Hashtbl.Make (Enc))
   ;;

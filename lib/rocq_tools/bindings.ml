@@ -111,6 +111,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
 
     exception CannotAppendDone of unit
 
+    (* See the [.mli]. *)
     let rec append (x : t) : t -> t
       =
       (* Logger.trace __FUNCTION__; *)
@@ -120,6 +121,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
       | Done -> raise (CannotAppendDone ())
     ;;
 
+    (* See the [.mli]. *)
     let rec length : t -> int =
       (* Logger.trace __FUNCTION__; *)
       function
@@ -183,6 +185,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
           let compare a b : int = 0
         end)
 
+    (* See the [.mli]. *)
     let update (cmap : t') (k : Constr.t) ((name, inst) : NamedInstructions.t)
       : unit
       =
@@ -198,27 +201,31 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
 
     exception Rocq_bindings_CannotFindBindingName of EConstr.t
 
+    (** [first_named x name_pairs] is the name paired with the first evar
+        in [name_pairs] equal to [x] (compared without encoding), or [None]
+        if there is none. Raises nothing. *)
+    let rec first_named (x : EConstr.t)
+      : (EConstr.t * Names.Name.t) list -> Names.Name.t option mm
+      =
+      let open Syntax in
+      function
+      | [] -> return None
+      | (y, z) :: name_pairs ->
+        let* eq = econstr_eq ~enc:false x y in
+        if eq
+        then (
+          Logger.thing ~__FUNCTION__ Trace "eq x" z Rocq_utils.Strfy.name;
+          return (Some z))
+        else first_named x name_pairs
+    ;;
+
+    (* See the [.mli]. {!first_named}, raising if there is no match. *)
     let find_name (name_pairs : (EConstr.t * Names.Name.t) list) (x : EConstr.t)
       : Names.Name.t mm
       =
-      (* Logger.trace __FUNCTION__; *)
       Logger.thing ~__FUNCTION__ Trace "x" x Strfy.econstr;
       let open Syntax in
-      let f (i : int) : Names.Name.t option -> Names.Name.t option mm = function
-        | Some n ->
-          Logger.thing ~__FUNCTION__ Trace "Some" n Rocq_utils.Strfy.name;
-          Some n |> return
-        | None ->
-          Logger.trace ~__FUNCTION__ "None";
-          let y, z = List.nth name_pairs i in
-          let* eq = econstr_eq ~enc:false x y in
-          if eq
-          then (
-            Logger.thing ~__FUNCTION__ Trace "eq x" z Rocq_utils.Strfy.name;
-            Some z |> return)
-          else return None
-      in
-      let* matches = iterate 0 (List.length name_pairs - 1) None f in
+      let* matches = first_named x name_pairs in
       match matches with
       | None ->
         Logger.trace
@@ -230,6 +237,50 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
         return n
     ;;
 
+    (** [walk m name_pairs path (x, y)] records in [m] ({!update}) the path
+        to each binder in [x], [path] being the path to [x] so far (its open
+        end still [Undefined]): see {!extract_binding_map}. [x] is the
+        constructor's term with an evar per binder, [y] the same term with de
+        Bruijn indices. At applications with the same head it walks each
+        argument pair, one [Arg] step deeper; where [y] is an index it
+        records the binder whose evar [x] is; elsewhere it stops.
+
+        Raises [Rocq_bindings_CannotFindBindingName], when run, if an index's
+        evar is not a binder (propagated from {!find_name}). *)
+    let rec walk
+              (m : t')
+              (name_pairs : (EConstr.t * Names.Name.t) list)
+              (path : Instructions.t)
+              ((x, y) : EConstr.t * Constr.t)
+      : unit mm
+      =
+      Logger.trace __FUNCTION__;
+      let open Syntax in
+      let* x_kind = econstr_kind x in
+      match x_kind, Constr.kind y with
+      | App (xty, xtys), App (yty, ytys) ->
+        let* eq = econstr_eq ~enc:false xty (EConstr.of_constr yty) in
+        if eq
+        then (
+          let xytys = Array.combine xtys ytys in
+          iterate
+            0
+            (Array.length xytys - 1)
+            ()
+            (fun index () ->
+              let step =
+                Instructions.Arg { root = yty; index; cont = Undefined }
+              in
+              walk m name_pairs (Instructions.append step path) xytys.(index)))
+        else return ()
+      | _, Rel _ ->
+        let* name = find_name name_pairs x in
+        update m y (name, Instructions.append Done path);
+        return ()
+      | _, _ -> return ()
+    ;;
+
+    (* See the [.mli]. {!walk} from the root, into a fresh table. *)
     let extract_binding_map
           (name_pairs : (EConstr.t * Names.Name.t) list)
           (x : EConstr.t)
@@ -239,49 +290,11 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
       Logger.trace __FUNCTION__;
       let open Syntax in
       let m : t' = create 0 in
-      let rec f
-                (acc : (Constr.t * NamedInstructions.t) list)
-                (b : Instructions.t)
-                ((x, y) : EConstr.t * Constr.t)
-        : unit mm
-        =
-        Logger.trace __FUNCTION__;
-        let* x_kind = econstr_kind x in
-        match x_kind, Constr.kind y with
-        | App (xty, xtys), App (yty, ytys) ->
-          let* eq = econstr_eq ~enc:false xty (EConstr.of_constr yty) in
-          if eq
-          then (
-            (* NOTE: set to [-1] so that it is [0] on first use. *)
-            let (tysindex, _), _ = Utils.new_int_counter ~start:(-1) () in
-            let xytys = Array.combine xtys ytys in
-            let iter_body (i : int) () =
-              Logger.trace __FUNCTION__;
-              let b' =
-                Instructions.append
-                  (Arg { root = yty; index = tysindex (); cont = Undefined })
-                  b
-              in
-              f acc b' xytys.(i)
-            in
-            iterate 0 (Array.length xytys - 1) () iter_body)
-          else return ()
-        | _, Rel _ ->
-          let* name = find_name name_pairs x in
-          update m y (name, Instructions.append Done b);
-          return ()
-        | _, _ -> return ()
-      in
-      let* () = f [] Undefined (x, y) in
+      let* () = walk m name_pairs Undefined (x, y) in
       return m
     ;;
 
-    (** [~keep_var]: also keep a position that is just a variable. For the
-        source that binding is redundant (matching the goal fixes it), so it
-        is dropped; for the target it is not -- in a proof the step's target
-        is still open when the constructor is applied, and a premise that
-        mentions it ([succ_rel n m -> lts n a m]) would stay open (backlog
-        I2, stage 2). *)
+    (* See the [.mli]. *)
     let make_opt
           ?(keep_var : bool = false)
           (name_pairs : (EConstr.t * Names.Name.t) list)
@@ -322,14 +335,13 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
       ;;
     end)
 
+  (* See the [.mli]. *)
   let use_no_bindings (xs : ConstrMap.t' option list) : bool =
     Logger.trace __FUNCTION__;
     List.filter (function None -> false | _ -> true) xs |> List.is_empty
   ;;
 
-  (** [] ...
-      @param name_map is a tuple list of evars and corresponding binding_names
-  *)
+  (* See the [.mli]. *)
   let extract
         (name_pairs : (EConstr.t * Names.Name.t) list)
         (from : EConstr.t * Constr.t)

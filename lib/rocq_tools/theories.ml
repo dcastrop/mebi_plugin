@@ -28,8 +28,8 @@ module Make
   open M
   module Th = Mebi_theories
 
-  (** [is_theory x y] checks if term [x] is equal to theory term [y], catching the exception thrown when [EConstr.kind_of_type x] is not [AtomicType (ty, tys)].
-  *)
+  (* See the [.mli], including why the handler below cannot see what
+     [to_atomic] raises. *)
   let is_theory (x : EConstr.t) (y : EConstr.t) : bool mm =
     try
       let open Syntax in
@@ -39,8 +39,8 @@ module Make
     | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> return false
   ;;
 
-  (** [is_any_theory x] is [true] if term [x] is equal to any of the terms presented in [Mebi_theories].
-  *)
+  (* See the [.mli]. Compares [x] with every loaded constant, running each
+     comparison. *)
   let is_any_theory (x : EConstr.t) : bool =
     Logger.trace __FUNCTION__;
     Th.get_constants ()
@@ -49,23 +49,16 @@ module Make
     |> List.exists (fun (y : EConstr.t) -> econstr_eq x y |> run)
   ;;
 
-  (** rocq exists *)
+  (* See the [.mli] for every [is_*] below. *)
   let is_exists (x : EConstr.t) : bool mm = is_theory x (Th.get "ex")
-
-  (** weak simulation*)
   let is_weak_sim (x : EConstr.t) : bool mm = is_theory x (Th.get "weak_sim")
 
-  (** weak bisimilarity, as one coinductive relation *)
   let is_weak_bisimilar (x : EConstr.t) : bool mm =
     is_theory x (Th.get "weak_bisimilar")
   ;;
 
-  (** weak transition *)
   let is_weak (x : EConstr.t) : bool mm = is_theory x (Th.get "weak")
-
-  (** tau transition *)
   let is_tau (x : EConstr.t) : bool mm = is_theory x (Th.get "tau")
-
   let is_silent (x : EConstr.t) : bool mm = is_theory x (Th.get "silent")
   let is_silent1 (x : EConstr.t) : bool mm = is_theory x (Th.get "silent1")
   let is_LTS (x : EConstr.t) : bool mm = is_theory x (Th.get "LTS")
@@ -75,9 +68,10 @@ module Make
   let is_cons (x : EConstr.t) : bool mm = is_theory x (Th.get "cons")
   let is_nil (x : EConstr.t) : bool mm = is_theory x (Th.get "nil")
 
+  (** Raised by {!ensure}. *)
   exception EnsureFail
 
-  (** [ensure x f] is a custom assertion for [f x] being [true]. @raise EnsureFail if [f x] is [false]. *)
+  (* See the [.mli]. *)
   let ensure (x : EConstr.t) (f : EConstr.t -> bool mm) : unit mm =
     Logger.trace __FUNCTION__;
     let open Syntax in

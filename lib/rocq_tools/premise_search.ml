@@ -6,29 +6,30 @@
     [Proved p] with a proof term [p]; [Refuted] only when the search was
     {e complete}; [Unknown] otherwise. *)
 
-(** How a premise was proved. A negation [~ P] has no proof term from
-    constructor search; it holds because [P] was refuted, and the solver
-    proves it with {!negation_tac} instead. *)
+(** How a premise was proved (see the [.mli]). A negation [~ P] has no
+    proof term from constructor search: it holds because [P] was refuted,
+    and the solver proves it with {!negation_tac}. *)
 type proof =
   | Term of EConstr.t
   | ByRefutation of EConstr.t
   | ByCases
 
+(* See the [.mli]. *)
 type result =
   | Proved of proof
   | Refuted
   | Unknown
 
-(** A user tactic tried on premises the search leaves undecided
-    ([MeBi Config Premise Tactic]): proving [P] means it holds, proving
-    [~ P] that it is false. *)
+(* See the [.mli]. *)
 let user_tactic : unit Proofview.tactic option ref = ref None
 
-(** The most nested constructor applications a search may try. *)
+(* See the [.mli]. *)
 let default_depth : int = 16
 
+(* See the [.mli]. *)
 let max_depth : int ref = ref default_depth
 
+(* See the [.mli]. *)
 let is_prop (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t) : bool =
   try
     match Retyping.get_sort_quality_of env sigma t with
@@ -38,18 +39,21 @@ let is_prop (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t) : bool =
   | _ -> false
 ;;
 
+(** [is_eq_ind ind] is whether [ind] is Rocq's [eq]. Raises nothing. *)
 let is_eq_ind (ind : Names.inductive) : bool =
   Rocqlib.check_ind_ref "core.eq.type" ind
 ;;
 
+(** [closed sigma x] is whether [x] has no evars. Raises nothing. *)
 let closed (sigma : Evd.evar_map) (x : EConstr.t) : bool =
   Evar.Set.is_empty (Evd.evars_of_term sigma x)
 ;;
 
-(** A term built only from constructors (after normalization): the only
-    kind of argument on which a failed match {e proves} a premise false. Type
-    arguments (whose type is a sort) are exempt. [le (f x) 3] with an opaque
-    [f] is not ground, so no constructor matching it is not a refutation. *)
+(** [ground env sigma x] is whether [x], normalised, is built only from
+    constructors (type arguments exempt): the only kind of argument on
+    which a failed match {e proves} a premise false. [le (f x) 3] with an
+    opaque [f] is not ground, so no constructor matching it is not a
+    refutation. Raises nothing. *)
 let rec ground (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t) : bool
   =
   let h, args = EConstr.decompose_app sigma x in
@@ -57,6 +61,8 @@ let rec ground (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t) : bool
   | Construct _ -> Array.for_all (arg_ground env sigma) args
   | _ -> false
 
+(** [arg_ground env sigma x] is whether the argument [x] is a type or
+    {!ground}. Raises nothing. *)
 and arg_ground (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t) : bool
   =
   let is_type_arg : bool =
@@ -70,12 +76,12 @@ and arg_ground (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t) : bool
   is_type_arg || ground env sigma x
 ;;
 
-(** A term with nothing opaque left after full normalization: no opaque
-    constant or axiom, free variable, or stuck [match]/fixpoint (open
-    variables are fine)
-    -- only constructors, inductives, sorts and binders. Conversion is
-    complete on such terms, so a parameter like [fun k => k <= 1] is fine,
-    while [f x] with an opaque [f] is not. *)
+(** [evaluated env sigma x] is whether [x], fully normalised, has nothing
+    opaque left: no opaque constant or axiom, free variable, or stuck
+    [match]/fixpoint, only constructors, inductives, sorts, binders and
+    evars. Conversion is complete on such terms, so a parameter like
+    [fun k => k <= 1] is fine, while [f x] with an opaque [f] is not.
+    Raises nothing. *)
 let evaluated (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t) : bool =
   let rec ok (x : EConstr.t) : bool =
     match EConstr.kind sigma x with
@@ -92,8 +98,15 @@ let evaluated (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t) : bool 
   ok (Reductionops.nf_all env sigma x)
 ;;
 
+(** Raised by {!unify} and {!unify_conclusion}: the terms do not unify. *)
 exception NoUnify
 
+(** [unify env sigma a b] is [sigma] with [a] and [b] unified (up to
+    conversion).
+
+    @raise NoUnify
+      if they do not unify (raised here, for Rocq's
+      unification errors). *)
 let unify
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -105,14 +118,17 @@ let unify
   | Pretype_errors.PretypeError _ | Evarconv.UnableToUnify _ -> raise NoUnify
 ;;
 
-(** [unify_conclusion env sigma concl goal]: [unify], and failing that,
-    argument by argument, left to right, each of [concl]'s arguments
-    normalized once the earlier ones have instantiated its evars. A
+(** [unify_conclusion env sigma concl goal] is [sigma] with the
+    constructor conclusion [concl] unified with [goal]: whole, and failing
+    that argument by argument, left to right, each of [concl]'s arguments
+    normalised once the earlier ones have instantiated its evars. A
     constructor whose index is computed from its binders ([ev k (dbl k)],
-    [termLTS (tfix t) None (subst (tfix t) t)]) can defeat [w_unify] on the
-    whole application, though the goal holds: [k := 2] first makes
-    [dbl k] reduce to [4]. A success is a genuine solution; the proof found
-    is still type-checked ([search_closed]). *)
+    [termLTS (tfix t) None (subst (tfix t) t)]) can defeat whole
+    unification though the goal holds: [k := 2] first makes [dbl k] reduce
+    to [4]. A success is a genuine solution; the proof is still
+    type-checked ({!search_closed}).
+
+    @raise NoUnify if neither way unifies them (propagated from {!unify}). *)
 let unify_conclusion
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -141,10 +157,10 @@ let unify_conclusion
     search incomplete (some solutions may be missing). *)
 let max_solutions : int = 64
 
-(** An index argument a match can fail on decidably: built from
-    constructors, with evars allowed at the leaves (an open pattern, such as
-    a target still to be computed -- first-order unification against it is
-    complete), or a type. *)
+(** [pattern env sigma x] is whether [x] is an index a match can fail on
+    decidably: built from constructors with evars allowed at the leaves (an
+    open pattern, such as a target still to be computed: first-order
+    unification against it is complete). Raises nothing. *)
 let rec pattern (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
   : bool
   =
@@ -157,6 +173,8 @@ let rec pattern (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
     | Construct _ -> Array.for_all (arg_pattern env sigma) args
     | _ -> false)
 
+(** [arg_pattern env sigma x] is whether the argument [x] is a type or,
+    normalised, a {!pattern}. Raises nothing. *)
 and arg_pattern (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
   : bool
   =
@@ -171,12 +189,19 @@ and arg_pattern (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
   is_type_arg || pattern env sigma (Reductionops.nf_all env sigma x)
 ;;
 
-(** [search ~all env sigma depth goal]: the solutions -- each an evar map in
-    which [goal]'s open variables may be instantiated, and a proof of the
-    instantiated [goal] -- and whether they are {e all} of them (no depth
-    cut, no undecidable leaf, no failed match on a non-pattern argument, cap
-    not reached). With [~all:false] it stops at the first solution, and
-    completeness then only matters when there is none. *)
+(** [search ~all env sigma depth goal] is the solutions of [goal] -- each
+    an evar map in which [goal]'s open variables may be instantiated, with a
+    proof of the instantiated [goal] -- and whether they are {e all} of them
+    (no depth cut, no undecidable leaf, no failed match on a non-pattern
+    argument, cap not reached). With [~all:false] it stops at the first
+    solution, and completeness then only matters when there is none.
+
+    An equation is decided by conversion when closed (a constructor
+    difference refutes it) and solved by unification when open; an
+    inductive proposition by trying each constructor ({!try_constructor})
+    at [depth - 1]; anything else is undecidable here.
+
+    Raises nothing (unification failures are caught). *)
 let rec search
           ~(all : bool)
           (env : Environ.env)
@@ -244,9 +269,16 @@ let rec search
       else sols, complete && decidable)
   | _ -> (* not an inductive proposition: undecidable here *) [], false
 
-(** One constructor: fresh evars for its binders, its conclusion unified
-    with [goal], then every [Prop] binder still open searched for, left to
-    right, at [depth - 1], every solution of one continuing into the next. *)
+(** [try_constructor ~all env sigma depth goal c] is the solutions of
+    [goal] that start with the constructor [c], and whether they are all of
+    them: fresh evars for [c]'s binders, its conclusion unified with [goal]
+    ({!unify_conclusion}), then every [Prop] binder still open searched for,
+    left to right, at [depth - 1], every solution of one continuing into the
+    next. A failed match rules [c] out only if its conclusion's indices are
+    patterns too. An open sub-premise is always fully enumerated: which of
+    its solutions is taken can decide whether a later premise holds.
+
+    Raises nothing (unification failures are caught). *)
 and try_constructor
       ~(all : bool)
       (env : Environ.env)
@@ -342,7 +374,8 @@ and try_constructor
     proofs, complete && List.length proofs = List.length states
 ;;
 
-(** [P -> False] (after head reduction, so [~ P] too): [Some P]. *)
+(** [negated env sigma goal] is [P] if [goal] is [P -> False] after head
+    reduction (so [~ P] too), else [None]. Raises nothing. *)
 let negated (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
   : EConstr.t option
   =
@@ -354,6 +387,10 @@ let negated (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
   | _ -> None
 ;;
 
+(** [search_closed env sigma goal] is the verdict of a {!search} for one
+    proof of the closed [goal]: [Proved] with its proof term (checked to be
+    closed and to type-check), [Refuted] if the search found none and was
+    complete, else [Unknown]. Raises nothing. *)
 let search_closed (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
   : result
   =
@@ -371,9 +408,7 @@ let search_closed (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
   | [], false -> Unknown
 ;;
 
-(** [enumerate env sigma goal]: for a premise that may still mention open
-    variables, every way to make it hold -- each an evar map instantiating
-    them -- and whether that is all of them (backlog I2, stage 2). *)
+(* See the [.mli]. *)
 let enumerate (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
   : Evd.evar_map list * bool
   =
@@ -390,12 +425,7 @@ let enumerate (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
     List.map fst sols, complete
 ;;
 
-(** [abstract_vars env sigma t]: [t] with every local variable it mentions
-    (a hypothesis of the proof, such as an inverted step's label [n] or
-    target [q']) replaced by a fresh evar of the same type. The search treats
-    a variable as opaque, so it decides nothing about
-    [step p (Some (Out n)) q']; over evars it asks whether {e any} [n] and
-    [q'] would do. *)
+(* See the [.mli]. *)
 let abstract_vars (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t)
   : Evd.evar_map * EConstr.t
   =
@@ -428,13 +458,12 @@ module ConstrTbl = Hashtbl.Make (struct
     let hash = Constr.hash
   end)
 
+(** {!dead}'s verdicts, keyed by the proposition with its local variables
+    numbered in order of occurrence -- so [step (var 18) (Some (Out n)) q']
+    and the same with [n0] and [q'1] share an entry -- and by the depth. *)
 let dead_memo : (int * bool) ConstrTbl.t = ConstrTbl.create 64
 
-(** [dead env sigma t]: the proposition [t] has no instance for any value of
-    the local variables it mentions -- the search over [abstract_vars] found
-    no solution and was complete. A hypothesis of this type is false in every
-    context, whatever else is known about its variables. Not for negations,
-    whose search would need a proof of the negated proposition. Memoised. *)
+(* See the [.mli]. *)
 let dead (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t) : bool =
   let decide () =
     is_prop env sigma t
@@ -466,7 +495,9 @@ let dead (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t) : bool =
        r)
 ;;
 
-(** Run the user tactic, if any, on [typ]: its closed proof term. *)
+(** [by_tactic env sigma typ] is the closed proof term of [typ] the
+    {!user_tactic} builds, or [None] if there is none or it fails. Raises
+    nothing. *)
 let by_tactic (env : Environ.env) (sigma : Evd.evar_map) (typ : EConstr.t)
   : EConstr.t option
   =
@@ -488,6 +519,7 @@ let by_tactic (env : Environ.env) (sigma : Evd.evar_map) (typ : EConstr.t)
      | e when CErrors.noncritical e -> None)
 ;;
 
+(** [negation_of goal] is [goal -> False]. Raises nothing. *)
 let negation_of (goal : EConstr.t) : EConstr.t =
   let false_ =
     EConstr.of_constr
@@ -498,7 +530,9 @@ let negation_of (goal : EConstr.t) : EConstr.t =
   EConstr.mkArrowR goal false_
 ;;
 
-(** The user tactic, if any, on [goal] and then on [~ goal]. *)
+(** [by_user_tactic env sigma goal] is the {!user_tactic}'s verdict on
+    [goal]: [Proved] if it proves [goal], [Refuted] if it proves [~ goal],
+    else [Unknown]. Raises nothing. *)
 let by_user_tactic (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
   : result
   =
@@ -512,7 +546,7 @@ let by_user_tactic (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
 
 (** A bounded universal premise, as {!bounded_universal} recognises it:
     [forall k : nat, k <= n -> P k], or [forall k : nat, k < n -> P k]
-    ([k < n] is [S k <= n] by definition, and [n > k] is [k < n]).
+    ([k < n] is [S k <= n] by definition, and [n > k] is [k < n]):
     - [pred]: [fun k => P k];
     - [strict]: [true] for [<], [false] for [<=];
     - [bound]: [n], read as a number;
@@ -526,37 +560,40 @@ type bounded =
   ; le : Names.inductive * EConstr.EInstance.t
   }
 
-(** The default for {!max_range}. Measured 2026-10-04: a cheap instance
-    ([k = k]) costs little even at 1000 values (6s, 0.4GB for a whole
-    proof), but one refuted by inversion over unary numerals ([k <> 5000])
-    took 12s / 0.6GB at 100 values and 190s / 3.9GB at 1000. *)
+(* See the [.mli]. Measured 2026-10-04: a cheap instance ([k = k]) costs
+   little even at 1000 values (6s, 0.4GB for a whole proof), but one
+   refuted by inversion over unary numerals ([k <> 5000]) took 12s / 0.6GB
+   at 100 values and 190s / 3.9GB at 1000. *)
 let default_range : int = 256
 
-(** The most values of [k] a bounded universal may range over to be
-    decided ([MeBi Config Premise Range]). Deciding one costs a premise
-    search per value, and its proof term grows with the square of the
-    range (each step of the chain carries a unary numeral), so a premise
-    with a wider range is left undecided, with its own warning. *)
+(* See the [.mli]. Deciding a premise costs a search per value, and its
+   proof term grows with the square of the range (each step of the chain
+   carries a unary numeral), so a wider premise is left undecided, with its
+   own warning. *)
 let max_range : int ref = ref default_range
 
-(** [nat_ind ()]: Peano's [nat], as registered with Rocq ([num.nat.type]),
-    or [None] if it is not loaded. *)
+(** [nat_ind ()] is Peano's [nat], as registered with Rocq
+    ([num.nat.type]), or [None] if it is not loaded. Raises nothing. *)
 let nat_ind () : Names.inductive option =
   match Rocqlib.lib_ref "num.nat.type" with
   | Names.GlobRef.IndRef ind -> Some ind
   | _ | (exception _) -> None
 ;;
 
-(** [the_nat_ind ()]: {!nat_ind}, for code that only runs once a bounded
-    universal has been recognised, which needed [nat]. *)
+(** [the_nat_ind ()] is {!nat_ind}, for code that only runs once a bounded
+    universal has been recognised, which needed [nat].
+
+    @raise Failure
+      if [nat] is not loaded (raised here; cannot happen after
+      a bounded universal was recognised). *)
 let the_nat_ind () : Names.inductive =
   match nat_ind () with
   | Some n -> n
   | None -> failwith "MeBi: [nat] is not loaded"
 ;;
 
-(** [numeral nat i]: the unary numeral for [i] in [nat], [S (... (S O))]
-    with [i] [S]s. *)
+(** [numeral nat i] is the unary numeral for [i] in [nat],
+    [S (... (S O))] with [i] [S]s. Raises nothing. *)
 let numeral (nat : Names.inductive) (i : int) : EConstr.t =
   let o = EConstr.mkConstructU ((nat, 1), EConstr.EInstance.empty) in
   let s = EConstr.mkConstructU ((nat, 2), EConstr.EInstance.empty) in
@@ -566,8 +603,8 @@ let numeral (nat : Names.inductive) (i : int) : EConstr.t =
   wrap o i
 ;;
 
-(** [is_constructor nat j sigma h]: [h] is the [j]-th constructor of [nat]
-    ([1] is [O], [2] is [S]). *)
+(** [is_constructor nat j sigma h] is whether [h] is the [j]-th
+    constructor of [nat] ([1] is [O], [2] is [S]). Raises nothing. *)
 let is_constructor
       (nat : Names.inductive)
       (j : int)
@@ -587,11 +624,11 @@ type reading =
   | Above_cap
   | Not_a_number
 
-(** [read_bound env sigma nat cap x]: what the [nat] term [x] evaluates
-    to, as a {!reading}. [x] is head-reduced one [S] at a time, so a bound
-    like [2 ^ 30] is given up on past [cap] rather than computed in full.
-    [Not_a_number] if [x] does not reduce to a numeral (it is open, or
-    stuck on something opaque). *)
+(** [read_bound env sigma nat cap x] is what the [nat] term [x] evaluates
+    to: a number, [Above_cap] past [cap], or [Not_a_number] if it does not
+    reduce to a numeral (it is open, or stuck on something opaque). [x] is
+    head-reduced one [S] at a time, so a bound like [2 ^ 30] is given up on
+    past [cap] rather than computed in full. Raises nothing. *)
 let read_bound
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -615,11 +652,12 @@ let read_bound
   count 0 x
 ;;
 
-(** [split_forall_implies env sigma goal]: for [goal] of the shape
-    [forall (k : T), D k -> B k] (after head reduction), where [B] does not
-    depend on the proof of [D k], the binder's name and type [(na, T)], the
-    environment under [k], [D] and [B] -- the last two still under [k]
-    (it is [Rel 1] in them), [B] with the proof's binder removed. *)
+(** [split_forall_implies env sigma goal] is, for [goal] of the shape
+    [forall (k : T), D k -> B k] (after head reduction) where [B] does not
+    depend on the proof of [D k], the binder's name and type, the
+    environment under [k], and [D] and [B], both still under [k] (it is
+    [Rel 1] in them), [B] with the proof's binder removed; [None] for any
+    other shape. Raises nothing. *)
 let split_forall_implies
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -643,7 +681,8 @@ let split_forall_implies
   | _ -> None
 ;;
 
-(** [is_nat env sigma nat t]: the type [t] reduces to [nat]. *)
+(** [is_nat env sigma nat t] is whether the type [t] reduces to [nat].
+    Raises nothing. *)
 let is_nat
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -656,10 +695,11 @@ let is_nat
   | _ -> false
 ;;
 
-(** [as_le env' sigma d]: for a hypothesis type [d] under the binder [k]
-    (in [env']) that reduces to Peano's [le x n], with [n] not mentioning
-    [k]: [le] with its universe instance, [x] (still under [k]) and [n]
-    (lowered out from under [k]). *)
+(** [as_le env' sigma d] is, for a hypothesis type [d] under the binder
+    [k] (in [env']) that reduces to Peano's [le x n] with [n] not
+    mentioning [k], [le] with its universe instance, [x] (still under [k])
+    and [n] (lowered out from under [k]); [None] otherwise. Raises
+    nothing. *)
 let as_le (env' : Environ.env) (sigma : Evd.evar_map) (d : EConstr.t)
   : ((Names.inductive * EConstr.EInstance.t) * EConstr.t * EConstr.t) option
   =
@@ -675,9 +715,10 @@ let as_le (env' : Environ.env) (sigma : Evd.evar_map) (d : EConstr.t)
   | _ -> None
 ;;
 
-(** [strictness env' sigma nat x]: for the left side [x] of [x <= n] under
-    the binder [k] (in [env']): [Some false] if [x] is [k] itself ([k <= n]), [Some true] if it is [S k] ([k < n]), [None] for anything else.
-*)
+(** [strictness env' sigma nat x] is, for the left side [x] of [x <= n]
+    under the binder [k] (in [env']), [Some false] if [x] is [k] itself
+    ([k <= n]), [Some true] if it is [S k] ([k < n]), and [None] for
+    anything else. Raises nothing. *)
 let strictness
       (env' : Environ.env)
       (sigma : Evd.evar_map)
@@ -706,10 +747,11 @@ type recognised =
   (** a bounded universal ranging over more than {!max_range} values *)
   | Not_bounded (** anything else, including a bound that is not a number *)
 
-(** [recognise env sigma goal]: whether [goal] is a bounded universal over
-    [nat], [forall k, k < n -> P k] or [forall k, k <= n -> P k], and if
-    so whether its [n] (or [n + 1]) values of [k] are within
-    {!max_range}. *)
+(** [recognise env sigma goal] is whether [goal] is a bounded universal
+    over [nat] ([forall k, k < n -> P k] or [forall k, k <= n -> P k]),
+    and if so whether its [n] (or [n + 1]) values of [k] are within
+    {!max_range}: {!split_forall_implies}, {!is_nat}, {!as_le},
+    {!strictness}, then {!read_bound}. Raises nothing. *)
 let recognise (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
   : recognised
   =
@@ -733,9 +775,10 @@ let recognise (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
      | Not_a_number -> Not_bounded)
 ;;
 
-(** [bounded_universal env sigma goal]: [goal] as a {!bounded}, if it is a
-    bounded universal within {!max_range} ({!recognise}); [None] otherwise
-    (it is then decided as before, i.e. left undecided). *)
+(** [bounded_universal env sigma goal] is [goal] as a {!type-bounded}, if
+    it is a bounded universal within {!max_range} ({!recognise}); [None]
+    otherwise, when it is decided as before (left undecided). Raises
+    nothing. *)
 let bounded_universal
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -747,8 +790,7 @@ let bounded_universal
   | Above_range | Not_bounded -> None
 ;;
 
-(** [above_range env sigma t]: [t] is a bounded universal left undecided
-    only because it ranges over more than {!max_range} values. *)
+(* See the [.mli]. *)
 let above_range (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t)
   : bool
   =
@@ -757,8 +799,7 @@ let above_range (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t)
   | Bounded _ | Not_bounded -> false
 ;;
 
-(** [is_bounded_universal env sigma t]: {!bounded_universal} recognises
-    [t]. *)
+(* See the [.mli]. *)
 let is_bounded_universal
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -768,23 +809,19 @@ let is_bounded_universal
   Stdlib.Option.is_some (bounded_universal env sigma t)
 ;;
 
-(** [bounded_range b]: the values [k] ranges over, in order: [0 .. n - 1]
-    for [<], [0 .. n] for [<=]. *)
+(** [bounded_range b] is the values [k] ranges over, in order:
+    [0 .. n - 1] for [<], [0 .. n] for [<=]. Raises nothing. *)
 let bounded_range (b : bounded) : int list =
   List.init (if b.strict then b.bound else b.bound + 1) Fun.id
 ;;
 
-(** [bounded_instance sigma b i]: the instance [P i] of [b]'s body,
-    beta-reduced. *)
+(** [bounded_instance sigma b i] is the instance [P i] of [b]'s body,
+    beta-reduced. Raises nothing. *)
 let bounded_instance (sigma : Evd.evar_map) (b : bounded) (i : int) : EConstr.t =
   Reductionops.beta_applist sigma (b.pred, [ numeral (the_nat_ind ()) i ])
 ;;
 
-(** [prove env sigma goal]: decide the premise [goal], if it is closed:
-    [Proved] with how ({!proof}), [Refuted] (only after a complete search),
-    or [Unknown]. A negation [~ P] holds iff [P] is refuted; anything still
-    [Unknown] is tried with the user tactic ([MeBi Config Premise Tactic]). The deciding itself is {!decide_closed}.
-*)
+(* See the [.mli]. *)
 let rec prove (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
   : result
   =
@@ -804,9 +841,10 @@ let rec prove (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
     in
     match decided with Unknown -> by_user_tactic env sigma goal | r -> r)
 
-(** [decide_closed env sigma goal]: decide the closed, non-negated premise
-    [goal]: a bounded universal by {!decide_bounded}, anything else by the
-    constructor search ({!search_closed}). *)
+(** [decide_closed env sigma goal] is the verdict on the closed,
+    non-negated premise [goal]: a bounded universal by {!decide_bounded},
+    anything else by the constructor search ({!search_closed}). Raises
+    nothing. *)
 and decide_closed (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
   : result
   =
@@ -814,11 +852,12 @@ and decide_closed (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
   | Some b -> decide_bounded env sigma b
   | None -> search_closed env sigma goal
 
-(** [decide_bounded env sigma b]: decide each instance [P i] of [b] with
-    {!prove}, in order. [Refuted] at the first refuted instance (one is
-    enough, so the rest are not tried); [Proved ByCases] if all are proved
-    (the proof is built later, by {!premise_tac}, only if a proof asks for
-    it); otherwise [Unknown]. *)
+(** [decide_bounded env sigma b] is the verdict on the bounded universal
+    [b], each instance [P i] decided by {!prove} in order: [Refuted] at the
+    first refuted instance (one is enough, so the rest are not tried);
+    [Proved ByCases] if all are proved (the proof is built later, by
+    {!premise_tac}, only if a proof asks for it); otherwise [Unknown].
+    Raises nothing. *)
 and decide_bounded (env : Environ.env) (sigma : Evd.evar_map) (b : bounded)
   : result
   =
@@ -833,8 +872,9 @@ and decide_bounded (env : Environ.env) (sigma : Evd.evar_map) (b : bounded)
   each true (bounded_range b)
 ;;
 
-(** [bounded_counterexample env sigma ty]: if [ty] is a bounded universal
-    with a refuted instance, the {!bounded} and the first such [i]. *)
+(** [bounded_counterexample env sigma ty] is, if [ty] is a bounded
+    universal with a refuted instance, the {!type-bounded} and the first
+    such [i]; [None] otherwise. Raises nothing. *)
 let bounded_counterexample
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -851,9 +891,9 @@ let bounded_counterexample
     |> Stdlib.Option.map (fun i -> b, i))
 ;;
 
-(** [bounded_le_proof b i]: a closed proof of the hypothesis [b] puts on
-    [k = i]: [i <= n] for [<=], [S i <= n] for [<] (with [x] that left side,
-    [le_S x (n-1) (... (le_S x x (le_n x)))]). *)
+(** [bounded_le_proof b i] is a closed proof of the hypothesis [b] puts on
+    [k = i]: [i <= n] for [<=], [S i <= n] for [<] (with [x] that left
+    side, [le_S x (n-1) (... (le_S x x (le_n x)))]). Raises nothing. *)
 let bounded_le_proof (b : bounded) (i : int) : EConstr.t =
   let nat = the_nat_ind () in
   let le, u = b.le in
@@ -870,10 +910,11 @@ let bounded_le_proof (b : bounded) (i : int) : EConstr.t =
   extend (EConstr.mkApp (le_n, [| x |])) lo
 ;;
 
-(** [instantiate_bounded_hyp id b i k]: for the hypothesis [id], a
-    bounded universal [b], add its instance [id i _ : P i] as a new
-    hypothesis (by [generalize] and [intro], under a fresh name) and go on
-    with [k] on that name. *)
+(** [instantiate_bounded_hyp id b i k] is a tactic that, for the
+    hypothesis [id], a bounded universal [b], adds its instance
+    [id i _ : P i] as a new hypothesis (by [generalize] and [intro], under
+    a fresh name) and goes on with [k] on that name. Raises nothing; fails
+    (as a tactic) only if [k] does. *)
 let instantiate_bounded_hyp
       (id : Names.Id.t)
       (b : bounded)
@@ -890,24 +931,26 @@ let instantiate_bounded_hyp
     (Tactics.intro_using_then (Names.Id.of_string "H_instance") k)
 ;;
 
-(** [refute_hyp_tac id]: close the goal from hypothesis [id], which cannot
-    hold: a closed premise that [prove] refutes, or an open one that is
-    {!dead}. An inductive one is unfolded ([simpl in], so a fixpoint like
-    [In] becomes [or]/[eq]/[False]) and cleared by [inversion_clear], and
-    every goal that leaves is refuted the same way ({!refute_goal}); a
-    negation [~ P] is applied to the proof of [P]. [inversion_clear], not
-    [inversion]: a kept hypothesis is picked again forever (the Step 0
-    loop). *)
+(* See the [.mli]. *)
 let rec refute_hyp_tac ?(depth : int = !max_depth) (id : Names.Id.t)
   : unit Proofview.tactic
   =
   refute_hyp_from ~depth ~before:None id
 
-(* [before]: the hypotheses (name and type) in scope when the outermost
-   refutation started, so that {!refute_goal} can tell those it introduced.
-   Not names alone: [inversion_clear] frees a name and Rocq hands it to the
-   next premise it introduces, which then looked old and was never checked
-   (measured on the CCS ABP: a quarter of the refutations failed so). *)
+(** [refute_hyp_from ~depth ~before id] is {!refute_hyp_tac}, tracking
+    [before]: the hypotheses (name and type) in scope when the outermost
+    refutation started, so that {!refute_goal} can tell those it
+    introduced. Not names alone: [inversion_clear] frees a name and Rocq
+    hands it to the next premise it introduces, which then looked old and
+    was never checked (measured on the CCS ABP: a quarter of the refutations
+    failed so). In order: a negation is applied to the proof of its body; a
+    bounded universal is instantiated at a refuted instance and that
+    refuted; a premise only the user tactic refutes uses its proof of the
+    negation; anything else is unfolded and inverted, its goals refuted by
+    {!refute_goal}.
+
+    Raises nothing; fails (as a tactic) when [id] cannot be refuted within
+    [depth]. *)
 and refute_hyp_from
       ~(depth : int)
       ~(before : (Names.Id.t * EConstr.t) list option)
@@ -975,16 +1018,17 @@ and refute_hyp_from
          in
          if user_refuted then by_user_tactic () else by_inversion ()))
 
-(** [refute_goal ~depth ~before]: close the goal in focus, which an
-    inversion of a hypothesis that cannot hold left behind. In order: a
-    {!dead} hypothesis the refutation introduced (memoised, and where the
-    falsity usually is); a closed one [prove] refutes, anywhere in the
-    context (the only case before 2026-10-02's dead-hypothesis refutation,
-    and dear: [prove] is not memoised and runs on every hypothesis); else,
-    when the premises are only false {e together} -- a handshake's
-    [p -!n-> p'] and [q -?n-> q'], each possible for some [n], never for
-    the same one -- [inversion_clear] the newest one it introduced, which
-    fixes the shared variable in each branch, and go on. *)
+(** [refute_goal ~depth ~before] is a tactic that closes the goal in
+    focus, which an inversion of a hypothesis that cannot hold left behind.
+    In order: a {!dead} hypothesis the refutation introduced (memoised, and
+    where the falsity usually is); a closed one {!prove} refutes, anywhere
+    in the context; else, when the premises are only false {e together} --
+    a handshake's [p -!n-> p'] and [q -?n-> q'], each possible for some
+    [n], never for the same one -- [inversion_clear] the newest one it
+    introduced, which fixes the shared variable in each branch, and go on.
+
+    Raises nothing; fails (as a tactic) when none of these applies within
+    [depth]. *)
 and refute_goal ~(depth : int) ~(before : (Names.Id.t * EConstr.t) list)
   : unit Proofview.tactic
   =
@@ -1049,8 +1093,7 @@ and refute_goal ~(depth : int) ~(before : (Names.Id.t * EConstr.t) list)
           | _ -> Tacticals.tclZEROMSG (Pp.str "MeBi: no refutable premise left"))))
 ;;
 
-(** [negation_tac]: prove a goal [~ P] whose [P] [prove] refutes:
-    [intro H], then {!refute_hyp_tac} [H]. *)
+(* See the [.mli]. *)
 let negation_tac : unit Proofview.tactic =
   (* [hnf] first: [~ P] is the constant [not], not yet a product. *)
   Proofview.tclTHEN
@@ -1059,9 +1102,9 @@ let negation_tac : unit Proofview.tactic =
        refute_hyp_tac id))
 ;;
 
-(** [premises_lemma name]: the lemma [MEBI.Premises.name] (see
+(** [premises_lemma name] is the lemma [MEBI.Premises.name] (see
     [theories/Premises.v]) as a term, or [None] if that file is not
-    loaded. *)
+    loaded. Raises nothing. *)
 let premises_lemma (name : string) : EConstr.t option =
   let path =
     Names.DirPath.make (List.rev_map Names.Id.of_string [ "MEBI"; "Premises" ])
@@ -1089,8 +1132,8 @@ type bounded_lemmas =
   ; lt_S : EConstr.t
   }
 
-(** [bounded_lemmas ()]: the {!bounded_lemmas}, or [None] if
-    [MEBI.Premises] is not loaded. *)
+(** [bounded_lemmas ()] is the {!type-bounded_lemmas}, or [None] if
+    [MEBI.Premises] is not loaded. Raises nothing. *)
 let bounded_lemmas () : bounded_lemmas option =
   let ( let* ) = Stdlib.Option.bind in
   let* le_0 = premises_lemma "bounded_le_0" in
@@ -1100,8 +1143,9 @@ let bounded_lemmas () : bounded_lemmas option =
   Some { le_0; le_S; lt_0; lt_S }
 ;;
 
-(** [subproof env sigma typ tac]: run [tac] on [typ] as a proof of its own;
-    the closed proof term if [tac] completes it, [None] if it fails. *)
+(** [subproof env sigma typ tac] is the closed proof term [tac] builds for
+    [typ], run as a proof of its own, or [None] if it fails. Raises
+    nothing. *)
 let subproof
       (env : Environ.env)
       (sigma : Evd.evar_map)
@@ -1122,10 +1166,10 @@ let subproof
   | exception e when CErrors.noncritical e -> None
 ;;
 
-(** [bounded_le_chain l b instance m]: a proof of [forall k, k <= m -> P k]
-    for [b]'s [P], from [instance i], a proof of [P i] for each [i <= m]:
-    [le_S P (m-1) (... (le_0 P p0) ...) pm]. [None] if an instance has no
-    proof. *)
+(** [bounded_le_chain l b instance m] is a proof of
+    [forall k, k <= m -> P k] for [b]'s [P], built from [instance i], a
+    proof of [P i] for each [i <= m]: [le_S P (m-1) (... (le_0 P p0) ...) pm]; [None] if an instance has no proof. Raises nothing.
+*)
 let rec bounded_le_chain
           (l : bounded_lemmas)
           (b : bounded)
@@ -1144,11 +1188,11 @@ let rec bounded_le_chain
          (l.le_S, [| b.pred; numeral (the_nat_ind ()) (m - 1); rest; pm |]))
 ;;
 
-(** [bounded_proof l b instance]: a proof of the bounded universal [b] from
-    a proof of each instance ([instance i], for every [i] in
+(** [bounded_proof l b instance] is a proof of the bounded universal [b]
+    from a proof of each instance ([instance i], for every [i] in
     {!bounded_range}): for [<=], {!bounded_le_chain} up to [n]; for [<],
     [lt_0] if [n = 0] (nothing to prove), else [lt_S] on the chain up to
-    [n - 1]. [None] if an instance has no proof. *)
+    [n - 1]; [None] if an instance has no proof. Raises nothing. *)
 let bounded_proof
       (l : bounded_lemmas)
       (b : bounded)
@@ -1167,10 +1211,7 @@ let bounded_proof
       (bounded_le_chain l b instance (b.bound - 1))
 ;;
 
-(** [premise_tac ()]: prove the closed premise in focus the way {!prove}
-    decided it holds: [exact] its proof term, {!negation_tac} for a
-    negation, {!bounded_tac} for a bounded universal. Fails if [prove] does
-    not find it true. *)
+(* See the [.mli]. *)
 let rec premise_tac () : unit Proofview.tactic =
   Proofview.Goal.enter (fun gl ->
     let env = Proofview.Goal.env gl in
@@ -1182,9 +1223,12 @@ let rec premise_tac () : unit Proofview.tactic =
     | Refuted | Unknown ->
       Tacticals.tclZEROMSG (Pp.str "MeBi: cannot prove the premise"))
 
-(** [bounded_tac ()]: prove the bounded universal in focus: each instance
-    [P i] as a proof of its own, by {!premise_tac}, then the universal from
-    those ({!bounded_proof}), checked by [exact]. *)
+(** [bounded_tac ()] is a tactic that proves the bounded universal in
+    focus: each instance [P i] as a proof of its own, by {!premise_tac},
+    then the universal from those ({!bounded_proof}), checked by [exact].
+    Raises nothing; fails (as a tactic) if the goal is not a bounded
+    universal, [MEBI.Premises] is not loaded, or an instance has no
+    proof. *)
 and bounded_tac () : unit Proofview.tactic =
   Proofview.Goal.enter (fun gl ->
     let env = Proofview.Goal.env gl in
