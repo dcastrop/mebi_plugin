@@ -177,34 +177,22 @@ module Make
         c
   ;;
 
-  (** [edge_bfs closure_of new_actions from old_edges] computes [from]'s
-      weak actions, in time linear in its output rather than in the number
-      of witnesses (backlog item 3b, 2026-10-03; it replaces [edge_closure],
-      see git history). For
-      each visible label [a]: the states [t] with [from -tau*-> s -a-> t],
-      each at its shortest distance (ties: the first met, in the order
-      [edge_closure] met them), are the sources of one breadth-first search
-      over silent steps, and every state it reaches is a weak [a]-target, at
-      its shortest distance, with the path that reached it first as its
-      witness. [edge_closure] instead proposed one witness per (s, visible
-      step, state reachable from t) -- 2.3M-4.7M per state on [Proc/Test4],
-      for 5,280-7,680 weak actions: 2.9s a state, now 35ms.
-
-      Same targets and lengths as [edge_closure]; among witnesses of equal
-      length it may keep a different one (2 of the 2426 in [satdiff]; no
-      proof count changed). *)
-  let edge_bfs
+  (** [visible_sources closure_of from old_edges]: for each visible label
+      [a] of a step [from -tau*-> s -a-> t], in the order first met, the
+      states [t] so reached, each with its shortest path (most recent step
+      first), that path's length, and the order in which it was first
+      reached (its arrival index, which breaks ties between equally short
+      paths later). [closure_of] gives [from]'s silent closure. *)
+  let visible_sources
         (closure_of : State.t -> (State.t * Note.t list * int) list)
-        (new_actions : ActionMap.t')
         (from : State.t)
         (old_edges : EdgeMap.t')
-    : unit
+    : (C.Label.t * (Note.t list * int * int) StateTbl.t) list
     =
-    Logger.trace __FUNCTION__;
-    (* per label, its sources: t -> (path, length, arrival index) *)
     let labels : (C.Label.t * (Note.t list * int * int) StateTbl.t) list ref =
       ref []
     in
+    (* [sources_of l]: [l]'s table, added (at the end) if new *)
     let sources_of (l : C.Label.t) : (Note.t list * int * int) StateTbl.t =
       match List.find_opt (fun (l', _) -> C.Label.equal l l') !labels with
       | Some (_, tbl) -> tbl
@@ -239,71 +227,128 @@ module Make
             actions
             ())
       (closure_of from);
+    !labels
+  ;;
+
+  (** [silent_bfs old_edges sources]: every state reachable by silent steps
+      from the [sources] of one label ({!visible_sources}), each with its
+      shortest distance and the path that first reached it (most recent step
+      first). The search goes distance by distance; within a distance,
+      sources in order of length then arrival index, so ties go to the path
+      met first. *)
+  let silent_bfs
+        (old_edges : EdgeMap.t')
+        (sources : (Note.t list * int * int) StateTbl.t)
+    : (Note.t list * int) StateTbl.t
+    =
+    let best : (Note.t list * int) StateTbl.t = StateTbl.create 256 in
+    (* frontier by distance; within a distance, in arrival order *)
+    let buckets : (int, (State.t * Note.t list) Queue.t) Hashtbl.t =
+      Hashtbl.create 16
+    in
+    (* [push d x]: queue [x] at distance [d] *)
+    let push (d : int) (x : State.t * Note.t list) : unit =
+      match Hashtbl.find_opt buckets d with
+      | Some q -> Queue.push x q
+      | None ->
+        let q = Queue.create () in
+        Queue.push x q;
+        Hashtbl.replace buckets d q
+    in
+    StateTbl.fold
+      (fun (t : State.t) ((path, len, k) : Note.t list * int * int) acc ->
+        (len, k, t, path) :: acc)
+      sources
+      []
+    |> List.sort (fun (l, k, _, _) (l', k', _, _) ->
+      match Int.compare l l' with 0 -> Int.compare k k' | n -> n)
+    |> List.iter (fun ((len, _, t, path) : int * int * State.t * Note.t list) ->
+      StateTbl.replace best t (path, len);
+      push len (t, path));
+    let d = ref (Hashtbl.fold (fun k _ acc -> min k acc) buckets max_int) in
+    while Hashtbl.length buckets > 0 do
+      (match Hashtbl.find_opt buckets !d with
+       | None -> ()
+       | Some q ->
+         Hashtbl.remove buckets !d;
+         Queue.iter
+           (fun ((u, path) : State.t * Note.t list) ->
+             (* settled at a shorter distance by now: skip *)
+             match StateTbl.find_opt best u with
+             | Some (_, du) when du < !d -> ()
+             | _ ->
+               List.iter
+                 (fun ((a, v) : Action.t * State.t) ->
+                   match StateTbl.find_opt best v with
+                   | Some (_, dv) when dv <= !d + 1 -> ()
+                   | _ ->
+                     let p = note_of u a v :: path in
+                     StateTbl.replace best v (p, !d + 1);
+                     push (!d + 1) (v, p))
+                 (silent_steps old_edges u))
+           q);
+      incr d
+    done;
+    best
+  ;;
+
+  (** [emit_weak_actions new_actions label best]: add to [new_actions] one
+      weak action under [label] per state of [best] ({!silent_bfs}), with
+      that single state as its destination and the state's path as its
+      annotation. *)
+  let emit_weak_actions
+        (new_actions : ActionMap.t')
+        (label : C.Label.t)
+        (best : (Note.t list * int) StateTbl.t)
+    : unit
+    =
+    StateTbl.fold
+      (fun (goto : State.t) ((path, _) : Note.t list * int) acc ->
+        match annotation_of_notes (List.rev path) with
+        | None -> acc
+        | Some ann ->
+          ( ({ label; annotation = Some ann; trees = Base.Trees.empty }
+             : Action.t)
+          , States.singleton goto )
+          :: acc)
+      best
+      []
+    |> ActionPairs.of_list
+    |> ActionPairs.iter (fun ((x, ds) : Action.t * States.t) ->
+      ActionMap.update new_actions x ds)
+  ;;
+
+  (** [edge_bfs closure_of new_actions from old_edges] computes [from]'s
+      weak actions, in time linear in its output rather than in the number
+      of witnesses (backlog item 3b, 2026-10-03; it replaces [edge_closure],
+      see git history). For
+      each visible label [a]: the states [t] with [from -tau*-> s -a-> t],
+      each at its shortest distance (ties: the first met, in the order
+      [edge_closure] met them), are the sources of one breadth-first search
+      over silent steps, and every state it reaches is a weak [a]-target, at
+      its shortest distance, with the path that reached it first as its
+      witness. [edge_closure] instead proposed one witness per (s, visible
+      step, state reachable from t) -- 2.3M-4.7M per state on [Proc/Test4],
+      for 5,280-7,680 weak actions: 2.9s a state, now 35ms.
+
+      Same targets and lengths as [edge_closure]; among witnesses of equal
+      length it may keep a different one (2 of the 2426 in [satdiff]; no
+      proof count changed).
+
+      In three steps: {!visible_sources}, then per label {!silent_bfs} and
+      {!emit_weak_actions}. *)
+  let edge_bfs
+        (closure_of : State.t -> (State.t * Note.t list * int) list)
+        (new_actions : ActionMap.t')
+        (from : State.t)
+        (old_edges : EdgeMap.t')
+    : unit
+    =
+    Logger.trace __FUNCTION__;
     List.iter
       (fun ((label, sources) : C.Label.t * (Note.t list * int * int) StateTbl.t) ->
-        let best : (Note.t list * int) StateTbl.t = StateTbl.create 256 in
-        (* frontier by distance; within a distance, in arrival order *)
-        let buckets : (int, (State.t * Note.t list) Queue.t) Hashtbl.t =
-          Hashtbl.create 16
-        in
-        let push (d : int) (x : State.t * Note.t list) : unit =
-          match Hashtbl.find_opt buckets d with
-          | Some q -> Queue.push x q
-          | None ->
-            let q = Queue.create () in
-            Queue.push x q;
-            Hashtbl.replace buckets d q
-        in
-        StateTbl.fold
-          (fun (t : State.t) ((path, len, k) : Note.t list * int * int) acc ->
-            (len, k, t, path) :: acc)
-          sources
-          []
-        |> List.sort (fun (l, k, _, _) (l', k', _, _) ->
-          match Int.compare l l' with 0 -> Int.compare k k' | n -> n)
-        |> List.iter
-             (fun ((len, _, t, path) : int * int * State.t * Note.t list) ->
-             StateTbl.replace best t (path, len);
-             push len (t, path));
-        let d = ref (Hashtbl.fold (fun k _ acc -> min k acc) buckets max_int) in
-        while Hashtbl.length buckets > 0 do
-          (match Hashtbl.find_opt buckets !d with
-           | None -> ()
-           | Some q ->
-             Hashtbl.remove buckets !d;
-             Queue.iter
-               (fun ((u, path) : State.t * Note.t list) ->
-                 (* settled at a shorter distance by now: skip *)
-                 match StateTbl.find_opt best u with
-                 | Some (_, du) when du < !d -> ()
-                 | _ ->
-                   List.iter
-                     (fun ((a, v) : Action.t * State.t) ->
-                       match StateTbl.find_opt best v with
-                       | Some (_, dv) when dv <= !d + 1 -> ()
-                       | _ ->
-                         let p = note_of u a v :: path in
-                         StateTbl.replace best v (p, !d + 1);
-                         push (!d + 1) (v, p))
-                     (silent_steps old_edges u))
-               q);
-          incr d
-        done;
-        StateTbl.fold
-          (fun (goto : State.t) ((path, _) : Note.t list * int) acc ->
-            match annotation_of_notes (List.rev path) with
-            | None -> acc
-            | Some ann ->
-              ( ({ label; annotation = Some ann; trees = Base.Trees.empty }
-                 : Action.t)
-              , States.singleton goto )
-              :: acc)
-          best
-          []
-        |> ActionPairs.of_list
-        |> ActionPairs.iter (fun ((x, ds) : Action.t * States.t) ->
-          ActionMap.update new_actions x ds))
-      !labels
+        emit_weak_actions new_actions label (silent_bfs old_edges sources))
+      (visible_sources closure_of from old_edges)
   ;;
 
   (** [from]'s weak actions, or [None] if it has none. The one place a
