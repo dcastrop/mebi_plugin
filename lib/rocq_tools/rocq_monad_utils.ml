@@ -2019,8 +2019,11 @@ module Make (Enc : Encoding.S) :
         let open Syntax in
         let raw_args = args in
         let lhs_raw = (Rocq_utils.constructor_args raw_args).lhs in
-        (* Explore this LTS premise from the current evar map, its source
-           closed, then carry on with the remaining binders. *)
+        (* [explore_closed ()] is this LTS premise explored from the current
+           evar map, its source closed: the constructors of [c] that can take
+           the step ({!check_valid_constructors}), their problems crossed
+           with [acc], then {!check_updated_ctx} on the remaining binders;
+           [None] if no constructor can. *)
         let explore_closed () =
           let args = Rocq_utils.constructor_args raw_args in
           let$+ lhs env sigma = Reductionops.nf_evar sigma args.lhs in
@@ -2041,14 +2044,16 @@ module Make (Enc : Encoding.S) :
             let acc = ListOfProblems.cross_product problems acc in
             check_updated_ctx lts_enc acc indmap (substl, tl)
         in
-        (* The premise's source is open and nothing fixes it. Matching
-           constructors against an open source cannot be trusted: the first
-           match fixes it for all its siblings, so only the first constructor
-           was ever found, and a recursive one could recurse without bound.
-           Instead the premise search, which is bounded and knows when it is
-           complete, enumerates the premise, and each distinct source it finds
-           is explored as usual (note 9, option B). Until 2026-10-03 this
-           explored from the open source, with a warning. *)
+        (* [explore_sources ()] is {!explore_closed} once per source the
+           premise search finds for this premise, whose source is open and
+           fixed by nothing, each in its own sandbox, the results combined
+           ({!combine_branches}); it warns if the search was incomplete or
+           left a source open. Matching constructors against an open source
+           cannot be trusted: the first match fixes it for all its siblings,
+           so only the first constructor was ever found, and a recursive one
+           could recurse without bound. The premise search is bounded and
+           knows when it is complete (note 9, option B). Until 2026-10-03
+           this explored from the open source, with a warning. *)
         let explore_sources () =
           let$+ found env sigma =
             enumerate_sources env sigma (name, raw_args) lhs_raw
@@ -2079,6 +2084,8 @@ module Make (Enc : Encoding.S) :
           in
           return (combine_branches branches)
         in
+        (* [explore ()] is {!explore_sources} if the premise's source is
+           open under the current evar map, else {!explore_closed}. *)
         let explore () =
           let$+ lhs_open _ sigma =
             has_evars sigma (Reductionops.nf_evar sigma lhs_raw)
