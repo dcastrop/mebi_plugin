@@ -1757,6 +1757,18 @@ module Make (Enc : Encoding.S) :
           sandbox ~sigma (Constructors.axiom act tgt constructor_index acc))
     ;;
 
+    (** [combine_branches branches] is the alternatives found in
+        [branches] (one per way an LTS premise was explored; [None] where it
+        led nowhere) as one: the first one's encoding with every one's
+        problems, in order, or [None] if all are [None]. Raises nothing. *)
+    let combine_branches (branches : (Enc.t * ListOfProblems.t) option list)
+      : (Enc.t * ListOfProblems.t) option
+      =
+      match List.filter_map Fun.id branches with
+      | [] -> None
+      | (enc, _) :: _ as found -> Some (enc, List.concat_map snd found)
+    ;;
+
     (* See the [.mli]. *)
     let check_constructor_args_unify
           (lhs : EConstr.t)
@@ -1931,13 +1943,6 @@ module Make (Enc : Encoding.S) :
         let open Syntax in
         let raw_args = args in
         let lhs_raw = (Rocq_utils.constructor_args raw_args).lhs in
-        (* the alternatives found, each in its own branch, as one result *)
-        let combine branches =
-          match List.filter_map Fun.id branches with
-          | [] -> return None
-          | (enc, _) :: _ as found ->
-            return (Some (enc, List.concat_map snd found))
-        in
         (* Explore this LTS premise from the current evar map, its source
            closed, then carry on with the remaining binders. *)
         let explore_closed () =
@@ -2021,7 +2026,7 @@ module Make (Enc : Encoding.S) :
                 in
                 return (r :: acc))
           in
-          combine branches
+          return (combine_branches branches)
         in
         let explore () =
           let$+ lhs_open _ sigma =
@@ -2087,7 +2092,7 @@ module Make (Enc : Encoding.S) :
                 let* r = sandbox ~sigma:(List.nth states k) (explore ()) in
                 return (r :: acc))
           in
-          combine branches
+          return (combine_branches branches)
 
     (** [check_unknown_app lts_enc acc indmap (substl, binders) (name, args)]
         is {!check_updated_ctx} on the remaining [binders] after a premise not
