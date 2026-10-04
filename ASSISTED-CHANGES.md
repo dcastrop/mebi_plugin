@@ -5858,6 +5858,52 @@ first run's table.
 **Session tally (2026-10-04), cont.:** New feature 1 (with its `Premise
 Range` setting) · Refactor 1 (review) · Docs 1 · Tooling 1.
 
+## 2026-10-04 — `MeBi Run Bisim ... As <name>` opens the proof
+
+**New feature.** On branch `feature/bisim-opens-proof`. Item 4 of the
+agenda, as Jonah chose it ("design B"): no cache. The alternative, keeping
+`Run Bisim`'s result for a later `Sim Begin`, would have held whole FSMs in
+memory between commands (`Test4`: everything, growing during the proof
+under on-demand saturation) and gone stale when the user steps back and
+redefines a relation; rejected.
+
+**What.** `MeBi Run Bisim x With a And y With b As <name> [Using rs]`
+states `weak_bisimilar a b x y` as the `Example <name>`, opens its proof
+and runs `Sim Begin` on it (`Proof_solver.start`: interpret the statement,
+`Declare.Proof.start`, then the existing `init`). The check is done once,
+inside the command, and nothing outlives it. If the two are not bisimilar,
+`init` refuses (`Not_Bisimilar`) and no proof is opened. `Sim Begin` is
+unchanged. `As` comes before `Using`, because grammar words are not
+reserved: a `reference_list` read `As <name>` as more relations (found on
+the first try).
+
+**Review (Jonah).** The first version was `As Bisim <name>` / `As Sim
+<name>`, the latter stating `weak_sim`. Jonah asked why `Bisim` appears
+twice. It did carry a choice, but a misplaced one: `Run Bisim ... As Sim`
+succeeded on a pair that is *not* bisimilar (only similar), a similarity
+check under a command named Bisim. Now `Run Bisim ... As <name>` always
+states `weak_bisimilar`, and `weak_sim` gets its own `MeBi Run Sim` (next
+branch, with the similarity computation restricted to reachable pairs:
+`Product.simulation` starts from all |A|x|B| pairs, ~6GB a copy on
+`Test4`, which `Sim Begin` already risks on a large non-bisimilar
+`weak_sim` goal).
+
+**Tests.** `Test.v` `RunBisimAs`: a bisimilar pair, with and without
+`Using` (43 each, the same as `Example ... MeBi Sim Begin`); a
+similar-but-not-bisimilar pair refused (checked: `Not_Bisimilar`, and no
+`rp_bis` declared). Other `Test.v` counts identical; proof matrix under
+`Auto` identical (the change only adds a function); `tests.exe` 99/99.
+Mistake on the way: I inserted the new code between `guard`'s doc comment
+and `guard`, which `dune build` accepts and `make` rejects (warning 50),
+exactly the trap `CLAUDE.md` describes; `make` caught it before commit.
+Docs: README (`MeBi Sim` section), `MeBi Help Run`.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep feature/bisim-opens-proof main`).
+
+**Session tally (2026-10-04), cont.:** New feature 2 · Refactor 1 (review)
+· Docs 1 · Tooling 1.
+
 ---
 
 ## Outstanding
