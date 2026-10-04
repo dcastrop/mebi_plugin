@@ -105,7 +105,6 @@ module type S = sig
     val hyp_type : Rocq_utils.hyp -> string
     val hyp : Rocq_utils.hyp -> string
     val hyp_value : Rocq_utils.hyp -> string
-
     val econstr_bindings : EConstr.t Tactypes.bindings -> string
   end
 

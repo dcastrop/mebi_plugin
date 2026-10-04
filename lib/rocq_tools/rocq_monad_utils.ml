@@ -985,8 +985,9 @@ module Make (Enc : Encoding.S) :
     (** [mip_to_lts_constructors mip] is the constructors of the inductive
         [mip], each with its name, in order.
 
-        @raise Mip_InconsistentNumConstructors if [mip] has different numbers
-          of constructor names and types (raised here). *)
+        @raise Mip_InconsistentNumConstructors
+          if [mip] has different numbers of constructor names and types
+          (raised here). *)
     let mip_to_lts_constructors (mip : Declarations.one_inductive_body)
       : LTS.constructor array
       =
@@ -1447,7 +1448,8 @@ module Make (Enc : Encoding.S) :
       return ()
     ;;
 
-    (** [has_evars sigma x] is whether [x] has evars under [sigma]. Raises nothing. *)
+    (** [has_evars sigma x] is whether [x] has evars under [sigma]. Raises
+        nothing. *)
     let has_evars (sigma : Evd.evar_map) (x : EConstr.t) : bool =
       Bool.not (Evar.Set.is_empty (Evd.evars_of_term sigma x))
     ;;
