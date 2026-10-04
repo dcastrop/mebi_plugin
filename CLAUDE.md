@@ -30,7 +30,11 @@ exercise the proof solver end to end are the `examples/Bisimilarity/**/
 PluginProofs.v` files, which are commented out of `_CoqProject` by default
 (full proof search is slow, so a plain `make`/`dune build` skips them).
 
-To run them:
+The quickest way is `bench/proofs.sh -m auto,True,False` (and `-s abp`,
+`-s test4` for the heavy ones), which runs each file memory-capped against
+the dune build, forces the strategy without patching `api.ml`, and writes
+per-Solve tables that `bench/compare.sh` diffs between two builds; see
+`bench/README.md`. The manual route through `make`:
 
 1. Uncomment the target `PluginProofs.v` line(s) in `_CoqProject`. The six
    marked `### Success` are `Proc/Test1`, `Proc/Test2`, `Proc/Test3`,
