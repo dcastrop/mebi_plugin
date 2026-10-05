@@ -4,9 +4,13 @@ module type S = sig
   type tree
   type trees
 
+  (** The monad and Rocq utilities over this encoding. *)
   module M : Rocq_monad_utils.S with type enc = enc and type tree = tree
+
+  (** Where constructors' binders sit ({!Bindings}). *)
   module Bindings : Bindings.S with type 'a mm = 'a M.mm
 
+  (** Constructors' explicit bindings for proofs ({!Constructor_bindings}). *)
   module ConstructorBindings :
     Constructor_bindings.S
     with type 'a mm = 'a M.mm
@@ -15,6 +19,7 @@ module type S = sig
      and type bindings = Bindings.t
      and type constrmap = Bindings.ConstrMap.t'
 
+  (** The model: LTSs, FSMs and their algorithms ({!Model}). *)
   module Model :
     Model.S
     with type base = enc
@@ -22,6 +27,7 @@ module type S = sig
      and type trees = trees
      and type constructorbindings = ConstructorBindings.t
 
+  (** The model printed with its Rocq terms ({!Decoder}). *)
   module Decode :
     Decoder.S
     with type enc = enc
@@ -46,23 +52,33 @@ module type S = sig
      and type result = Model.Bisimilarity.Result.t
      and type bisimilarity = Model.Bisimilarity.t
 
+  (** The plugin's theory terms, by encoding ({!Theories_enc}). *)
   module Theory :
     Theories_enc.S
     with type enc = enc
      and type 'a mm = 'a M.mm
      and type 'a im = 'a M.mm
 
+  (** Silent labels ({!Weak}). *)
   module Weak : Weak.S with type enc = enc
 
+  (** The configuration loaded for a command ({!Config_loader}). *)
   module Config :
     Config_loader.S with type weak = Weak.t and type 'a mm = 'a M.mm
 
+  (** [result_log ?decode enc dec] is the printer to log a result with:
+      [dec], showing Rocq terms, when [decode] (the default) and
+      [DecodeResults] are on; [enc], showing encodings, otherwise. Raises
+      nothing. *)
   val result_log
     :  ?decode:bool
     -> (module Json.S with type k = 'a)
     -> (module Json.S with type k = 'a)
     -> (module Json.S with type k = 'a)
 
+  (** [handle_results k s x printer] logs [x] at the kind [k] under the
+      title [s], and, for a [Result] with [DumpResults] on, writes it as JSON
+      into [./_dumps/]. Raises whatever [printer] raises (propagated). *)
   val handle_results
     :  Output.Kind.t
     -> string
@@ -70,6 +86,16 @@ module type S = sig
     -> (module Json.S with type k = 'a)
     -> unit
 
+  (** [extract_lts lts t using weak] is the LTS of the term [t] by the
+      relation [lts] ({!Graph.S.build}, then {!Graph.S.extract}), marked
+      incomplete if any premise was approximated, and checked against the
+      [FailIf] flags.
+
+      @raise Rocq_monad_utils.S.Errors.MEBI_exn
+        when run, for an empty LTS (with [FailIf Empty]) or an incomplete
+        one (with [FailIf Incomplete], the default) (raised here, via
+        {!Rocq_monad_utils.S.Err}). Also raises what {!Graph.S.build}
+        raises (propagated). *)
   val extract_lts
     :  Libnames.qualid
     -> Constrexpr.constr_expr
@@ -77,15 +103,22 @@ module type S = sig
     -> Weak.t option
     -> Model.LTS.t M.mm
 
-  (** [similarity r]: for a bisimilarity check's result [r], the greatest
+  (** [similarity r] is, for a bisimilarity check's result [r], the greatest
       weak simulation from FSM a to FSM b among the pairs reachable from
       their start states ({!Model.Product.simulation}), or [None] if either
       FSM has no start state. When an FSM is saturated on demand, that walk
-      saturates state after state, so it needs [MeBi Config Bounds Game <n>] and stays within it: without the bound, or past it, it is a user
-      error saying how to allow it. *)
+      saturates state after state, so it needs [MeBi Config Bounds Game <n>]
+      and stays within it.
+
+      Raises Rocq's [UserError] when an FSM is saturated on demand and no
+      game bound is set, or the game is larger than it (raised here). *)
   val similarity : Model.Bisimilarity.t -> Model.Product.Pair.Set.t option
 
+  (** The [MeBi Run] commands. *)
   module Command : sig
+    (** [build_lts ?weak lts t using] is {!extract_lts}, with the first
+        system's silent label when [weak] is not given. Raises as
+        {!extract_lts}, when run. *)
     val build_lts
       :  ?weak:Weak.t option
       -> Libnames.qualid
@@ -93,6 +126,8 @@ module type S = sig
       -> Libnames.qualid list
       -> Model.LTS.t M.mm
 
+    (** [build_fsm ?weak lts t using] is {!build_lts} as an FSM. Raises as
+        {!extract_lts}, when run. *)
     val build_fsm
       :  ?weak:Weak.t option
       -> Libnames.qualid
@@ -100,6 +135,8 @@ module type S = sig
       -> Libnames.qualid list
       -> Model.FSM.t M.mm
 
+    (** A [MeBi Run] command: what to build or check, from which term and
+        relation. *)
     type t =
       | MakeLTS of rocq_args
       | MakeFSM of rocq_args
@@ -117,61 +154,102 @@ module type S = sig
       ; b : rocq_args
       }
 
+    (** [do_make_lts (t, lts) using] logs the LTS of [t] ([MeBi Run LTS]).
+        [None]. Raises as {!extract_lts}, when run. *)
     val do_make_lts
       :  Constrexpr.constr_expr * Libnames.qualid
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
+    (** [do_make_fsm (t, lts) using] logs the FSM of [t] ([MeBi Run FSM]).
+        [None]. Raises as {!extract_lts}, when run. *)
     val do_make_fsm
       :  Constrexpr.constr_expr * Libnames.qualid
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
+    (** [do_saturate (t, lts) using] logs the FSM of [t], saturated
+        ([MeBi Run Saturate]). [None].
+
+        @raise Rocq_monad_utils.S.Errors.MEBI_exn
+          when run, if saturation would pass the saturation bound and
+          [FailIf Oversaturated] is set (raised here). Also raises as
+          {!extract_lts}. *)
     val do_saturate
       :  Constrexpr.constr_expr * Libnames.qualid
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
+    (** [do_minimize (t, lts) using] logs the FSM of [t] and its minimised
+        partition ([MeBi Run Minimize]). [None]. Raises as {!do_saturate}, when
+        run. *)
     val do_minimize
       :  Constrexpr.constr_expr * Libnames.qualid
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
+    (** [build_fsms a b using] is the FSMs of the two systems [a] and [b],
+        each with its own silent label, logged. Raises as {!extract_lts},
+        when run. *)
     val build_fsms
       :  rocq_args
       -> rocq_args
       -> Libnames.qualid list
       -> (Model.FSM.t * Model.FSM.t) M.mm
 
+    (** [do_merge {a; b} using] logs the two systems' FSMs merged into one
+        ([MeBi Run Merge]), [b]'s states renamed apart where they conflict.
+        [None]. Raises as {!extract_lts}, when run. *)
     val do_merge
       :  rocq_pair
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
+    (** [do_check_bisim {a; b} using] is the weak bisimilarity check of the
+        two systems ([MeBi Run Bisim]), each saturated, on demand when too
+        large; the FSMs and the result are logged.
+
+        @raise Rocq_monad_utils.S.Errors.MEBI_exn
+          when run, if they are not bisimilar and [FailIf NotBisimilar] is
+          set (the default) (raised here). Also raises as {!extract_lts}
+          and, when the two systems share states that move differently,
+          Rocq's [UserError]. *)
     val do_check_bisim
       :  rocq_pair
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
-    (** [do_check_sim { a; b } refs]: decide whether [a]'s term is weakly
-        simulated by [b]'s ([MeBi Run Sim]), reporting the verdict. Bisimilar
-        states are similar outright; otherwise {!similarity} decides. Not
-        similar is an error under [MeBi Config FailIf NotBisimilar True]
-        (the default), else a warning. *)
+    (** [do_check_sim { a; b } using] decides whether [a]'s term is weakly
+        simulated by [b]'s ([MeBi Run Sim]), reporting the verdict: bisimilar
+        states are similar outright; otherwise {!similarity} decides.
+
+        Raises Rocq's [UserError] when they are not similar and [FailIf NotBisimilar] is set (the default; a warning otherwise), and as
+        {!similarity} (raised here). Also raises as {!do_check_bisim}'s
+        checks, apart from the verdict. *)
     val do_check_sim
       :  rocq_pair
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
-    (** [do_benchmark_graph ((xs, primary_lts), (time, repeat)) refs] is always [None]. This command is similar to {!val:do_make_lts} except that it can handle a list of [xs] that each use the same [primary_lts] and [refs]. {i {b Note:} We use {!Rocq_utils.extract_benchmark_args} to obtain the list of xs, as [g_mebi] only knows it to be a [constr] (i.e., a [Constrexpr.constr_expr]).} {b Param [time]} is the {i minimum} run time per iteration and {b Param [repeat]} is the number of times to repeat each of the benchmarks. {i See {!Benchmarking}.}
-    *)
+    (** [do_benchmark_graph ((ts, lts), (time, repeat)) using] times the LTS
+        extraction of each term of the list [ts] (or of [ts] alone, if it is
+        not a list) by [lts], each run for at least [time] seconds, [repeat]
+        times ({!Benchmarking}), and logs the samples ([MeBi Benchmark]).
+        [None].
+
+        Raises, when run, [NothingToBenchmark] for a list type that is not
+        Rocq's [list] (raised here), and as {!extract_lts}. *)
     val do_benchmark_graph
       :  rocq_args * (int * int)
       -> Libnames.qualid list
       -> Decode.bisimilarity option M.mm
 
-    (** [run refs x] is the entrypoint of {!Command}. {b Param [refs]} is a list of {b Rocq} inductive-LTS that may be used for the upper layers of a {i multi-layered} LTS. {b Param [x]} is a {!t} that specifies the command to be run.
-    *)
+    (** [run using x] runs the command [x], with the relations [using]
+        available to constructors' premises, after loading the bounds and
+        silent labels configured: a bisimilarity result for [CheckBisim] and
+        [CheckSim], [None] otherwise.
+
+        Raises as the command it runs, when run (propagated). *)
     val run : Libnames.qualid list -> t -> Model.Bisimilarity.t option M.mm
   end
 end
@@ -183,6 +261,8 @@ module Make (Enc : Encoding.S) :
    and type tree = Enc.Tree.t
    and type trees = Enc.Trees.t
 
+(** [make ?enc ()] is a new wrapper over the encoding [enc ()] (by default
+    {!Api.make_enc_int}). Raises nothing. *)
 val make : ?enc:(unit -> (module Encoding.S)) -> unit -> (module S)
 
 (** The shared instance the [MeBi ...] vernaculars run against, created on first

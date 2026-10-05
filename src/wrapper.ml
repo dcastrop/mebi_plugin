@@ -77,12 +77,6 @@ module type S = sig
     -> Weak.t option
     -> Model.LTS.t M.mm
 
-  (** [similarity r]: for a bisimilarity check's result [r], the greatest
-      weak simulation from FSM a to FSM b among the pairs reachable from
-      their start states ({!Model.Product.simulation}), or [None] if either
-      FSM has no start state. When an FSM is saturated on demand, that walk
-      saturates state after state, so it needs [MeBi Config Bounds Game <n>] and stays within it: without the bound, or past it, it is a user
-      error saying how to allow it. *)
   val similarity : Model.Bisimilarity.t -> Model.Product.Pair.Set.t option
 
   module Command : sig
@@ -153,11 +147,6 @@ module type S = sig
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
-    (** [do_check_sim { a; b } refs]: decide whether [a]'s term is weakly
-        simulated by [b]'s ([MeBi Run Sim]), reporting the verdict. Bisimilar
-        states are similar outright; otherwise {!similarity} decides. Not
-        similar is an error under [MeBi Config FailIf NotBisimilar True]
-        (the default), else a warning. *)
     val do_check_sim
       :  rocq_pair
       -> Libnames.qualid list
@@ -190,32 +179,33 @@ module Make (Enc : Encoding.S) :
      whole module tree with a differently-configured logger (Logger.ReMake),
      which is why the attempt that lived here was left commented out. *)
 
-  (** [module M] ... *)
+  (* See the [.mli]. *)
   module M = Rocq_monad_utils.Make (Enc)
 
-  (** [module Bindings] ... *)
+  (* See the [.mli]. *)
   module Bindings = Bindings.Make (M)
 
-  (** [module ConstructorBindings] ... *)
+  (* See the [.mli]. *)
   module ConstructorBindings = Constructor_bindings.Make (M) (Bindings)
 
-  (** [module Model] ... *)
+  (* See the [.mli]. *)
   module Model = Model.Make (Enc) (ConstructorBindings)
-
   module LTS = Model.LTS
   module FSM = Model.FSM
 
-  (** [module Decode] handles obtaining [EConstr.t] from [module M]. *)
+  (* See the [.mli]. *)
   module Decode = Decoder.Make (Enc) (M) (ConstructorBindings) (Model)
 
-  (** [module Theory] ... *)
+  (* See the [.mli]. *)
   module Theory = Theories_enc.Make (Enc) (M) (M) (Theories.Make (Enc) (M))
 
-  (** [module Weak] ... *)
+  (* See the [.mli]. *)
   module Weak = Weak.Make (Enc) (M)
 
+  (* See the [.mli]. *)
   module Config = Config_loader.Make (Enc) (M) (Weak)
 
+  (* See the [.mli]. *)
   let result_log
         ?(decode : bool = true)
         (type a)
@@ -231,6 +221,7 @@ module Make (Enc : Encoding.S) :
     (module E : Json.S with type k = a)
   ;;
 
+  (* See the [.mli]. *)
   let handle_results
         (type a)
         (m : Output.Kind.t)
@@ -245,10 +236,15 @@ module Make (Enc : Encoding.S) :
     | _ -> ()
   ;;
 
-  (** [approximations] are what made [x] approximate (see
-      {!Rocq_monad_utils.Approximations}), and [x] is then already marked
-      incomplete; [cut_short] is whether exploration also stopped at the
-      bound. *)
+  (** [check_if_lts_fail ?approximations ?cut_short x] does nothing unless
+      the [FailIf] flags make [x] an error: an empty LTS (one state at most,
+      no transitions) with [FailIf Empty], or an incomplete one with [FailIf Incomplete]. The error says why: exploration was [cut_short] by the
+      bound (the default), or [approximations] (see
+      {!Rocq_monad_utils.Approximations}) made [x] approximate, or both.
+
+      @raise Rocq_monad_utils.S.Errors.MEBI_exn
+        for an empty or incomplete LTS under those flags (raised here, via
+        {!Rocq_monad_utils.S.Err}). *)
   let check_if_lts_fail
         ?(approximations : string list = [])
         ?(cut_short : bool = true)
@@ -317,12 +313,17 @@ module Make (Enc : Encoding.S) :
     else ()
   ;;
 
-  (** Guards every saturation: computes, without saturating, how many weak
-      actions saturating [x] would produce ({!Model.SaturationEstimate}), and
-      refuses past [Api.the_saturation_bound] -- or, with [MeBi Config FailIf Oversaturated False], warns and carries on. Saturating [Proc/Test4]
-      (74.6M weak actions) exhausted a 15GB machine; this says so up front.
-      A no-op for an FSM with no silent labels, which saturation leaves
-      unchanged. *)
+  (** [check_saturation_size name x] guards a saturation: it estimates,
+      without saturating, how many weak actions saturating [x] would produce
+      ({!Model.SaturationEstimate}), and refuses past
+      {!Api.the_saturation_bound} -- or, with [FailIf Oversaturated False],
+      warns. Saturating [Proc/Test4] (74.6M weak actions) exhausted a 15GB
+      machine; this says so up front. Does nothing for an FSM with no silent
+      labels.
+
+      @raise Rocq_monad_utils.S.Errors.MEBI_exn
+        if saturation would pass the bound and [FailIf Oversaturated] is set
+        (raised here). *)
   let check_saturation_size (name : string) (x : FSM.t) : unit =
     if Model.FSM.is_weak_mode x
     then (
@@ -357,11 +358,14 @@ module Make (Enc : Encoding.S) :
         else Logger.warning (String.capitalize_ascii msg)))
   ;;
 
-  (** Whether the bisimilarity check saturates [x] on demand
-      ({!Api.the_saturation_mode}; notes/13). Under [Auto], exactly when
-      saturating it whole would exceed the saturation bound -- which used to
-      be an error -- and then it warns: the result is the same, the cost
-      profile is not. Under [Whole], the guard as before. *)
+  (** [on_demand_for name x] is whether the bisimilarity check saturates [x]
+      on demand ({!Api.the_saturation_mode}; notes/13): under [Auto], when
+      saturating it whole would pass the saturation bound -- which used to be
+      an error -- and then it warns; under [On_demand], always; under
+      [Whole], never, with {!check_saturation_size}'s guard instead.
+
+      @raise Rocq_monad_utils.S.Errors.MEBI_exn
+        as {!check_saturation_size}, under [Whole]. *)
   let on_demand_for (name : string) (x : FSM.t) : bool =
     if Bool.not (Model.FSM.is_weak_mode x)
     then false
@@ -413,6 +417,9 @@ module Make (Enc : Encoding.S) :
         else false)
   ;;
 
+  (** [make_graph_args ()] is the tables and bounds a graph is explored
+      with: fresh tables keyed by encoding, and the bounds now configured.
+      Raises nothing. *)
   let make_graph_args ()
     : (module Graph_type.Args with type enc = Enc.t and type tree = Enc.Tree.t)
     =
@@ -432,10 +439,12 @@ module Make (Enc : Encoding.S) :
        and type tree = Enc.Tree.t)
   ;;
 
+  (** The graph explorer over the tables [X]. *)
   module G
       (X : Graph_type.Args with type enc = Enc.t and type tree = Enc.Tree.t) =
     Graph.Make (Enc) (M) (Weak) (Theory) (ConstructorBindings) (Model) (X)
 
+  (* See the [.mli]. *)
   let extract_lts
         (primary_lts : Libnames.qualid)
         (init : Constrexpr.constr_expr)
@@ -470,6 +479,7 @@ module Make (Enc : Encoding.S) :
     M.return the_lts
   ;;
 
+  (* See the [.mli]. *)
   let similarity (r : Model.Bisimilarity.t) : Model.Product.Pair.Set.t option =
     Logger.trace __FUNCTION__;
     let a : FSM.t = r.fsm_a.original in
@@ -514,6 +524,7 @@ module Make (Enc : Encoding.S) :
   ;;
 
   module Command = struct
+    (* See the [.mli]. *)
     let build_lts
           ?(weak : Weak.t option = None)
           (primary_lts : Libnames.qualid)
@@ -525,6 +536,7 @@ module Make (Enc : Encoding.S) :
       Config.get_weak weak |> extract_lts primary_lts init names
     ;;
 
+    (* See the [.mli]. *)
     let build_fsm
           ?(weak : Weak.t option = None)
           (primary_lts : Libnames.qualid)
@@ -538,6 +550,7 @@ module Make (Enc : Encoding.S) :
       Model.FSM.of_lts the_lts |> M.return
     ;;
 
+    (* See the [.mli]. *)
     let do_make_lts (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
       Logger.trace __FUNCTION__;
       let open M.Syntax in
@@ -548,6 +561,7 @@ module Make (Enc : Encoding.S) :
       M.return None
     ;;
 
+    (* See the [.mli]. *)
     let do_make_fsm (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
       Logger.trace __FUNCTION__;
       Logger.info "Making FSM (from extracted LTS)...";
@@ -558,6 +572,7 @@ module Make (Enc : Encoding.S) :
       M.return None
     ;;
 
+    (* See the [.mli]. *)
     let do_saturate (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
       Logger.trace __FUNCTION__;
       Logger.info "Making FSM (from extracted LTS)...";
@@ -573,6 +588,7 @@ module Make (Enc : Encoding.S) :
       M.return None
     ;;
 
+    (* See the [.mli]. *)
     let do_minimize (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
       Logger.trace __FUNCTION__;
       Logger.info "Making FSM (from extracted LTS)...";
@@ -589,6 +605,7 @@ module Make (Enc : Encoding.S) :
       M.return None
     ;;
 
+    (* See the [.mli]. *)
     type t =
       | MakeLTS of rocq_args
       | MakeFSM of rocq_args
@@ -606,6 +623,7 @@ module Make (Enc : Encoding.S) :
       ; b : rocq_args
       }
 
+    (* See the [.mli]. *)
     let build_fsms
           ((ax, alts) : rocq_args)
           ((bx, blts) : rocq_args)
@@ -628,11 +646,14 @@ module Make (Enc : Encoding.S) :
       M.return (the_fsm_a, the_fsm_b)
     ;;
 
-    (** Refuses two FSMs that share a state behaving differently on each side
-        ({!Model.Bisimilarity.conflicts}): merged, it would be one state, and
-        the verdict could be wrong (2026-10-03: [a] and [b] were reported
-        bisimilar). Sharing states with the same moves -- both sides using
-        the same relation -- is exact, and allowed. *)
+    (** [refuse_conflicts a b] does nothing unless [a] and [b] share a state
+        that moves differently on each side ({!Model.Bisimilarity.conflicts}):
+        merged, it would be one state, and the verdict could be wrong
+        (2026-10-03: [a] and [b] were reported bisimilar). Sharing states
+        with the same moves -- both sides using the same relation -- is
+        exact, and allowed.
+
+        Raises Rocq's [UserError] on such a state, when run (raised here). *)
     let refuse_conflicts (the_fsm_a : FSM.t) (the_fsm_b : FSM.t) : unit M.mm =
       let c : Model.State.Set.t =
         Model.Bisimilarity.conflicts the_fsm_a the_fsm_b
@@ -660,14 +681,14 @@ module Make (Enc : Encoding.S) :
                   example)))
     ;;
 
-    (** When [a] and [b] share states that move differently on each side,
-        [b]'s copies of {e all} the shared states are renamed apart: each gets
-        a fresh encoding that decodes to the same term ([M.alias]), so the
-        merge keeps them distinct while proofs and output still read the
-        right terms. All, not only the conflicting ones: a shared state with
-        the same moves on both sides may lead to a conflicting one, and would
-        then differ once that one is renamed on one side only. With no
-        conflict (both sides one relation) [b] is returned unchanged. *)
+    (** [separate a b] is [b] with its copies of {e all} the states it shares
+        with [a] renamed apart, if any of them moves differently on each
+        side; [b] itself otherwise. Each gets a fresh encoding that decodes to
+        the same term ({!Rocq_monad_utils.S.alias}), so the merge keeps them
+        distinct while proofs and output still read the right terms. All,
+        not only the conflicting ones: a shared state with the same moves on
+        both sides may lead to a conflicting one, and would then differ once
+        that one is renamed on one side only. Raises nothing. *)
     let separate (the_fsm_a : FSM.t) (the_fsm_b : FSM.t) : FSM.t =
       let c = Model.Bisimilarity.conflicts the_fsm_a the_fsm_b in
       if Model.State.Set.is_empty c
@@ -696,6 +717,7 @@ module Make (Enc : Encoding.S) :
           the_fsm_b)
     ;;
 
+    (* See the [.mli]. *)
     let do_merge { a; b } refs : Model.Bisimilarity.t option M.mm =
       Logger.trace __FUNCTION__;
       let open M.Syntax in
@@ -709,6 +731,10 @@ module Make (Enc : Encoding.S) :
       M.return None
     ;;
 
+    (** [fail_if_not_bisim r] does nothing unless [r] says the two systems are
+        not bisimilar and [FailIf NotBisimilar] is set; then it logs [r].
+
+        @raise Rocq_monad_utils.S.Errors.MEBI_exn in that case (raised here). *)
     let fail_if_not_bisim (x : Model.Bisimilarity.Result.t) : unit =
       if !Api.the_fail_flags.non_bisimilar
       then
@@ -719,10 +745,14 @@ module Make (Enc : Encoding.S) :
           M.Err.not_bisimilar ())
     ;;
 
-    (* [bisimilarity_of { a; b } refs]: build both FSMs, saturate them (on
-       demand above the saturation bound) and check them for weak
-       bisimilarity, logging the FSMs and the result. No verdict check: see
-       {!do_check_bisim} and {!do_check_sim}. *)
+    (** [bisimilarity_of {a; b} using] is the weak bisimilarity check of the
+        two systems: both FSMs built, [b]'s conflicting states renamed apart,
+        each saturated (on demand above the saturation bound), and the FSMs
+        and the result logged. No verdict check: see {!do_check_bisim} and
+        {!do_check_sim}.
+
+        Raises, when run, as {!build_fsms}, {!refuse_conflicts} and
+        {!on_demand_for} (propagated). *)
     let bisimilarity_of { a; b } refs : Model.Bisimilarity.t M.mm =
       Logger.trace __FUNCTION__;
       let open M.Syntax in
@@ -752,6 +782,7 @@ module Make (Enc : Encoding.S) :
       M.return result
     ;;
 
+    (* See the [.mli]. *)
     let do_check_bisim (args : rocq_pair) refs
       : Model.Bisimilarity.t option M.mm
       =
@@ -762,6 +793,7 @@ module Make (Enc : Encoding.S) :
       M.return (Some result)
     ;;
 
+    (* See the [.mli]. *)
     let do_check_sim (args : rocq_pair) refs : Model.Bisimilarity.t option M.mm =
       Logger.trace __FUNCTION__;
       let open M.Syntax in
@@ -806,6 +838,8 @@ module Make (Enc : Encoding.S) :
       M.return (Some result)
     ;;
 
+    (** Raised by {!extract_benchmark_args}: a list type that is not Rocq's
+        [list]. *)
     exception NothingToBenchmark
 
     let _log_kinds ?(__FUNCTION__ : string = "") (x : EConstr.t) : unit M.mm =
@@ -816,6 +850,12 @@ module Make (Enc : Encoding.S) :
         sigma, ())
     ;;
 
+    (** [extract_benchmark_args xs] is the elements of the Rocq list [xs], or
+        [[xs]] if it is not a list.
+
+        @raise NothingToBenchmark
+          when run, if [xs]'s type is an application that is not [list]
+          (raised here). *)
     let rec extract_benchmark_args (xs : EConstr.t) : EConstr.t list M.mm =
       Logger.debug __FUNCTION__;
       let open M.Syntax in
@@ -838,9 +878,11 @@ module Make (Enc : Encoding.S) :
         M.return [ xs ]
     ;;
 
+    (** A benchmark case: its name, what it times, and its argument. *)
     type graph_benchmark =
       string * (Constrexpr.constr_expr -> LTS.t) * Constrexpr.constr_expr
 
+    (* See the [.mli]. *)
     let do_benchmark_graph
           (((xs, primary_lts), (time, repeat)) : rocq_args * (int * int))
           refs
@@ -868,6 +910,7 @@ module Make (Enc : Encoding.S) :
       M.return None
     ;;
 
+    (* See the [.mli]. *)
     let run (refs : Libnames.qualid list) (x : t)
       : Model.Bisimilarity.t option M.mm
       =
@@ -888,13 +931,8 @@ module Make (Enc : Encoding.S) :
   end
 end
 
-(** [make ?enc ?ctx] constructs a [Wrapper.S] module.
-    @param ?enc
-      is a function returning a [module Encoding.S]. The default encoding uses [Int.t].
-    @param ?ctx is the rocq-context.
-
-    There is no longer a [?log]: output goes through [Logger] against the sink
-    installed at plugin load, so a wrapper no longer carries a logger. *)
+(* See the [.mli]. There is no [?log]: output goes through [Logger] against
+   the sink installed at plugin load. *)
 let make ?(enc : unit -> (module Encoding.S) = Api.make_enc_int) () : (module S)
   =
   let module Enc : Encoding.S = (val enc ()) in
