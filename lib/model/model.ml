@@ -71,7 +71,8 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) = struct
   module C = Components.Make (Base) (ConstructorBindings)
   include C
 
-  (* TODO: the idea of [Traces] needs to be revisited. It does provide optimizations to examples with a lot of silent actions, where the saturated FSM is considerably larger, but i believe that there are areas where this can still be improved. *)
+  (* Each algorithm is a functor over the components and the models it
+     needs; the order is their dependency order. *)
   module LTS = LTS.Make (C)
   module Saturation = Saturation.Make (Base) (C)
   module FSM = FSM.Make (C) (LTS) (Saturation)

@@ -25,27 +25,8 @@ module type S = sig
   val merge : t -> t -> t
   val is_weak_mode : t -> bool
   val saturate : ?only_if_weak:bool -> t -> t
-
-  (** [ensure x s] makes [x.edges] hold [s]'s edges: a no-op unless [x] is
-      saturated on demand. Every read of a saturated FSM's edges for one
-      state goes through it. *)
   val ensure : t -> state -> unit
-
-  (** [saturate_on_demand ~budget x] is [saturate x] without the up-front
-      cost: each state is saturated when first asked about ({!ensure}), from
-      the same code as {!saturate}, so with the same weak actions and
-      witnesses. At most about [budget] weak actions are held at a time
-      (default 1,000,000), the oldest states dropped first and recomputed if
-      asked about again. [terminals] stays [x]'s: states that only become
-      terminal by saturating are not found without saturating them. For FSMs
-      too large to saturate whole ({!Saturation_estimate}); see
-      [notes/13]. *)
   val saturate_on_demand : ?budget:int -> t -> t
-
-  (** [rename f x] is [x] with every state [s] replaced by [f s]: states,
-      initial state, terminals, and edges (sources and destinations). For an
-      FSM as extracted, before saturation: annotations, which name states,
-      are left as they are. *)
   val rename : (state -> state) -> t -> t
 end
 
@@ -115,6 +96,7 @@ module Make
       ;;
     end)
 
+  (* See the [.mli]. *)
   let of_lts (x : LTS.t) : t =
     Logger.trace __FUNCTION__;
     { init = x.init
@@ -127,6 +109,7 @@ module Make
     }
   ;;
 
+  (* See the [.mli]. *)
   let merge (a : t) (b : t) : t =
     let init : State.t option = None in
     let terminals : States.t = States.union a.terminals b.terminals in
@@ -146,10 +129,12 @@ module Make
     { init; terminals; alphabet; states; edges; info; fill }
   ;;
 
+  (* See the [.mli]. *)
   let is_weak_mode (x : t) : bool =
     Bool.not (Labels.is_empty x.info.weak_labels)
   ;;
 
+  (* See the [.mli]. *)
   let saturate ?(only_if_weak : bool = true) (x : t) : t =
     Logger.trace __FUNCTION__;
     if only_if_weak && Bool.not (is_weak_mode x)
@@ -163,12 +148,17 @@ module Make
       { x with edges; terminals = States.union x.terminals terminals' })
   ;;
 
+  (* See the [.mli]. *)
   let ensure (x : t) (s : State.t) : unit =
     match x.fill with None -> () | Some f -> f s
   ;;
 
   module StateTbl = Hashtbl.Make (C.State)
 
+  (* See the [.mli]. The edges held live in a fresh table that [fill]
+     fills one state at a time, counting the weak actions held and
+     dropping the oldest states past [budget]; [none] remembers states with
+     no weak action, so they are not recomputed. *)
   let saturate_on_demand ?(budget : int = 1_000_000) (x : t) : t =
     Logger.trace __FUNCTION__;
     if Bool.not (is_weak_mode x)
@@ -180,6 +170,9 @@ module Make
       let none : unit StateTbl.t = StateTbl.create 64 in
       let held : int ref = ref 0 in
       let order : State.t Queue.t = Queue.create () in
+      (* [fill s] does nothing if [s] is held or known to have no weak
+         action; else it saturates [s], holds its weak actions, and drops
+         the oldest held states while more than [budget] actions are held. *)
       let fill (s : State.t) : unit =
         if Bool.not (EdgeMap.mem edges s || StateTbl.mem none s)
         then (
@@ -202,17 +195,27 @@ module Make
       { x with edges; fill = Some fill })
   ;;
 
+  (** [rename_destinations f actions] is a new action table with the
+      actions of [actions], each destination [d] replaced by [f d]. Raises
+      nothing. *)
+  let rename_destinations (f : State.t -> State.t) (actions : C.Action.Map.t')
+    : C.Action.Map.t'
+    =
+    let renamed : C.Action.Map.t' = C.Action.Map.create 0 in
+    C.Action.Map.iter
+      (fun (a : C.Action.t) (ds : States.t) ->
+        C.Action.Map.update renamed a (States.map f ds))
+      actions;
+    renamed
+  ;;
+
+  (* See the [.mli]. *)
   let rename (f : State.t -> State.t) (x : t) : t =
     Logger.trace __FUNCTION__;
     let edges : EdgeMap.t' = EdgeMap.create (EdgeMap.length x.edges) in
     EdgeMap.iter
       (fun (from : State.t) (actions : C.Action.Map.t') ->
-        let renamed : C.Action.Map.t' = C.Action.Map.create 0 in
-        C.Action.Map.iter
-          (fun (a : C.Action.t) (ds : States.t) ->
-            C.Action.Map.update renamed a (States.map f ds))
-          actions;
-        EdgeMap.replace edges (f from) renamed)
+        EdgeMap.replace edges (f from) (rename_destinations f actions))
       x.edges;
     { x with
       init = Stdlib.Option.map f x.init

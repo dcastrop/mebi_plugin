@@ -6273,6 +6273,64 @@ with 702 warnings (baseline for the cross-reference pass).
 
 ---
 
+## 2026-10-05 — Documentation pass, part 3: `lib/model`
+
+**Docs + Refactor.** On branch `docs/model-components`, after Jonah's go
+("merge once CI is green, then continue onto the next pass"; PR #40 merged).
+
+**Comments** (`ac65dbb`; comments only, code unchanged with comments
+stripped). `components.ml` has no `.mli`, so its signatures carry the
+contracts, the implementations point to them, and each signature says what
+its type stands for. `FSM.mli`'s older contracts restyled, and the copies
+of three of them in `FSM.ml`'s own signature removed (two copies drift).
+`model.mli`'s stub comments for `LTS` and `FSM` ("{!LTS} has an", "{!FSM}
+...") written, and a stale TODO in `model.ml` about `Traces`, deleted
+2026-09-28, replaced.
+
+**Found, recorded in `TODO.md`, not fixed** (`1064d83`): `Label.compare`
+is not a total order (`is_silent` compared only when both labels know
+it); `Action.Map.update` means to merge the derivation trees of equal
+actions but, since `Action.equal` compares trees, never does -- and the
+proof solver relies on that (`MultipleDerivations`), so it needs a
+decision.
+
+**Dead code removed** (`c85bc64`): 23 functions of the component
+signatures had no callers, among them `Action.Pair.try_update` and
+`merge_lists` (unused since the 2026-09-28 saturation rewrite) and four
+`EdgeMap` functions; the `Edge` component, used only by those, went too.
+
+**odoc references** (`a506314`): pointers and mentions in the new
+comments became `{!...}` references, at Jonah's request (2026-10-05); a
+backlog item covers the earlier libraries.
+
+**Splits**, one commit each: `with_trees_of` (from `Action.Map.update`),
+`action_of_transition` (from `EdgeMap.of_transitions`),
+`rename_destinations` (from `FSM.rename`).
+
+**Mistake on the way.** I split four functions (`try_update`,
+`merge_list`, `get_edges`/`to_edges`, `extrapolate`) before checking that
+anything called them; none did. Refactoring dead code is untestable
+effort, so I scanned every exported model function for callers, rebuilt
+the branch (not yet pushed) as comments, removal, then splits of live code
+only, and kept the first attempt as `backup/docs-model-components-v1`
+locally. Also ran `satdiff` once with the wrong arguments (40 seeds, not
+the golden's 200) and briefly read the mismatch as a regression.
+
+**Verification.** Each code commit (the removal and the three splits), in
+its own worktree: the proof matrix in all three solver modes, every
+`Solve` identical. The last also: the `Test4` suite, identical; `Test.v`'s
+60 counts identical to `main`'s; `satdiff` byte-identical to its golden;
+`tests.exe` 103/103; `make` clean. Two later commits (`a506314`, odoc
+references; a `TODO.md` baseline) are comments only.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/model-components main`), or one commit.
+
+**Session tally (2026-10-05):** Docs 2 · Refactor 4 (3 splits, 1 dead-code
+removal).
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

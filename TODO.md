@@ -28,6 +28,7 @@
 
 ## Documenting (`odoc`)
 - [ ] **Comment and function-size pass over the codebase** (Jonah, 2026-10-04): every function gets a header comment saying what it does with its arguments, and large or convoluted functions are split into smaller single-purpose ones. Prompted by review of `Premise_search.bounded_universal` (fixed in PR #31); untouched code largely lacks such comments (e.g. `Product.reachable`), so the whole codebase needs the pass. Planned after the structural-congruence guide, on its own branch, one library per PR so each stays reviewable.
+- [ ] **odoc cross-references in existing comments** (Jonah, 2026-10-05): the comments written so far mostly name other functions, types and modules as plain code spans (`[Foo.bar]`), which odoc renders as text. Convert those to references -- `{!Foo.bar}`, or `{{!Foo.bar}text}`, with kind prefixes such as `{!val:f}`, `{!type:t}`, `{!module-type:S}` where a name is ambiguous -- so `dune build @doc` gives an interlinked site. A quick mechanical pass, library by library; comments written from now on use references already. Check it with `dune build @doc` (`odoc` joins the dev setup in PR #41): a reference odoc cannot resolve is only a warning. Baseline on 2026-10-05: 702 warnings, mostly stale references from before the component collapse (`Model.S.States.t`, `Model.S.Labels.t`, ... -- now `State.Set`, `Label.Set`) and stdlib names (`Not_found`, `Stdlib.Hashtbl.find`) that do not resolve without the stdlib's docs; ambiguous names need a kind (`partition`: `type-partition` or `val-partition`).
 - [x] `lib/model/...` -- every interface has doc comments (2026-10-01; `Bisimilarity` and `Minimization` were the gaps). Not yet rendered: `odoc` is not installed in the local switch.
   - [x] `lib/model/`
   
@@ -54,6 +55,8 @@ they are in the code (the comments point here); each needs a fix with a test.
 - [x] ~~`Rocq_monad_utils.econstr_to_constr` takes `?abort_on_undefined_evars` but does not pass it on, so the flag does nothing.~~ -- fixed 2026-10-04 (branch `fix/rocq-tools-latent-bugs`).
 - [x] ~~`Rocq_monad_utils.Unification.Problem`'s JSON writes the `act` pair under `"goto"` as well as `"act"` (only dumps and logs are affected).~~ -- fixed 2026-10-04 (branch `fix/rocq-tools-latent-bugs`).
 - [x] ~~`Rocq_monad_utils.Unification.Pair.unify` catches only the `CannotUnify` kind of `PretypeError`; `w_unify`'s other failures (an occur-check, `UnifOccurCheck`, say) escape instead of meaning "does not unify".~~ -- fixed 2026-10-04 (branch `fix/rocq-tools-latent-bugs`).
+- [ ] `Components.Label.compare` is not a total order: it compares `is_silent` only when both labels know it, so with the same base a label with `None` compares equal to both `Some true` and `Some false`, which differ. Sets and maps ordered by it can misbehave if one base term ever appears with different `is_silent`s. (Found 2026-10-05, `lib/model` pass.)
+- [ ] `Components.Action.Map.update` means to merge the derivation trees of equal actions, but `Action.equal` compares the trees, so the actions it finds already have them: it never merges, and scans every key per update (linear). The proof solver relies on today's behaviour -- one action per derivation tree, which `Test.v`'s `MultipleDerivations` exercises -- so this needs deciding, not just fixing. (Found 2026-10-05.)
 
 ## To discuss with @dcastrop
 

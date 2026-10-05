@@ -25,7 +25,7 @@ module type S = sig
 
       [State] (with nested [Set]), [Label] (with [Set]), [Note], [Annotation]
       (with [Set]), [Transition] (with [Set]), [Action] (with [Set], [Map]
-      and [Pair]), [Edge] (with [Set]), [EdgeMap], [Partition] and [Info] --
+      and [Pair]), [EdgeMap], [Partition] and [Info] --
       see {!Components.S} for each. *)
   include
     Components.S
@@ -38,7 +38,8 @@ module type S = sig
 
   (** {2 LTS} *)
 
-  (** {!LTS} has an *)
+  (** {!LTS}: a labelled transition system as extracted from Rocq, its
+      transitions listed one by one. *)
   module LTS :
     LTS.S
     with type state = State.t
@@ -49,7 +50,9 @@ module type S = sig
 
   (** {2 FSM} *)
 
-  (** {!FSM} ... *)
+  (** {!FSM}: the form the algorithms work on, each state mapped to its
+      actions and their destinations ({!EdgeMap}); built from an {!LTS} by
+      {!FSM.of_lts}, and saturated by {!FSM.saturate}. *)
   module FSM :
     FSM.S
     with type state = State.t
