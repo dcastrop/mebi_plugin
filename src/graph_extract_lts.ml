@@ -141,27 +141,43 @@ struct
     M.return x
   ;;
 
+  (** [is_silent_under w l] is whether the label encoded by [l] is silent
+      under the silent label [w]: for [Option], whether it is [None]; for
+      [Custom (tau, _)], whether it is [tau].
+
+      @raise Bi_encoding.S.CannotDecode
+        for [Option], if [l] encodes no term (propagated). *)
+  let is_silent_under : Weak.t -> Enc.t -> bool M.mm = function
+    | Weak.Option _ -> fun (y : Enc.t) -> M.decode y |> Theory.is_None
+    | Weak.Custom (tau_enc, _) ->
+      fun (y : Enc.t) -> Enc.equal tau_enc y |> M.return
+  ;;
+
+  (** [add_if_silent w x ls] is [ls] with the label [x] added if it is
+      silent under [w] ({!is_silent_under}). Raises as that. *)
+  let add_if_silent (w : Weak.t) (x : Label.t) (acc : Label.Set.t)
+    : Label.Set.t M.mm
+    =
+    let open M.Syntax in
+    let* is_weak : bool = is_silent_under w x.base in
+    M.return (if is_weak then Label.Set.add x acc else acc)
+  ;;
+
   (** [weak_labels g ls] is the labels of [ls] that are silent under [g]'s
-      silent label (none without one). Raises nothing when run. *)
+      silent label (none without one).
+
+      @raise Bi_encoding.S.CannotDecode as {!is_silent_under}. *)
   let weak_labels (g : G.t) (xs : Label.Set.t) : Label.Set.t M.mm =
     Logger.trace __FUNCTION__;
     match g.weak with
     | None -> Label.Set.empty |> M.return
     | Some weak ->
-      let f : Enc.t -> bool M.mm =
-        match weak with
-        | Weak.Option x -> fun (y : Enc.t) -> M.decode y |> Theory.is_None
-        | Weak.Custom (tau_enc, _) ->
-          fun (y : Enc.t) -> Enc.equal tau_enc y |> M.return
-      in
-      let open M.Syntax in
       let xs : Label.t list = Label.Set.to_list xs in
-      let g (i : int) (acc : Label.Set.t) =
-        let x : Label.t = List.nth xs i in
-        let* is_weak : bool = f x.base in
-        if is_weak then Label.Set.add x acc |> M.return else M.return acc
-      in
-      M.iterate 0 (List.length xs - 1) Label.Set.empty g
+      M.iterate
+        0
+        (List.length xs - 1)
+        Label.Set.empty
+        (fun i -> add_if_silent weak (List.nth xs i))
   ;;
 
   (* See the [.mli]. *)
