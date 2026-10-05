@@ -128,9 +128,6 @@ module type Annotation_note_sig = sig
   (** [is_silent n] is whether [n]'s label is silent ({!Label_sig.is_silent}).
       Raises nothing. *)
   val is_silent : t -> bool
-
-  (** [has_label l n] is whether [n]'s label equals [l]. Raises nothing. *)
-  val has_label : label -> t -> bool
 end
 
 (** A weak transition's witness: the non-empty sequence of its steps, the
@@ -154,21 +151,8 @@ module type Annotation_sig = sig
       it is a prefix). Raises nothing. *)
   val compare : t -> t -> int
 
-  (** [is_empty a] is whether [a] has a single note. An annotation always
-      has at least one, so "empty" means no note beyond the first; the name
-      misleads. Raises nothing. *)
-  val is_empty : t -> bool
-
   (** Raised by {!opt_is_empty} and {!opt_length} on [None] when asked to. *)
   exception AnnotationIsNone
-
-  (** [opt_is_empty ?fail_if_none a] is {!is_empty} of the annotation [a],
-      or [true] if it is [None].
-
-      @raise AnnotationIsNone
-        if [a] is [None] and [fail_if_none] is set
-        (raised here). *)
-  val opt_is_empty : ?fail_if_none:bool -> t option -> bool
 
   (** [length a] is the number of notes in [a] (at least 1). Raises nothing. *)
   val length : t -> int
@@ -180,44 +164,12 @@ module type Annotation_sig = sig
         if [a] is [None] and [fail_if_none] is set
         (raised here). *)
   val opt_length : ?fail_if_none:bool -> t option -> int
-
-  (** [shorter a b] is the one of [a] and [b] with fewer notes; [b] if they
-      are as long. Raises nothing. *)
-  val shorter : t -> t -> t
-
-  (** [exists n a] is whether the note [n] is one of [a]'s. Raises nothing. *)
-  val exists : note -> t -> bool
-
-  (** [exists_label l a] is whether some note of [a] has the label [l].
-      Raises nothing. *)
-  val exists_label : label -> t -> bool
-
-  (** [append n a] is [a] with the note [n] added at the end (linear in
-      [a]'s length). Raises nothing. *)
-  val append : note -> t -> t
-
-  (** [last a] is [a]'s last note. Raises nothing. *)
-  val last : t -> note
-
-  (** Raised by {!drop_last} on a single-note annotation. *)
-  exception CannotDropLastOfSingleton of t
-
-  (** [drop_last a] is [a] without its last note.
-
-      @raise CannotDropLastOfSingleton if [a] has only one note (raised
-                                       here). *)
-  val drop_last : t -> t
 end
 
 (** A set of witnesses. *)
 module type Annotations_sig = sig
   include Set.S
   include Json.S with type k = t
-
-  (** [extrapolate a] is [a] and each prefix of [a] that includes its
-      first visible note: the shorter weak steps [a] also witnesses, cut
-      after any later note. Raises nothing. *)
-  val extrapolate : elt -> t
 end
 
 (** A transition of an LTS, [from -label-> goto], with its derivation tree
@@ -290,19 +242,8 @@ module type Action_sig = sig
       length and its first and last states. Raises nothing. *)
   val hash : t -> int
 
-  (** [wk_equal a b] is whether [a] and [b] have the same label (witness
-      and trees ignored). Raises nothing. *)
-  val wk_equal : t -> t -> bool
-
   (** [is_silent a] is whether [a]'s label is silent. Raises nothing. *)
   val is_silent : t -> bool
-
-  (** [is_labelled l a] is whether [a]'s label equals [l]. Raises nothing. *)
-  val is_labelled : label -> t -> bool
-
-  (** [shorter_annotation a b] is the one of [a] and [b] with the shorter
-      witness (none counts as 0); [a] if they are as long. Raises nothing. *)
-  val shorter_annotation : t -> t -> t
 end
 
 (** A set of actions. *)
@@ -312,12 +253,6 @@ module type Actions_sig = sig
 
   include Set.S
   include Json.S with type k = t
-
-  (** [labelled xs l] is the actions of [xs] labelled [l]. Raises nothing. *)
-  val labelled : t -> label -> t
-
-  (** [labels xs] is the labels of the actions [xs]. Raises nothing. *)
-  val labels : t -> labels
 end
 
 (** An action and its destinations. *)
@@ -336,18 +271,6 @@ module type Actionpair_sig = sig
       action has the shorter witness ({!Action_sig.shorter_annotation}); [p]
       if they are as long. Raises nothing. *)
   val shorter_annotation : t -> t -> t
-
-  (** [try_update x ps] is [x] merged into the first pair of [ps] with the
-      same label and destinations, if there is one: [Some z] and [ps]
-      without that pair, where [z]'s witness is the shorter of the two and
-      its trees the union of both. Otherwise [None] and [ps]. Either way the
-      list comes back reversed. Raises nothing. *)
-  val try_update : t -> t list -> t option * t list
-
-  (** [merge_lists a b] is [a] with each pair of [b] merged in, in turn:
-      into a matching pair ({!try_update}), or else added at the front. The
-      order of [a] is not kept. Raises nothing. *)
-  val merge_lists : t list -> t list -> t list
 end
 
 (** A set of (action, destinations) pairs. *)
@@ -369,11 +292,6 @@ module type Actionpairs_sig = sig
 
       @raise IsEmpty if [ps] is empty (raised here). *)
   val shortest_annotation : t -> elt
-
-  (** [merge_list s ps] is [s] with each pair [(a, d)] of [ps] added, in
-      turn; where [s] already has pairs whose action equals [a], [d] is
-      joined to their destinations instead. Raises nothing. *)
-  val merge_list : t -> elt list -> t
 end
 
 (** The actions from one state: a table from each action to its
@@ -408,9 +326,6 @@ module type Actionmap_sig = sig
       [l]. Raises nothing. *)
   val reduce_by_label : t' -> label -> t'
 
-  (** [to_actions m] is the actions of [m]. Raises nothing. *)
-  val to_actions : t' -> actions
-
   (** [to_actionpairs m] is [m] as a set of (action, destinations) pairs.
       Raises nothing. *)
   val to_actionpairs : t' -> actionpairs
@@ -424,47 +339,6 @@ module type Actionmap_sig = sig
   val merge : t' -> t' -> t'
 end
 
-(** One step of an FSM, [from -action-> goto]. *)
-module type Edge_sig = sig
-  type state
-  type label
-  type action
-
-  type t =
-    { from : state
-    ; goto : state
-    ; action : action
-    }
-
-  include Json.S with type k = t
-
-  (** [equal a b] is whether the edges [a] and [b] have equal source, target
-      and action. Raises nothing. *)
-  val equal : t -> t -> bool
-
-  (** [compare a b] orders edges by source, target, then action. Raises
-      nothing. *)
-  val compare : t -> t -> int
-
-  (** [is_silent e] is whether [e]'s action is silent. Raises nothing. *)
-  val is_silent : t -> bool
-
-  (** [is_labelled l e] is whether [e]'s action is labelled [l]. Raises
-      nothing. *)
-  val is_labelled : label -> t -> bool
-end
-
-(** A set of edges. *)
-module type Edges_sig = sig
-  type label
-
-  include Set.S
-  include Json.S with type k = t
-
-  (** [labelled es l] is the edges of [es] labelled [l]. Raises nothing. *)
-  val labelled : t -> label -> t
-end
-
 (** An FSM's steps: a table from each state to its actions
     ({!Actionmap_sig}). *)
 module type Edgemap_sig = sig
@@ -475,7 +349,6 @@ module type Edgemap_sig = sig
   type action
   type actions
   type actionmap
-  type edges
 
   include Hashtbl.S with type key = state
 
@@ -495,29 +368,9 @@ module type Edgemap_sig = sig
       [s] has no entry). Raises nothing. *)
   val destinations : t' -> state -> states
 
-  (** [get_actions m s] is the actions from [s] in [m].
-
-      @raise Not_found
-        if [s] has no entry in [m] (propagated from
-        [Hashtbl.find]). *)
-  val get_actions : t' -> state -> actions
-
   (** [reduce_by_label m l] is a copy of [m] with only its actions labelled
       [l], dropping states left with none. Raises nothing. *)
   val reduce_by_label : t' -> label -> t'
-
-  (** [get_edges m s] is the edges from [s] in [m].
-
-      @raise Not_found
-        if [s] has no entry in [m] (propagated from
-        [Hashtbl.find]). *)
-  val get_edges : t' -> state -> edges
-
-  (** [to_edges m] is every edge of [m]. Raises nothing. *)
-  val to_edges : t' -> edges
-
-  (** [of_edges es] is a new table of the edges [es]. Raises nothing. *)
-  val of_edges : edges -> t'
 
   (** [of_transitions ts] is a new table of the transitions [ts], each an
       action with its label, annotation and (if it has one) derivation tree.
@@ -642,9 +495,9 @@ module type S = sig
      [Partition] stay standalone: [EdgeMap] and [Action.Map] are mutually
      dependent (each stores the other's [t]/[t'] as a value), which cannot be
      expressed if either is nested inside its own key type's module -- doing
-     so would require [State] to be declared both before [Note]/[Transition]/
-     [Edge] (which need its bare type) and after [Action]/[Transition]/[Edge]
-     (which [State.Map] would need), an ordering cycle ordinary (non-[rec])
+     so would require [State] to be declared both before [Note]/[Transition]
+     (which need its bare type) and after [Action]/[Transition] (which
+     [State.Map] would need), an ordering cycle ordinary (non-[rec])
      module signatures cannot express. *)
 
   module State : sig
@@ -708,16 +561,6 @@ module type S = sig
        and type actionpairs = Pair.Set.t
   end
 
-  module Edge : sig
-    include
-      Edge_sig
-      with type state = State.t
-       and type label = Label.t
-       and type action = Action.t
-
-    module Set : Edges_sig with type elt = t and type label = Label.t
-  end
-
   module EdgeMap :
     Edgemap_sig
     with type state = State.t
@@ -727,7 +570,6 @@ module type S = sig
      and type action = Action.t
      and type actions = Action.Set.t
      and type actionmap = Action.Map.t'
-     and type edges = Edge.Set.t
 
   module Partition :
     State_partition_sig
@@ -756,7 +598,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
   (* Wrapped in its own module so the flat, mutually-referential component
      bodies below (unchanged from the pre-nesting design) can be regrouped
-     under State/Label/Annotation/Transition/Action/Edge afterwards without
+     under State/Label/Annotation/Transition/Action afterwards without
      a "multiple definition of module X" clash -- accessed here via
      [Impl.State], not the bare name [State]. *)
   module Impl = struct
@@ -920,9 +762,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       (* See [Annotation_note_sig]. *)
       let is_silent (x : t) : bool = Label.is_silent x.label
-
-      (* See [Annotation_note_sig]. *)
-      let has_label (x : Label.t) (y : t) : bool = Label.equal x y.label
     end
 
     module Annotation = struct
@@ -961,20 +800,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
-      (* See [Annotation_sig]. *)
-      let is_empty : t -> bool = function
-        | { this; next = None } -> true
-        | _ -> false
-      ;;
-
       exception AnnotationIsNone
-
-      (* See [Annotation_sig]. *)
-      let opt_is_empty ?(fail_if_none : bool = false) : t option -> bool
-        = function
-        | None -> if fail_if_none then raise AnnotationIsNone else true
-        | Some x -> is_empty x
-      ;;
 
       (* See [Annotation_sig]. *)
       let rec length : t -> int = function
@@ -987,48 +813,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         | None -> if fail_if_none then raise AnnotationIsNone else 0
         | Some x -> length x
       ;;
-
-      (* See [Annotation_sig]. *)
-      let shorter (a : t) (b : t) : t =
-        match Int.compare (length a) (length b) with -1 -> a | _ -> b
-      ;;
-
-      (* See [Annotation_sig]. *)
-      let rec exists (x : Note.t) : t -> bool = function
-        | { this; next = None } -> Note.equal x this
-        | { this; next = Some next } ->
-          if Note.equal x this then true else exists x next
-      ;;
-
-      (* See [Annotation_sig]. *)
-      let rec exists_label (x : Label.t) : t -> bool = function
-        | { this; next = None } -> Note.has_label x this
-        | { this; next = Some next } ->
-          if Note.has_label x this then true else exists_label x next
-      ;;
-
-      (* See [Annotation_sig]. *)
-      let rec append (x : Note.t) : t -> t = function
-        | { this; next = None } ->
-          { this; next = Some { this = x; next = None } }
-        | { this; next = Some next } -> { this; next = Some (append x next) }
-      ;;
-
-      (* See [Annotation_sig]. *)
-      let rec last : t -> Note.t = function
-        | { this; next = None } -> this
-        | { next = Some next; _ } -> last next
-      ;;
-
-      exception CannotDropLastOfSingleton of t
-
-      (* See [Annotation_sig]. *)
-      let rec drop_last : t -> t = function
-        | { this; next = None } ->
-          raise (CannotDropLastOfSingleton { this; next = None })
-        | { this; next = Some { next = None; _ }; _ } -> { this; next = None }
-        | { this; next = Some next } -> { this; next = Some (drop_last next) }
-      ;;
     end
 
     module Annotations = struct
@@ -1038,30 +822,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           (struct
             let name = "Annotations"
           end)
-
-      (* See [Annotations_sig]. [skip] walks the silent notes before the first
-         visible one, which every result keeps; from there [get] gives every
-         prefix. *)
-      let extrapolate (x : Annotation.t) : t =
-        Logger.trace __FUNCTION__;
-        let rec skip ({ this; next } : Annotation.t) : t =
-          let xs =
-            Stdlib.Option.fold
-              ~none:empty
-              ~some:(if Note.is_silent this then skip else get)
-              next
-            |> map (fun (y : Annotation.t) -> { this; next = Some y })
-          in
-          if Note.is_silent this then xs else add { this; next = None } xs
-        and get : Annotation.t -> t = function
-          | { this; next = None } -> singleton { this; next = None }
-          | { this; next = Some next } ->
-            get next
-            |> map (fun (y : Annotation.t) -> { this; next = Some y })
-            |> add { this; next = None }
-        in
-        add x (skip x)
-      ;;
     end
 
     module Transition = struct
@@ -1204,24 +964,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       ;;
 
       (* See [Action_sig]. *)
-      let wk_equal (a : t) (b : t) : bool = Label.equal a.label b.label
-
-      (* See [Action_sig]. *)
       let is_silent (x : t) : bool = Label.is_silent x.label
-
-      (* See [Action_sig]. *)
-      let is_labelled (x : Label.t) (y : t) : bool = Label.equal x y.label
-
-      (* See [Action_sig]. *)
-      let shorter_annotation (a : t) (b : t) : t =
-        match
-          Int.compare
-            (Annotation.opt_length a.annotation)
-            (Annotation.opt_length b.annotation)
-        with
-        | 1 -> b
-        | _ -> a
-      ;;
     end
 
     module Actions = struct
@@ -1234,22 +977,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           (struct
             let name = "Actions"
           end)
-
-      (* See [Actions_sig]. *)
-      let labelled (xs : t) (y : label) : t =
-        Logger.trace __FUNCTION__;
-        filter (fun ({ label; _ } : Action.t) -> Label.equal label y) xs
-      ;;
-
-      (* See [Actions_sig]. *)
-      let labels (xs : t) : Labels.t =
-        Logger.trace __FUNCTION__;
-        fold
-          (fun ({ label; _ } : Action.t) : (Labels.t -> Labels.t) ->
-            Labels.add label)
-          xs
-          Labels.empty
-      ;;
     end
 
     module ActionPair = struct
@@ -1292,59 +1019,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         | 1 -> b, ys
         | _ -> a, xs
       ;;
-
-      (* See [Actionpair_sig]. One fold: once a pair has been merged, the
-         rest are passed through. *)
-      let try_update ((xaction, xdestinations) : t) (a : t list)
-        : t option * t list
-        =
-        Logger.trace __FUNCTION__;
-        let f : Annotation.t option * Annotation.t option -> Annotation.t option
-          = function
-          | None, None -> None
-          | None, y -> y
-          | x, None -> x
-          | Some x, Some y -> Some (Annotation.shorter x y)
-        in
-        List.fold_left
-          (fun ((updated_opt, acc) :
-                 (Action.t * States.t) option * (Action.t * States.t) list)
-            ((yaction, ydestinations) : Action.t * States.t) ->
-            match updated_opt with
-            | Some opt -> Some opt, (yaction, ydestinations) :: acc
-            | None ->
-              if
-                Action.wk_equal xaction yaction
-                && States.equal xdestinations ydestinations
-              then (
-                let annotation : Annotation.t option =
-                  f (yaction.annotation, xaction.annotation)
-                in
-                let zaction : Action.t =
-                  { label = yaction.label
-                  ; annotation
-                  ; trees = Base.Trees.union yaction.trees xaction.trees
-                  }
-                in
-                Some (zaction, ydestinations), acc)
-              else None, (yaction, ydestinations) :: acc)
-          (None, [])
-          a
-      ;;
-
-      (* See [Actionpair_sig]. *)
-      let rec merge_lists (a : t list) : t list -> t list =
-        Logger.trace __FUNCTION__;
-        function
-        | [] -> a
-        | h :: tl ->
-          let (a : (Action.t * States.t) list) =
-            match try_update h a with
-            | None, a -> h :: a
-            | Some updated, a -> updated :: a
-          in
-          merge_lists a tl
-      ;;
     end
 
     module ActionPairs = struct
@@ -1373,23 +1047,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         match to_list x with
         | [] -> raise IsEmpty
         | h :: tl -> List.fold_left ActionPair.shorter_annotation h tl
-      ;;
-
-      (* See [Actionpairs_sig]. *)
-      let merge_list : t -> ActionPair.t list -> t =
-        List.fold_left (fun (acc : t) ((a, s) : ActionPair.t) ->
-          let matching =
-            filter (fun ((b, t) : ActionPair.t) -> Action.equal a b) acc
-          in
-          if is_empty matching
-          then add (a, s) acc
-          else (
-            let acc = diff acc matching in
-            matching
-            |> to_list
-            |> List.map (fun (_, t) -> a, States.union s t)
-            |> of_list
-            |> union acc))
       ;;
     end
 
@@ -1469,9 +1126,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       ;;
 
       (* See [Actionmap_sig]. *)
-      let to_actions (x : t') : Actions.t = to_seq_keys x |> Actions.of_seq
-
-      (* See [Actionmap_sig]. *)
       let to_actionpairs (x : t') : ActionPairs.t =
         Logger.trace __FUNCTION__;
         fold
@@ -1498,76 +1152,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       ;;
     end
 
-    module Edge = struct
-      type state = State.t
-      type label = Label.t
-      type action = Action.t
-
-      type t =
-        { from : state
-        ; goto : state
-        ; action : action
-        }
-
-      module X = struct
-        type nonrec t = t
-
-        let name = "Edge"
-
-        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          `Assoc
-            [ "from", State.json x.from
-            ; "goto", State.json x.goto
-            ; "action", Action.json x.action
-            ]
-        ;;
-
-        let equal (a : t) (b : t) : bool =
-          State.equal a.from b.from
-          && State.equal a.goto b.goto
-          && Action.equal a.action b.action
-        ;;
-
-        let compare (a : t) (b : t) : int =
-          Utils.compare_chain
-            [ State.compare a.from b.from
-            ; State.compare a.goto b.goto
-            ; Action.compare a.action b.action
-            ]
-        ;;
-      end
-
-      include Thing.Make (X)
-
-      (* See [Edge_sig]. *)
-      let is_silent (x : t) : bool = Action.is_silent x.action
-
-      (* See [Edge_sig]. *)
-      let is_labelled (x : Label.t) (y : t) : bool =
-        Action.is_labelled x y.action
-      ;;
-    end
-
-    module Edges = struct
-      type label = Edge.label
-
-      (* Name kept as "Edge" (singular), matching the JSON dump name the
-         original edges.ml used -- not renamed to "Edges" here, to keep the
-         dump format byte-for-byte unchanged. *)
-      include
-        Thing.Set
-          (Edge)
-          (struct
-            let name = "Edge"
-          end)
-
-      (* See [Edges_sig]. *)
-      let labelled (xs : t) (y : label) : t =
-        Logger.trace __FUNCTION__;
-        filter (Edge.is_labelled y) xs
-      ;;
-    end
-
     module EdgeMap = struct
       type state = State.t
       type states = States.t
@@ -1576,7 +1160,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       type action = Action.t
       type actions = Actions.t
       type actionmap = ActionMap.t'
-      type edges = Edges.t
 
       module Map_ : Hashtbl.S with type key = State.t = Hashtbl.Make (State)
       include Map_
@@ -1635,12 +1218,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       ;;
 
       (* See [Edgemap_sig]. *)
-      let get_actions (x : t') (from : State.t) : Actions.t =
-        Logger.trace __FUNCTION__;
-        find x from |> ActionMap.to_seq_keys |> Actions.of_seq
-      ;;
-
-      (* See [Edgemap_sig]. *)
       let reduce_by_label (x : t') (label : label) : t' =
         Logger.trace __FUNCTION__;
         let y : t' = copy x in
@@ -1650,50 +1227,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             if ActionMap.length vs' > 0 then Some vs' else None)
           y;
         y
-      ;;
-
-      (* See [Edgemap_sig]. *)
-      let get_edges (x : t') (from : State.t) : Edges.t =
-        Logger.trace __FUNCTION__;
-        ActionMap.fold
-          (fun (action : Action.t) (v : States.t) (acc : Edges.t) : Edges.t ->
-            States.fold
-              (fun (goto : State.t) (acc : Edges.t) : Edges.t ->
-                Edges.add { from; action; goto } acc)
-              v
-              acc)
-          (find x from)
-          Edges.empty
-      ;;
-
-      (* See [Edgemap_sig]. *)
-      let to_edges (x : t') : Edges.t =
-        Logger.trace __FUNCTION__;
-        fold
-          (fun (from : State.t) (vs : ActionMap.t') : (Edges.t -> Edges.t) ->
-            ActionMap.to_actionpairs vs
-            |> ActionPairs.fold
-                 (fun
-                     ((action, destinations) : ActionPairs.elt)
-                      : (Edges.t -> Edges.t)
-                    ->
-                 States.fold
-                   (fun (goto : State.t) : (Edges.t -> Edges.t) ->
-                     Edges.add { from; goto; action })
-                   destinations))
-          x
-          Edges.empty
-      ;;
-
-      (* See [Edgemap_sig]. *)
-      let of_edges (xs : Edges.t) : t' =
-        Logger.trace __FUNCTION__;
-        let ys : t' = create 0 in
-        Edges.iter
-          (fun ({ from; goto; action } : Edge.t) ->
-            update ys from action (States.singleton goto))
-          xs;
-        ys
       ;;
 
       (* See [Edgemap_sig]. *)
@@ -1962,11 +1495,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
     end
 
     module Map = Impl.ActionMap
-  end
-
-  module Edge = struct
-    include Impl.Edge
-    module Set = Impl.Edges
   end
 
   module EdgeMap = Impl.EdgeMap

@@ -25,7 +25,7 @@ module type S = sig
 
       [State] (with nested [Set]), [Label] (with [Set]), [Note], [Annotation]
       (with [Set]), [Transition] (with [Set]), [Action] (with [Set], [Map]
-      and [Pair]), [Edge] (with [Set]), [EdgeMap], [Partition] and [Info] --
+      and [Pair]), [EdgeMap], [Partition] and [Info] --
       see {!Components.S} for each. *)
   include
     Components.S
