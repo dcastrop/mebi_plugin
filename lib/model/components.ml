@@ -1230,24 +1230,32 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         y
       ;;
 
+      (** [action_of_transition t] is the action [t] takes: its label and
+          witness, and its derivation tree, if it has one. Raises nothing. *)
+      let action_of_transition ({ label; annotation; tree; _ } : Transition.t)
+        : Action.t
+        =
+        { label
+        ; annotation
+        ; trees =
+            Stdlib.Option.fold
+              ~none:Base.Trees.empty
+              ~some:Base.Trees.singleton
+              tree
+        }
+      ;;
+
       (* See [Edgemap_sig]. *)
       let of_transitions (xs : Transitions.t) : t' =
         Logger.trace __FUNCTION__;
         let edges : t' = create 0 in
         Transitions.iter
-          (fun ({ from; goto; label; annotation; tree } : Transition.t) ->
+          (fun (t : Transition.t) ->
             update
               edges
-              from
-              { label
-              ; annotation
-              ; trees =
-                  Stdlib.Option.fold
-                    ~none:Base.Trees.empty
-                    ~some:Base.Trees.singleton
-                    tree
-              }
-              (States.singleton goto))
+              t.from
+              (action_of_transition t)
+              (States.singleton t.goto))
           xs;
         edges
       ;;
