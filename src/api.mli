@@ -1,6 +1,6 @@
-(** Per-message-kind output settings live in [Logger]; what remains here is the
-    part that was never about logging. [config_output] and [set_output] forward
-    to [Logger.configure]. *)
+(** The plugin's configuration, as the [MeBi Config] commands set it. Per
+    message kind output settings live in {!Logger}; {!set_output} forwards
+    to it. *)
 type output_config =
   { mutable decode_results : bool
   ; mutable dump_results : bool
@@ -19,8 +19,6 @@ val the_output_config : output_config ref
 (** [reset_output_config ()] restores the default output configuration
     and {!Logger}'s per-kind settings. Raises nothing. *)
 val reset_output_config : unit -> unit
-
-val config_output : bool -> Output.Kind.t -> unit
 
 (** [output_config_decode_results b] sets whether results are decoded
     back to Rocq terms when printed. Raises nothing. *)

@@ -1,12 +1,3 @@
-(* module Defaults = struct
-   module Log : Logger.S = Logger.Default
-   module Ctx : Rocq_context.S = Rocq_context.Default
-   module Enc : Encoding.S with type t = int = Encoding.Int (* module Tree = Enc_tree.Make (Enc) *)
-   (* module Trees = Enc_trees.Make (Tree) *)
-   end *)
-
-(***********************************************************************)
-
 (* Per-message-kind output settings now live in [Logger] itself rather than in
    a record here that a per-command [Logger.Make] closed over. What remains
    below is the part that was never about logging. *)
@@ -33,8 +24,6 @@ let reset_output_config () : unit =
   the_output_config := output_config_default ();
   Logger.reset_config ()
 ;;
-
-let config_output (x : bool) (k : Output.Kind.t) : unit = Logger.configure k x
 
 (* See the [.mli]. *)
 let output_config_decode_results (x : bool) : unit =
@@ -71,8 +60,6 @@ let make_enc (module X : Encoding.Packed.PackedS) : (module Encoding.S) =
 let make_enc_int () : (module Encoding.S) =
   (module (val make_enc (module Encoding.Packed.Int)) : Encoding.S)
 ;;
-
-(***********************************************************************)
 
 type fail_flags =
   { mutable empty : bool
@@ -129,8 +116,6 @@ let set_fail_flag_oversaturated (oversaturated : bool) : unit =
     oversaturated
   |> Logger.show
 ;;
-
-(***********************************************************************)
 
 type bounds_args =
   | States of int
@@ -296,8 +281,6 @@ let set_the_bounds_args (x : bounds_args) : unit =
   | Transitions _ -> ()
 ;;
 
-(***********************************************************************)
-
 type weak_args =
   { a : weak_arg option
   ; b : weak_arg option
@@ -337,8 +320,6 @@ let set_the_weak_arg1 (x : weak_arg) : unit =
 let set_the_weak_arg2 (x : weak_arg) : unit =
   the_weak_args := Some (ref { a = get_the_weak_arg1 (); b = Some x })
 ;;
-
-(***********************************************************************)
 
 (** How the proof solver introduces its coinduction hypotheses.
 

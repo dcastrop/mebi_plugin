@@ -11,14 +11,11 @@ module type S = sig
     }
 
   val the_weak_args : weak_args ref option ref
-  val reset_the_weak_args : unit -> unit
   val load_weak_args : unit -> unit mm
   val get_the_weak_args : unit -> weak_args option
   val get_the_weak_arg1 : unit -> weak option
   val get_the_weak_arg2 : unit -> weak option
   val get_weak : weak option -> weak option
-
-  (* val api_bounds_to_model_bounds : Api.bounds_args -> Model.Info.Meta.bounds *)
   val the_bounds_args : Api.bounds_args ref
   val load_the_bounds_args : unit -> unit
 end
@@ -69,7 +66,6 @@ module Make
 
   (* See the [.mli]. *)
   let the_weak_args : weak_args ref option ref = ref None
-  let reset_the_weak_args () : unit = the_weak_args := None
 
   (* See the [.mli]. *)
   let load_weak_args () : unit M.mm =

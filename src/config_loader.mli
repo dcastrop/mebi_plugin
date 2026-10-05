@@ -23,8 +23,6 @@ module type S = sig
   (** The silent labels loaded by {!load_weak_args}, if any. *)
   val the_weak_args : weak_args ref option ref
 
-  val reset_the_weak_args : unit -> unit
-
   (** [load_weak_args ()] sets {!the_weak_args} from {!Api.the_weak_args},
       encoded. Raises as {!load_weak_arg}, when run. *)
   val load_weak_args : unit -> unit mm

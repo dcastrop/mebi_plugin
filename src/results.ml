@@ -59,10 +59,6 @@ module type S = sig
     :  ?pi:Model.Partition.t
     -> Model.State.t
     -> Model.State.Set.t
-
-  val are_states_bisimilar : Model.State.t -> Model.State.t -> bool
-
-  (* val get_candidates : Model.State.t -> Model.Label.t -> Model.EdgeMap.t' -> Model.State.t -> Model.State.Set.t *)
 end
 
 module Make (Enc : Encoding.S) :
@@ -164,27 +160,4 @@ module Make (Enc : Encoding.S) :
     try pi |> Model.Partition.get_bisimilar x with
     | Not_found -> Model.State.Set.empty
   ;;
-
-  let are_states_bisimilar (x : Model.State.t) (y : Model.State.t) : bool =
-    get_bisimilar_states x |> Model.State.Set.mem y
-  ;;
-
-  (** [get_candidates from goto edges] returns the set of states reachable from state [from] that are bisimilar with state [goto].
-      @param from is a state of fsm "b".
-      @param label is the label of the action taken by fsm "b".
-      @param edges is the [Model.EdgeMap.t'] of fsm "b".
-      @param goto is a state of fsm "a". *)
-  (* let get_candidates
-     (from : Model.State.t)
-     (label : Model.Label.t)
-     (edges : Model.EdgeMap.t')
-     (goto : Model.State.t)
-     : Model.State.Set.t
-     =
-     let reachable : Model.Partition.t =
-     get_bisimilar_partition ()
-     |> Model.Partition.reachable_by_label from label edges
-     in
-     get_bisimilar_states ~pi:reachable goto
-     ;; *)
 end

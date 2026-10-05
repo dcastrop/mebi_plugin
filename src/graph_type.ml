@@ -106,7 +106,6 @@ module Make
 
   (* See the [.mli]. *)
   module States : Set.S with type elt = Enc.t = X.S
-  (* (val M.make_enc_set ()) *)
 
   (* See the [.mli]. *)
   module Destinations : Set.S with type elt = Enc.t * Enc.Tree.t = X.D
