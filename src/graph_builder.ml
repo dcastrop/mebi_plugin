@@ -54,18 +54,16 @@ module Make
 
   open G
 
-  (** [get_new_constrs g from] finds the transitions out of [from].
-
-      Run in a [sandbox], so the evar map is restored afterwards: matching a
-      state against the LTS's constructors creates an evar per constructor
-      binder, per constructor tried, and leaving them all in the one
-      command-wide evar map was most of extraction's memory (80% of the live
-      heap on [Proc/Test4] at 2000 states, ~150 evars per state; see
-      [ASSISTED-CHANGES.md], 2026-10-01). Nothing that escapes needs them:
-      the result is encodings, whose terms are normalized and were measured
-      evar-free on every example. The encoding tables themselves are updated
-      in place, so the sandbox keeps them. Should a found term ever contain
-      an evar, the inner evar map is kept instead -- the old behaviour. *)
+  (* See the [.mli]. Run in a [sandbox], so the evar map is restored
+     afterwards: matching a state against the LTS's constructors creates an
+     evar per constructor binder, per constructor tried, and leaving them all
+     in the one command-wide evar map was most of extraction's memory (80% of
+     the live heap on [Proc/Test4] at 2000 states, ~150 evars per state; see
+     [ASSISTED-CHANGES.md], 2026-10-01). Nothing that escapes needs them: the
+     result is encodings, whose terms are normalized and were measured
+     evar-free on every example. The encoding tables themselves are updated
+     in place, so the sandbox keeps them. Should a found term ever contain an
+     evar, the inner evar map is kept instead -- the old behaviour. *)
   let get_new_constrs (g : t) (from : Enc.t) : M.Constructor.t list M.mm =
     Logger.trace __FUNCTION__;
     let open M.Syntax in
@@ -79,6 +77,7 @@ module Make
           g.primarylts.enc
       in
       let* sigma : Evd.evar_map = M.get_sigma in
+      (* [has_evars x] is whether [x]'s term has an evar under [sigma]. *)
       let has_evars (x : Enc.t) : bool =
         Bool.not (Evar.Set.is_empty (Evd.evars_of_term sigma (M.decode x)))
       in
@@ -98,14 +97,14 @@ module Make
       M.return cs
   ;;
 
-  (** [update_to_visit g x] adds [x] to [g.to_visit] if [x] has not yet been explored {i (i.e., if [x] is not recorded in [g] as a state or as having a transition)}.
-  *)
+  (* See the [.mli]. *)
   let update_to_visit (g : t) (x : Enc.t) : unit =
     if Transitions.mem g.transitions x || States.mem x g.states
     then ()
     else update_to_visit g x
   ;;
 
+  (* See the [.mli]. *)
   let update_transitions
         (g : t)
         (from : Enc.t)
@@ -116,6 +115,7 @@ module Make
     Destinations.singleton goto |> Transitions.update g.transitions from a
   ;;
 
+  (* See the [.mli]. *)
   let get_action (g : t) (act : Enc.t) (int_tree : Enc.Tree.t) : Action.t mm =
     Logger.trace __FUNCTION__;
     let act_dec : EConstr.t = M.decode act in
@@ -128,20 +128,37 @@ module Make
     M.return action
   ;;
 
+  (** [record_step g from (l, t, tree) states] is [states] with the target
+      [t] added, after adding the step [from -l-> t], derived by [tree], to
+      [g] ({!update_transitions}) and queueing [t] if it is new
+      ({!update_to_visit}). Raises nothing when run. *)
+  let record_step
+        (g : t)
+        (from : Enc.t)
+        ((act, tgt, int_tree) : M.Constructor.t)
+        (states : States.t)
+    : States.t M.mm
+    =
+    let open M.Syntax in
+    let* action : Action.t = get_action g act int_tree in
+    update_transitions g from (tgt, int_tree) action;
+    update_to_visit g tgt;
+    M.return (States.add tgt states)
+  ;;
+
+  (* See the [.mli]. *)
   let get_new_states (g : t) (from : Enc.t) : States.t M.mm =
     Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* new_constrs : M.Constructor.t list = get_new_constrs g from in
-    let iter_body (i : int) (new_states : States.t) =
-      let (act, tgt, int_tree) : M.Constructor.t = List.nth new_constrs i in
-      let* action : Action.t = get_action g act int_tree in
-      update_transitions g from (tgt, int_tree) action;
-      update_to_visit g tgt;
-      M.return (States.add tgt new_states)
-    in
-    M.iterate 0 (List.length new_constrs - 1) (States.singleton from) iter_body
+    M.iterate
+      0
+      (List.length new_constrs - 1)
+      (States.singleton from)
+      (fun i -> record_step g from (List.nth new_constrs i))
   ;;
 
+  (* See the [.mli]. *)
   let stop (g : t) : bool =
     Logger.trace __FUNCTION__;
     match g.bounds with
@@ -149,6 +166,9 @@ module Make
     | Transitions n -> Transitions.size g.transitions > n
   ;;
 
+  (* See the [.mli]. The [try] catches [NoMoreToVisit] from
+     {!Graph_type.S.next_to_visit}, which runs while the value is built, so
+     the handler does see it. *)
   let rec build ?(stop : t -> bool = stop) (g : t) : t M.mm =
     Logger.trace __FUNCTION__;
     if stop g

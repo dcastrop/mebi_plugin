@@ -4,6 +4,16 @@ module type S = sig
   type t
   type lts
 
+  (** [build ?weak t lts using] is the graph of every state reachable from
+      the term [t] by the LTS [lts], whose constructors may use the LTSs
+      [using] in their premises, explored breadth first until the bounds
+      ({!Api.the_bounds_args}) stop it. [t] is typechecked against [lts]'s
+      state type first. [weak] names the silent label.
+
+      Raises, when run, Rocq's errors if [t] does not typecheck or a name is
+      unknown, [LTSMapDoesNotContainPrimaryLTS] if [lts] is not among
+      [using], and whatever extracting a constructor raises (all
+      propagated). *)
   val build
     :  ?weak:weak option
     -> Constrexpr.constr_expr
@@ -11,6 +21,8 @@ module type S = sig
     -> Names.GlobRef.t list
     -> t mm
 
+  (** [extract g] is the LTS of the graph [g]
+      ({!Graph_extract_lts.S.extract}). Raises nothing when run. *)
   val extract : t -> lts mm
 end
 

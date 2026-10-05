@@ -3,6 +3,14 @@ module type S = sig
   type lts
   type 'a mm
 
+  (** [extract g] is the LTS of the graph [g]: its states, transitions (each
+      with its derivation tree), alphabet and terminals (states with no
+      step), the silent labels among its labels, counts, and metadata: the
+      constructors of each LTS used ({!Constructor_bindings.S.extract_info})
+      and whether exploration finished.
+
+      Raises, when run, whatever {!Constructor_bindings.S.extract_info}
+      raises (propagated). *)
   val extract : t -> lts mm
 end
 

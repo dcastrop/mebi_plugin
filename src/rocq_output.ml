@@ -25,8 +25,8 @@ let render ({ fn; prefix; body; _ } : Output.message) : Pp.t =
   seq [ v 0 (seq [ a; b ]); ws 0; c ] |> hv 0
 ;;
 
-(** [Trace], [Result] and [Show] have no [Feedback] level of their own, so they
-    map onto Debug/Info/Notice as they did before. *)
+(* See the [.mli]. [Trace], [Result] and [Show] have no [Feedback] level
+   of their own, so they map onto debug, info and notice. *)
 let sink : Logger.sink =
   fun (m : Output.message) ->
   let doc : Pp.t = render m in
@@ -39,7 +39,7 @@ let sink : Logger.sink =
   | Error -> Feedback.msg_debug doc
 ;;
 
-(** Names a dump with the [.v] file and line that triggered it. *)
+(* See the [.mli]. *)
 let loc_provider () : string =
   match Loc.get_current_command_loc () with
   | Some { line_nb; fname = InFile { file; _ } } ->
@@ -48,6 +48,7 @@ let loc_provider () : string =
   | _ -> "Unknown Location"
 ;;
 
+(* See the [.mli]. *)
 let install () : unit =
   Logger.set_sink sink;
   Utils.FileWriter.set_loc_provider loc_provider

@@ -404,14 +404,6 @@ module type State_partition_sig = sig
   (** [reachable s m p] is the blocks of [p] with a state one action from
       [s] in [m]. Raises nothing. *)
   val reachable : state -> edgemap -> t -> t
-
-  (** [reachable_by_label s l m p] is the blocks of [p] with a state one
-      action labelled [l] from [s] in [m].
-
-      @raise Not_found
-        if [s] has no entry in [m] (propagated from
-        {!Stdlib.Hashtbl.find}). *)
-  val reachable_by_label : state -> label -> edgemap -> t -> t
 end
 
 (** What a model records about itself: its metadata (whether exploration
@@ -1311,20 +1303,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       let reachable (from : State.t) (edges : EdgeMap.t') : t -> t =
         Logger.trace __FUNCTION__;
         filter_reachable (EdgeMap.destinations edges from)
-      ;;
-
-      (* See {!module-type:State_partition_sig}. *)
-      let reachable_by_label
-            (from : State.t)
-            (label : label)
-            (edges : EdgeMap.t')
-        : t -> t
-        =
-        Logger.trace __FUNCTION__;
-        let actions =
-          ActionMap.reduce_by_label (EdgeMap.find edges from) label
-        in
-        filter_reachable (ActionMap.destinations actions)
       ;;
     end
 

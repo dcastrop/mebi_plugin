@@ -24,6 +24,7 @@ module Make (Enc : Encoding.S) (M : Rocq_monad_utils.S with type enc = Enc.t) :
       let name = "Weak"
 
       let json ?(as_elt : bool = false) : t -> Yojson.t =
+        (* [f x] is [x]'s encoding and term. *)
         let f (x : Enc.t) : Yojson.t =
           `Assoc
             [ "enc", Enc.json ~as_elt:true x
@@ -37,6 +38,7 @@ module Make (Enc : Encoding.S) (M : Rocq_monad_utils.S with type enc = Enc.t) :
       ;;
     end)
 
+  (* See the [.mli]. *)
   let eq x y : bool =
     match x, y with
     | Option x, Option y -> Enc.equal x y
