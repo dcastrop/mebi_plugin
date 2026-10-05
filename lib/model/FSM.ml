@@ -195,18 +195,27 @@ module Make
       { x with edges; fill = Some fill })
   ;;
 
+  (** [rename_destinations f actions] is a new action table with the
+      actions of [actions], each destination [d] replaced by [f d]. Raises
+      nothing. *)
+  let rename_destinations (f : State.t -> State.t) (actions : C.Action.Map.t')
+    : C.Action.Map.t'
+    =
+    let renamed : C.Action.Map.t' = C.Action.Map.create 0 in
+    C.Action.Map.iter
+      (fun (a : C.Action.t) (ds : States.t) ->
+        C.Action.Map.update renamed a (States.map f ds))
+      actions;
+    renamed
+  ;;
+
   (* See the [.mli]. *)
   let rename (f : State.t -> State.t) (x : t) : t =
     Logger.trace __FUNCTION__;
     let edges : EdgeMap.t' = EdgeMap.create (EdgeMap.length x.edges) in
     EdgeMap.iter
       (fun (from : State.t) (actions : C.Action.Map.t') ->
-        let renamed : C.Action.Map.t' = C.Action.Map.create 0 in
-        C.Action.Map.iter
-          (fun (a : C.Action.t) (ds : States.t) ->
-            C.Action.Map.update renamed a (States.map f ds))
-          actions;
-        EdgeMap.replace edges (f from) renamed)
+        EdgeMap.replace edges (f from) (rename_destinations f actions))
       x.edges;
     { x with
       init = Stdlib.Option.map f x.init
