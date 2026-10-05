@@ -6331,6 +6331,57 @@ removal).
 
 ---
 
+## 2026-10-05 — Documentation pass, part 4: `src/`, the extraction layer
+
+**Docs + Refactor.** On branch `docs/src-extraction`. `src/` is 8,600
+lines, so it is split in three PRs: this one (`api`, `config_loader`,
+`decoder`, `graph*`, `help`, `results`, `rocq_output`, `weak`,
+`benchmarking`), then `wrapper` and the command grammar, then the proof
+solver.
+
+**Comments** (`d46064a`; comments only, checked file by file):
+contracts in the `.mli`, with odoc references; pointers or a short "how"
+in the `.ml`; small local helpers commented where they stay. Stale and
+old-style comments replaced (e.g. "module Decode.ModelToString").
+
+**Dead code** (`5261803`): `Api.config_output`,
+`Config_loader.reset_the_weak_args`, `Results.are_states_bisimilar` and
+`Model.Partition.reachable_by_label` (its only caller was commented out);
+commented-out code (`Results.get_candidates`, a `Command` module, `Api`'s
+`Defaults`); separator bars. This time the callers were checked before any
+split. The scan I first used (a regex that strips comments) reported four
+`graph_type` functions as unused that `graph_builder` calls after `open G`;
+every candidate was re-checked with a plain `grep`.
+
+**Splits**, one commit each: `record_step` (from
+`Graph_builder.get_new_states`), `add_rocq_lts` (from
+`Graph_extract_lts.constructor_info`), `is_silent_under` and
+`add_if_silent` (from `weak_labels`, whose contract now says decoding a
+label can raise `CannotDecode`).
+
+**Two of the 13 "try around a monadic value" sites** in `TODO.md` are in
+these files, and both work: in `Graph.get_primary_lts` and
+`Graph_builder.build` the guarded call runs while the value is built, so
+the handler sees it. The comments say so; the list keeps them, marked.
+
+**Mistakes on the way.** Two module headers (`help.ml`,
+`rocq_output.mli`) sat directly above the first definition, so my comment
+tool replaced them; caught in the review of removed lines and restored.
+
+**Verification.** Each code commit (the removal and the splits), in its
+own worktree: the proof matrix in all three solver modes, every `Solve`
+identical; the last also the `Test4` suite, identical, and `Test.v`'s 60
+counts identical to `main`'s. `tests.exe` 103/103; `make` clean; module
+lists agree.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/src-extraction main`), or one commit.
+
+**Session tally (2026-10-05), cont.:** Docs 3 · Refactor 7 (5 splits, 2
+dead-code removals) · Tooling 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
