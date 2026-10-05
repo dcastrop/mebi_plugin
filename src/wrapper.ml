@@ -236,6 +236,59 @@ module Make (Enc : Encoding.S) :
     | _ -> ()
   ;;
 
+  (** [bound_to_string b] is the exploration bound [b] in words ("100
+      states"; both, for a merged model). Raises nothing. *)
+  let rec bound_to_string : Model.Info.Meta.Bounds.t -> string = function
+    | States n -> Printf.sprintf "%i states" n
+    | Transitions n -> Printf.sprintf "%i transitions" n
+    | Merged (a, b) ->
+      Printf.sprintf "%s and %s" (bound_to_string a) (bound_to_string b)
+  ;;
+
+  (** [cut_short_reason b (states, transitions)] is the reason an LTS cut
+      short by the bound [b], with [states] and [transitions] found, is
+      incomplete, and how to raise the bound. Raises nothing. *)
+  let cut_short_reason
+        (bounds : Model.Info.Meta.Bounds.t)
+        ((states, transitions) : int * int)
+    : string
+    =
+    Printf.sprintf
+      "exploration stopped at the bound of %s, with %i states and %i \
+       transitions found and more still unexplored. Raise the bound with [MeBi \
+       Config Bounds As Num States <n>] (or [... Num Transitions <n>]). A \
+       large LTS can still be too big to saturate."
+      (bound_to_string bounds)
+      states
+      transitions
+  ;;
+
+  (** [approximation_reason xs (states, transitions)] is the reason an LTS
+      with [states] and [transitions] is only an approximation, naming the
+      first three of the approximations [xs] and counting the rest; [None]
+      if there are none. Raises nothing. *)
+  let approximation_reason
+        (approximations : string list)
+        ((states, transitions) : int * int)
+    : string option
+    =
+    match approximations with
+    | [] -> None
+    | xs ->
+      Some
+        (Printf.sprintf
+           "the extracted LTS (%i states, %i transitions) is only an \
+            approximation: %s. A [MeBi Run Bisim] verdict on it may be wrong \
+            (a proof cannot be: [Qed] checks every step). See the warnings \
+            above and [MeBi Help Premises]."
+           states
+           transitions
+           (let shown = List.filteri (fun i _ -> i < 3) xs in
+            let more = List.length xs - List.length shown in
+            String.concat "; " shown
+            ^ if more > 0 then Printf.sprintf "; and %i more" more else ""))
+  ;;
+
   (** [check_if_lts_fail ?approximations ?cut_short x] does nothing unless
       the [FailIf] flags make [x] an error: an empty LTS (one state at most,
       no transitions) with [FailIf Empty], or an incomplete one with [FailIf Incomplete]. The error says why: exploration was [cut_short] by the
@@ -265,49 +318,21 @@ module Make (Enc : Encoding.S) :
       | { info = { meta = Some { is_complete = false; bounds; _ }; _ }; _ } ->
         result_log (module Model.LTS) (module Decode.LTS)
         |> handle_results Result "LTS Incomplete" x;
-        let rec bound : Model.Info.Meta.Bounds.t -> string = function
-          | States n -> Printf.sprintf "%i states" n
-          | Transitions n -> Printf.sprintf "%i transitions" n
-          | Merged (a, b) -> Printf.sprintf "%s and %s" (bound a) (bound b)
-        in
         let states = Model.State.Set.cardinal x.states
         and transitions = Model.Transition.Set.cardinal x.transitions in
         let cut_short : string option =
           if List.is_empty approximations || cut_short
-          then
-            Some
-              (Printf.sprintf
-                 "exploration stopped at the bound of %s, with %i states and \
-                  %i transitions found and more still unexplored. Raise the \
-                  bound with [MeBi Config Bounds As Num States <n>] (or [... \
-                  Num Transitions <n>]). A large LTS can still be too big to \
-                  saturate."
-                 (bound bounds)
-                 states
-                 transitions)
+          then Some (cut_short_reason bounds (states, transitions))
           else None
-        in
-        let approximate : string option =
-          match approximations with
-          | [] -> None
-          | xs ->
-            Some
-              (Printf.sprintf
-                 "the extracted LTS (%i states, %i transitions) is only an \
-                  approximation: %s. A [MeBi Run Bisim] verdict on it may be \
-                  wrong (a proof cannot be: [Qed] checks every step). See the \
-                  warnings above and [MeBi Help Premises]."
-                 states
-                 transitions
-                 (let shown = List.filteri (fun i _ -> i < 3) xs in
-                  let more = List.length xs - List.length shown in
-                  String.concat "; " shown
-                  ^ if more > 0 then Printf.sprintf "; and %i more" more else ""))
         in
         M.Err.lts_incomplete
           (String.concat
              " Also, "
-             (List.filter_map Fun.id [ cut_short; approximate ])
+             (List.filter_map
+                Fun.id
+                [ cut_short
+                ; approximation_reason approximations (states, transitions)
+                ])
            ^ " Accept it anyway with [MeBi Config FailIf Incomplete False].")
       | _ -> ())
     else ()
