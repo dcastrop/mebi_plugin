@@ -6248,6 +6248,31 @@ by its commit.
 
 ---
 
+## 2026-10-05 — `odoc` and `odig` in the dev setup; `scripts/relock.sh`
+
+**Tooling.** On branch `chore/odoc-tooling`, finishing Jonah's
+`dune-project` edit so the odoc references in doc comments can be checked
+(`dune build @doc`). `odoc` is declared once for both `:with-doc` and
+`:with-dev-setup` (Jonah's edit made it unconditional, which would have
+installed it for every user and CI run; dune also added its own
+`{with-doc}` line beside a `{with-dev-setup}` one), `odig` for dev setup.
+
+The lock needed more than `opam lock .`: it drops a filter's packages
+silently unless all of them are installed (my first run lost every
+dev-setup pin), and gives each package one filter, so the packages the doc
+and editor tooling share (`cmdliner`, `astring`, ...) went under
+`with-doc` only, unpinned for a `--with-dev-setup` install.
+`scripts/relock.sh` regenerates both files, widens those filters, and
+checks the lock describes the switch exactly; the README now points to it.
+I could not install the packages from my session (opam's bubblewrap
+sandbox cannot nest there); Jonah ran `opam install odoc odig`.
+
+**Verification:** `opam install . --locked --deps-only` with and without
+`--with-dev-setup`: "Nothing to do". `dune build @doc` builds the site,
+with 702 warnings (baseline for the cross-reference pass).
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

@@ -42,12 +42,14 @@ eval $(opam env --switch=$(pwd) --set-switch)
 Check it took: `rocq --version` should report 9.2, and `which dune` should point inside `_opam/bin`.
 
 ### Changing dependencies
-Edit the `(depends ...)` ranges in `dune-project`, then regenerate both files:
+Edit the `(depends ...)` ranges in `dune-project`, install what changed (with the dev setup: `opam install . --deps-only --with-dev-setup --with-doc`), then regenerate both files:
 ```shell
-dune build rocq-mebi.opam        # dune-project -> rocq-mebi.opam
-opam lock .                      # -> rocq-mebi.opam.locked
+scripts/relock.sh                # dune-project -> rocq-mebi.opam -> rocq-mebi.opam.locked
 ```
-Commit both. Bumping `rocq-core`'s upper bound is a deliberate act — the plugin links against `rocq-runtime`'s OCaml API, which breaks across Rocq *minor* versions.
+Commit both. Use the script rather than `opam lock .` alone: `opam lock` silently drops a filter's packages unless all of them are installed, and files packages shared by the doc and editor tooling under `with-doc` only; the script widens those to `with-dev-setup` and checks the lock matches the switch. Bumping `rocq-core`'s upper bound is a deliberate act — the plugin links against `rocq-runtime`'s OCaml API, which breaks across Rocq *minor* versions.
+
+### Documentation
+`dune build @doc` builds the API docs from the doc comments into `_build/default/_doc/_html/` (open `index.html`); `odoc` and `odig` come with the dev setup. Comments refer to other definitions with odoc references (`{!Module.f}`, `{{!Module.f}text}`), which become links.
 
 ### Two build paths
 

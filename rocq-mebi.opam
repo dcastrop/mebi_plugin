@@ -18,10 +18,11 @@ depends: [
   "rocq-stdlib" {>= "9.1"}
   "yojson" {>= "3.0"}
   "benchmark" {>= "1.6"}
+  "odoc" {with-doc | with-dev-setup}
+  "odig" {with-dev-setup}
   "ocaml-lsp-server" {with-dev-setup}
   "ocamlformat" {with-dev-setup & = "0.29.0"}
   "vsrocq-language-server" {with-dev-setup}
-  "odoc" {with-doc}
 ]
 build: [
   ["dune" "subst"] {dev}
