@@ -20,10 +20,8 @@ module type S = sig
   val is_fsm_constructor : EConstr.t -> fsm -> bool
 end
 
-(** [module Make] ...
-    @param I
-      is the [module Rocq_monad_utils.S] for the current {i iteration} of the proof-solver.
-*)
+(** [module Make] ... @param I is the [module Rocq_monad_utils.S] for the
+    current {i iteration} of the proof-solver. *)
 module Make
     (Enc : Encoding.S)
     (W :
@@ -42,6 +40,7 @@ module Make
   module Model = W.Model
   module Decode = W.Decode
 
+  (** The theory terms, encoded in the proof step's own table ([I]). *)
   module ThEnc :
     Theories_enc.S
     with type 'a im = 'a I.mm
@@ -55,6 +54,7 @@ module Make
 
   exception FSM_HasNoSilentLabel of Model.FSM.t
 
+  (* See the [.mli]. *)
   let is_fsm_silent_label (x : EConstr.t) (m : Model.FSM.t) : bool =
     Logger.trace __FUNCTION__;
     match
@@ -67,7 +67,7 @@ module Make
 
   exception FSM_HasNoVisibleLabel of Model.FSM.t
 
-  (** i.e., not silent label *)
+  (* See the [.mli]. *)
   let is_fsm_visible_label (x : EConstr.t) (m : Model.FSM.t) : bool =
     Logger.trace __FUNCTION__;
     match
@@ -90,6 +90,7 @@ module Make
 
   exception FSM_HasNoConstructors of Model.FSM.t
 
+  (* See the [.mli]. *)
   let is_fsm_constructor (x : EConstr.t) (m : Model.FSM.t) : bool =
     Logger.trace __FUNCTION__;
     match m with

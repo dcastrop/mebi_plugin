@@ -27,27 +27,38 @@ end
 
 module Make (Enc : Encoding.S) (X : Args) :
   S with type enc = Enc.t and type tree = Enc.Tree.t = struct
+  (* See the [.mli]. *)
   let gl () : Proofview.Goal.t = !X.gl
+
+  (* See the [.mli]. *)
   let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
+
+  (* See the [.mli]. *)
   let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps (gl ())
 
+  (* See the [.mli]. *)
   let get_hyp_name (x : Rocq_utils.hyp) : Names.Id.t =
     Context.Named.Declaration.get_id x
   ;;
 
+  (* See the [.mli]. *)
   let get_hyp_names () : Names.Id.Set.t = Context.Named.to_vars (get_hyps ())
 
+  (* See the [.mli]. *)
   let next_name_of (names : Names.Id.Set.t) (x : Names.Id.t) : Names.Id.t =
     Namegen.next_ident_away x names
   ;;
 
+  (* See the [.mli]. *)
   let new_name_of_string (x : string) : Names.Id.t =
     next_name_of (get_hyp_names ()) (Names.Id.of_string x)
   ;;
 
+  (* See the [.mli]. *)
   let new_cofix_name () : Names.Id.t = new_name_of_string "Cofix0"
   let new_H_name () : Names.Id.t = new_name_of_string "H0"
 
+  (* See the [.mli]. *)
   let get_all_cofix_hyp_names () : Names.Id.Set.t =
     Names.Id.Set.filter
       (fun (x : Names.Id.t) ->
@@ -55,6 +66,7 @@ module Make (Enc : Encoding.S) (X : Args) :
       (get_hyp_names ())
   ;;
 
+  (* See the [.mli]. *)
   let get_all_non_cofix_hyp_names () : Names.Id.Set.t =
     Names.Id.Set.diff (get_hyp_names ()) (get_all_cofix_hyp_names ())
   ;;
@@ -83,13 +95,31 @@ module Make (Enc : Encoding.S) (X : Args) :
 
   include I
 
+  (* See the [.mli]. *)
   let log_concl () : unit = log_econstr ~s:"concl" (get_concl ())
+
+  (* See the [.mli]. *)
   let log_hyps () : unit = Logger.things Debug "hyps" (get_hyps ()) Strfy.hyp
 
-  (** [EConstrSet] is a custom [Set] of [EConstr.t] that allows terms to be compared more efficiently during {b a single proof step only}. Since each proof step gets a new [env] and [sigma] (a fresh [module Iter], and with it a fresh [EConstrSet], is created on every call to {!Proof_solver.step} -- see [make]/[step] there), the same underlying term may encode differently across steps, so an [EConstrSet.t] built in one step is not meaningful to compare against one built in another.
+  (** [EConstrSet] is a custom [Set] of [EConstr.t] that allows terms to be
+      compared more efficiently during {b a single proof step only}. Since each
+      proof step gets a new [env] and [sigma] (a fresh [module Iter], and with
+      it a fresh [EConstrSet], is created on every call to {!Proof_solver.step}
+      -- see [make]/[step] there), the same underlying term may encode
+      differently across steps, so an [EConstrSet.t] built in one step is not
+      meaningful to compare against one built in another.
 
-      {b Audited 2026-09-27:} no call site does this. Every use ([Proof_solver_tactics.collect_component_econstrs]/[try_unfold_any]) builds, consumes and discards an [EConstrSet.t] within a single function call, and no persistent state type ([Proof_solver_statem.S], [Proof_solver.t]) ever stores one. This holds structurally, not by convention: the whole module tree containing [EConstrSet] is torn down and rebuilt fresh each step, so a value could not survive to the next step even if something tried to stash it. If a future change introduces a call site that returns or stores an [EConstrSet.t] outside of one step's local computation, that would break this invariant and needs the same scrutiny this comment once flagged.
-  *)
+      {b Audited 2026-09-27:} no call site does this. Every use
+      ([Proof_solver_tactics.collect_component_econstrs]/[try_unfold_any])
+      builds, consumes and discards an [EConstrSet.t] within a single function
+      call, and no persistent state type ([Proof_solver_statem.S],
+      [Proof_solver.t]) ever stores one. This holds structurally, not by
+      convention: the whole module tree containing [EConstrSet] is torn down and
+      rebuilt fresh each step, so a value could not survive to the next step
+      even if something tried to stash it. If a future change introduces a call
+      site that returns or stores an [EConstrSet.t] outside of one step's local
+      computation, that would break this invariant and needs the same scrutiny
+      this comment once flagged. *)
   module EConstrSet = struct
     include Set.Make (struct
         type t = EConstr.t

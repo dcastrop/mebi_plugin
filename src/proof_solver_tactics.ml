@@ -36,9 +36,9 @@ module type S = sig
   (** [exact_term p] closes the goal with proof term [p]. *)
   val exact_term : EConstr.t -> tactic mm
 
-  (** [invert_premise h]: [simpl in h; inversion h; clear h; subst], for a premise
-      hypothesis that mentions variables it determines (an output, such as a
-      target [m] in [succ_rel n m]; backlog I2, stage 2). *)
+  (** [invert_premise h]: [simpl in h; inversion h; clear h; subst], for a
+      premise hypothesis that mentions variables it determines (an output, such
+      as a target [m] in [succ_rel n m]; backlog I2, stage 2). *)
   val invert_premise : Rocq_utils.hyp -> tactic mm
 
   (** [prove_negation ()] proves a goal [~ P] whose [P] is refutable. *)
@@ -182,6 +182,7 @@ module Make
   (* *)
   open Iter
 
+  (* See the [.mli]. *)
   let inversion (x : Rocq_utils.hyp) : Tactic.t mm =
     Inv.inv_tac (Context.Named.Declaration.get_id x)
     |> Tactic.create
@@ -192,8 +193,9 @@ module Make
     |> return
   ;;
 
-  (* See [Premise_search.refute_hyp_tac]: unfold, [inversion_clear], and
-     refute whatever premise each remaining goal is left with. *)
+  (* See the [.mli]: {!Premise_search.refute_hyp_tac} unfolds, inverts
+     ([inversion_clear]), and refutes whatever premise each remaining goal is
+     left with. *)
   let refute_premise (x : Rocq_utils.hyp) : Tactic.t mm =
     Premise_search.refute_hyp_tac (Context.Named.Declaration.get_id x)
     |> Tactic.create
@@ -201,6 +203,7 @@ module Make
     |> return
   ;;
 
+  (* See the [.mli]. *)
   let refute_dead (x : Rocq_utils.hyp) : Tactic.t mm =
     let id = Context.Named.Declaration.get_id x in
     Proofview.tclORELSE (Premise_search.refute_hyp_tac id) (fun _ ->
@@ -214,11 +217,11 @@ module Make
     |> return
   ;;
 
-  (* [inversion; clear; subst], not [inversion_clear]: the latter reverts
-     the hypotheses that depend on the premise's variables -- the transition
-     hypothesis [H : lts n a m] -- and reintroduces them with a fresh,
-     unconstrained [m], so [get_transition] never sees the computed target.
-     Checked by hand, 2026-10-02. *)
+  (* See the [.mli]. [inversion; clear; subst], not [inversion_clear]: the
+     latter reverts the hypotheses that depend on the premise's variables --
+     the transition hypothesis [H : lts n a m] -- and reintroduces them with
+     a fresh, unconstrained [m], so [get_transition] never sees the computed
+     target. Checked by hand, 2026-10-02. *)
   let invert_premise (x : Rocq_utils.hyp) : Tactic.t mm =
     let id = Context.Named.Declaration.get_id x in
     Proofview.tclTHEN
@@ -238,39 +241,45 @@ module Make
     |> return
   ;;
 
+  (* See the [.mli]. *)
   let prove_negation () : Tactic.t mm =
     Premise_search.negation_tac
     |> Tactic.create ~msg:"(prove negated premise)"
     |> return
   ;;
 
+  (* See the [.mli]. *)
   let prove_bounded () : Tactic.t mm =
     Premise_search.premise_tac ()
     |> Tactic.create ~msg:"(prove bounded universal premise)"
     |> return
   ;;
 
+  (* See the [.mli]. *)
   let subst_all () : Tactic.t mm =
     Equality.subst_all ()
     |> Tactic.create ~kind:Info ~msg:(Printf.sprintf "(subst all)")
     |> return
   ;;
 
-  (** by specifying [None] it appears to be the same as using [simpl in *]. *)
+  (* See the [.mli]: [simpl_option None] is [simpl in *]. *)
   let simplify () : Tactic.t mm =
     Tactics.simpl_option None |> Tactic.create ~msg:"simpl" |> return
   ;;
 
+  (* See the [.mli]. *)
   let simplify_concl () : Tactic.t mm =
     Tactics.simpl_in_concl |> Tactic.create ~msg:"simpl" |> return
   ;;
 
+  (* See the [.mli]. *)
   let simplify_hyp (x : Rocq_utils.hyp) : Tactic.t mm =
     Tactics.simpl_in_hyp (Context.Named.Declaration.get_id x, Locus.InHyp)
     |> Tactic.create ~msg:(Printf.sprintf "simpl in %s" (Strfy.hyp_name x))
     |> return
   ;;
 
+  (* See the [.mli]. *)
   let simplify_hyps () : Tactic.t mm =
     match get_hyps () with
     | [] -> Tactic.empty () |> return
@@ -294,6 +303,7 @@ module Make
     Tactic.seq concl hyps |> return
   ;;
 
+  (* See the [.mli]. *)
   let exact_term (p : EConstr.t) : Tactic.t mm =
     Logger.trace __FUNCTION__;
     Tactics.exact_check p
@@ -301,11 +311,13 @@ module Make
     |> return
   ;;
 
+  (* See the [.mli]. *)
   let reflexivity () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     Tactics.reflexivity_red true |> Tactic.create ~msg:"reflexivity" |> return
   ;;
 
+  (* See the [.mli]. *)
   let simplify_and_subst_all () : Tactic.t mm =
     let open Syntax in
     (* let* simpls : Tactic.t = simplify_all () in *)
@@ -314,6 +326,7 @@ module Make
     Tactic.seq simpls substs |> return
   ;;
 
+  (* See the [.mli]. *)
   let cofix () : Tactic.t mm =
     let name : Names.Id.t = new_cofix_name () in
     FixTactics.cofix name
@@ -321,16 +334,7 @@ module Make
     |> return
   ;;
 
-  (** [mutual_cofix root others] opens a mutual cofixpoint: [root]'s type comes
-      from the goal, [others] supplies the name and type of every other
-      definition in the block, and one goal is produced per definition with the
-      whole block in scope as hypotheses.
-
-      Must be sequenced with [all_goals] applying [In_sim]/[Pack_sim]/[intros]
-      in the SAME tactic. Straight after this, every goal in the block is
-      syntactically its own hypothesis, so anything that consults the
-      coinduction hypotheses before a constructor has been applied closes the
-      goal unguarded and [Qed] rejects the proof. *)
+  (* See the [.mli]. *)
   let mutual_cofix (root : Names.Id.t) (others : (Names.Id.t * EConstr.t) list)
     : Tactic.t mm
     =
@@ -344,16 +348,15 @@ module Make
     |> return
   ;;
 
-  (* [Proofview.Goal.enter] focuses each goal in turn and runs the tactic on
-     it, which is this engine's "to every goal". The solver's own [step] relies
-     on the same thing. *)
+  (* See the [.mli]. [Proofview.Goal.enter] focuses each goal in turn and
+     runs the tactic on it, which is this engine's "to every goal"; the
+     solver's own [step] relies on the same. *)
   let all_goals (x : Tactic.t) : Tactic.t =
     Proofview.Goal.enter (fun _ -> Tactic.unpack x)
     |> Tactic.create ~msg:"(to all goals)"
   ;;
 
-  (** [trivial ?msg ()] applies the [Auto.gen_trivial] (i.e., [trivial]) tactic. If the [module Log] is configured to display [Output.Kind.Info] messages, then the equivalent of tactic [info_trivial] is used instead.
-  *)
+  (* See the [.mli]. *)
   let trivial ?(msg : string = "trivial") () : Tactic.t mm =
     let f : string list option -> unit Proofview.tactic =
       if Logger.is_enabled Output.Kind.Info
@@ -363,13 +366,7 @@ module Make
     Tactic.create ~msg (f None) |> return
   ;;
 
-  (** [exact_hyp h] closes the goal with the hypothesis [h] itself.
-
-      Used where the goal has already been established equal to [h]'s type, so
-      there is nothing to search for. It replaces a [trivial], which found the
-      same hypothesis by hint search: cheap while the context holds one
-      coinduction hypothesis per branch, but not once the whole relation is in
-      scope at once, and free to pick something else. *)
+  (* See the [.mli]. *)
   let exact_hyp (x : Rocq_utils.hyp) : Tactic.t mm =
     let name : Names.Id.t = Context.Named.Declaration.get_id x in
     Tactics.exact_check (EConstr.mkVar name)
@@ -377,6 +374,7 @@ module Make
     |> return
   ;;
 
+  (* See the [.mli]. *)
   let ex_intro (x : Model.State.t) : Tactic.t mm =
     let t : EConstr.t = Decode.state x in
     let bindings = Tactypes.ImplicitBindings [ t ] in
@@ -384,10 +382,12 @@ module Make
     Tactic.create ~msg (Tactics.constructor_tac true None 1 bindings) |> return
   ;;
 
+  (* See the [.mli]. *)
   let split () : Tactic.t mm =
     Tactic.create (Tactics.split Tactypes.NoBindings) |> return
   ;;
 
+  (* See the [.mli]. *)
   let ex_intro_split (x : Model.State.t) : Tactic.t mm =
     let open Syntax in
     let* ex_intro : Tactic.t = ex_intro x in
@@ -395,12 +395,13 @@ module Make
     Tactic.seq ex_intro split |> return
   ;;
 
+  (* See the [.mli]. *)
   let intros_all () : Tactic.t mm =
     Tactics.intros |> Tactic.create ~msg:"intros" |> return
   ;;
 
-  (** [intro_as x] applies the introduction tactic using the (next non-conficting) name [x].
-  *)
+  (** [intro_as x] applies the introduction tactic using the (next
+      non-conficting) name [x]. *)
   let intro_as (x : string) : Tactic.t mm =
     let name : Names.Id.t = new_name_of_string x in
     Tactics.introduction name
@@ -408,47 +409,61 @@ module Make
     |> return
   ;;
 
-  (* *)
+  (* See the [.mli]. *)
   let apply (x : EConstr.t) : Tactic.t mm =
     Tactics.apply x
     |> Tactic.create ~msg:(Printf.sprintf "apply %s" (Strfy.econstr x))
     |> return
   ;;
 
+  (* See the [.mli]. *)
   let apply_Pack_sim () : Tactic.t mm = apply (Mebi_theories.get "Pack_sim")
+
+  (* See the [.mli]. *)
   let apply_In_sim () : Tactic.t mm = apply (Mebi_theories.get "In_sim")
+
+  (* See the [.mli]. *)
   let apply_wk_none () : Tactic.t mm = apply (Mebi_theories.get "wk_none")
+
+  (* See the [.mli]. *)
   let apply_rt1n_refl () : Tactic.t mm = apply (Mebi_theories.get "rt1n_refl")
   let apply_rt1n_trans () : Tactic.t mm = apply (Mebi_theories.get "rt1n_trans")
 
+  (* See the [.mli]. *)
   let apply_weak_sim_refl () : Tactic.t mm =
     apply (Mebi_theories.get "weak_sim_refl")
   ;;
 
+  (* See the [.mli]. *)
   let apply_Pack_bisim () : Tactic.t mm = apply (Mebi_theories.get "Pack_bisim")
+
+  (* See the [.mli]. *)
   let apply_In_bisim () : Tactic.t mm = apply (Mebi_theories.get "In_bisim")
 
+  (* See the [.mli]. *)
   let apply_weak_bisimilar_refl () : Tactic.t mm =
     apply (Mebi_theories.get "weak_bisimilar_refl")
   ;;
 
-  (* let apply_wk_bisim_refl () : Tactic.t mm = apply (Mebi_theories.c_wk_bisim_refl ()) *)
-
+  (* See the [.mli]. *)
   let eapply (x : EConstr.t) : Tactic.t mm =
     Tactics.eapply x
     |> Tactic.create ~msg:(Printf.sprintf "eapply %s" (Strfy.econstr x))
     |> return
   ;;
 
+  (* See the [.mli]. *)
   let eapply_wk_some () : Tactic.t mm = eapply (Mebi_theories.get "wk_some")
+
+  (* See the [.mli]. *)
   let eapply_rt1n_refl () : Tactic.t mm = eapply (Mebi_theories.get "rt1n_refl")
 
+  (* See the [.mli]. *)
   let eapply_rt1n_trans () : Tactic.t mm =
     eapply (Mebi_theories.get "rt1n_trans")
   ;;
 
-  (** {b counter intuitively, this applies a transition if the label is silent.} This is because we use this to determine if we need to unfold the [weak] transition from the [Bisimilarity.v] theory.
-  *)
+  (* See the [.mli]. *)
   let eapply_rt1n_via (x : Model.Label.t) : Tactic.t mm =
     if Model.Label.is_silent x
     then eapply_rt1n_trans ()
@@ -458,9 +473,7 @@ module Make
   (* *)
   exception CannotUnfoldConstr of Constr.t
 
-  (** [unfold_constr ?in_hyp x] ... {e NOTE: term [x] is always unfolded. If [?in_hyp] is provided then we {b also} unfold [x] [in_hyp].}
-      @raise CannotUnfoldConstr of [x] if [Constr.kind x] is not [Const (_, _)].
-  *)
+  (* See the [.mli]. *)
   let unfold_constr ?(in_hyp : Rocq_utils.hyp option) (x : Constr.t) : Tactic.t =
     Logger.trace __FUNCTION__;
     match Constr.kind x with
@@ -481,8 +494,7 @@ module Make
     | _ -> raise (CannotUnfoldConstr x)
   ;;
 
-  (** [handle_unfold_hyp_opt f ?in_hyp x] helps keep this function cleaner to use. i.e., [unfold_econstr ~in_hyp:x] rather than [~in_hyp:(Some x)].
-  *)
+  (* See the [.mli]. *)
   let f_unfold_hyp
         (f : ?in_hyp:Rocq_utils.hyp -> 'a -> Tactic.t)
         ?(in_hyp : Rocq_utils.hyp option = None)
@@ -493,6 +505,7 @@ module Make
     match in_hyp with None -> f x | Some in_hyp -> f ~in_hyp x
   ;;
 
+  (* See the [.mli]. *)
   let unfold_econstr ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
     : Tactic.t
     =
@@ -501,6 +514,7 @@ module Make
     econstr_to_constr x |> run |> f_unfold_hyp unfold_constr ~in_hyp
   ;;
 
+  (* See the [.mli]. *)
   let unfold_constrexpr
         ?(in_hyp : Rocq_utils.hyp option)
         (x : Constrexpr.constr_expr)
@@ -512,6 +526,7 @@ module Make
     constrexpr_to_econstr x |> run |> f_unfold_hyp unfold_econstr ~in_hyp
   ;;
 
+  (* See the [.mli]. *)
   let unfold_opt_constrexpr_list ?(in_hyp : Rocq_utils.hyp option)
     : Constrexpr.constr_expr list -> Tactic.t option
     =
@@ -529,13 +544,14 @@ module Make
       (match ys with [] -> None | ys -> Some (Tactic.chain ys))
   ;;
 
+  (* See the [.mli]. *)
   let unfold_silent () : Tactic.t = unfold_econstr (Mebi_theories.get "silent")
 
   let unfold_silent1 () : Tactic.t =
     unfold_econstr (Mebi_theories.get "silent1")
   ;;
 
-  (* *)
+  (* See the [.mli]. *)
   let do_refl () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -545,7 +561,7 @@ module Make
     Tactic.chain [ wk_none; unfold_silent; rt1n_refl ] |> return
   ;;
 
-  (* *)
+  (* See the [.mli]. *)
   let collect_component_econstrs (sigma : Evd.evar_map) (x : EConstr.t)
     : EConstrSet.t
     =
@@ -581,14 +597,14 @@ module Make
           tys
       with
       | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ ->
-        (* log_econstr ~__FUNCTION__ ~s:"Err: Rocq_utils_EConstrIsNotA_Type" x; *)
+        (* log_econstr ~__FUNCTION__ ~s:"Err: Rocq_utils_EConstrIsNotA_Type" x;
+        *)
         acc
     in
     f EConstrSet.empty x
   ;;
 
-  (** [can_be_unfolded sigma x] returns [true] if [x] can be {e unfolded}, i.e., refers to a definition, e.g., of a definition, fixpoint or example.
-  *)
+  (* See the [.mli]. *)
   let can_be_unfolded (sigma : Evd.evar_map) (x : EConstr.t) : bool =
     Logger.trace __FUNCTION__;
     try
@@ -599,7 +615,8 @@ module Make
          | { const_body = Def z; const_type; _ } ->
            (* log_econstr ~__FUNCTION__ ~s:"x" x; *)
            (* _log_constr_kind ~__FUNCTION__ "(z kinds, z)" z; *)
-           (* _log_constr_kind ~__FUNCTION__ "(kinds, const_type)" const_type; *)
+           (* _log_constr_kind ~__FUNCTION__ "(kinds, const_type)" const_type;
+              *)
            (match Constr.kind z with
             | Fix _ ->
               (* log_econstr ~__FUNCTION__ ~s:"is Fix" x; *)
@@ -631,17 +648,14 @@ module Make
       false
   ;;
 
-  (** [try_unfold_any x] chains an [unfold] for every unfoldable,
-      non-theory constant in [x]. Within one term these are distinct by
-      construction ([collect_component_econstrs] returns an [EConstrSet]).
-
-      {i Duplicates across terms (formerly a TODO here).} Only
-      {!try_unfold_any_of} combines several terms, at one call site
-      ([Proof_solver_step.handle_hyp_transition], on the conclusion's
-      [wk_trans] and [wk_sim]), where a constant in both would be unfolded
-      twice. Measured 2026-10-01 over the whole proof suite (27 [Solve]s,
-      829 calls): the two never share an unfoldable constant (14 calls find 6
-      distinct, the rest none), so no dedup is done. Backlog item A4. *)
+  (* See the [.mli]. Within one term the constants are distinct
+     ({!collect_component_econstrs} returns a set). Across terms only
+     {!try_unfold_any_of} combines several, at one call site
+     ([Proof_solver_step.handle_hyp_transition], on the conclusion's
+     [wk_trans] and [wk_sim]), where a constant in both would be unfolded
+     twice. Measured 2026-10-01 over the whole proof suite (27 [Solve]s, 829
+     calls): the two never share an unfoldable constant (14 calls find 6
+     distinct, the rest none), so no dedup is done. Backlog item A4. *)
   let try_unfold_any ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
     : Tactic.t option mm
     =
@@ -668,6 +682,7 @@ module Make
        | ys -> Some (Tactic.chain ys) |> return)
   ;;
 
+  (* See the [.mli]. *)
   let rec try_unfold_any_of : EConstr.t list -> Tactic.t option mm =
     Logger.trace __FUNCTION__;
     function
@@ -687,6 +702,7 @@ module Make
 
   exception NoRocqLTSFoundWithEnc of Enc.t
 
+  (* See the [.mli]. *)
   let find_lts (lts_enc : Enc.t)
     : Model.Info.Meta.RocqLTS.t list -> Model.Info.Meta.RocqLTS.t
     =
@@ -700,6 +716,7 @@ module Make
 
   exception NoConstructorFoundWithIndex of int
 
+  (* See the [.mli]. *)
   let find_constructor (constructor_index : int)
     : ConstructorBindings.t list -> ConstructorBindings.t
     =
@@ -717,6 +734,7 @@ module Make
     ; label : EConstr.t option
     }
 
+  (* See the [.mli]. *)
   let get_constructor_bindings
         ({ from; goto; label } : binding_args)
         (bindings : Bindings.t)
@@ -726,9 +744,7 @@ module Make
     W.ConstructorBindings.get from label goto bindings |> W.M.run
   ;;
 
-  (** if we have no way of obtaining the bindings (i.e., not info.meta) then we use no bindings.
-      (* TODO: check if we can optimize this so we use [NoBindings] where possible *)
-  *)
+  (* See the [.mli]. *)
   let try_get_constructor_bindings
         ((enc, index) : Enc.Tree.Node.t)
         (args : binding_args)
@@ -745,7 +761,8 @@ module Make
       get_constructor_bindings args bindings
   ;;
 
-  (** A goal that is an LTS step of either FSM, or already solved. *)
+  (** [is_lts_goal sigma g] is whether the goal [g] is an LTS step of
+      either FSM, or already solved. Raises nothing. *)
   let is_lts_goal (sigma : Evd.evar_map) (gl : Proofview_monad.goal_with_state)
     : bool
     =
@@ -778,18 +795,18 @@ module Make
     Proofview.Unsafe.tclSETGOALS (lts @ others)
   ;;
 
-  (** Run after [move_premises_last], while the constructor's subgoals are
-      all visible. A binder that appears only in premises that are not LTS
-      steps ([q] in [base q a q' -> open_c n a q'] with [base] not in
-      [Using]) is an evar no LTS premise's replay will fix, and the premise
-      goal it leaves open ([base ?q a 1]) cannot be proved as it is: the
-      search proves closed goals. Such witnesses are chosen here, by
-      enumerating every premise goal that mentions them together (a choice
-      that suits one premise may fail another: [In q [0; 1]] and [base q a 2]) and committing the first solution that fixes each of them to a
-      closed term. Any such solution will do: no other goal mentions them.
-      A goal that also mentions an evar an LTS premise fixes is left alone,
-      so as not to pre-empt that replay. Until 2026-10-03 the solver stopped
-      on such a goal ("cannot prove the constructor premise"). *)
+  (** Run after [move_premises_last], while the constructor's subgoals are all
+      visible. A binder that appears only in premises that are not LTS steps
+      ([q] in [base q a q' -> open_c n a q'] with [base] not in [Using]) is an
+      evar no LTS premise's replay will fix, and the premise goal it leaves open
+      ([base ?q a 1]) cannot be proved as it is: the search proves closed goals.
+      Such witnesses are chosen here, by enumerating every premise goal that
+      mentions them together (a choice that suits one premise may fail another:
+      [In q [0; 1]] and [base q a 2]) and committing the first solution that
+      fixes each of them to a closed term. Any such solution will do: no other
+      goal mentions them. A goal that also mentions an evar an LTS premise fixes
+      is left alone, so as not to pre-empt that replay. Until 2026-10-03 the
+      solver stopped on such a goal ("cannot prove the constructor premise"). *)
   let fix_premise_witnesses : unit Proofview.tactic =
     let open Proofview.Notations in
     Proofview.tclENV
@@ -853,6 +870,7 @@ module Make
 
   exception GoalNotAnLTSStep
 
+  (* See the [.mli]. *)
   let apply_constructor ((enc, index) : Enc.Tree.Node.t) (args : binding_args)
     : Tactic.t mm
     =

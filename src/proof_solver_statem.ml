@@ -127,6 +127,7 @@ module Make
 
     exception TransitionHasNoConstructorsToApply
 
+    (* See the [.mli]. *)
     let init ({ from; goto; label; tree; annotation } : W.Model.Transition.t)
       : t
       =
@@ -138,7 +139,8 @@ module Make
           (match annotation, tree with
            (* NOTE: is a saturated transition *)
            | Some y, _ -> Some y
-           (* NOTE: is an unsaturated transition, so we use the contructor tree *)
+           (* NOTE: is an unsaturated transition, so we use the contructor tree
+           *)
            | None, Some y ->
              Some
                { this = { from; label; goto; using = Enc.Trees.singleton y }
@@ -151,13 +153,7 @@ module Make
   end
 
   module StateM = struct
-    (** [t] represents the internal state-machine used to solve proofs.
-        (Note: We are required to split some of the states over several steps since we need to update the proof iteratively in order to apply what we need to apply. E.g., it is easier to apply the constructors one after the other, since we require the proof to be updated by the previous appliction in order to apply the next.)
-        - [NewProof] the start state. We unfold any terms that we can before proceeding to [WeakSim].
-        - [WeakSim] either: (i) check if can be solved by cofix in hyps, or (ii) create new cofix. Either stays in [WeakSim] (to invert or unfold the hyps) or proceeds to [Exists], or [Done].
-        - [Exists] means that the conclusion begins with an [exists a n2] (where [n2] is some state reached from [n] after taking action [a]). We: (1) extract the transition made by fsm "a" from the hyps (possible requiring inversion beforehand), (2) determine which transition fsm "b" will make in response to the one made by fsm "a" (in the hyps), and (3) apply [ex_intro] and [split] tactics to the conclusion (since we now know what to instantiate state [n2] with). If We may re-enter [Exists] if we make "b" do a reflexive transition, in which case we apply the necessary constructors to finish the case and proceed to [WeakSim], else we proceed to [ApplyConstructors].
-        - [ApplyConstructors] is for applying the constructors we know we need to apply in order for fsm "b" to reach a state that is bisimilar to that reached by fsm "a".
-        - [Done] means the proof is finished. *)
+    (* See the [.mli]. *)
     type t =
       | Done
       | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
@@ -192,14 +188,17 @@ module Make
 
   exception NoStateFound
 
+  (* See the [.mli]. *)
   let get () : t ref =
     match !the_state with None -> raise NoStateFound | Some x -> x
   ;;
 
+  (* See the [.mli]. *)
   let set (pstate : Declare.Proof.t) (x : StateM.t) : unit =
     the_state := Some (ref { p = pstate; x })
   ;;
 
+  (* See the [.mli]. *)
   let init
         (pstate : Declare.Proof.t)
         (x : Constrexpr.constr_expr * Constrexpr.constr_expr)
@@ -208,25 +207,30 @@ module Make
     set pstate (NewProof x)
   ;;
 
+  (* See the [.mli]. *)
   let get_pstate () : Declare.Proof.t = !(get ()).p
+
+  (* See the [.mli]. *)
   let get_statem () : StateM.t = !(get ()).x
 
+  (* See the [.mli]. *)
   let update_pstate (pstate : Declare.Proof.t) : unit =
     the_state := Some (ref { !(get ()) with p = pstate })
   ;;
 
+  (* See the [.mli]. *)
   let update_statem (state : StateM.t) : unit =
     the_state := Some (ref { !(get ()) with x = state })
   ;;
 
-  (** [is_done ()] is true if the state [x] is [Done], else checks if [p] is done (via [Proof.is_done]).
-  *)
+  (* See the [.mli]. *)
   let is_done () : bool =
     match !(get ()) with
     | { p; x = Done } -> true
     | { p; x } -> Proof.is_done (Declare.Proof.get p)
   ;;
 
+  (* See the [.mli]. *)
   let log ?(__FUNCTION__ : string = "") () : unit =
     Logger.thing
       ~__FUNCTION__

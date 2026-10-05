@@ -3,20 +3,36 @@ module type S = sig
 
   type fsm
 
+  (** Raised by {!is_fsm_silent_label}: the FSM has no silent label. *)
   exception FSM_HasNoSilentLabel of fsm
 
+  (** [is_fsm_silent_label x m] is whether [x] is one of [m]'s silent
+      labels.
+
+      @raise FSM_HasNoSilentLabel if [m] has none (raised here). *)
   val is_fsm_silent_label : EConstr.t -> fsm -> bool
 
+  (** Raised by {!is_fsm_visible_label}: the FSM has no visible weak label. *)
   exception FSM_HasNoVisibleLabel of fsm
 
+  (** [is_fsm_visible_label x m] is whether [x] is one of [m]'s weak labels
+      that are not silent.
+
+      @raise FSM_HasNoVisibleLabel if [m] has none (raised here). *)
   val is_fsm_visible_label : EConstr.t -> fsm -> bool
 
   exception FSM_HasNoWeakLabels of fsm
 
   val is_fsm_weak_labels : EConstr.t -> fsm -> bool
 
+  (** Raised by {!is_fsm_constructor}: the FSM has no metadata, so no
+      constructors. *)
   exception FSM_HasNoConstructors of fsm
 
+  (** [is_fsm_constructor x m] is whether [x] is one of the LTSs [m] was
+      extracted with (not a theory term).
+
+      @raise FSM_HasNoConstructors if [m] has no metadata (raised here). *)
   val is_fsm_constructor : EConstr.t -> fsm -> bool
 end
 
