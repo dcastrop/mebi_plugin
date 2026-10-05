@@ -6270,6 +6270,9 @@ sandbox cannot nest there); Jonah ran `opam install odoc odig`.
 **Verification:** `opam install . --locked --deps-only` with and without
 `--with-dev-setup`: "Nothing to do". `dune build @doc` builds the site,
 with 702 warnings (baseline for the cross-reference pass).
+
+---
+
 ## 2026-10-05 — Documentation pass, part 3: `lib/model`
 
 **Docs + Refactor.** On branch `docs/model-components`, after Jonah's go
