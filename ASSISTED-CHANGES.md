@@ -6428,6 +6428,45 @@ dead-code removals) · Tooling 1.
 
 ---
 
+## 2026-10-05 — Documentation pass, part 6: the proof solver's support modules
+
+**Docs + Refactor.** On branch `docs/src-solver`. The proof solver is
+3,700 lines, so it is two PRs: this one (`proof_solver_tactic`,
+`_tactics`, `_theory`, `_wrapper`, `_statem`), then `proof_solver` and
+`proof_solver_step`.
+
+**Comments** (`3c35e3d`, `2bdeb59`; comments only): contracts in the
+`.mli`, the state machine's description moved there from the `.ml`, the
+history kept where it is the "how" (A4's measurement in `try_unfold_any`,
+why `invert_premise` uses `inversion; clear; subst`). A small helper,
+`notes/tools/reflow.py`, rewraps comments past 80 columns (`ocamlformat`
+leaves long ones alone when they hold code spans).
+
+**Dead code** (`41a3b15`): `simplify_all`, `intro_as`,
+`apply_rt1n_trans`, `unfold_silent1`, `is_fsm_weak_labels` (and the
+exception only it raised), `new_H_name`, `do_nothing`; 24 commented-out
+debugging calls and empty comments in `Proof_solver_tactics`.
+
+**Splits**, one commit each: `fix_premise_witnesses` into `goal_concl`,
+`union_evars`, `open_witnesses`, `conjunction` and `fixes_closed`;
+`unfoldable_definition` (from `can_be_unfolded`); `unfolding_of` (from
+`try_unfold_any`). The small closures that stay are commented.
+
+**Verification.** Each code commit (the removal and the splits), in its
+own worktree: the proof matrix in all three solver modes, every `Solve`
+identical; the last split's commit is followed only by comments, and the
+head also passed the `Test4` suite, identical, with `Test.v`'s 60 counts
+identical to `main`'s (they exercise the premise-witness code split here).
+`tests.exe` 103/103; `make` clean.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/src-solver main`), or one commit.
+
+**Session tally (2026-10-05), cont.:** Docs 6 · Refactor 18 (14 splits, 4
+dead-code removals) · Tooling 2 (`relock.sh`, `reflow.py`).
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
