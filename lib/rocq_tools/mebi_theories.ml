@@ -5,11 +5,10 @@ module Log = Logger.Scoped (struct
     let overrides = [ Output.Kind.Debug, true; Output.Kind.Trace, true ]
   end)
 
-(* See the [.mli]. [constants'] is {!get_constants}' cache. *)
-let constants : EConstr.t list ref = ref ([] : EConstr.t list)
+(** {!get_constants}' cache. *)
 let constants' : (string, EConstr.t) Hashtbl.t ref option ref = ref None
 
-(** Raised by {!find_reference}; not exported (see the [.mli]). *)
+(* See the [.mli]. *)
 exception ErrorWithGlobalOfPath
 
 (* See the [.mli]. *)
@@ -112,7 +111,3 @@ let get (k : string) : EConstr.t =
   | Some v -> v
   | None -> constant_not_found k
 ;;
-
-(* See the [.mli] for these two. *)
-let get_proof_from_pstate : Declare.Proof.t -> Proof.t = Declare.Proof.get
-let get_partial_proof : Proof.t -> EConstr.t list = Proof.partial_proof

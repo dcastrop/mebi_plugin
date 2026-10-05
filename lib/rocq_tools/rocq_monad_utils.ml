@@ -424,14 +424,15 @@ module Make (Enc : Encoding.S) :
     state (fun env sigma -> sigma, EConstr.isEvar sigma x)
   ;;
 
-  (* See the [.mli]: [abort_on_undefined_evars] is not passed on. *)
+  (* See the [.mli]. *)
   let econstr_to_constr
         ?(abort_on_undefined_evars : bool = false)
         (x : EConstr.t)
     : Constr.t mm
     =
     Logger.trace __FUNCTION__;
-    state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr sigma x)
+    state (fun env sigma ->
+      sigma, Rocq_utils.econstr_to_constr ~abort_on_undefined_evars sigma x)
   ;;
 
   (* See the [.mli]. *)
@@ -1126,7 +1127,10 @@ module Make (Enc : Encoding.S) :
         else sigma, { to_check; acc }
       ;;
 
-      (* See the [.mli]: only [CannotUnify] is caught. *)
+      (* See the [.mli]. Only failures that show there is no unifier mean
+         [false]; one where Rocq gives up (beyond its capabilities,
+         unsatisfiable constraints) is not a "no", so it stays an error
+         rather than silently dropping a transition. *)
       let unify
             (env : Environ.env)
             (sigma : Evd.evar_map)
@@ -1139,7 +1143,9 @@ module Make (Enc : Encoding.S) :
           in
           sigma, true
         with
-        | Pretype_errors.PretypeError (_, _, CannotUnify (c, d, _e)) ->
+        | Pretype_errors.PretypeError
+            (_, _, (CannotUnify _ | UnifOccurCheck _ | CannotUnifyBindingType _))
+          ->
           sigma, false
       ;;
 
@@ -1166,7 +1172,7 @@ module Make (Enc : Encoding.S) :
           let json ?as_elt ({ act; goto; tree } : t) : Yojson.t =
             `Assoc
               [ "act", Pair.json ~as_elt:true act
-              ; "goto", Pair.json ~as_elt:true act
+              ; "goto", Pair.json ~as_elt:true goto
               ; "tree", Enc.Tree.json ~as_elt:true tree
               ]
           ;;

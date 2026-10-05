@@ -56,8 +56,7 @@ type econstr_kind =
     , Evd.erelevance )
     Constr.kind_of_term
 
-(** Raised by {!econstr_to_app}, and by {!econstr_to_lambda}: not of the expected kind.
-*)
+(** Raised by {!econstr_to_app}: not an application. *)
 exception
   Rocq_utils_EConstrIsNot_App of (Evd.evar_map * Evd.econstr * econstr_kind)
 
@@ -75,17 +74,15 @@ type lambda_triple =
   * Evd.econstr
   * Evd.econstr
 
-(** Meant for {!econstr_to_lambda}, which raises
-    {!Rocq_utils_EConstrIsNot_App} instead; never raised ([TODO.md]). *)
+(** Raised by {!econstr_to_lambda}: not a [fun]. *)
 exception
   Rocq_utils_EConstrIsNot_Lambda of (Evd.evar_map * Evd.econstr * econstr_kind)
 
 (** [econstr_to_lambda sigma x] is the binder, type and body of the [fun]
     [x].
 
-    @raise Rocq_utils_EConstrIsNot_App
-      if [x] is not a [fun] (raised here;
-      not {!Rocq_utils_EConstrIsNot_Lambda}, see [TODO.md]). *)
+    @raise Rocq_utils_EConstrIsNot_Lambda if [x] is not a [fun] (raised here).
+*)
 val econstr_to_lambda : Evd.evar_map -> Evd.econstr -> lambda_triple
 
 (** A named hypothesis of a goal. *)
@@ -173,11 +170,7 @@ val type_of_econstr
   -> Evd.econstr
   -> Evd.evar_map * Evd.econstr
 
-(** Rocq values as strings, for logs and messages. Each raises nothing.
-    Several are still placeholders that return "TODO: ..." instead of the
-    value: [ind_constr], [ind_constrs], [constr_kind], [econstr_type],
-    [econstr_types], [econstr_kind], [concl] (via [econstr_types]), [hyp]
-    and [goal] ([TODO.md]). *)
+(** Rocq values as strings, for logs and messages. Each raises nothing. *)
 module Strfy : sig
   (** [pp ?clean x] is [x] as a string, whitespace cleaned up unless [~clean:false].
   *)
@@ -214,14 +207,17 @@ module Strfy : sig
     -> Constr.rel_context
     -> string
 
-  (** Placeholder: "TODO: ind_constr". *)
-  val ind_constr : 'a -> 'b -> ind_constr -> string
+  (** [ind_constr env sigma (ctx, t)] is the constructor type [t] printed
+      under its binders [ctx], as [ctx |- t]. Raises nothing. *)
+  val ind_constr : Environ.env -> Evd.evar_map -> ind_constr -> string
 
-  (** Placeholder: "TODO: ind_constrs". *)
-  val ind_constrs : 'a -> 'b -> ind_constr array -> string
+  (** [ind_constrs env sigma cs] is each of [cs] printed ({!ind_constr}),
+      as a list. Raises nothing. *)
+  val ind_constrs : Environ.env -> Evd.evar_map -> ind_constr array -> string
 
-  (** Placeholder: "TODO: constr_kind". *)
-  val constr_kind : 'a -> 'b -> Constr.t -> string
+  (** [constr_kind env sigma x] is the name of [x]'s kind ([App], [Rel],
+      ...) and [x] printed. Raises nothing. *)
+  val constr_kind : Environ.env -> Evd.evar_map -> Constr.t -> string
 
   (** [econstr env sigma x] is [x] printed. *)
   val econstr : Environ.env -> Evd.evar_map -> Evd.econstr -> string
@@ -229,21 +225,17 @@ module Strfy : sig
   (** [econstr_rel_decl env sigma d] is the declaration [d] printed. *)
   val econstr_rel_decl : Environ.env -> Evd.evar_map -> econstr_decl -> string
 
-  (** Placeholder: "TODO: econstr_type". *)
-  val econstr_type
-    :  'a
-    -> 'b
-    -> string * Evd.econstr * Evd.econstr * Evd.econstr array
-    -> string
+  (** [econstr_types env sigma t] is the type [t] printed, as {!econstr}.
+      Raises nothing. *)
+  val econstr_types : Environ.env -> Evd.evar_map -> Evd.econstr -> string
 
-  (** Placeholder: "TODO: econstr_types". *)
-  val econstr_types : 'a -> 'b -> Evd.econstr -> string
+  (** [econstr_kind env sigma x] is the name of [x]'s kind ([App], [Rel],
+      ...) and [x] printed. Raises nothing. *)
+  val econstr_kind : Environ.env -> Evd.evar_map -> Evd.econstr -> string
 
-  (** Placeholder: "TODO: econstr_kind". *)
-  val econstr_kind : 'a -> 'b -> Evd.econstr -> string
-
-  (** Placeholder, as {!econstr_types}: "TODO: econstr_types". *)
-  val concl : 'a -> 'b -> Evd.econstr -> string
+  (** [concl env sigma c] is the conclusion [c] printed, as
+      {!econstr_types}. Raises nothing. *)
+  val concl : Environ.env -> Evd.evar_map -> Evd.econstr -> string
 
   (** [erel env sigma r] is "relevant" or "irrelevant". *)
   val erel : 'a -> Evd.evar_map -> Evd.erelevance -> string
@@ -257,10 +249,12 @@ module Strfy : sig
   (** [hyp_type env sigma h] is the hypothesis' type printed. *)
   val hyp_type : Environ.env -> Evd.evar_map -> hyp -> string
 
-  (** Placeholder: "TODO: hyp". *)
-  val hyp : 'a -> 'b -> hyp -> string
+  (** [hyp env sigma h] is the hypothesis printed as [name : type], or
+      [name := body : type] if it has a body. Raises nothing. *)
+  val hyp : Environ.env -> Evd.evar_map -> hyp -> string
 
-  (** Placeholder: "TODO: goal". *)
+  (** [goal g] is the goal [g] printed, hypotheses and conclusion, with
+      Rocq's debug printer. Raises nothing. *)
   val goal : Proofview.Goal.t -> string
 end
 
@@ -382,17 +376,13 @@ exception Rocq_utils_InvalidLtsTermKind of Constr.t
       (raised here). *)
 val extract_args : ?substl:EConstr.Vars.substl -> Constr.t -> constructor_args
 
-(** Meant for {!unpack_constr_args}, whose handler can never fire; never
-    raised ([TODO.md]). *)
+(** Raised by {!unpack_constr_args}: fewer than three arguments. *)
 exception Rocq_utils_CouldNotExtractBinding of unit
 
 (** [unpack_constr_args (_, args)] is the first three of [args].
 
-    @raise Invalid_argument
-      if there are fewer than three (propagated from
-      the array access; the handler meant to turn that into
-      {!Rocq_utils_CouldNotExtractBinding} catches [Not_found] instead, so
-      it never fires -- [TODO.md]). *)
+    @raise Rocq_utils_CouldNotExtractBinding
+      if there are fewer than three (raised here). *)
 val unpack_constr_args : Constr.t kind_pair -> Constr.t * Constr.t * Constr.t
 
 (** [econstr_to_constrexpr env sigma x] is [x] externalised, as printing would show it. Raises nothing.
@@ -441,14 +431,3 @@ val is_constant : Evd.evar_map -> Evd.econstr -> (unit -> Evd.econstr) -> bool
     @raise Not_found if one refers to nothing (propagated from
                      [Nametab.global]). *)
 val libnames_to_globrefs : Libnames.qualid list -> Names.GlobRef.t list
-
-(** [extract_benchmark_args env sigma e] is [e] interpreted and
-    externalised again, as a one-element list (the name suggests a list of
-    terms, which it does not split), and the evar map after.
-
-    Raises Rocq's interpretation errors (propagated). *)
-val extract_benchmark_args
-  :  Environ.env
-  -> Evd.evar_map
-  -> Constrexpr.constr_expr
-  -> Evd.evar_map * Constrexpr.constr_expr list

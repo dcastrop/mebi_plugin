@@ -36,9 +36,9 @@ module type S = sig
   (** [econstr_is_evar x] is whether [x] is an evar. Raises nothing. *)
   val econstr_is_evar : EConstr.t -> bool mm
 
-  (** [econstr_to_constr ?abort_on_undefined_evars x] is [x] as a [Constr],
-      undefined evars kept. Raises nothing. [abort_on_undefined_evars] is
-      ignored ([TODO.md]). *)
+  (** [econstr_to_constr ?abort_on_undefined_evars x] is [x] as a [Constr];
+      undefined evars are kept unless [abort_on_undefined_evars], in which
+      case Rocq raises, when run (propagated). *)
   val econstr_to_constr
     :  ?abort_on_undefined_evars:bool
     -> EConstr.t
@@ -66,9 +66,8 @@ module type S = sig
 
   (** [to_lambda x] is the binder, type and body of the [fun] [x].
 
-      @raise Rocq_utils.Rocq_utils_EConstrIsNot_App
-        when run, if [x] is not
-        a [fun] (propagated; see {!Rocq_utils.econstr_to_lambda}). *)
+      @raise Rocq_utils.Rocq_utils_EConstrIsNot_Lambda
+        when run, if [x] is not a [fun] (propagated). *)
   val to_lambda : EConstr.t -> Rocq_utils.lambda_triple mm
 
   (** [to_app x] is the head and arguments of the application [x].
@@ -419,8 +418,11 @@ module type S = sig
       (** [unify env sigma p] is the evar map with [p.to_check] unified with
           [p.acc] (up to cumulativity), and whether that succeeded.
 
-          Raises Rocq's unification errors other than [CannotUnify]
-          (propagated; only that one is caught, [TODO.md]). *)
+          [false] when Rocq finds no unifier ([CannotUnify], an occur-check,
+          binder types that differ).
+
+          Raises Rocq's other unification errors, where it gives up rather
+          than finds none (propagated). *)
       val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
 
       (** [unifies to_check acc] is {!unify} in the current context, keeping
