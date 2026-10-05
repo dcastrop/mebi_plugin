@@ -338,6 +338,29 @@ module Make (Enc : Encoding.S) :
     else ()
   ;;
 
+  (** [memory_range n] is the memory [n] weak actions take, as a range from
+      {!Api.bytes_per_weak_action} ("450MB--900MB"). Raises nothing. *)
+  let memory_range (n : int) : string =
+    let lo, hi = Api.bytes_per_weak_action in
+    Printf.sprintf
+      "%s--%s"
+      (Api.human_bytes (n * lo))
+      (Api.human_bytes (n * hi))
+  ;;
+
+  (** [estimate name x] is how many weak actions saturating [x] would
+      produce ({!Model.SaturationEstimate.fsm}), after logging it at [Info].
+      Raises nothing. *)
+  let estimate (name : string) (x : FSM.t) : Model.SaturationEstimate.t =
+    let e : Model.SaturationEstimate.t = Model.SaturationEstimate.fsm x in
+    Logger.info
+      (Printf.sprintf
+         "Saturating %s: %s."
+         name
+         (Model.SaturationEstimate.to_string e));
+    e
+  ;;
+
   (** [check_saturation_size name x] guards a saturation: it estimates,
       without saturating, how many weak actions saturating [x] would produce
       ({!Model.SaturationEstimate}), and refuses past
@@ -352,12 +375,7 @@ module Make (Enc : Encoding.S) :
   let check_saturation_size (name : string) (x : FSM.t) : unit =
     if Model.FSM.is_weak_mode x
     then (
-      let e : Model.SaturationEstimate.t = Model.SaturationEstimate.fsm x in
-      Logger.info
-        (Printf.sprintf
-           "Saturating %s: %s."
-           name
-           (Model.SaturationEstimate.to_string e));
+      let e : Model.SaturationEstimate.t = estimate name x in
       let bound : int = !Api.the_saturation_bound in
       let lo, hi = Api.bytes_per_weak_action in
       if e.weak > bound
@@ -365,22 +383,53 @@ module Make (Enc : Encoding.S) :
         let msg : string =
           Printf.sprintf
             "saturating %s would produce %s, above the bound of %i. That needs \
-             about %s--%s of memory (measured %i--%i bytes per weak action), \
-             and can take a long time. Raise the bound with [MeBi Config \
-             Bounds Saturation <n>] if your machine has the memory, or carry \
-             on with only a warning with [MeBi Config FailIf Oversaturated \
-             False]."
+             about %s of memory (measured %i--%i bytes per weak action), and \
+             can take a long time. Raise the bound with [MeBi Config Bounds \
+             Saturation <n>] if your machine has the memory, or carry on with \
+             only a warning with [MeBi Config FailIf Oversaturated False]."
             name
             (Model.SaturationEstimate.to_string e)
             bound
-            (Api.human_bytes (e.weak * lo))
-            (Api.human_bytes (e.weak * hi))
+            (memory_range e.weak)
             lo
             hi
         in
         if !Api.the_fail_flags.oversaturated
         then M.Err.saturation_too_large msg
         else Logger.warning (String.capitalize_ascii msg)))
+  ;;
+
+  (** [warn_on_demand name e above] warns that the FSM [name], whose
+      saturation [e] would take, is saturated on demand instead: because it
+      is [above] the saturation bound, or because [MeBi Config Saturation OnDemand True] asks for it. Raises nothing.
+  *)
+  let warn_on_demand
+        (name : string)
+        (e : Model.SaturationEstimate.t)
+        (above : bool)
+    : unit
+    =
+    let bound : int = !Api.the_saturation_bound in
+    Logger.warning
+      (Printf.sprintf
+         "%s would saturate to %s%s. Instead, MeBi saturates each state only \
+          when it is needed, holding at most %i weak actions (about %s) and \
+          saturating again any it had to drop, and decides bisimilarity on the \
+          %i silent SCCs rather than on the saturated FSM. The verdict is the \
+          same; a proof may take longer. [MeBi Config Saturation OnDemand \
+          False] refuses such FSMs instead. See [MeBi Help Config Saturation]."
+         (String.capitalize_ascii name)
+         (Model.SaturationEstimate.to_string e)
+         (if above
+          then
+            Printf.sprintf
+              ", above the bound of %i (about %s of memory)"
+              bound
+              (memory_range e.weak)
+          else " (on demand by [MeBi Config Saturation OnDemand True])")
+         bound
+         (memory_range bound)
+         e.sccs)
   ;;
 
   (** [on_demand_for name x] is whether the bisimilarity check saturates [x]
@@ -400,44 +449,11 @@ module Make (Enc : Encoding.S) :
         check_saturation_size name x;
         false
       | (Api.Saturation_auto | Api.Saturation_on_demand) as mode ->
-        let e : Model.SaturationEstimate.t = Model.SaturationEstimate.fsm x in
-        Logger.info
-          (Printf.sprintf
-             "Saturating %s: %s."
-             name
-             (Model.SaturationEstimate.to_string e));
-        let bound : int = !Api.the_saturation_bound in
-        let above : bool = e.weak > bound in
+        let e : Model.SaturationEstimate.t = estimate name x in
+        let above : bool = e.weak > !Api.the_saturation_bound in
         if above || mode = Api.Saturation_on_demand
         then (
-          let lo, hi = Api.bytes_per_weak_action in
-          let mem (n : int) : string =
-            Printf.sprintf
-              "%s--%s"
-              (Api.human_bytes (n * lo))
-              (Api.human_bytes (n * hi))
-          in
-          Logger.warning
-            (Printf.sprintf
-               "%s would saturate to %s%s. Instead, MeBi saturates each state \
-                only when it is needed, holding at most %i weak actions (about \
-                %s) and saturating again any it had to drop, and decides \
-                bisimilarity on the %i silent SCCs rather than on the \
-                saturated FSM. The verdict is the same; a proof may take \
-                longer. [MeBi Config Saturation OnDemand False] refuses such \
-                FSMs instead. See [MeBi Help Config Saturation]."
-               (String.capitalize_ascii name)
-               (Model.SaturationEstimate.to_string e)
-               (if above
-                then
-                  Printf.sprintf
-                    ", above the bound of %i (about %s of memory)"
-                    bound
-                    (mem e.weak)
-                else " (on demand by [MeBi Config Saturation OnDemand True])")
-               bound
-               (mem bound)
-               e.sccs);
+          warn_on_demand name e above;
           true)
         else false)
   ;;
