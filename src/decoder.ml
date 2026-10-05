@@ -111,32 +111,36 @@ module Make
   type result = Model.Bisimilarity.Result.t
   type bisimilarity = Model.Bisimilarity.t
 
+  (* See the [.mli]. *)
   let enc (x : Enc.t) : EConstr.t = M.decode x
 
+  (* See the [.mli]. *)
   let handle (x : Enc.t) (e : exn) : EConstr.t =
     try enc x with M.CannotDecode _ -> raise e
   ;;
 
   exception CouldNotDecode_State of Model.State.t
 
+  (* See the [.mli]. *)
   let state (x : Model.State.t) : EConstr.t =
     handle x.base (CouldNotDecode_State x)
   ;;
 
   exception CouldNotDecode_Label of Model.Label.t
 
+  (* See the [.mli]. *)
   let label (x : Model.Label.t) : EConstr.t =
     handle x.base (CouldNotDecode_Label x)
   ;;
 
   exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
 
+  (* See the [.mli]. *)
   let lts_constructor (x : Model.Info.Meta.RocqLTS.t) : EConstr.t =
     handle x.base (CouldNotDecode_LTS_Constructor x)
   ;;
 
-  (** [module Decode.ModelToString] handles the decoding of [module Model] components to their decoded and pretty-printed counterparts.
-  *)
+  (* See the [.mli]: one JSON printer per model component. *)
   module Base = struct
     include Json.Thing.Make (struct
         type k = Enc.t

@@ -1,9 +1,10 @@
-(** [MeBi Help] (backlog item F). Topics are paths, e.g. [["Config"; "Bounds"; "Saturation"]] for [MeBi Help Config Bounds Saturation]. The
-    figures quoted are computed from the same constants the plugin's errors
-    and notices use ([Api.bytes_per_weak_action],
-    [Api.mb_per_extracted_state], [Api.default_saturation_bound]), so the
+(** [MeBi Help] (backlog item F). Topics are paths, e.g.
+    [["Config"; "Bounds"; "Saturation"]] for [MeBi Help Config Bounds Saturation]. The figures quoted are computed from the same constants the
+    plugin's errors and notices use ({!Api.bytes_per_weak_action},
+    {!Api.mb_per_extracted_state}, {!Api.default_saturation_bound}), so the
     help cannot drift from what the plugin actually reports. *)
 
+(* See the [.mli]. *)
 let topics : string list list =
   [ [ "Run" ]
   ; [ "Sim" ]
@@ -20,8 +21,11 @@ let topics : string list list =
   ]
 ;;
 
+(** [name p] is the command that shows the topic [p]. Raises nothing. *)
 let name (path : string list) : string = String.concat " " ("MeBi Help" :: path)
 
+(** [overview ()] is the help overview: what MeBi does and every topic.
+    Raises nothing. *)
 let overview () : string =
   String.concat
     "\n"
@@ -35,8 +39,11 @@ let overview () : string =
      @ [ ""; "See also README.md." ])
 ;;
 
+(** [saturation_table ()] is the memory saturation needs at a few bounds,
+    from {!Api.bytes_per_weak_action}, the default marked. Raises nothing. *)
 let saturation_table () : string =
   let lo, hi = Api.bytes_per_weak_action in
+  (* [row n] is the table's line for a bound of [n] weak actions. *)
   let row (n : int) : string =
     Printf.sprintf
       "  %12i weak actions   %s - %s%s"
@@ -50,6 +57,7 @@ let saturation_table () : string =
     (List.map row [ 1_000_000; 5_000_000; 10_000_000; 20_000_000 ])
 ;;
 
+(* See the [.mli]. *)
 let text : string list -> string option = function
   | [] -> Some (overview ())
   | [ "Run" ] ->
@@ -297,6 +305,7 @@ let text : string list -> string option = function
   | _ -> None
 ;;
 
+(* See the [.mli]. *)
 let show (path : string list) : unit =
   match text path with
   | Some t -> Feedback.msg_notice (Pp.str t)

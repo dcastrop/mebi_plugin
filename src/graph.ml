@@ -67,6 +67,9 @@ struct
   open G
   module LTS = Model.LTS
 
+  (** [encode_indlts r ltsmap] adds the LTS [r] to [ltsmap], keyed by its
+      encoding. Raises, when run, Rocq's errors if [r] is not an inductive
+      LTS ({!Rocq_monad_utils.S.Ind.lts}; propagated). *)
   let encode_indlts (x : Names.GlobRef.t) (ltsmap : G.indmap) : unit M.mm =
     let open M.Syntax in
     (* NOTE: [M.Ind.lts] automatically encodes [x.ind] into the bi-enc maps. *)
@@ -77,17 +80,29 @@ struct
     M.return ()
   ;;
 
+  (** [build_ltsmap rs] is the table of the LTSs [rs] ({!encode_indlts}).
+      Raises as {!encode_indlts}, when run. *)
   let build_ltsmap (grefs : Names.GlobRef.t list) : M.Ind.t M.B.t M.mm =
     Logger.trace __FUNCTION__;
     let ltsmap : G.indmap = M.B.create (List.length grefs) in
     let open M.Syntax in
+    (* [f i ()] adds the [i]th LTS of [grefs] to [ltsmap]. *)
     let f (i : int) () = encode_indlts (List.nth grefs i) ltsmap in
     let* () = M.iterate 0 (List.length grefs - 1) () f in
     M.return ltsmap
   ;;
 
+  (** Raised by {!get_primary_lts}: the LTS explored is not among those
+      given in [Using]. *)
   exception LTSMapDoesNotContainPrimaryLTS of G.indmap * Libnames.qualid
 
+  (** [get_primary_lts ltsmap q] is the LTS named [q], checked to be in
+      [ltsmap].
+
+      @raise LTSMapDoesNotContainPrimaryLTS
+        when run, if it is not (raised here; the handler is inside the
+        continuation, so it does catch [Not_found]). Also raises Rocq's
+        errors if [q] names no inductive LTS (propagated). *)
   let get_primary_lts (ltsmap : G.indmap) (primary_lts : Libnames.qualid)
     : M.Ind.t M.mm
     =
@@ -100,7 +115,9 @@ struct
     | Not_found -> raise (LTSMapDoesNotContainPrimaryLTS (ltsmap, primary_lts))
   ;;
 
-  (** normalize and encode the initial term *)
+  (** [initialize_term t lts] is the term [t] interpreted, fully
+      normalised and typechecked against [lts]'s state type. Raises, when
+      run, Rocq's errors if [t] is ill-formed or ill-typed (propagated). *)
   let initialize_term (x : Constrexpr.constr_expr) (lts : M.Ind.t)
     : EConstr.t M.mm
     =
@@ -114,6 +131,8 @@ struct
     M.return x
   ;;
 
+  (** [encode_initial_term t lts] is the encoding of {!initialize_term}
+      [t lts]. Raises as that, when run. *)
   let encode_initial_term (x : Constrexpr.constr_expr) (lts : M.Ind.t)
     : Enc.t M.mm
     =
@@ -125,6 +144,7 @@ struct
     M.return init
   ;;
 
+  (* See the [.mli]. *)
   let build
         ?(weak : Weak.t option = None)
         (starting_term : Constrexpr.constr_expr)
@@ -155,6 +175,7 @@ struct
       (X)
       (G)
 
+  (* See the [.mli]. *)
   let extract (g : G.t) : LTS.t M.mm =
     Logger.trace __FUNCTION__;
     Logger.info "Extracting LTS from Graph...";

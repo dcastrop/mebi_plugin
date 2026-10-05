@@ -43,12 +43,17 @@ struct
 
   open Model
 
+  (** [state x] is the model state of the encoding [x]. Raises nothing. *)
   let state (x : Enc.t) : State.t = { base = x }
 
+  (** [states xs] is the model states of the encodings [xs]. Raises
+      nothing. *)
   let states (xs : G.States.t) : State.Set.t =
     xs |> G.States.to_list |> List.map state |> State.Set.of_list
   ;;
 
+  (** [terminals xs ts] is the states of [xs] with no step in [ts]. Raises
+      nothing. *)
   let terminals (xs : G.States.t) (ys : G.Transitions.t') : State.Set.t =
     xs
     |> G.States.filter (fun (x : Enc.t) -> Bool.not (G.Transitions.mem ys x))
@@ -57,9 +62,15 @@ struct
     |> State.Set.of_list
   ;;
 
+  (** [label a] is the action [a]'s label. Raises nothing. *)
   let label (x : Action.t) : Label.t = x.label
 
+  (** [transitions ts] is the graph's steps [ts] as model transitions, one
+      per action and destination, each with its derivation tree. Raises
+      nothing. *)
   let transitions (xs : G.Transitions.t') : Model.Transition.Set.t =
+    (* [goto from label (goto, tree)] adds the transition
+       [from -label-> goto], derived by [tree]. *)
     let goto (from : State.t) (label : Label.t) (goto, tree)
       : Transition.Set.t -> Transition.Set.t
       =
@@ -67,11 +78,14 @@ struct
       Transition.Set.add
         { from; goto; label; tree = Some tree; annotation = None }
     in
+    (* [action from a ds] adds a transition from [from] by [a] to each of
+       [ds]. *)
     let action (from : State.t) (action : Action.t)
       : G.Destinations.t -> Transition.Set.t -> Transition.Set.t
       =
       G.Destinations.fold (goto from (label action))
     in
+    (* [from s as] adds the transitions of each of [s]'s actions [as]. *)
     let from (from : Enc.t)
       : G.Actions.t' -> Transition.Set.t -> Transition.Set.t
       =
@@ -80,6 +94,10 @@ struct
     G.Transitions.fold from xs Transition.Set.empty
   ;;
 
+  (** [constructor_info g] is, for each LTS [g] may use, its encoding and
+      its constructors' binder locations
+      ({!Constructor_bindings.S.extract_info}). Raises as that, when run
+      (propagated). *)
   let constructor_info (g : G.t) : Model.Info.Meta.RocqLTS.t list M.mm =
     Logger.trace __FUNCTION__;
     let xs = M.B.to_seq g.ltsmap |> List.of_seq in
@@ -96,6 +114,9 @@ struct
     M.iterate 0 (List.length xs - 1) [] f
   ;;
 
+  (** [meta g] is [g]'s metadata: whether exploration finished (nothing left
+      to visit), its bounds, and {!constructor_info}. Raises as
+      {!constructor_info}, when run. *)
   let meta (g : G.t) : Info.Meta.t M.mm =
     Logger.trace __FUNCTION__;
     let open M.Syntax in
@@ -113,6 +134,8 @@ struct
     M.return x
   ;;
 
+  (** [weak_labels g ls] is the labels of [ls] that are silent under [g]'s
+      silent label (none without one). Raises nothing when run. *)
   let weak_labels (g : G.t) (xs : Label.Set.t) : Label.Set.t M.mm =
     Logger.trace __FUNCTION__;
     match g.weak with
@@ -134,6 +157,7 @@ struct
       M.iterate 0 (List.length xs - 1) Label.Set.empty g
   ;;
 
+  (* See the [.mli]. *)
   let extract (g : G.t) : LTS.t M.mm =
     Logger.trace __FUNCTION__;
     let states : State.Set.t = states g.states in
