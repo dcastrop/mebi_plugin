@@ -410,7 +410,7 @@ module type State_partition_sig = sig
 
       @raise Not_found
         if [s] has no entry in [m] (propagated from
-        [Hashtbl.find]). *)
+        {!Stdlib.Hashtbl.find}). *)
   val reachable_by_label : state -> label -> edgemap -> t -> t
 end
 
@@ -617,7 +617,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
-      (* See [State_sig]. *)
+      (* See {!module-type:State_sig}. *)
       let hash x = Base.hash x.base
     end
 
@@ -629,14 +629,14 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "States"
           end)
 
-      (* See [States_sig]. *)
+      (* See {!module-type:States_sig}. *)
       let add_to_opt (x : State.t) (ys : t option) : t =
         add x (Stdlib.Option.value ys ~default:empty)
       ;;
 
       exception StateHasNoOrigin of (State.t * t * t)
 
-      (* See [States_sig]. *)
+      (* See {!module-type:States_sig}. *)
       let origin_of_state (x : State.t) (a : t) (b : t) : int =
         match mem x a, mem x b with
         | true, true -> 0
@@ -645,7 +645,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         | false, false -> raise (StateHasNoOrigin (x, a, b))
       ;;
 
-      (* See [States_sig]. *)
+      (* See {!module-type:States_sig}. *)
       let has_shared_origin (a : t) (b : t) (c : t) : bool =
         let f (i : int) (x : State.t) : bool =
           match origin_of_state x b c with 0 -> true | j -> Int.equal i j
@@ -692,10 +692,10 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
-      (* See [Label_sig]. *)
+      (* See {!module-type:Label_sig}. *)
       let hash (x : t) : int = Base.hash x.base
 
-      (* See [Label_sig]. *)
+      (* See {!module-type:Label_sig}. *)
       let is_silent (x : t) : bool =
         Stdlib.Option.value x.is_silent ~default:false
       ;;
@@ -709,7 +709,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Labels"
           end)
 
-      (* See [Labels_sig]. *)
+      (* See {!module-type:Labels_sig}. *)
       let non_silent (xs : t) : t =
         filter (fun (x : Label.t) -> Bool.not (Label.is_silent x)) xs
       ;;
@@ -760,7 +760,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
-      (* See [Annotation_note_sig]. *)
+      (* See {!module-type:Annotation_note_sig}. *)
       let is_silent (x : t) : bool = Label.is_silent x.label
     end
 
@@ -802,13 +802,13 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       exception AnnotationIsNone
 
-      (* See [Annotation_sig]. *)
+      (* See {!module-type:Annotation_sig}. *)
       let rec length : t -> int = function
         | { next = None; _ } -> 1
         | { next = Some next; _ } -> 1 + length next
       ;;
 
-      (* See [Annotation_sig]. *)
+      (* See {!module-type:Annotation_sig}. *)
       let opt_length ?(fail_if_none : bool = false) : t option -> int = function
         | None -> if fail_if_none then raise AnnotationIsNone else 0
         | Some x -> length x
@@ -875,7 +875,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
-      (* See [Transition_sig]. *)
+      (* See {!module-type:Transition_sig}. *)
       let is_silent (x : t) : bool = Label.is_silent x.label
     end
 
@@ -889,7 +889,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Transitions"
           end)
 
-      (* See [Transitions_sig]. *)
+      (* See {!module-type:Transitions_sig}. *)
       let labels (xs : t) : Labels.t =
         Logger.trace __FUNCTION__;
         fold
@@ -963,7 +963,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             (Label.hash x.label, n, State.hash a.this.from, State.hash z.goto)
       ;;
 
-      (* See [Action_sig]. *)
+      (* See {!module-type:Action_sig}. *)
       let is_silent (x : t) : bool = Label.is_silent x.label
     end
 
@@ -1009,7 +1009,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
-      (* See [Actionpair_sig]. *)
+      (* See {!module-type:Actionpair_sig}. *)
       let shorter_annotation ((a, xs) : t) ((b, ys) : t) : t =
         match
           Int.compare
@@ -1031,7 +1031,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "ActionPairs"
           end)
 
-      (* See [Actionpairs_sig]. *)
+      (* See {!module-type:Actionpairs_sig}. *)
       let destinations (x : t) : States.t =
         to_list x
         |> List.fold_left
@@ -1042,7 +1042,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       exception IsEmpty
 
-      (* See [Actionpairs_sig]. *)
+      (* See {!module-type:Actionpairs_sig}. *)
       let shortest_annotation (x : t) : ActionPair.t =
         match to_list x with
         | [] -> raise IsEmpty
@@ -1078,7 +1078,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Destinations"
           end)
 
-      (* See [Actionmap_sig]. *)
+      (* See {!module-type:Actionmap_sig}. *)
       let size (x : t') : int =
         fold (fun _ (ys : States.t) (z : int) -> z + States.cardinal ys) x 0
       ;;
@@ -1089,7 +1089,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         { a with trees = Base.Trees.union a.trees b.trees }
       ;;
 
-      (* See [Actionmap_sig]. The scan over every key, for the trees of equal
+      (* See {!module-type:Actionmap_sig}. The scan over every key, for the trees of equal
          actions, makes each update linear in the table's size. *)
       let update (x : t') (action : Action.t) (states : States.t) : unit =
         Logger.trace __FUNCTION__;
@@ -1107,7 +1107,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             replace x action (States.union old_states states))
       ;;
 
-      (* See [Actionmap_sig]. *)
+      (* See {!module-type:Actionmap_sig}. *)
       let destinations (x : t') : States.t =
         Logger.trace __FUNCTION__;
         to_seq_values x
@@ -1115,7 +1115,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         |> List.fold_left States.union States.empty
       ;;
 
-      (* See [Actionmap_sig]. *)
+      (* See {!module-type:Actionmap_sig}. *)
       let reduce_by_label (x : t') (label : Label.t) : t' =
         Logger.trace __FUNCTION__;
         let y : t' = copy x in
@@ -1126,7 +1126,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         y
       ;;
 
-      (* See [Actionmap_sig]. *)
+      (* See {!module-type:Actionmap_sig}. *)
       let to_actionpairs (x : t') : ActionPairs.t =
         Logger.trace __FUNCTION__;
         fold
@@ -1137,7 +1137,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           ActionPairs.empty
       ;;
 
-      (* See [Actionmap_sig]. *)
+      (* See {!module-type:Actionmap_sig}. *)
       let of_actionpairs (xs : ActionPairs.t) : t' =
         Logger.trace __FUNCTION__;
         let y : t' = create 0 in
@@ -1145,7 +1145,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         y
       ;;
 
-      (* See [Actionmap_sig]. *)
+      (* See {!module-type:Actionmap_sig}. *)
       let merge (a : t') (b : t') : t' =
         Logger.trace __FUNCTION__;
         ActionPairs.union (to_actionpairs a) (to_actionpairs b)
@@ -1188,12 +1188,12 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let compare a b : int = 0
           end)
 
-      (* See [Edgemap_sig]. *)
+      (* See {!module-type:Edgemap_sig}. *)
       let size (x : t') : int =
         fold (fun _ (ys : ActionMap.t') (z : int) -> z + ActionMap.size ys) x 0
       ;;
 
-      (* See [Edgemap_sig]. *)
+      (* See {!module-type:Edgemap_sig}. *)
       let update
             (x : t')
             (from : State.t)
@@ -1210,7 +1210,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         | Some actions -> ActionMap.update actions action destinations
       ;;
 
-      (* See [Edgemap_sig]. *)
+      (* See {!module-type:Edgemap_sig}. *)
       let destinations (x : t') (from : State.t) : States.t =
         Logger.trace __FUNCTION__;
         match find_opt x from with
@@ -1218,7 +1218,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         | Some ys -> ActionMap.destinations ys
       ;;
 
-      (* See [Edgemap_sig]. *)
+      (* See {!module-type:Edgemap_sig}. *)
       let reduce_by_label (x : t') (label : label) : t' =
         Logger.trace __FUNCTION__;
         let y : t' = copy x in
@@ -1245,7 +1245,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         }
       ;;
 
-      (* See [Edgemap_sig]. *)
+      (* See {!module-type:Edgemap_sig}. *)
       let of_transitions (xs : Transitions.t) : t' =
         Logger.trace __FUNCTION__;
         let edges : t' = create 0 in
@@ -1260,7 +1260,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         edges
       ;;
 
-      (* See [Edgemap_sig]. *)
+      (* See {!module-type:Edgemap_sig}. *)
       let merge (a : t') (b : t') : t' =
         Logger.trace __FUNCTION__;
         let c : t' = copy a in
@@ -1286,34 +1286,34 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Partitions"
           end)
 
-      (* See [State_partition_sig]. Not [find_first]: that returns the least
+      (* See {!module-type:State_partition_sig}. Not [find_first]: that returns the least
          element satisfying a predicate and requires the predicate to be
          monotonically increasing over the set's ordering, which "this block
          contains [x]" is not. With a non-monotonic predicate its binary search
          is unspecified, and it really does miss -- on a ten-block partition of
          twenty states it failed to find the block holding the second state.
-         Both callers ([Results.get_bisimilar_states] and [Product.successors])
-         turn [Not_found] into the empty set, so the miss surfaced not as an
-         error but as a state with nothing bisimilar to it. Found 2026-09-29
-         while writing a [Product.estimate] test. *)
+         Both callers ({!Mebi_plugin.Results.get_bisimilar_states} and
+         {!Product.S.successors}) turn [Not_found] into the empty set, so the
+         miss surfaced not as an error but as a state with nothing bisimilar
+         to it. Found 2026-09-29 while writing a {!Product.S.estimate} test. *)
       let get_bisimilar (x : State.t) (p : t) : States.t =
         let matching : t = filter (fun (ys : States.t) -> States.mem x ys) p in
         if is_empty matching then raise Not_found else choose matching
       ;;
 
-      (* See [State_partition_sig]. *)
+      (* See {!module-type:State_partition_sig}. *)
       let filter_reachable (xs : States.t) : t -> t =
         filter (fun (y : States.t) ->
           Bool.not (States.is_empty (States.inter y xs)))
       ;;
 
-      (* See [State_partition_sig]. *)
+      (* See {!module-type:State_partition_sig}. *)
       let reachable (from : State.t) (edges : EdgeMap.t') : t -> t =
         Logger.trace __FUNCTION__;
         filter_reachable (EdgeMap.destinations edges from)
       ;;
 
-      (* See [State_partition_sig]. *)
+      (* See {!module-type:State_partition_sig}. *)
       let reachable_by_label
             (from : State.t)
             (label : label)
@@ -1404,7 +1404,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             ;;
           end)
 
-        (* See [Info_sig]. *)
+        (* See {!module-type:Info_sig}. *)
         let merge (a : t) (b : t) : t =
           { is_complete = a.is_complete && b.is_complete
           ; is_merged = true
@@ -1418,7 +1418,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           }
         ;;
 
-        (* See [Info_sig]. *)
+        (* See {!module-type:Info_sig}. *)
         let merge_opt (a : t option) (b : t option) : t option =
           match a, b with
           | None, None -> None
@@ -1462,7 +1462,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           ;;
         end)
 
-      (* See [Info_sig]. *)
+      (* See {!module-type:Info_sig}. *)
       let merge ?(nums : nums option = None) (a : t) (b : t) : t =
         { meta = Meta.merge_opt a.meta b.meta
         ; weak_labels = Labels.union a.weak_labels b.weak_labels

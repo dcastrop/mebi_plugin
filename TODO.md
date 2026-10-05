@@ -28,6 +28,7 @@
 
 ## Documenting (`odoc`)
 - [ ] **Comment and function-size pass over the codebase** (Jonah, 2026-10-04): every function gets a header comment saying what it does with its arguments, and large or convoluted functions are split into smaller single-purpose ones. Prompted by review of `Premise_search.bounded_universal` (fixed in PR #31); untouched code largely lacks such comments (e.g. `Product.reachable`), so the whole codebase needs the pass. Planned after the structural-congruence guide, on its own branch, one library per PR so each stays reviewable.
+- [ ] **odoc cross-references in existing comments** (Jonah, 2026-10-05): the comments written so far mostly name other functions, types and modules as plain code spans (`[Foo.bar]`), which odoc renders as text. Convert those to references -- `{!Foo.bar}`, or `{{!Foo.bar}text}`, with kind prefixes such as `{!val:f}`, `{!type:t}`, `{!module-type:S}` where a name is ambiguous -- so `dune build @doc` gives an interlinked site. A quick mechanical pass, library by library; comments written from now on use references already. Check it with `dune build @doc` once `odoc` is installed in the switch (it is not yet), since a reference odoc cannot resolve is only a warning.
 - [x] `lib/model/...` -- every interface has doc comments (2026-10-01; `Bisimilarity` and `Minimization` were the gaps). Not yet rendered: `odoc` is not installed in the local switch.
   - [x] `lib/model/`
   
