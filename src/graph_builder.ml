@@ -128,19 +128,34 @@ module Make
     M.return action
   ;;
 
+  (** [record_step g from (l, t, tree) states] is [states] with the target
+      [t] added, after adding the step [from -l-> t], derived by [tree], to
+      [g] ({!update_transitions}) and queueing [t] if it is new
+      ({!update_to_visit}). Raises nothing when run. *)
+  let record_step
+        (g : t)
+        (from : Enc.t)
+        ((act, tgt, int_tree) : M.Constructor.t)
+        (states : States.t)
+    : States.t M.mm
+    =
+    let open M.Syntax in
+    let* action : Action.t = get_action g act int_tree in
+    update_transitions g from (tgt, int_tree) action;
+    update_to_visit g tgt;
+    M.return (States.add tgt states)
+  ;;
+
   (* See the [.mli]. *)
   let get_new_states (g : t) (from : Enc.t) : States.t M.mm =
     Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* new_constrs : M.Constructor.t list = get_new_constrs g from in
-    let iter_body (i : int) (new_states : States.t) =
-      let (act, tgt, int_tree) : M.Constructor.t = List.nth new_constrs i in
-      let* action : Action.t = get_action g act int_tree in
-      update_transitions g from (tgt, int_tree) action;
-      update_to_visit g tgt;
-      M.return (States.add tgt new_states)
-    in
-    M.iterate 0 (List.length new_constrs - 1) (States.singleton from) iter_body
+    M.iterate
+      0
+      (List.length new_constrs - 1)
+      (States.singleton from)
+      (fun i -> record_step g from (List.nth new_constrs i))
   ;;
 
   (* See the [.mli]. *)
