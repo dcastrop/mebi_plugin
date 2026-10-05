@@ -54,6 +54,9 @@ they are in the code (the comments point here); each needs a fix with a test.
 - [x] ~~`Rocq_monad_utils.econstr_to_constr` takes `?abort_on_undefined_evars` but does not pass it on, so the flag does nothing.~~ -- fixed 2026-10-04 (branch `fix/rocq-tools-latent-bugs`).
 - [x] ~~`Rocq_monad_utils.Unification.Problem`'s JSON writes the `act` pair under `"goto"` as well as `"act"` (only dumps and logs are affected).~~ -- fixed 2026-10-04 (branch `fix/rocq-tools-latent-bugs`).
 - [x] ~~`Rocq_monad_utils.Unification.Pair.unify` catches only the `CannotUnify` kind of `PretypeError`; `w_unify`'s other failures (an occur-check, `UnifOccurCheck`, say) escape instead of meaning "does not unify".~~ -- fixed 2026-10-04 (branch `fix/rocq-tools-latent-bugs`).
+- [ ] `Components.Label.compare` is not a total order: it compares `is_silent` only when both labels know it, so with the same base a label with `None` compares equal to both `Some true` and `Some false`, which differ. Sets and maps ordered by it can misbehave if one base term ever appears with different `is_silent`s. (Found 2026-10-05, `lib/model` pass.)
+- [ ] `Components.Action.Map.update` means to merge the derivation trees of equal actions, but `Action.equal` compares the trees, so the actions it finds already have them: it never merges, and scans every key per update (linear). The proof solver relies on today's behaviour -- one action per derivation tree, which `Test.v`'s `MultipleDerivations` exercises -- so this needs deciding, not just fixing. (Found 2026-10-05.)
+- [ ] `Components.Annotation.is_empty` is true for a one-note annotation (an annotation always has at least one): the name misleads; `opt_is_empty` inherits it. (Found 2026-10-05.)
 
 ## To discuss with @dcastrop
 
