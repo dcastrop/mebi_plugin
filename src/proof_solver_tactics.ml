@@ -736,6 +736,82 @@ module Make
     Proofview.Unsafe.tclSETGOALS (lts @ others)
   ;;
 
+  (** [goal_concl sigma g] is the conclusion of the goal [g]. Raises
+      nothing for a goal still open. *)
+  let goal_concl (sigma : Evd.evar_map) (gl : Proofview_monad.goal_with_state)
+    : EConstr.t
+    =
+    Evd.evar_concl (Evd.find_undefined sigma (Proofview.drop_state gl))
+  ;;
+
+  (** [union_evars sigma ts] is every evar the terms [ts] mention. Raises
+      nothing. *)
+  let union_evars (sigma : Evd.evar_map) (ts : EConstr.t list) : Evar.Set.t =
+    List.fold_left
+      (fun acc t -> Evar.Set.union acc (Evd.evars_of_term sigma t))
+      Evar.Set.empty
+      ts
+  ;;
+
+  (** [open_witnesses sigma lts others] is the witnesses no LTS premise will
+      fix -- the evars of the premise goals [others] that none of the LTS
+      goals [lts] mentions -- and the premise goals that mention one of them
+      but no evar an LTS goal mentions, which are the ones to solve now.
+      Raises nothing. *)
+  let open_witnesses
+        (sigma : Evd.evar_map)
+        (lts : Proofview_monad.goal_with_state list)
+        (others : Proofview_monad.goal_with_state list)
+    : Evar.Set.t * EConstr.t list
+    =
+    let in_lts : Evar.Set.t =
+      union_evars sigma (List.map (goal_concl sigma) lts)
+    in
+    let premises : EConstr.t list = List.map (goal_concl sigma) others in
+    let witnesses : Evar.Set.t =
+      Evar.Set.diff (union_evars sigma premises) in_lts
+    in
+    let involved : EConstr.t list =
+      List.filter
+        (fun p ->
+          let e = Evd.evars_of_term sigma p in
+          (not (Evar.Set.is_empty (Evar.Set.inter e witnesses)))
+          && Evar.Set.is_empty (Evar.Set.inter e in_lts))
+        premises
+    in
+    witnesses, involved
+  ;;
+
+  (** [conjunction env p ps] is the conjunction [p /\ q1 /\ ...] of [p] and
+      each of [ps], left-nested. Raises Rocq's errors if [and] is not
+      registered (propagated; it always is). *)
+  let conjunction (env : Environ.env) (p : EConstr.t) (ps : EConstr.t list)
+    : EConstr.t
+    =
+    let and_ : EConstr.t =
+      EConstr.of_constr
+        (UnivGen.constr_of_monomorphic_global
+           env
+           (Rocqlib.lib_ref "core.and.type"))
+    in
+    List.fold_left (fun acc q -> EConstr.mkApp (and_, [| acc; q |])) p ps
+  ;;
+
+  (** [fixes_closed ws sol] is whether the evar map [sol] gives every evar
+      of [ws] a closed value. Raises nothing. *)
+  let fixes_closed (ws : Evar.Set.t) (sol : Evd.evar_map) : bool =
+    Evar.Set.for_all
+      (fun ev ->
+        match Evd.find_defined sol ev with
+        | None -> false
+        | Some info ->
+          (match Evd.evar_body info with
+           | Evd.Evar_defined c ->
+             Evar.Set.is_empty
+               (Evd.evars_of_term sol (Reductionops.nf_evar sol c))))
+      ws
+  ;;
+
   (** Run after [move_premises_last], while the constructor's subgoals are all
       visible. A binder that appears only in premises that are not LTS steps
       ([q] in [base q a q' -> open_c n a q'] with [base] not in [Using]) is an
@@ -757,54 +833,17 @@ module Make
     Proofview.Unsafe.tclGETGOALS
     >>= fun gls ->
     let lts, others = List.partition (is_lts_goal sigma) gls in
-    let concl (gl : Proofview_monad.goal_with_state) : EConstr.t =
-      Evd.evar_concl (Evd.find_undefined sigma (Proofview.drop_state gl))
-    in
-    let evars (t : EConstr.t) : Evar.Set.t = Evd.evars_of_term sigma t in
-    let union = List.fold_left Evar.Set.union Evar.Set.empty in
-    let in_lts : Evar.Set.t =
-      union (List.map (fun gl -> evars (concl gl)) lts)
-    in
-    let premises : EConstr.t list = List.map concl others in
-    let witnesses : Evar.Set.t =
-      Evar.Set.diff (union (List.map evars premises)) in_lts
-    in
-    let involved : EConstr.t list =
-      List.filter
-        (fun p ->
-          let e = evars p in
-          (not (Evar.Set.is_empty (Evar.Set.inter e witnesses)))
-          && Evar.Set.is_empty (Evar.Set.inter e in_lts))
-        premises
-    in
+    let witnesses, involved = open_witnesses sigma lts others in
     match involved with
     | [] -> Proofview.tclUNIT ()
     | p :: ps ->
-      let and_ : EConstr.t =
-        EConstr.of_constr
-          (UnivGen.constr_of_monomorphic_global
-             env
-             (Rocqlib.lib_ref "core.and.type"))
+      let mentioned : Evar.Set.t = union_evars sigma involved in
+      let sols, _complete =
+        Premise_search.enumerate env sigma (conjunction env p ps)
       in
-      let goal : EConstr.t =
-        List.fold_left (fun acc q -> EConstr.mkApp (and_, [| acc; q |])) p ps
-      in
-      let mentioned : Evar.Set.t = union (List.map evars involved) in
-      (* every witness the involved goals mention is given a closed value *)
-      let fixed (sol : Evd.evar_map) : bool =
-        Evar.Set.for_all
-          (fun ev ->
-            match Evd.find_defined sol ev with
-            | None -> false
-            | Some info ->
-              (match Evd.evar_body info with
-               | Evd.Evar_defined c ->
-                 Evar.Set.is_empty
-                   (Evd.evars_of_term sol (Reductionops.nf_evar sol c))))
-          (Evar.Set.inter witnesses mentioned)
-      in
-      let sols, _complete = Premise_search.enumerate env sigma goal in
-      (match List.find_opt fixed sols with
+      (match
+         List.find_opt (fixes_closed (Evar.Set.inter witnesses mentioned)) sols
+       with
        | Some sol -> Proofview.Unsafe.tclEVARS sol
        | None -> Proofview.tclUNIT ())
   ;;
