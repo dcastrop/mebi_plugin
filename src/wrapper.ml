@@ -525,6 +525,23 @@ module Make (Enc : Encoding.S) :
     M.return the_lts
   ;;
 
+  (** [refuse_walk why] fails with a user error saying that deciding weak
+      similarity walks every reachable pair, which an FSM saturated on
+      demand makes costly, and [why] the walk is not allowed (and how to
+      allow it).
+
+      Raises Rocq's [UserError] always (raised here). *)
+  let refuse_walk (why : string) : 'a =
+    CErrors.user_err
+      (Pp.str
+         (Printf.sprintf
+            "MeBi: deciding weak similarity walks every pair of states \
+             reachable from the two start states, and an FSM here is saturated \
+             on demand (too large to saturate whole; see the warning above), \
+             so that walk saturates state after state as it goes. %s"
+            why))
+  ;;
+
   (* See the [.mli]. *)
   let similarity (r : Model.Bisimilarity.t) : Model.Product.Pair.Set.t option =
     Logger.trace __FUNCTION__;
@@ -535,18 +552,6 @@ module Make (Enc : Encoding.S) :
       Stdlib.Option.is_some r.fsm_a.saturated.fill
       || Stdlib.Option.is_some b_saturated.fill
     in
-    (* a user error naming why the walk is not allowed, and how to allow it *)
-    let refuse (why : string) : 'a =
-      CErrors.user_err
-        (Pp.str
-           (Printf.sprintf
-              "MeBi: deciding weak similarity walks every pair of states \
-               reachable from the two start states, and an FSM here is \
-               saturated on demand (too large to saturate whole; see the \
-               warning above), so that walk saturates state after state as it \
-               goes. %s"
-              why))
-    in
     match a.init, b.init with
     | None, _ | _, None -> None
     | Some ra, Some rb ->
@@ -556,12 +561,12 @@ module Make (Enc : Encoding.S) :
       else (
         match !Api.the_game_bound with
         | None ->
-          refuse
+          refuse_walk
             "Bound it with [MeBi Config Bounds Game <n>] (pairs) to allow it."
         | Some n ->
           (try Some (Model.Product.with_cap n compute) with
            | Model.Product.Game_too_large n ->
-             refuse
+             refuse_walk
                (Printf.sprintf
                   "The game has more than %i pairs, the bound set with [MeBi \
                    Config Bounds Game %i]: raise it to allow it."
