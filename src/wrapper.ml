@@ -842,14 +842,6 @@ module Make (Enc : Encoding.S) :
         [list]. *)
     exception NothingToBenchmark
 
-    let _log_kinds ?(__FUNCTION__ : string = "") (x : EConstr.t) : unit M.mm =
-      M.state (fun env sigma ->
-        Rocq_utils.list_of_econstr_kinds sigma x
-        |> List.iter (fun (s, b) ->
-          Logger.debug ~__FUNCTION__ (Printf.sprintf "%b : %s" b s));
-        sigma, ())
-    ;;
-
     (** [extract_benchmark_args xs] is the elements of the Rocq list [xs], or
         [[xs]] if it is not a list.
 

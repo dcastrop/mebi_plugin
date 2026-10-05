@@ -4,7 +4,6 @@ open Tacarg
 
 (* This one is necessary, to avoid message about missing wit_string *)
 open Stdarg
-(* open Pp *)
 
 (* lib/ emits through Logger, which prints to stdout until a sink is installed.
    Route it through Rocq's Feedback now that we are running inside Rocq. *)
