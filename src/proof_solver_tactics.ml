@@ -278,6 +278,7 @@ module Make
     | x :: xs ->
       let open Syntax in
       let* x : Tactic.t = simplify_hyp x in
+      (* [f i acc] is [acc] then [simpl] in the [i]th of [xs]. *)
       let f (i : int) (x : Tactic.t) : Tactic.t mm =
         let y : Rocq_utils.hyp = List.nth xs i in
         let* y : Tactic.t = simplify_hyp y in
@@ -449,6 +450,7 @@ module Make
     Logger.trace __FUNCTION__;
     match Constr.kind x with
     | Const (name, _) ->
+      (* [f c] unfolds the constant [c], in [in_hyp] too if given. *)
       let f (name : Names.Constant.t) : unit Proofview.tactic =
         match in_hyp with
         | None -> Tactics.unfold_constr (Names.GlobRef.ConstRef name)
@@ -530,12 +532,17 @@ module Make
     : EConstrSet.t
     =
     Logger.trace __FUNCTION__;
+    (* [is_constr_ref x] is whether [x] is a constant. *)
     let is_constr_ref (x : EConstr.t) : bool =
       EConstr.isRef sigma x && EConstr.isConst sigma x
     in
+    (* [acc_constr_ref x acc] is [acc] with [x] added if it is a constant. *)
     let acc_constr_ref (x : EConstr.t) (acc : EConstrSet.t) : EConstrSet.t =
       if is_constr_ref x then EConstrSet.add x acc else acc
     in
+    (* [f acc y] is [acc] with the constants of [y] added: [y] itself, its
+       head, a [match]'s scrutinee's head, and those of its arguments. A term
+       that is not a type has no components. *)
     let rec f (acc : EConstrSet.t) (y : EConstr.t) : EConstrSet.t =
       let acc : EConstrSet.t = acc_constr_ref y acc in
       try
@@ -729,6 +736,7 @@ module Make
     ||
     let concl = Evd.evar_concl (Evd.find_undefined sigma ev) in
     let h, _ = EConstr.decompose_app sigma concl in
+    (* [lts_of m] is whether the goal's head is one of [m]'s LTSs. *)
     let lts_of (m : Model.FSM.t) : bool =
       try Theory.is_fsm_constructor h m with _ -> false
     in
