@@ -50,17 +50,19 @@
    (>= 3.0))
   (benchmark
    (>= 1.6))
+  ; Documentation tooling (`dune build @doc`; `odig` browses it locally).
+  (odoc
+   (or :with-doc :with-dev-setup))
+  (odig :with-dev-setup)
   ; Editor/formatting tooling: installed by `opam install . --with-dev-setup`,
   ; kept out of the build closure. ocamlformat is exact because its output
   ; changes between releases (see the `version` field in .ocamlformat).
-  (ocaml-lsp-server
-   :with-dev-setup)
+  (ocaml-lsp-server :with-dev-setup)
   (ocamlformat
    (and
     :with-dev-setup
     (= 0.29.0)))
-  (vsrocq-language-server
-   :with-dev-setup))
+  (vsrocq-language-server :with-dev-setup))
  (tags
   (bisimulation coinduction "process algebra" "proof automation" rocq)))
 
