@@ -1083,6 +1083,12 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         fold (fun _ (ys : States.t) (z : int) -> z + States.cardinal ys) x 0
       ;;
 
+      (** [with_trees_of a b] is the action [a] with [b]'s derivation trees
+          added to its own. Raises nothing. *)
+      let with_trees_of (a : Action.t) (b : Action.t) : Action.t =
+        { a with trees = Base.Trees.union a.trees b.trees }
+      ;;
+
       (* See [Actionmap_sig]. The scan over every key, for the trees of equal
          actions, makes each update linear in the table's size. *)
       let update (x : t') (action : Action.t) (states : States.t) : unit =
@@ -1096,12 +1102,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let action : Action.t =
               to_seq_keys x
               |> Seq.filter (Action.equal action)
-              |> Seq.fold_left
-                   (fun (action : Action.t) (y : Action.t) ->
-                     { action with
-                       trees = Base.Trees.union action.trees y.trees
-                     })
-                   action
+              |> Seq.fold_left with_trees_of action
             in
             replace x action (States.union old_states states))
       ;;
