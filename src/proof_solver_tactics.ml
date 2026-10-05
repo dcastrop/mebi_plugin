@@ -598,6 +598,26 @@ module Make
       false
   ;;
 
+  (** [unfolding_of sigma ?in_hyp x] is the [unfold] of the constant [x]
+      ({!unfold_econstr}), if it is not a theory term and can be unfolded
+      ({!can_be_unfolded}); [None] otherwise.
+
+      @raise CannotUnfoldConstr
+        as {!unfold_econstr} (propagated; never, as
+        [x] is a constant). *)
+  let unfolding_of
+        (sigma : Evd.evar_map)
+        ?(in_hyp : Rocq_utils.hyp option)
+        (x : EConstr.t)
+    : Tactic.t option
+    =
+    if Theory.is_any_theory x
+    then None
+    else if can_be_unfolded sigma x
+    then Some (f_unfold_hyp unfold_econstr ~in_hyp x)
+    else None
+  ;;
+
   (* See the [.mli]. Within one term the constants are distinct
      ({!collect_component_econstrs} returns a set). Across terms only
      {!try_unfold_any_of} combines several, at one call site
@@ -616,16 +636,7 @@ module Make
     match collect_component_econstrs sigma x |> EConstrSet.to_list with
     | [] -> return None
     | to_check ->
-      let ys =
-        List.filter_map
-          (fun (x : EConstr.t) ->
-            if Theory.is_any_theory x
-            then None
-            else if can_be_unfolded sigma x
-            then Some (f_unfold_hyp unfold_econstr ~in_hyp x)
-            else None)
-          to_check
-      in
+      let ys = List.filter_map (unfolding_of sigma ?in_hyp) to_check in
       (match ys with
        | [] -> return None
        | ys -> Some (Tactic.chain ys) |> return)
