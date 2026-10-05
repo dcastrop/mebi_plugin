@@ -38,7 +38,8 @@ module type S = sig
 
   (** {2 LTS} *)
 
-  (** {!LTS} has an *)
+  (** {!LTS}: a labelled transition system as extracted from Rocq, its
+      transitions listed one by one. *)
   module LTS :
     LTS.S
     with type state = State.t
@@ -49,7 +50,9 @@ module type S = sig
 
   (** {2 FSM} *)
 
-  (** {!FSM} ... *)
+  (** {!FSM}: the form the algorithms work on, each state mapped to its
+      actions and their destinations ({!EdgeMap}); built from an {!LTS} by
+      {!FSM.of_lts}, and saturated by {!FSM.saturate}. *)
   module FSM :
     FSM.S
     with type state = State.t

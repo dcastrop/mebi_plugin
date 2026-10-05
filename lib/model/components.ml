@@ -14,29 +14,54 @@
    original file. Each is a near-verbatim copy of that file's [module type S], renamed to avoid clashing with its neighbours in this single
    namespace. *)
 
+(** A state: a base term. *)
 module type State_sig = sig
   type base
   type t = { base : base }
 
   include Json.S with type k = t
 
+  (** [equal a b] is whether the states [a] and [b] have equal base terms.
+      Raises nothing. *)
   val equal : t -> t -> bool
+
+  (** [compare a b] orders states by their base terms. Raises nothing. *)
   val compare : t -> t -> int
+
+  (** [hash x] is the hash of [x]'s base term, consistent with {!equal}.
+      Raises nothing. *)
   val hash : t -> int
 end
 
+(** A set of states. *)
 module type States_sig = sig
   include Set.S
   include Json.S with type k = t
 
+  (** [add_to_opt x ys] is [ys] with [x] added, or the set of [x] alone if
+      [ys] is [None]. Raises nothing. *)
   val add_to_opt : elt -> t option -> t
 
+  (** Raised by {!origin_of_state}: the state is in neither set. *)
   exception StateHasNoOrigin of (elt * t * t)
 
+  (** [origin_of_state x a b] is which of [a] and [b] the state [x] is in:
+      [-1] for [a] only, [1] for [b] only, [0] for both.
+
+      @raise StateHasNoOrigin if [x] is in neither (raised here). *)
   val origin_of_state : elt -> t -> t -> int
+
+  (** [has_shared_origin a b c] is whether [a] has a state of [b] and a
+      state of [c] (a state in both counts for either): whether [a] mixes
+      the two systems.
+
+      @raise StateHasNoOrigin
+        if a state of [a] met before the answer is known is in neither [b]
+        nor [c] (propagated from {!origin_of_state}). *)
   val has_shared_origin : t -> t -> t -> bool
 end
 
+(** A label: a base term, and whether it is silent, when known. *)
 module type Label_sig = sig
   type base
 
@@ -47,19 +72,37 @@ module type Label_sig = sig
 
   include Json.S with type k = t
 
+  (** [equal a b] is whether the labels [a] and [b] have equal base terms;
+      [is_silent] is not compared. Raises nothing. *)
   val equal : t -> t -> bool
+
+  (** [compare a b] orders labels by base term, then by [is_silent] when
+      both know it. Not a total order: a label whose [is_silent] is [None]
+      compares equal to the same base with [Some true] and with [Some false],
+      which differ from each other ([TODO.md]). Raises nothing. *)
   val compare : t -> t -> int
+
+  (** [hash x] is the hash of [x]'s base term, consistent with {!equal}.
+      Raises nothing. *)
   val hash : t -> int
+
+  (** [is_silent x] is whether [x] is known to be silent ([false] if
+      unknown). Raises nothing. *)
   val is_silent : t -> bool
 end
 
+(** A set of labels. *)
 module type Labels_sig = sig
   include Set.S
   include Json.S with type k = t
 
+  (** [non_silent xs] is the labels of [xs] not known to be silent. Raises
+      nothing. *)
   val non_silent : t -> t
 end
 
+(** One step of a weak transition's witness: [from -label-> goto], with
+    the derivation trees [using] it was built from. *)
 module type Annotation_note_sig = sig
   type state
   type label
@@ -74,12 +117,24 @@ module type Annotation_note_sig = sig
 
   include Json.S with type k = t
 
+  (** [equal a b] is whether the notes [a] and [b] have equal source, target,
+      label and derivation trees. Raises nothing. *)
   val equal : t -> t -> bool
+
+  (** [compare a b] orders notes by source, target, label, then trees.
+      Raises nothing. *)
   val compare : t -> t -> int
+
+  (** [is_silent n] is whether [n]'s label is silent ({!Label_sig.is_silent}).
+      Raises nothing. *)
   val is_silent : t -> bool
+
+  (** [has_label l n] is whether [n]'s label equals [l]. Raises nothing. *)
   val has_label : label -> t -> bool
 end
 
+(** A weak transition's witness: the non-empty sequence of its steps, the
+    first in [this], the rest in [next]. *)
 module type Annotation_sig = sig
   type label
   type note
@@ -91,33 +146,82 @@ module type Annotation_sig = sig
 
   include Json.S with type k = t
 
+  (** [equal a b] is whether the annotations [a] and [b] have equal notes, in
+      order. Raises nothing. *)
   val equal : t -> t -> bool
+
+  (** [compare a b] orders annotations note by note (a shorter one first if
+      it is a prefix). Raises nothing. *)
   val compare : t -> t -> int
+
+  (** [is_empty a] is whether [a] has a single note. An annotation always
+      has at least one, so "empty" means no note beyond the first; the name
+      misleads. Raises nothing. *)
   val is_empty : t -> bool
 
+  (** Raised by {!opt_is_empty} and {!opt_length} on [None] when asked to. *)
   exception AnnotationIsNone
 
+  (** [opt_is_empty ?fail_if_none a] is {!is_empty} of the annotation [a],
+      or [true] if it is [None].
+
+      @raise AnnotationIsNone
+        if [a] is [None] and [fail_if_none] is set
+        (raised here). *)
   val opt_is_empty : ?fail_if_none:bool -> t option -> bool
+
+  (** [length a] is the number of notes in [a] (at least 1). Raises nothing. *)
   val length : t -> int
+
+  (** [opt_length ?fail_if_none a] is {!length} of the annotation [a], or [0]
+      if it is [None].
+
+      @raise AnnotationIsNone
+        if [a] is [None] and [fail_if_none] is set
+        (raised here). *)
   val opt_length : ?fail_if_none:bool -> t option -> int
+
+  (** [shorter a b] is the one of [a] and [b] with fewer notes; [b] if they
+      are as long. Raises nothing. *)
   val shorter : t -> t -> t
+
+  (** [exists n a] is whether the note [n] is one of [a]'s. Raises nothing. *)
   val exists : note -> t -> bool
+
+  (** [exists_label l a] is whether some note of [a] has the label [l].
+      Raises nothing. *)
   val exists_label : label -> t -> bool
+
+  (** [append n a] is [a] with the note [n] added at the end (linear in
+      [a]'s length). Raises nothing. *)
   val append : note -> t -> t
+
+  (** [last a] is [a]'s last note. Raises nothing. *)
   val last : t -> note
 
+  (** Raised by {!drop_last} on a single-note annotation. *)
   exception CannotDropLastOfSingleton of t
 
+  (** [drop_last a] is [a] without its last note.
+
+      @raise CannotDropLastOfSingleton if [a] has only one note (raised
+                                       here). *)
   val drop_last : t -> t
 end
 
+(** A set of witnesses. *)
 module type Annotations_sig = sig
   include Set.S
   include Json.S with type k = t
 
+  (** [extrapolate a] is [a] and each prefix of [a] that includes its
+      first visible note: the shorter weak steps [a] also witnesses, cut
+      after any later note. Raises nothing. *)
   val extrapolate : elt -> t
 end
 
+(** A transition of an LTS, [from -label-> goto], with its derivation tree
+    (when extracted from Rocq) and its witness (when weak). *)
 module type Transition_sig = sig
   type state
   type label
@@ -134,20 +238,32 @@ module type Transition_sig = sig
 
   include Json.S with type k = t
 
+  (** [equal a b] is whether the transitions [a] and [b] agree on every field.
+      Raises nothing. *)
   val equal : t -> t -> bool
+
+  (** [compare a b] orders transitions by source, target, label, annotation,
+      then derivation tree. Raises nothing. *)
   val compare : t -> t -> int
+
+  (** [is_silent t] is whether [t]'s label is silent. Raises nothing. *)
   val is_silent : t -> bool
 end
 
+(** A set of transitions. *)
 module type Transitions_sig = sig
   type labels
 
   include Set.S
   include Json.S with type k = t
 
+  (** [labels ts] is the labels of the transitions [ts]. Raises nothing. *)
   val labels : t -> labels
 end
 
+(** An action of an FSM: a label, its witness when weak, and the
+    derivation trees of the strong steps it stands for. An FSM maps each
+    state to its actions, and each action to its destinations. *)
 module type Action_sig = sig
   type label
   type annotation
@@ -161,15 +277,35 @@ module type Action_sig = sig
 
   include Json.S with type k = t
 
+  (** [equal a b] is whether the actions [a] and [b] have equal label,
+      witness and derivation trees. Raises nothing. *)
   val equal : t -> t -> bool
+
+  (** [compare a b] orders actions by label, witness, then trees. Raises
+      nothing. *)
   val compare : t -> t -> int
+
+  (** [hash a] is a hash consistent with {!equal}: of the label alone for an
+      action with no witness; for a weak action, also of the witness's
+      length and its first and last states. Raises nothing. *)
   val hash : t -> int
+
+  (** [wk_equal a b] is whether [a] and [b] have the same label (witness
+      and trees ignored). Raises nothing. *)
   val wk_equal : t -> t -> bool
+
+  (** [is_silent a] is whether [a]'s label is silent. Raises nothing. *)
   val is_silent : t -> bool
+
+  (** [is_labelled l a] is whether [a]'s label equals [l]. Raises nothing. *)
   val is_labelled : label -> t -> bool
+
+  (** [shorter_annotation a b] is the one of [a] and [b] with the shorter
+      witness (none counts as 0); [a] if they are as long. Raises nothing. *)
   val shorter_annotation : t -> t -> t
 end
 
+(** A set of actions. *)
 module type Actions_sig = sig
   type label
   type labels
@@ -177,10 +313,14 @@ module type Actions_sig = sig
   include Set.S
   include Json.S with type k = t
 
+  (** [labelled xs l] is the actions of [xs] labelled [l]. Raises nothing. *)
   val labelled : t -> label -> t
+
+  (** [labels xs] is the labels of the actions [xs]. Raises nothing. *)
   val labels : t -> labels
 end
 
+(** An action and its destinations. *)
 module type Actionpair_sig = sig
   type action
   type states
@@ -188,26 +328,56 @@ module type Actionpair_sig = sig
 
   include Json.S with type k = t
 
+  (** [compare a b] orders pairs by action, then destinations. Raises
+      nothing. *)
   val compare : t -> t -> int
+
+  (** [shorter_annotation p q] is the one of the pairs [p] and [q] whose
+      action has the shorter witness ({!Action_sig.shorter_annotation}); [p]
+      if they are as long. Raises nothing. *)
   val shorter_annotation : t -> t -> t
+
+  (** [try_update x ps] is [x] merged into the first pair of [ps] with the
+      same label and destinations, if there is one: [Some z] and [ps]
+      without that pair, where [z]'s witness is the shorter of the two and
+      its trees the union of both. Otherwise [None] and [ps]. Either way the
+      list comes back reversed. Raises nothing. *)
   val try_update : t -> t list -> t option * t list
+
+  (** [merge_lists a b] is [a] with each pair of [b] merged in, in turn:
+      into a matching pair ({!try_update}), or else added at the front. The
+      order of [a] is not kept. Raises nothing. *)
   val merge_lists : t list -> t list -> t list
 end
 
+(** A set of (action, destinations) pairs. *)
 module type Actionpairs_sig = sig
   type states
 
   include Set.S
   include Json.S with type k = t
 
+  (** [destinations ps] is the union of the destinations of [ps]. Raises
+      nothing. *)
   val destinations : t -> states
 
+  (** Raised by {!shortest_annotation} on an empty set. *)
   exception IsEmpty
 
+  (** [shortest_annotation ps] is the pair of [ps] whose action has the
+      shortest witness (none counts as 0); the first in set order on a tie.
+
+      @raise IsEmpty if [ps] is empty (raised here). *)
   val shortest_annotation : t -> elt
+
+  (** [merge_list s ps] is [s] with each pair [(a, d)] of [ps] added, in
+      turn; where [s] already has pairs whose action equals [a], [d] is
+      joined to their destinations instead. Raises nothing. *)
   val merge_list : t -> elt list -> t
 end
 
+(** The actions from one state: a table from each action to its
+    destinations. *)
 module type Actionmap_sig = sig
   type label
   type action
@@ -221,16 +391,40 @@ module type Actionmap_sig = sig
 
   include Json.S with type k = t'
 
+  (** [size m] is the number of (action, destination) pairs in [m]. Raises
+      nothing. *)
   val size : t' -> int
+
+  (** [update m a d] adds the destinations [d] to the action [a] in [m]
+      (nothing if [d] is empty). Meant also to merge the derivation trees of
+      equal actions, but since {!Action_sig.equal} compares the trees, the
+      actions it finds already have them ([TODO.md]). Raises nothing. *)
   val update : t' -> action -> states -> unit
+
+  (** [destinations m] is the union of [m]'s destinations. Raises nothing. *)
   val destinations : t' -> states
+
+  (** [reduce_by_label m l] is a copy of [m] with only its actions labelled
+      [l]. Raises nothing. *)
   val reduce_by_label : t' -> label -> t'
+
+  (** [to_actions m] is the actions of [m]. Raises nothing. *)
   val to_actions : t' -> actions
+
+  (** [to_actionpairs m] is [m] as a set of (action, destinations) pairs.
+      Raises nothing. *)
   val to_actionpairs : t' -> actionpairs
+
+  (** [of_actionpairs ps] is a new table of the pairs [ps] ({!update} for
+      each). Raises nothing. *)
   val of_actionpairs : actionpairs -> t'
+
+  (** [merge a b] is a new table with the pairs of both [a] and [b]. Raises
+      nothing. *)
   val merge : t' -> t' -> t'
 end
 
+(** One step of an FSM, [from -action-> goto]. *)
 module type Edge_sig = sig
   type state
   type label
@@ -244,21 +438,35 @@ module type Edge_sig = sig
 
   include Json.S with type k = t
 
+  (** [equal a b] is whether the edges [a] and [b] have equal source, target
+      and action. Raises nothing. *)
   val equal : t -> t -> bool
+
+  (** [compare a b] orders edges by source, target, then action. Raises
+      nothing. *)
   val compare : t -> t -> int
+
+  (** [is_silent e] is whether [e]'s action is silent. Raises nothing. *)
   val is_silent : t -> bool
+
+  (** [is_labelled l e] is whether [e]'s action is labelled [l]. Raises
+      nothing. *)
   val is_labelled : label -> t -> bool
 end
 
+(** A set of edges. *)
 module type Edges_sig = sig
   type label
 
   include Set.S
   include Json.S with type k = t
 
+  (** [labelled es l] is the edges of [es] labelled [l]. Raises nothing. *)
   val labelled : t -> label -> t
 end
 
+(** An FSM's steps: a table from each state to its actions
+    ({!Actionmap_sig}). *)
 module type Edgemap_sig = sig
   type state
   type states
@@ -275,18 +483,54 @@ module type Edgemap_sig = sig
 
   include Json.S with type k = t'
 
+  (** [size m] is the number of (source, action, destination) triples in
+      [m]. Raises nothing. *)
   val size : t' -> int
+
+  (** [update m s a d] adds the destinations [d] to the action [a] from
+      [s] in [m], giving [s] an entry if it has none. Raises nothing. *)
   val update : t' -> state -> action -> states -> unit
+
+  (** [destinations m s] is every state one action from [s] in [m] (none if
+      [s] has no entry). Raises nothing. *)
   val destinations : t' -> state -> states
+
+  (** [get_actions m s] is the actions from [s] in [m].
+
+      @raise Not_found
+        if [s] has no entry in [m] (propagated from
+        [Hashtbl.find]). *)
   val get_actions : t' -> state -> actions
+
+  (** [reduce_by_label m l] is a copy of [m] with only its actions labelled
+      [l], dropping states left with none. Raises nothing. *)
   val reduce_by_label : t' -> label -> t'
+
+  (** [get_edges m s] is the edges from [s] in [m].
+
+      @raise Not_found
+        if [s] has no entry in [m] (propagated from
+        [Hashtbl.find]). *)
   val get_edges : t' -> state -> edges
+
+  (** [to_edges m] is every edge of [m]. Raises nothing. *)
   val to_edges : t' -> edges
+
+  (** [of_edges es] is a new table of the edges [es]. Raises nothing. *)
   val of_edges : edges -> t'
+
+  (** [of_transitions ts] is a new table of the transitions [ts], each an
+      action with its label, annotation and (if it has one) derivation tree.
+      Raises nothing. *)
   val of_transitions : transitions -> t'
+
+  (** [merge a b] is a copy of [a] with [b]'s entries added; a state in both
+      gets its action tables merged ({!Actionmap_sig.merge}). Raises nothing. *)
   val merge : t' -> t' -> t'
 end
 
+(** A partition of states into blocks (sets of states), as a
+    minimisation or bisimilarity check leaves it. *)
 module type State_partition_sig = sig
   type state
   type label
@@ -295,12 +539,31 @@ module type State_partition_sig = sig
   include Set.S
   include Json.S with type k = t
 
+  (** [get_bisimilar x p] is the block of the partition [p] containing [x].
+
+      @raise Not_found if no block does (raised here). *)
   val get_bisimilar : state -> t -> elt
+
+  (** [filter_reachable xs p] is the blocks of [p] with a state of [xs].
+      Raises nothing. *)
   val filter_reachable : elt -> t -> t
+
+  (** [reachable s m p] is the blocks of [p] with a state one action from
+      [s] in [m]. Raises nothing. *)
   val reachable : state -> edgemap -> t -> t
+
+  (** [reachable_by_label s l m p] is the blocks of [p] with a state one
+      action labelled [l] from [s] in [m].
+
+      @raise Not_found
+        if [s] has no entry in [m] (propagated from
+        [Hashtbl.find]). *)
   val reachable_by_label : state -> label -> edgemap -> t -> t
 end
 
+(** What a model records about itself: its metadata (whether exploration
+    completed, its bounds, the Rocq LTSs it came from), its weak labels,
+    and its counts. *)
 module type Info_sig = sig
   type base
   type constructorbindings
@@ -334,7 +597,14 @@ module type Info_sig = sig
 
     include Json.S with type k = t
 
+    (** [merge a b] is the metadata of a model made of the two models [a] and
+        [b] describe: complete if both are, marked merged, both bounds kept,
+        and both lists of Rocq LTSs merged by base term (sorted lists stay
+        sorted). Raises nothing. *)
     val merge : t -> t -> t
+
+    (** [merge_opt a b] is {!merge} of [a] and [b], or whichever is present,
+        marked merged, or [None]. Raises nothing. *)
     val merge_opt : t option -> t option -> t option
   end
 
@@ -352,6 +622,10 @@ module type Info_sig = sig
 
   include Json.S with type k = t
 
+  (** [merge ?nums a b] is the information of a model made of the two that
+      [a] and [b] describe: metadata merged ({!Meta.merge_opt}), weak labels
+      united, and the counts [nums] (default [None]: not computed here).
+      Raises nothing. *)
   val merge : ?nums:nums option -> t -> t -> t
 end
 
@@ -501,6 +775,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
+      (* See [State_sig]. *)
       let hash x = Base.hash x.base
     end
 
@@ -512,12 +787,14 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "States"
           end)
 
+      (* See [States_sig]. *)
       let add_to_opt (x : State.t) (ys : t option) : t =
         add x (Stdlib.Option.value ys ~default:empty)
       ;;
 
       exception StateHasNoOrigin of (State.t * t * t)
 
+      (* See [States_sig]. *)
       let origin_of_state (x : State.t) (a : t) (b : t) : int =
         match mem x a, mem x b with
         | true, true -> 0
@@ -526,6 +803,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         | false, false -> raise (StateHasNoOrigin (x, a, b))
       ;;
 
+      (* See [States_sig]. *)
       let has_shared_origin (a : t) (b : t) (c : t) : bool =
         let f (i : int) (x : State.t) : bool =
           match origin_of_state x b c with 0 -> true | j -> Int.equal i j
@@ -572,8 +850,10 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
+      (* See [Label_sig]. *)
       let hash (x : t) : int = Base.hash x.base
 
+      (* See [Label_sig]. *)
       let is_silent (x : t) : bool =
         Stdlib.Option.value x.is_silent ~default:false
       ;;
@@ -587,6 +867,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Labels"
           end)
 
+      (* See [Labels_sig]. *)
       let non_silent (xs : t) : t =
         filter (fun (x : Label.t) -> Bool.not (Label.is_silent x)) xs
       ;;
@@ -637,7 +918,10 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
+      (* See [Annotation_note_sig]. *)
       let is_silent (x : t) : bool = Label.is_silent x.label
+
+      (* See [Annotation_note_sig]. *)
       let has_label (x : Label.t) (y : t) : bool = Label.equal x y.label
     end
 
@@ -677,6 +961,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
+      (* See [Annotation_sig]. *)
       let is_empty : t -> bool = function
         | { this; next = None } -> true
         | _ -> false
@@ -684,44 +969,52 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       exception AnnotationIsNone
 
+      (* See [Annotation_sig]. *)
       let opt_is_empty ?(fail_if_none : bool = false) : t option -> bool
         = function
         | None -> if fail_if_none then raise AnnotationIsNone else true
         | Some x -> is_empty x
       ;;
 
+      (* See [Annotation_sig]. *)
       let rec length : t -> int = function
         | { next = None; _ } -> 1
         | { next = Some next; _ } -> 1 + length next
       ;;
 
+      (* See [Annotation_sig]. *)
       let opt_length ?(fail_if_none : bool = false) : t option -> int = function
         | None -> if fail_if_none then raise AnnotationIsNone else 0
         | Some x -> length x
       ;;
 
+      (* See [Annotation_sig]. *)
       let shorter (a : t) (b : t) : t =
         match Int.compare (length a) (length b) with -1 -> a | _ -> b
       ;;
 
+      (* See [Annotation_sig]. *)
       let rec exists (x : Note.t) : t -> bool = function
         | { this; next = None } -> Note.equal x this
         | { this; next = Some next } ->
           if Note.equal x this then true else exists x next
       ;;
 
+      (* See [Annotation_sig]. *)
       let rec exists_label (x : Label.t) : t -> bool = function
         | { this; next = None } -> Note.has_label x this
         | { this; next = Some next } ->
           if Note.has_label x this then true else exists_label x next
       ;;
 
+      (* See [Annotation_sig]. *)
       let rec append (x : Note.t) : t -> t = function
         | { this; next = None } ->
           { this; next = Some { this = x; next = None } }
         | { this; next = Some next } -> { this; next = Some (append x next) }
       ;;
 
+      (* See [Annotation_sig]. *)
       let rec last : t -> Note.t = function
         | { this; next = None } -> this
         | { next = Some next; _ } -> last next
@@ -729,6 +1022,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       exception CannotDropLastOfSingleton of t
 
+      (* See [Annotation_sig]. *)
       let rec drop_last : t -> t = function
         | { this; next = None } ->
           raise (CannotDropLastOfSingleton { this; next = None })
@@ -745,7 +1039,9 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Annotations"
           end)
 
-      (** returns all of the possible actions after the named action *)
+      (* See [Annotations_sig]. [skip] walks the silent notes before the first
+         visible one, which every result keeps; from there [get] gives every
+         prefix. *)
       let extrapolate (x : Annotation.t) : t =
         Logger.trace __FUNCTION__;
         let rec skip ({ this; next } : Annotation.t) : t =
@@ -819,6 +1115,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
+      (* See [Transition_sig]. *)
       let is_silent (x : t) : bool = Label.is_silent x.label
     end
 
@@ -832,6 +1129,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Transitions"
           end)
 
+      (* See [Transitions_sig]. *)
       let labels (xs : t) : Labels.t =
         Logger.trace __FUNCTION__;
         fold
@@ -905,10 +1203,16 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             (Label.hash x.label, n, State.hash a.this.from, State.hash z.goto)
       ;;
 
+      (* See [Action_sig]. *)
       let wk_equal (a : t) (b : t) : bool = Label.equal a.label b.label
+
+      (* See [Action_sig]. *)
       let is_silent (x : t) : bool = Label.is_silent x.label
+
+      (* See [Action_sig]. *)
       let is_labelled (x : Label.t) (y : t) : bool = Label.equal x y.label
 
+      (* See [Action_sig]. *)
       let shorter_annotation (a : t) (b : t) : t =
         match
           Int.compare
@@ -931,11 +1235,13 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Actions"
           end)
 
+      (* See [Actions_sig]. *)
       let labelled (xs : t) (y : label) : t =
         Logger.trace __FUNCTION__;
         filter (fun ({ label; _ } : Action.t) -> Label.equal label y) xs
       ;;
 
+      (* See [Actions_sig]. *)
       let labels (xs : t) : Labels.t =
         Logger.trace __FUNCTION__;
         fold
@@ -976,6 +1282,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
+      (* See [Actionpair_sig]. *)
       let shorter_annotation ((a, xs) : t) ((b, ys) : t) : t =
         match
           Int.compare
@@ -986,8 +1293,8 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         | _ -> a, xs
       ;;
 
-      (** [try_update x a] returns [None, a] when [x] cannot be used to update a pre-existing tuple in [a], and [Some z, a'] where [z] is the updated tuple in [a] which has been removed in [a'].
-          (* TODO:REFACTOR -- this is the reason so many functor params *) *)
+      (* See [Actionpair_sig]. One fold: once a pair has been merged, the
+         rest are passed through. *)
       let try_update ((xaction, xdestinations) : t) (a : t list)
         : t option * t list
         =
@@ -1025,8 +1332,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           a
       ;;
 
-      (** [merge_lists a b] merges elements of [b] into [a], either by updating an element in [a] with additional annotation for a saturation tuple that describes the same action-destination, or in the case that the saturation tuple is not described within [a] by inserting it within [a].
-      *)
+      (* See [Actionpair_sig]. *)
       let rec merge_lists (a : t list) : t list -> t list =
         Logger.trace __FUNCTION__;
         function
@@ -1051,6 +1357,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "ActionPairs"
           end)
 
+      (* See [Actionpairs_sig]. *)
       let destinations (x : t) : States.t =
         to_list x
         |> List.fold_left
@@ -1061,14 +1368,14 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       exception IsEmpty
 
-      (** returns the action in [x] that has the {e shortest} annotation (where [None] is treated as 0).
-      *)
+      (* See [Actionpairs_sig]. *)
       let shortest_annotation (x : t) : ActionPair.t =
         match to_list x with
         | [] -> raise IsEmpty
         | h :: tl -> List.fold_left ActionPair.shorter_annotation h tl
       ;;
 
+      (* See [Actionpairs_sig]. *)
       let merge_list : t -> ActionPair.t list -> t =
         List.fold_left (fun (acc : t) ((a, s) : ActionPair.t) ->
           let matching =
@@ -1114,12 +1421,13 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Destinations"
           end)
 
+      (* See [Actionmap_sig]. *)
       let size (x : t') : int =
         fold (fun _ (ys : States.t) (z : int) -> z + States.cardinal ys) x 0
       ;;
 
-      (** [update] ... if the action is already present, then along with merging the destination states, we also merge the constructor trees.
-      *)
+      (* See [Actionmap_sig]. The scan over every key, for the trees of equal
+         actions, makes each update linear in the table's size. *)
       let update (x : t') (action : Action.t) (states : States.t) : unit =
         Logger.trace __FUNCTION__;
         if States.is_empty states
@@ -1141,8 +1449,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             replace x action (States.union old_states states))
       ;;
 
-      (** [destinations x f e] merges the values of [x] using [f], where [e] is some initial (i.e., "empty") collection of ['a].
-      *)
+      (* See [Actionmap_sig]. *)
       let destinations (x : t') : States.t =
         Logger.trace __FUNCTION__;
         to_seq_values x
@@ -1150,6 +1457,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         |> List.fold_left States.union States.empty
       ;;
 
+      (* See [Actionmap_sig]. *)
       let reduce_by_label (x : t') (label : Label.t) : t' =
         Logger.trace __FUNCTION__;
         let y : t' = copy x in
@@ -1160,8 +1468,10 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         y
       ;;
 
+      (* See [Actionmap_sig]. *)
       let to_actions (x : t') : Actions.t = to_seq_keys x |> Actions.of_seq
 
+      (* See [Actionmap_sig]. *)
       let to_actionpairs (x : t') : ActionPairs.t =
         Logger.trace __FUNCTION__;
         fold
@@ -1172,6 +1482,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           ActionPairs.empty
       ;;
 
+      (* See [Actionmap_sig]. *)
       let of_actionpairs (xs : ActionPairs.t) : t' =
         Logger.trace __FUNCTION__;
         let y : t' = create 0 in
@@ -1179,6 +1490,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         y
       ;;
 
+      (* See [Actionmap_sig]. *)
       let merge (a : t') (b : t') : t' =
         Logger.trace __FUNCTION__;
         ActionPairs.union (to_actionpairs a) (to_actionpairs b)
@@ -1227,8 +1539,10 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
 
       include Thing.Make (X)
 
+      (* See [Edge_sig]. *)
       let is_silent (x : t) : bool = Action.is_silent x.action
 
+      (* See [Edge_sig]. *)
       let is_labelled (x : Label.t) (y : t) : bool =
         Action.is_labelled x y.action
       ;;
@@ -1247,6 +1561,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Edge"
           end)
 
+      (* See [Edges_sig]. *)
       let labelled (xs : t) (y : label) : t =
         Logger.trace __FUNCTION__;
         filter (Edge.is_labelled y) xs
@@ -1289,10 +1604,12 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let compare a b : int = 0
           end)
 
+      (* See [Edgemap_sig]. *)
       let size (x : t') : int =
         fold (fun _ (ys : ActionMap.t') (z : int) -> z + ActionMap.size ys) x 0
       ;;
 
+      (* See [Edgemap_sig]. *)
       let update
             (x : t')
             (from : State.t)
@@ -1309,6 +1626,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         | Some actions -> ActionMap.update actions action destinations
       ;;
 
+      (* See [Edgemap_sig]. *)
       let destinations (x : t') (from : State.t) : States.t =
         Logger.trace __FUNCTION__;
         match find_opt x from with
@@ -1316,11 +1634,13 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         | Some ys -> ActionMap.destinations ys
       ;;
 
+      (* See [Edgemap_sig]. *)
       let get_actions (x : t') (from : State.t) : Actions.t =
         Logger.trace __FUNCTION__;
         find x from |> ActionMap.to_seq_keys |> Actions.of_seq
       ;;
 
+      (* See [Edgemap_sig]. *)
       let reduce_by_label (x : t') (label : label) : t' =
         Logger.trace __FUNCTION__;
         let y : t' = copy x in
@@ -1332,6 +1652,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         y
       ;;
 
+      (* See [Edgemap_sig]. *)
       let get_edges (x : t') (from : State.t) : Edges.t =
         Logger.trace __FUNCTION__;
         ActionMap.fold
@@ -1345,6 +1666,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           Edges.empty
       ;;
 
+      (* See [Edgemap_sig]. *)
       let to_edges (x : t') : Edges.t =
         Logger.trace __FUNCTION__;
         fold
@@ -1363,6 +1685,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           Edges.empty
       ;;
 
+      (* See [Edgemap_sig]. *)
       let of_edges (xs : Edges.t) : t' =
         Logger.trace __FUNCTION__;
         let ys : t' = create 0 in
@@ -1373,6 +1696,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         ys
       ;;
 
+      (* See [Edgemap_sig]. *)
       let of_transitions (xs : Transitions.t) : t' =
         Logger.trace __FUNCTION__;
         let edges : t' = create 0 in
@@ -1394,6 +1718,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         edges
       ;;
 
+      (* See [Edgemap_sig]. *)
       let merge (a : t') (b : t') : t' =
         Logger.trace __FUNCTION__;
         let c : t' = copy a in
@@ -1419,35 +1744,34 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Partitions"
           end)
 
-      (** [get_bisimilar x p] is the block of [p] containing [x].
-
-          @raise Not_found when no block does.
-
-          Not [find_first]: that returns the least element satisfying a
-          predicate and requires the predicate to be {b monotonically
-          increasing} over the set's ordering, which "this block contains [x]"
-          is not. With a non-monotonic predicate its binary search is
-          unspecified, and it really does miss -- on a ten-block partition of
-          twenty states it failed to find the block holding the second state,
-          which is visibly there. Both callers ([Results.get_bisimilar_states]
-          and [Product.successors]) turn [Not_found] into the empty set, so the
-          miss surfaced not as an error but as a state with nothing bisimilar
-          to it. Found 2026-09-29 while writing a [Product.estimate] test. *)
+      (* See [State_partition_sig]. Not [find_first]: that returns the least
+         element satisfying a predicate and requires the predicate to be
+         monotonically increasing over the set's ordering, which "this block
+         contains [x]" is not. With a non-monotonic predicate its binary search
+         is unspecified, and it really does miss -- on a ten-block partition of
+         twenty states it failed to find the block holding the second state.
+         Both callers ([Results.get_bisimilar_states] and [Product.successors])
+         turn [Not_found] into the empty set, so the miss surfaced not as an
+         error but as a state with nothing bisimilar to it. Found 2026-09-29
+         while writing a [Product.estimate] test. *)
       let get_bisimilar (x : State.t) (p : t) : States.t =
         let matching : t = filter (fun (ys : States.t) -> States.mem x ys) p in
         if is_empty matching then raise Not_found else choose matching
       ;;
 
+      (* See [State_partition_sig]. *)
       let filter_reachable (xs : States.t) : t -> t =
         filter (fun (y : States.t) ->
           Bool.not (States.is_empty (States.inter y xs)))
       ;;
 
+      (* See [State_partition_sig]. *)
       let reachable (from : State.t) (edges : EdgeMap.t') : t -> t =
         Logger.trace __FUNCTION__;
         filter_reachable (EdgeMap.destinations edges from)
       ;;
 
+      (* See [State_partition_sig]. *)
       let reachable_by_label
             (from : State.t)
             (label : label)
@@ -1538,6 +1862,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             ;;
           end)
 
+        (* See [Info_sig]. *)
         let merge (a : t) (b : t) : t =
           { is_complete = a.is_complete && b.is_complete
           ; is_merged = true
@@ -1551,6 +1876,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           }
         ;;
 
+        (* See [Info_sig]. *)
         let merge_opt (a : t option) (b : t option) : t option =
           match a, b with
           | None, None -> None
@@ -1594,6 +1920,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           ;;
         end)
 
+      (* See [Info_sig]. *)
       let merge ?(nums : nums option = None) (a : t) (b : t) : t =
         { meta = Meta.merge_opt a.meta b.meta
         ; weak_labels = Labels.union a.weak_labels b.weak_labels
