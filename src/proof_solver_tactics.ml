@@ -559,6 +559,27 @@ module Make
     f EConstrSet.empty x
   ;;
 
+  (** [unfoldable_definition z ty] is whether a constant defined as [z], of
+      type [ty], is worth unfolding: a function or fixpoint (of a product
+      type), an application of type a constant or inductive, a constructor
+      of type a constant, or an alias of another constant (e.g.
+      [SomeModule.example_1]). Raises nothing. *)
+  let unfoldable_definition (z : Constr.t) (const_type : Constr.t) : bool =
+    match Constr.kind z with
+    | Fix _ -> Constr.isProd const_type
+    | Lambda _ -> Constr.isProd const_type
+    | App _ ->
+      Constr.isRef const_type
+      && (Constr.isConst const_type || Constr.isInd const_type)
+    | Construct _ ->
+      Constr.isRef z && Constr.isConst const_type && Constr.isRef const_type
+    | _ ->
+      Constr.isConst z
+      && Constr.isRef z
+      && Constr.isConst const_type
+      && Constr.isRef const_type
+  ;;
+
   (* See the [.mli]. *)
   let can_be_unfolded (sigma : Evd.evar_map) (x : EConstr.t) : bool =
     Logger.trace __FUNCTION__;
@@ -568,22 +589,7 @@ module Make
       | ConstRef y ->
         (match Global.lookup_constant y with
          | { const_body = Def z; const_type; _ } ->
-           (match Constr.kind z with
-            | Fix _ -> Constr.isProd const_type
-            | Lambda _ -> Constr.isProd const_type
-            | App _ ->
-              Constr.isRef const_type
-              && (Constr.isConst const_type || Constr.isInd const_type)
-            | Construct _ ->
-              Constr.isRef z
-              && Constr.isConst const_type
-              && Constr.isRef const_type
-            | _ ->
-              (* NOTE: unfold, e.g., [SomeModule.example_1] *)
-              Constr.isConst z
-              && Constr.isRef z
-              && Constr.isConst const_type
-              && Constr.isRef const_type)
+           unfoldable_definition z const_type
          | _ -> false)
       | _ -> false
     with
