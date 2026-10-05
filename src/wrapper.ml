@@ -935,6 +935,29 @@ module Make (Enc : Encoding.S) :
     type graph_benchmark =
       string * (Constrexpr.constr_expr -> LTS.t) * Constrexpr.constr_expr
 
+    (** [add_benchmark_case lts using i x cases] is [cases] with the [i]th
+        case in front: named [benchmark_graph_i], timing the extraction of
+        the term [x] by [lts] ({!build_lts}). Raises nothing when run; the
+        case itself raises as {!build_lts}, when timed. *)
+    let add_benchmark_case
+          (primary_lts : Libnames.qualid)
+          (refs : Libnames.qualid list)
+          (i : int)
+          (x : EConstr.t)
+          (funs : graph_benchmark list)
+      : graph_benchmark list M.mm
+      =
+      Logger.debug __FUNCTION__;
+      let open M.Syntax in
+      let test_name : string = Printf.sprintf "benchmark_graph_%i" i in
+      let* x : Constrexpr.constr_expr =
+        M.state (fun env sigma ->
+          sigma, Rocq_utils.econstr_to_constrexpr env sigma x)
+      in
+      let runf = fun x -> M.run (build_lts primary_lts x refs) in
+      M.return ((test_name, runf, x) :: funs)
+    ;;
+
     (* See the [.mli]. *)
     let do_benchmark_graph
           (((xs, primary_lts), (time, repeat)) : rocq_args * (int * int))
@@ -945,18 +968,12 @@ module Make (Enc : Encoding.S) :
       let open M.Syntax in
       let* xs : EConstr.t = M.constrexpr_to_econstr xs in
       let* xs : EConstr.t list = extract_benchmark_args xs in
-      let f (i : int) (funs : graph_benchmark list) : graph_benchmark list M.mm =
-        Logger.debug __FUNCTION__;
-        let test_name : string = Printf.sprintf "benchmark_graph_%i" i in
-        let* x : Constrexpr.constr_expr =
-          M.state (fun env sigma ->
-            sigma, List.nth xs i |> Rocq_utils.econstr_to_constrexpr env sigma)
-        in
-        let runf = fun x -> M.run (build_lts primary_lts x refs) in
-        (test_name, runf, x) :: funs |> M.return
-      in
       let* funs : graph_benchmark list =
-        M.iterate 0 (List.length xs - 1) [] f
+        M.iterate
+          0
+          (List.length xs - 1)
+          []
+          (fun i -> add_benchmark_case primary_lts refs i (List.nth xs i))
       in
       let samples = Benchmark.throughputN ~style:All ~repeat time funs in
       handle_results Result "benchmark lts graph" samples (module Benchmarking);
