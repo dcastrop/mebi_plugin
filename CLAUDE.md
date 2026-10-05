@@ -159,6 +159,13 @@ anything the proof solver reads.
   dune `(modules ...)`. `python3 scripts/check_module_lists.py` checks all
   three against the source tree (CI runs it first); run it before
   committing such a change.
+- In-tree build artifacts (`.vo`, `.glob`, `.aux` left in `theories/`,
+  `examples/` or `src/` by `make` or by deleting parts of `_build` by hand)
+  can make `dune build` **silently skip** `theories/Test.v` -- no error, no
+  output (seen 2026-10-05). If `Test.v`'s messages are missing, check
+  `_build/default/theories/Test.vo` exists; `git clean -fX theories src
+  examples` and `dune clean` restore it. Verification in a fresh worktree
+  (the `bench/` scripts) is not affected.
 - `make` rejects warnings `dune build` accepts, notably **warning 50**: a
   doc comment separated from its definition, which inserting new code
   between the two causes. Run `make -j$(nproc) src/mebi_plugin.cmxs

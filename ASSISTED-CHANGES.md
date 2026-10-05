@@ -6382,6 +6382,52 @@ dead-code removals) · Tooling 1.
 
 ---
 
+## 2026-10-05 — Documentation pass, part 5: `wrapper` and the command grammar
+
+**Docs + Refactor.** On branch `docs/src-wrapper`, the second of the three
+`src/` PRs.
+
+**Comments** (`ce3bff3`; comments only): the commands' contracts in
+`wrapper.mli`, with what each raises; the internal guards
+(`check_if_lts_fail`, `check_saturation_size`, `on_demand_for`,
+`refuse_conflicts`, `separate`, `bisimilarity_of`) restyled; placeholder
+comments ("[module M] ...") written; `do_benchmark_graph`'s reference to
+`Rocq_utils.extract_benchmark_args` (removed in PR #40) fixed; two
+contracts duplicated in the `.ml`'s own signature removed. The grammar
+file `g_mebi.mlg` has no functions of its own; its sections already have
+headings.
+
+**Dead code** (`40d22b0`): the unused `_log_kinds`, a commented-out `open`.
+
+**Splits**, one commit each, the user-facing messages unchanged (the
+on-demand warning checked against `Test.v`'s output): `bound_to_string`,
+`cut_short_reason`, `approximation_reason` (from `check_if_lts_fail`);
+`estimate`, `memory_range`, `warn_on_demand` (shared by
+`check_saturation_size` and `on_demand_for`); `mark_approximate` (from
+`extract_lts`); `refuse_walk` (from `similarity`); `user_term`,
+`is_similar` (from `do_check_sim`); `add_benchmark_case` (from
+`do_benchmark_graph`).
+
+**Found on the way.** My local `dune build` had silently stopped compiling
+`theories/Test.v`: stale in-tree build artifacts, which I then made worse
+by deleting part of `_build` by hand. No error, no output, so a quick
+local build looked clean. Verification runs in fresh worktrees, so no
+reported result was affected; `CLAUDE.md` now says how to spot and fix it.
+
+**Verification.** Each code commit (the removal and the six splits), in
+its own worktree: the proof matrix in all three solver modes, every
+`Solve` identical; the last also the `Test4` suite, identical, and
+`Test.v`'s 60 counts identical to `main`'s. `tests.exe` 103/103; `make`
+clean.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/src-wrapper main`), or one commit.
+
+**Session tally (2026-10-05), cont.:** Docs 4 · Refactor 14 (11 splits, 3
+dead-code removals) · Tooling 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
