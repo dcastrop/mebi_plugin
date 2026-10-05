@@ -485,6 +485,20 @@ module Make (Enc : Encoding.S) :
       (X : Graph_type.Args with type enc = Enc.t and type tree = Enc.Tree.t) =
     Graph.Make (Enc) (M) (Weak) (Theory) (ConstructorBindings) (Model) (X)
 
+  (** [mark_approximate approximations x] is [x] marked incomplete if there
+      are [approximations] (an approximate LTS is incomplete, like one cut
+      short by the bound), else [x]. Raises nothing. *)
+  let mark_approximate (approximations : string list) (x : Model.LTS.t)
+    : Model.LTS.t
+    =
+    match approximations, x.info.meta with
+    | _ :: _, Some meta ->
+      { x with
+        info = { x.info with meta = Some { meta with is_complete = false } }
+      }
+    | _ -> x
+  ;;
+
   (* See the [.mli]. *)
   let extract_lts
         (primary_lts : Libnames.qualid)
@@ -500,22 +514,13 @@ module Make (Enc : Encoding.S) :
     Rocq_monad_utils.Approximations.reset ();
     let* the_graph : G.t = G.build ~weak init primary_lts grefs in
     let* the_lts : Model.LTS.t = G.extract the_graph in
-    (* an approximate LTS is incomplete, like one cut short by the bound *)
     let approximations = Rocq_monad_utils.Approximations.get () in
     let cut_short : bool =
       match the_lts.info.meta with
       | Some { is_complete; _ } -> Bool.not is_complete
       | None -> false
     in
-    let the_lts : Model.LTS.t =
-      match approximations, the_lts.info.meta with
-      | _ :: _, Some meta ->
-        { the_lts with
-          info =
-            { the_lts.info with meta = Some { meta with is_complete = false } }
-        }
-      | _ -> the_lts
-    in
+    let the_lts : Model.LTS.t = mark_approximate approximations the_lts in
     check_if_lts_fail ~approximations ~cut_short the_lts;
     M.return the_lts
   ;;
