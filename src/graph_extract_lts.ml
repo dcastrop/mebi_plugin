@@ -94,6 +94,23 @@ struct
     G.Transitions.fold from xs Transition.Set.empty
   ;;
 
+  (** [add_rocq_lts (enc, l) ls] is [ls] with, if [l] is an LTS (not its
+      label or state type), its encoding [enc] and its constructors' binder
+      locations ({!Constructor_bindings.S.extract_info}) in front. Raises as
+      that, when run (propagated). *)
+  let add_rocq_lts
+        ((enc, v) : Enc.t * M.Ind.t)
+        (acc : Model.Info.Meta.RocqLTS.t list)
+    : Model.Info.Meta.RocqLTS.t list M.mm
+    =
+    let open M.Syntax in
+    match v.kind with
+    | LTS _ ->
+      let* constructors = ConstructorBindings.extract_info v in
+      M.return ({ Model.Info.Meta.RocqLTS.base = enc; constructors } :: acc)
+    | _ -> M.return acc
+  ;;
+
   (** [constructor_info g] is, for each LTS [g] may use, its encoding and
       its constructors' binder locations
       ({!Constructor_bindings.S.extract_info}). Raises as that, when run
@@ -101,17 +118,7 @@ struct
   let constructor_info (g : G.t) : Model.Info.Meta.RocqLTS.t list M.mm =
     Logger.trace __FUNCTION__;
     let xs = M.B.to_seq g.ltsmap |> List.of_seq in
-    let open M.Syntax in
-    let f (i : int) (acc : Model.Info.Meta.RocqLTS.t list) =
-      let (enc, v) : Enc.t * M.Ind.t = List.nth xs i in
-      match v.kind with
-      | LTS x ->
-        let* constructors = ConstructorBindings.extract_info v in
-        let open Model.Info.Meta.RocqLTS in
-        { base = enc; constructors } :: acc |> M.return
-      | _ -> M.return acc
-    in
-    M.iterate 0 (List.length xs - 1) [] f
+    M.iterate 0 (List.length xs - 1) [] (fun i -> add_rocq_lts (List.nth xs i))
   ;;
 
   (** [meta g] is [g]'s metadata: whether exploration finished (nothing left
