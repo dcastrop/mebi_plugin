@@ -844,29 +844,39 @@ module Make (Enc : Encoding.S) :
       M.return (Some result)
     ;;
 
+    (** [user_term (t, _)] is the term [t] as the user wrote it, printed,
+        for a verdict. Raises, when run, Rocq's errors if [t] is ill-formed
+        (propagated). *)
+    let user_term ((x, _) : rocq_args) : string M.mm =
+      let open M.Syntax in
+      let* e = M.constrexpr_to_econstr x in
+      M.state (fun env sigma -> sigma, Rocq_utils.Strfy.econstr env sigma e)
+    ;;
+
+    (** [is_similar r] is whether, by the check [r], the first system's start
+        state is weakly simulated by the second's: bisimilar outright, or
+        related by {!similarity}.
+
+        Raises as {!similarity} (propagated). *)
+    let is_similar (result : Model.Bisimilarity.t) : bool =
+      Model.Bisimilarity.Result.are_bisimilar result.result
+      ||
+      match similarity result with
+      | Some sim ->
+        (match result.fsm_a.original.init, result.fsm_b.original.init with
+         | Some ra, Some rb -> Model.Product.Pair.Set.mem (ra, rb) sim
+         | _ -> false)
+      | None -> false
+    ;;
+
     (* See the [.mli]. *)
     let do_check_sim (args : rocq_pair) refs : Model.Bisimilarity.t option M.mm =
       Logger.trace __FUNCTION__;
       let open M.Syntax in
       let* result = bisimilarity_of args refs in
-      (* the two terms as the user wrote them, for the verdict *)
-      let term ((x, _) : rocq_args) : string M.mm =
-        let* e = M.constrexpr_to_econstr x in
-        M.state (fun env sigma -> sigma, Rocq_utils.Strfy.econstr env sigma e)
-      in
-      let* left = term args.a in
-      let* right = term args.b in
-      let similar : bool =
-        Model.Bisimilarity.Result.are_bisimilar result.result
-        ||
-        match similarity result with
-        | Some sim ->
-          (match result.fsm_a.original.init, result.fsm_b.original.init with
-           | Some ra, Some rb -> Model.Product.Pair.Set.mem (ra, rb) sim
-           | _ -> false)
-        | None -> false
-      in
-      if similar
+      let* left = user_term args.a in
+      let* right = user_term args.b in
+      if is_similar result
       then
         Logger.info
           (Printf.sprintf "(Similar: %s is weakly simulated by %s.)" left right)
