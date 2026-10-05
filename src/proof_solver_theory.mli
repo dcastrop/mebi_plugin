@@ -21,10 +21,6 @@ module type S = sig
       @raise FSM_HasNoVisibleLabel if [m] has none (raised here). *)
   val is_fsm_visible_label : EConstr.t -> fsm -> bool
 
-  exception FSM_HasNoWeakLabels of fsm
-
-  val is_fsm_weak_labels : EConstr.t -> fsm -> bool
-
   (** Raised by {!is_fsm_constructor}: the FSM has no metadata, so no
       constructors. *)
   exception FSM_HasNoConstructors of fsm

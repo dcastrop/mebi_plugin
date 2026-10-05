@@ -7,7 +7,6 @@ module type S = sig
   val next_name_of : Names.Id.Set.t -> Names.Id.t -> Names.Id.t
   val new_name_of_string : string -> Names.Id.t
   val new_cofix_name : unit -> Names.Id.t
-  val new_H_name : unit -> Names.Id.t
   val get_all_cofix_hyp_names : unit -> Names.Id.Set.t
   val get_all_non_cofix_hyp_names : unit -> Names.Id.Set.t
 
@@ -56,7 +55,6 @@ module Make (Enc : Encoding.S) (X : Args) :
 
   (* See the [.mli]. *)
   let new_cofix_name () : Names.Id.t = new_name_of_string "Cofix0"
-  let new_H_name () : Names.Id.t = new_name_of_string "H0"
 
   (* See the [.mli]. *)
   let get_all_cofix_hyp_names () : Names.Id.Set.t =
@@ -126,7 +124,5 @@ module Make (Enc : Encoding.S) (X : Args) :
 
         let compare (a : t) (b : t) : int = econstr_compare a b
       end)
-
-    (* let add (x : elt) (xs : t) : t = add (run (econstr_normalize x)) xs *)
   end
 end

@@ -17,7 +17,6 @@ module type S = sig
 
   val create : ?kind:Output.Kind.t -> ?msg:string -> unit Proofview.tactic -> t
   val empty : unit -> t
-  val do_nothing : unit -> t
   val seq : t -> t -> t
 
   exception EmptyTacticChain
@@ -70,11 +69,6 @@ module Make : S = struct
 
   (* See the [.mli]. *)
   let empty () : t = create (Proofview.tclUNIT ())
-
-  (* See the [.mli]. *)
-  let do_nothing () : t =
-    create ~kind:Debug ~msg:"(skip)" (Proofview.tclUNIT ())
-  ;;
 
   (* See the [.mli]. *)
   let rec seq : t -> t -> t = function

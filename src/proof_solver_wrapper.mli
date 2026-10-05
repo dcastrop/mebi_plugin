@@ -27,8 +27,6 @@ module type S = sig
       ([Cofix0], [Cofix1], ...). Raises nothing. *)
   val new_cofix_name : unit -> Names.Id.t
 
-  val new_H_name : unit -> Names.Id.t
-
   (** [get_all_cofix_hyp_names ()] is the names of the coinduction
       hypotheses ([Cofix...]). Raises nothing. *)
   val get_all_cofix_hyp_names : unit -> Names.Id.Set.t

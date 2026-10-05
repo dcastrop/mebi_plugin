@@ -26,10 +26,6 @@ module type S = sig
   (** [empty ()] is the chain of [tclUNIT], doing nothing. Raises nothing. *)
   val empty : unit -> t
 
-  (** [do_nothing ()] is {!empty}, shown as "(skip)" at [Debug]. Raises
-      nothing. *)
-  val do_nothing : unit -> t
-
   (** [seq a b] is the chain [a] then [b]. Raises nothing. *)
   val seq : t -> t -> t
 

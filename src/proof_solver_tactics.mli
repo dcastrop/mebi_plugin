@@ -42,8 +42,6 @@ module type S = sig
       nothing. *)
   val simplify_hyps : unit -> tactic mm
 
-  val simplify_all : unit -> tactic mm
-
   (** [simplify_and_subst_all ()] is [simpl in *; subst]. Raises nothing. *)
   val simplify_and_subst_all : unit -> tactic mm
 
@@ -114,8 +112,6 @@ module type S = sig
   (** [intros_all ()] is [intros]. Raises nothing. *)
   val intros_all : unit -> tactic mm
 
-  val intro_as : string -> tactic mm
-
   (** [apply x] is [apply x]. Raises nothing. *)
   val apply : Evd.econstr -> tactic mm
 
@@ -132,8 +128,6 @@ module type S = sig
 
   (** [apply_rt1n_refl ()] is [apply rt1n_refl]. *)
   val apply_rt1n_refl : unit -> tactic mm
-
-  val apply_rt1n_trans : unit -> tactic mm
 
   (** [apply_weak_sim_refl ()] is [apply weak_sim_refl]. *)
   val apply_weak_sim_refl : unit -> tactic mm
@@ -206,8 +200,6 @@ module type S = sig
 
   (** [unfold_silent ()] is [unfold silent]. Raises as {!apply_Pack_sim}. *)
   val unfold_silent : unit -> tactic
-
-  val unfold_silent1 : unit -> tactic
 
   (** [do_refl ()] answers with no step: [apply wk_none; unfold silent; apply rt1n_refl]. Raises as {!apply_Pack_sim}.
   *)

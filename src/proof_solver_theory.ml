@@ -11,10 +11,6 @@ module type S = sig
 
   val is_fsm_visible_label : EConstr.t -> fsm -> bool
 
-  exception FSM_HasNoWeakLabels of fsm
-
-  val is_fsm_weak_labels : EConstr.t -> fsm -> bool
-
   exception FSM_HasNoConstructors of fsm
 
   val is_fsm_constructor : EConstr.t -> fsm -> bool
@@ -78,14 +74,6 @@ module Make
     with
     | [] -> raise (FSM_HasNoVisibleLabel m)
     | ys -> M.exists_eq x ys Decode.label |> M.run
-  ;;
-
-  exception FSM_HasNoWeakLabels of Model.FSM.t
-
-  let is_fsm_weak_labels (x : EConstr.t) (m : Model.FSM.t) : bool =
-    Logger.trace __FUNCTION__;
-    let is_silent = is_fsm_silent_label x m in
-    if is_silent then true else is_fsm_visible_label x m
   ;;
 
   exception FSM_HasNoConstructors of Model.FSM.t

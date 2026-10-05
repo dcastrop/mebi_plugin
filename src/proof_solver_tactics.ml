@@ -27,7 +27,6 @@ module type S = sig
   val simplify_concl : unit -> tactic mm
   val simplify_hyp : Rocq_utils.hyp -> tactic mm
   val simplify_hyps : unit -> tactic mm
-  val simplify_all : unit -> tactic mm
   val simplify_and_subst_all : unit -> tactic mm
 
   (** [reflexivity ()] closes an equation premise goal (up to reduction). *)
@@ -57,13 +56,11 @@ module type S = sig
   val split : unit -> tactic mm
   val ex_intro_split : state -> tactic mm
   val intros_all : unit -> tactic mm
-  val intro_as : string -> tactic mm
   val apply : Evd.econstr -> tactic mm
   val apply_Pack_sim : unit -> tactic mm
   val apply_In_sim : unit -> tactic mm
   val apply_wk_none : unit -> tactic mm
   val apply_rt1n_refl : unit -> tactic mm
-  val apply_rt1n_trans : unit -> tactic mm
   val apply_weak_sim_refl : unit -> tactic mm
   val apply_Pack_bisim : unit -> tactic mm
   val apply_In_bisim : unit -> tactic mm
@@ -97,7 +94,6 @@ module type S = sig
     -> tactic option
 
   val unfold_silent : unit -> tactic
-  val unfold_silent1 : unit -> tactic
   val do_refl : unit -> tactic mm
   val collect_component_econstrs : Evd.evar_map -> Evd.econstr -> econstrset
   val can_be_unfolded : Evd.evar_map -> Evd.econstr -> bool
@@ -179,17 +175,12 @@ module Make
   type tactic = Tactic.t
   type econstrset = Iter.EConstrSet.t
 
-  (* *)
   open Iter
 
   (* See the [.mli]. *)
   let inversion (x : Rocq_utils.hyp) : Tactic.t mm =
     Inv.inv_tac (Context.Named.Declaration.get_id x)
-    |> Tactic.create
-         ~msg:
-           (Printf.sprintf
-              "inversion %s"
-              (Strfy.hyp_name x) (* (Strfy.hyp_type x) *))
+    |> Tactic.create ~msg:(Printf.sprintf "inversion %s" (Strfy.hyp_name x))
     |> return
   ;;
 
@@ -295,14 +286,6 @@ module Make
       iterate 0 (List.length xs - 1) x f
   ;;
 
-  (** not needed, manual/explicit version of [simplfy ()] *)
-  let simplify_all () : Tactic.t mm =
-    let open Syntax in
-    let* concl : Tactic.t = simplify_concl () in
-    let* hyps : Tactic.t = simplify_hyps () in
-    Tactic.seq concl hyps |> return
-  ;;
-
   (* See the [.mli]. *)
   let exact_term (p : EConstr.t) : Tactic.t mm =
     Logger.trace __FUNCTION__;
@@ -320,7 +303,6 @@ module Make
   (* See the [.mli]. *)
   let simplify_and_subst_all () : Tactic.t mm =
     let open Syntax in
-    (* let* simpls : Tactic.t = simplify_all () in *)
     let* simpls : Tactic.t = simplify () in
     let* substs : Tactic.t = subst_all () in
     Tactic.seq simpls substs |> return
@@ -400,15 +382,6 @@ module Make
     Tactics.intros |> Tactic.create ~msg:"intros" |> return
   ;;
 
-  (** [intro_as x] applies the introduction tactic using the (next
-      non-conficting) name [x]. *)
-  let intro_as (x : string) : Tactic.t mm =
-    let name : Names.Id.t = new_name_of_string x in
-    Tactics.introduction name
-    |> Tactic.create ~msg:(Printf.sprintf "intro %s" (Names.Id.to_string name))
-    |> return
-  ;;
-
   (* See the [.mli]. *)
   let apply (x : EConstr.t) : Tactic.t mm =
     Tactics.apply x
@@ -427,7 +400,6 @@ module Make
 
   (* See the [.mli]. *)
   let apply_rt1n_refl () : Tactic.t mm = apply (Mebi_theories.get "rt1n_refl")
-  let apply_rt1n_trans () : Tactic.t mm = apply (Mebi_theories.get "rt1n_trans")
 
   (* See the [.mli]. *)
   let apply_weak_sim_refl () : Tactic.t mm =
@@ -470,7 +442,6 @@ module Make
     else eapply_rt1n_refl ()
   ;;
 
-  (* *)
   exception CannotUnfoldConstr of Constr.t
 
   (* See the [.mli]. *)
@@ -510,7 +481,6 @@ module Make
     : Tactic.t
     =
     Logger.trace __FUNCTION__;
-    (* let* y : Constr.t = econstr_to_constr x in *)
     econstr_to_constr x |> run |> f_unfold_hyp unfold_constr ~in_hyp
   ;;
 
@@ -521,8 +491,6 @@ module Make
     : Tactic.t
     =
     Logger.trace __FUNCTION__;
-    (* let open Syntax in *)
-    (* let* y : EConstr.t = constrexpr_to_econstr x in *)
     constrexpr_to_econstr x |> run |> f_unfold_hyp unfold_econstr ~in_hyp
   ;;
 
@@ -547,10 +515,6 @@ module Make
   (* See the [.mli]. *)
   let unfold_silent () : Tactic.t = unfold_econstr (Mebi_theories.get "silent")
 
-  let unfold_silent1 () : Tactic.t =
-    unfold_econstr (Mebi_theories.get "silent1")
-  ;;
-
   (* See the [.mli]. *)
   let do_refl () : Tactic.t mm =
     Logger.trace __FUNCTION__;
@@ -566,7 +530,6 @@ module Make
     : EConstrSet.t
     =
     Logger.trace __FUNCTION__;
-    (* log_econstr ~__FUNCTION__ ~s:"x" x; *)
     let is_constr_ref (x : EConstr.t) : bool =
       EConstr.isRef sigma x && EConstr.isConst sigma x
     in
@@ -574,32 +537,24 @@ module Make
       if is_constr_ref x then EConstrSet.add x acc else acc
     in
     let rec f (acc : EConstrSet.t) (y : EConstr.t) : EConstrSet.t =
-      (* log_econstr ~__FUNCTION__ ~s:"y" y; *)
       let acc : EConstrSet.t = acc_constr_ref y acc in
       try
         let ty, tys = Rocq_utils.econstr_to_atomic sigma y in
-        (* log_econstr ~__FUNCTION__ ~s:"ty" ty; *)
-        (* _log_econstr_kind ~__FUNCTION__ "ty" ty; *)
         let acc : EConstrSet.t =
           match EConstr.kind sigma ty with
           | Case (_, _, _, _, _, c, _) ->
-            (* _log_econstr_kind ~__FUNCTION__ "c" c; *)
             (match EConstr.kind sigma c with
              | App (ty, _) -> acc_constr_ref ty acc
              | _ -> acc)
           | _ -> acc
         in
-        (* log_econstrs ~__FUNCTION__ "tys" (Array.to_list tys); *)
         let acc : EConstrSet.t = acc_constr_ref ty acc in
         Array.fold_left
           (fun (acc : EConstrSet.t) (z : EConstr.t) -> f acc z)
           acc
           tys
       with
-      | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ ->
-        (* log_econstr ~__FUNCTION__ ~s:"Err: Rocq_utils_EConstrIsNotA_Type" x;
-        *)
-        acc
+      | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> acc
     in
     f EConstrSet.empty x
   ;;
@@ -613,29 +568,18 @@ module Make
       | ConstRef y ->
         (match Global.lookup_constant y with
          | { const_body = Def z; const_type; _ } ->
-           (* log_econstr ~__FUNCTION__ ~s:"x" x; *)
-           (* _log_constr_kind ~__FUNCTION__ "(z kinds, z)" z; *)
-           (* _log_constr_kind ~__FUNCTION__ "(kinds, const_type)" const_type;
-              *)
            (match Constr.kind z with
-            | Fix _ ->
-              (* log_econstr ~__FUNCTION__ ~s:"is Fix" x; *)
-              Constr.isProd const_type
-            | Lambda _ ->
-              (* log_econstr ~__FUNCTION__ ~s:"is Lambda" x; *)
-              Constr.isProd const_type
+            | Fix _ -> Constr.isProd const_type
+            | Lambda _ -> Constr.isProd const_type
             | App _ ->
-              (* log_econstr ~__FUNCTION__ ~s:"is App" x; *)
               Constr.isRef const_type
               && (Constr.isConst const_type || Constr.isInd const_type)
             | Construct _ ->
-              (* log_econstr ~__FUNCTION__ ~s:"is Construct" x; *)
               Constr.isRef z
               && Constr.isConst const_type
               && Constr.isRef const_type
             | _ ->
               (* NOTE: unfold, e.g., [SomeModule.example_1] *)
-              (* log_econstr ~__FUNCTION__ ~s:"(skip)" x; *)
               Constr.isConst z
               && Constr.isRef z
               && Constr.isConst const_type
@@ -660,7 +604,6 @@ module Make
     : Tactic.t option mm
     =
     Logger.trace __FUNCTION__;
-    (* log_econstr ~__FUNCTION__ ~s:"x" x; *)
     let open Syntax in
     let* sigma = get_sigma in
     (* NOTE: [collect_component_econstrs] ensures no duplicates. *)
@@ -697,8 +640,6 @@ module Make
        | Some x, None -> return (Some x)
        | None, None -> return None)
   ;;
-
-  (***********************************************************************)
 
   exception NoRocqLTSFoundWithEnc of Enc.t
 
@@ -878,7 +819,6 @@ module Make
     (* NOTE: constructors index from 1 *)
     let index : int = index + 1 in
     let msg : string = Printf.sprintf "constructor %i" index in
-    (* let open Syntax in *)
     let bindings =
       try try_get_constructor_bindings (enc, index) args with
       | ConstructorBindings.BindingInstruction_NotApp _ ->
