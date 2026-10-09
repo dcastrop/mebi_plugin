@@ -1594,6 +1594,105 @@ struct
       return x
   ;;
 
+  (** [outside_block_error x y] reports a [weak_sim] goal for the pair of
+      states [x] and [y] outside the mutual cofix block. Every pair the
+      search can reach is supposed to be in the block. Reaching one that is
+      not means the product computed up front disagrees with what the
+      solver actually does -- name the pair rather than leaving a stuck
+      goal. A user error, not an uncaught exception: Rocq reports the
+      latter as an anomaly in Rocq itself.
+
+      @raise CErrors.UserError always (raised here). *)
+  let outside_block_error (x : EConstr.t) (y : EConstr.t) : 'a =
+    CErrors.user_err
+      (Pp.str
+         (Printf.sprintf
+            "MeBi: reached a weak_sim goal for a pair outside the mutual cofix \
+             block computed up front, so the proof cannot close it:\n\
+            \  %s\n\
+            \  %s\n\
+             This is a bug in the plugin's product computation \
+             (Model.Product). [MeBi Config Solver MutualCofix False] avoids \
+             the mutual block."
+            (Strfy.econstr x)
+            (Strfy.econstr y)))
+  ;;
+
+  (** [close_or_coinduct tys] is the tactic for a [weak_sim] or
+      [weak_bisimilar] goal of two states that are not trivially related
+      ([tys] its arguments): unfolding the conclusion if anything unfolds,
+      else closing it by the coinduction hypothesis that is the goal, else
+      introducing one ({!handle_new_cofix}).
+
+      @raise CErrors.UserError
+        under a mutual cofix, if no hypothesis is the goal: the pair is
+        outside the block ({!outside_block_error}; raised when run). *)
+  let close_or_coinduct (tys : EConstr.t array) : Tactic.t mm =
+    let open Syntax in
+    (* Normalise the conclusion BEFORE consulting the coinduction
+       hypotheses. The unfolding used to live inside [handle_new_cofix],
+       which was harmless while every hypothesis was minted from whatever
+       the goal happened to look like -- a nested [cofix] copies the goal,
+       spelling included. It stops being harmless as soon as the
+       hypotheses are built ahead of time from decoded model states, since
+       [Concl.eq] is syntactic and would not match a goal still written in
+       terms of definitions. Unfolding first makes both sides normal. *)
+    let* unfold_opt : Tactic.t option = Concl.try_unfold_any () in
+    match unfold_opt with
+    | Some x ->
+      Logger.trace ~__FUNCTION__ "unfold before cofix lookup";
+      return x
+    | None ->
+      let* hyp_cofix : Rocq_utils.hyp option = Hyps.can_solve_concl_cofix () in
+      (match hyp_cofix with
+       | Some h -> Tacs.exact_hyp h
+       | None ->
+         if !Api.the_mutual_cofix
+         then outside_block_error tys.(5) tys.(6)
+         else handle_new_cofix ())
+  ;;
+
+  (** [handle_weak_goal ()] is the tactic for a [weak_sim] or
+      [weak_bisimilar] conclusion: reflexivity ([weak_bisimilar_refl] or
+      [weak_sim_refl]) for two equal states over one LTS, else
+      {!close_or_coinduct}.
+
+      Raises as {!Concl.is_weak_refl} and {!close_or_coinduct}
+      (propagated). *)
+  let handle_weak_goal () : Tactic.t mm =
+    let open Syntax in
+    let* _, tys = get_concl () |> to_atomic in
+    let* is_weak_refl : bool = Concl.is_weak_refl () in
+    if is_weak_refl
+    then (
+      Logger.trace ~__FUNCTION__ "is weak refl";
+      let* bisim = Concl.is_weak_bisimilar () in
+      if bisim
+      then Tacs.apply_weak_bisimilar_refl ()
+      else Tacs.apply_weak_sim_refl ())
+    else close_or_coinduct tys
+  ;;
+
+  (** [invert_or_unfold ()] is the tactic inverting the hypothesis that
+      most needs it ({!Hyps.try_invert_any}), or else unfolding what can be
+      unfolded in the hypotheses ({!Hyps.try_unfold_any}).
+
+      @raise ExitWeakSim if neither applies (raised here, when run). *)
+  let invert_or_unfold () : Tactic.t mm =
+    let open Syntax in
+    let* invert_opt = Hyps.try_invert_any () in
+    match invert_opt with
+    | Some x -> return x
+    | None ->
+      Logger.trace ~__FUNCTION__ "no hyps to invert";
+      let* unfold_opt = Hyps.try_unfold_any () in
+      (match unfold_opt with
+       | Some x -> return x
+       | None ->
+         Logger.trace ~__FUNCTION__ "no terms to unfold";
+         raise ExitWeakSim)
+  ;;
+
   (** [handle_weaksim ()] is the tactic for the [WeakSim] state. On a
       [weak_sim] or [weak_bisimilar] goal: reflexivity for two equal states
       over one LTS; otherwise unfolding the conclusion if anything unfolds,
@@ -1614,74 +1713,10 @@ struct
     if is_weak_sim
     then (
       Logger.trace ~__FUNCTION__ "is weak sim";
-      let* _, tys = get_concl () |> to_atomic in
-      let* is_weak_refl : bool = Concl.is_weak_refl () in
-      if is_weak_refl
-      then (
-        Logger.trace ~__FUNCTION__ "is weak refl";
-        let* bisim = Concl.is_weak_bisimilar () in
-        if bisim
-        then Tacs.apply_weak_bisimilar_refl ()
-        else Tacs.apply_weak_sim_refl ())
-      else
-        (* Normalise the conclusion BEFORE consulting the coinduction
-           hypotheses. The unfolding used to live inside [handle_new_cofix],
-           which was harmless while every hypothesis was minted from whatever
-           the goal happened to look like -- a nested [cofix] copies the goal,
-           spelling included. It stops being harmless as soon as the
-           hypotheses are built ahead of time from decoded model states, since
-           [Concl.eq] is syntactic and would not match a goal still written in
-           terms of definitions. Unfolding first makes both sides normal. *)
-        let* unfold_opt : Tactic.t option = Concl.try_unfold_any () in
-        match unfold_opt with
-        | Some x ->
-          Logger.trace ~__FUNCTION__ "unfold before cofix lookup";
-          return x
-        | None ->
-          let* hyp_cofix : Rocq_utils.hyp option =
-            Hyps.can_solve_concl_cofix ()
-          in
-          (match hyp_cofix with
-           | Some h -> Tacs.exact_hyp h
-           | None ->
-             if !Api.the_mutual_cofix
-             then
-               (* Every pair the search can reach is supposed to be in the
-                  block. Reaching one that is not means the product computed
-                  up front disagrees with what the solver actually does --
-                  name the pair rather than leaving a stuck goal. A user
-                  error, not an uncaught exception: Rocq reports the latter
-                  as an anomaly in Rocq itself. *)
-               CErrors.user_err
-                 (Pp.str
-                    (Printf.sprintf
-                       "MeBi: reached a weak_sim goal for a pair outside the \
-                        mutual cofix block computed up front, so the proof \
-                        cannot close it:\n\
-                       \  %s\n\
-                       \  %s\n\
-                        This is a bug in the plugin's product computation \
-                        (Model.Product). [MeBi Config Solver MutualCofix \
-                        False] avoids the mutual block."
-                       (Strfy.econstr tys.(5))
-                       (Strfy.econstr tys.(6))))
-             else handle_new_cofix ()))
+      handle_weak_goal ())
     else if ProofState.is_done ()
     then raise ProofComplete
-    else
-      (* NOTE: try invert any that need to be inverted *)
-      let* invert_opt = Hyps.try_invert_any () in
-      match invert_opt with
-      | Some x -> return x
-      | None ->
-        Logger.trace ~__FUNCTION__ "no hyps to invert";
-        (* NOTE: check if we need to unfold anything in the inverted hyps. *)
-        let* unfold_opt = Hyps.try_unfold_any () in
-        (match unfold_opt with
-         | Some x -> return x
-         | None ->
-           Logger.trace ~__FUNCTION__ "no terms to unfold";
-           raise ExitWeakSim)
+    else invert_or_unfold ()
   ;;
 
   (** [handle_exists hyp_opt] is the tactic for the [Exists] state. On an
