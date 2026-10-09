@@ -10,8 +10,9 @@
 
 type sink = Output.message -> unit
 
-(** Used when no sink is installed, i.e. under [tests/] and any other plain
-    OCaml entry point. Formatting matches the old [Output.Mode.OCaml]. *)
+(* See the [.mli]. Used when no sink is installed, i.e. under [tests/] and
+   any other plain OCaml entry point. Formatting matches the old
+   [Output.Mode.OCaml]. *)
 let default_sink : sink =
   fun ({ kind; fn; prefix; body } : Output.message) ->
   Printf.printf
@@ -21,7 +22,10 @@ let default_sink : sink =
     (match prefix with None -> body | Some p -> Printf.sprintf "%s: %s" p body)
 ;;
 
+(** The installed sink. *)
 let the_sink : sink ref = ref default_sink
+
+(* See the [.mli] for these two. *)
 let set_sink (f : sink) : unit = the_sink := f
 let reset_sink () : unit = the_sink := default_sink
 
@@ -30,6 +34,7 @@ let reset_sink () : unit = the_sink := default_sink
 (** Global on/off, checked before the per-kind configuration. *)
 let the_enabled : bool ref = ref true
 
+(* See the [.mli] for these, through [is_enabled]. *)
 let enable () : unit = the_enabled := true
 let disable () : unit = the_enabled := false
 
@@ -50,9 +55,8 @@ let is_enabled (k : Output.Kind.t) : bool =
   | Some b -> b
 ;;
 
-(** [quiet f] runs [f] with all output suppressed, restoring the previous
-    setting afterwards (including if [f] raises). Replaces the old
-    [Logger.ReMake], whose two uses were both commented out. *)
+(* See the [.mli]. Replaces the old [Logger.ReMake], whose two uses were
+   both commented out. *)
 let quiet (f : unit -> 'a) : 'a =
   let saved : bool = !the_enabled in
   the_enabled := false;
@@ -61,8 +65,11 @@ let quiet (f : unit -> 'a) : 'a =
 
 (***********************************************************************)
 
-(** The one place a message is filtered and handed to the sink. [enabled] lets
-    a scoped logger substitute its own predicate. *)
+(** [emit ?enabled ?__FUNCTION__ ?prefix ?override k body] hands the
+    message [body] of kind [k] to the sink, if [override] or [enabled k]
+    (default {!is_enabled}): the one place a message is filtered. An empty
+    [body] is dropped. [enabled] lets a scoped logger substitute its own
+    predicate. Raises whatever the sink raises (propagated). *)
 let emit
       ?(enabled : Output.Kind.t -> bool = is_enabled)
       ?(__FUNCTION__ : string = "")
@@ -77,8 +84,7 @@ let emit
     then !the_sink { kind; fn = __FUNCTION__; prefix; body }
 ;;
 
-(** The logging API. Available directly at the top level of [Logger] against the
-    global configuration, and via [Scoped] for a module that needs its own. *)
+(* See the [.mli]. *)
 module type S = sig
   val is_enabled : Output.Kind.t -> bool
   val debug : ?__FUNCTION__:string -> string -> unit
@@ -105,37 +111,24 @@ module type S = sig
     -> 'a list
     -> ('a -> string)
     -> unit
-
-  val option
-    :  ?__FUNCTION__:string
-    -> Output.Kind.t
-    -> string
-    -> 'a option
-    -> ('a -> string)
-    -> unit
-
-  val options
-    :  ?__FUNCTION__:string
-    -> Output.Kind.t
-    -> string
-    -> 'a list option
-    -> ('a -> string)
-    -> unit
 end
 
-(** Bodies shared by the top-level API and [Scoped], parameterised only by which
-    predicate decides whether a kind is emitted. *)
+(** [Body (E)] is the logging API with [E.is_enabled] deciding whether a
+    kind is emitted: shared by the top level and {!Scoped}. *)
 module Body (E : sig
     val is_enabled : Output.Kind.t -> bool
   end) : S = struct
   let is_enabled = E.is_enabled
 
+  (** [out ?__FUNCTION__ ?prefix k body] is {!emit} under
+      [E.is_enabled]. *)
   let out ?(__FUNCTION__ : string = "") ?(prefix : string option = None)
     : Output.Kind.t -> string -> unit
     =
     emit ~enabled:E.is_enabled ~__FUNCTION__ ~prefix
   ;;
 
+  (* See the [.mli] for the rest. *)
   let debug ?(__FUNCTION__ : string = "") (x : string) : unit =
     out ~__FUNCTION__ Debug x
   ;;
@@ -168,7 +161,6 @@ module Body (E : sig
     out ~__FUNCTION__ Show x
   ;;
 
-  (** [thing k prefix x f] outputs [f x] at kind [k]. *)
   let thing
         ?(__FUNCTION__ : string = "")
         (k : Output.Kind.t)
@@ -196,12 +188,12 @@ module Body (E : sig
     =
     if is_enabled k
     then (
-      (* NOTE: start and end *)
+      (* [e s] emits [s] headed [prefix] *)
       let e : string -> unit =
         out ~prefix:(Some (Printf.sprintf "%s: " prefix)) ~__FUNCTION__ k
       in
-      (* NOTE: indexed iterator *)
       let index : int ref = ref 0 in
+      (* [fx x] emits [x] headed by its index *)
       let fx (x : 'a) : unit =
         thing k (Printf.sprintf "%i" !index) x f;
         index := !index + 1
@@ -209,32 +201,6 @@ module Body (E : sig
       e "start";
       List.iter fx xs;
       e "end")
-  ;;
-
-  let option
-        ?(__FUNCTION__ : string = "")
-        (k : Output.Kind.t)
-        (prefix : string)
-        (x : 'a option)
-        (f : 'a -> string)
-    : unit
-    =
-    match x with
-    | Some x -> thing ~__FUNCTION__ k prefix x f
-    | None -> thing ~__FUNCTION__ k prefix "None" (fun x -> x)
-  ;;
-
-  let options
-        ?(__FUNCTION__ : string = "")
-        (k : Output.Kind.t)
-        (prefix : string)
-        (xs : 'a list option)
-        (f : 'a -> string)
-    : unit
-    =
-    match xs with
-    | Some xs -> things ~__FUNCTION__ k prefix xs f
-    | None -> thing ~__FUNCTION__ k prefix "None" (fun x -> x)
   ;;
 end
 
@@ -244,13 +210,10 @@ include Body (struct
 
 (***********************************************************************)
 
-(** A logger with its own per-kind overrides, for a module that wants output
-    settings independent of the user-facing configuration. Shares the global
-    sink and the global on/off.
-
-    Unlike the old [Logger.Make], this is {b not} threaded anywhere: it is
-    declared and used within a single file. Only [Rocq_utils] and
-    [Mebi_theories] need it. *)
+(* See the [.mli]: for a module that wants output settings independent of the
+   user-facing configuration. Unlike the old [Logger.Make], this is {b not}
+   threaded anywhere: it is declared and used within a single file. Only
+   [Rocq_utils] and [Mebi_theories] need it. *)
 module Scoped (X : sig
     val overrides : (Output.Kind.t * bool) list
   end) : S = Body (struct

@@ -139,7 +139,22 @@ module Make
   exception BindingInstruction_IndexOutOfBounds of EConstr.t * int
   exception BindingInstruction_NEQ of EConstr.t * Constr.t
 
-  (* See the [.mli], including why the outer handler cannot fire. *)
+  (** [naming_outer x m] is [m], but a [BindingInstruction_Undefined] it
+      raises when run names [x] as the outer term. The handler is inside
+      the computation, so it runs with [m], not around building it.
+
+      @raise BindingInstruction_Undefined
+        when run, as [m] raises it, naming [x] (raised here). Also raises
+        whatever else [m] raises (propagated). *)
+  let naming_outer (x : EConstr.t) (m : EConstr.t mm) : EConstr.t mm =
+    fun st ->
+    try m st with
+    | BindingInstruction_Undefined (_, y) ->
+      raise (BindingInstruction_Undefined (x, y))
+  ;;
+
+  (* See the [.mli]. Each [Arg] step names its own term in an [Undefined]
+     from deeper in, so the outermost one is what the caller sees. *)
   let rec get_bound_term (x : EConstr.t)
     : Bindings.Instructions.t -> EConstr.t mm
     =
@@ -150,8 +165,9 @@ module Make
     | Done -> return x
     | Arg { root; index; cont } ->
       Bindings.Instructions.log ~__FUNCTION__ (Arg { root; index; cont });
-      (try
-         let open Syntax in
+      naming_outer
+        x
+        (let open Syntax in
          let* kind = econstr_kind x in
          match kind with
          | App (xty, xtys) ->
@@ -165,10 +181,7 @@ module Make
              log_econstr ~__FUNCTION__ ~s:"xty" xty;
              log_constr ~__FUNCTION__ ~s:"root" root;
              raise (BindingInstruction_NEQ (xty, root)))
-         | _ -> raise (BindingInstruction_NotApp x)
-       with
-       | BindingInstruction_Undefined (_, y) ->
-         raise (BindingInstruction_Undefined (x, y)))
+         | _ -> raise (BindingInstruction_NotApp x))
   ;;
 
   (** [explicit_binding x (name, path)] is the [with] binding of the binder

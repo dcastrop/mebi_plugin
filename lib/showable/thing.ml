@@ -5,6 +5,7 @@
    [json] function (via [to_string]) rather than requiring a second,
    independently-written pretty-printer per component. *)
 
+(** A component of the model: printable, ordered, and with JSON. *)
 module type S = sig
   type t
 
@@ -20,6 +21,9 @@ end
    record type declared via [Thing.Make] to be unusable with its own field
    syntax ([x.base]). Naming [X.t] directly sidesteps the issue: nothing
    here ever needs its own name for the type, so nothing is hidden. *)
+
+(** [Make (X)] is {!S} for [X.t], from its name, JSON, equality and order:
+    [show] is its JSON on one line, and [pp] prints that. *)
 module Make (X : sig
     type t
 
@@ -55,6 +59,8 @@ end = struct
 
   let equal = X.equal
   let compare = X.compare
+
+  (* [pp] and [show] come from [json] (the note above [Make]) *)
   let show : X.t -> string = to_string ~pretty:false
 
   let pp (ppf : Format.formatter) (x : X.t) : unit =
@@ -62,10 +68,10 @@ end = struct
   ;;
 end
 
-(* [Set (X) (N)] is the Set-of-[X] companion, carrying both [Showable]'s
-   pp/show/subset/random/etc and the JSON-dump mechanism together. [N.name]
-   is separate from [X.name] because the existing dump format names a set
-   differently from its element (e.g. "States", not "State"). *)
+(** [Set (X) (N)] is the set of [X]s, printable ({!Showable.Set}) and with
+    JSON ({!Json.Set}). [N.name] is separate from [X.name] because the dump
+    format names a set differently from its element (e.g. "States", not
+    "State"). *)
 module Set
     (X : S)
     (N : sig

@@ -21,6 +21,7 @@ module Kind = struct
     | Result
     | Show
 
+  (* See the [.mli] for these. *)
   let all : t list =
     [ Debug; Info; Notice; Warning; Error; Trace; Result; Show ]
   ;;
@@ -48,8 +49,8 @@ module Kind = struct
     | _ -> None
   ;;
 
-  (** Whether a kind is emitted when nothing has configured it. Matches the
-      previous [Output.default_level_fun] / [default_special_fun] defaults. *)
+  (* See the [.mli]. Matches the previous [Output.default_level_fun] /
+     [default_special_fun] defaults. *)
   let default : t -> bool = function
     | Debug -> false
     | Trace -> false
