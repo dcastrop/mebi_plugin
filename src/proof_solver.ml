@@ -1,4 +1,6 @@
-exception NothingToDo
+(* One exception for "nothing to do", whether this module or a step
+   finds it: {!solve} stops on either. *)
+exception NothingToDo = Proof_solver_step.NothingToDo
 
 module type S = sig
   type enc
@@ -98,20 +100,25 @@ module Make (Enc : Encoding.S) :
 
   (* See the [.mli]. A fresh {!Step} is entered for the goal in focus
      ([Proofview.Goal.enter]), so each step reads that goal's [env] and
-     [sigma]. *)
+     [sigma]. The step runs inside that tactic, whose engine wraps an
+     exception raised there, so its [NothingToDo] is unwrapped for
+     {!solve}. *)
   let step (pstate : Declare.Proof.t) : Declare.Proof.t =
     Logger.trace __FUNCTION__;
     ProofState.update_pstate pstate;
     if Proof.is_done (Declare.Proof.get pstate) then exit_proof ();
-    Proofview.Goal.enter (fun gl ->
-      let module PStep : Proof_solver_step.S with type tactic = Tactic.t =
-        (val make gl)
-      in
-      let x = PStep.step () in
-      let y = PStep.run (PStep.Tacs.simplify_and_subst_all ()) in
-      let z = Tactic.seq x y in
-      Tactic.unpack z)
-    |> get_updated_pstate
+    try
+      Proofview.Goal.enter (fun gl ->
+        let module PStep : Proof_solver_step.S with type tactic = Tactic.t =
+          (val make gl)
+        in
+        let x = PStep.step () in
+        let y = PStep.run (PStep.Tacs.simplify_and_subst_all ()) in
+        let z = Tactic.seq x y in
+        Tactic.unpack z)
+      |> get_updated_pstate
+    with
+    | Logic_monad.TacticFailure NothingToDo -> raise NothingToDo
   ;;
 end
 

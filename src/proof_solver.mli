@@ -4,8 +4,9 @@
     hands the goal in focus to {!Proof_solver_step}, which chooses the
     tactic. *)
 
-(** Raised by {!S.step} (and {!step}): the proof has no goals left, so
-    there is nothing to do. {!solve} stops on it. *)
+(** Raised by {!S.step} (and {!step}): the proof has no goals left, or
+    its state machine is [Done], so there is nothing to do. {!solve} stops
+    on it. The same exception as {!Proof_solver_step.NothingToDo}. *)
 exception NothingToDo
 
 (** A proof solver for one encoding: the command-time results it reads
@@ -59,8 +60,9 @@ module type S = sig
 
       @raise NothingToDo
         if [pstate] has no goals left (raised here; the state machine is
-        set to [Done] first). Also raises whatever the step raises
-        (propagated). *)
+        set to [Done] first), or the step finds the state machine [Done]
+        (propagated, unwrapped from the tactic engine's wrapper). Also
+        raises whatever else the step raises (propagated). *)
   val step : Declare.Proof.t -> Declare.Proof.t
 end
 
@@ -151,8 +153,8 @@ val start
 
     @raise NoCachedModules if no solver has been built (propagated).
     @raise NothingToDo
-      if [pstate] has no goals left (propagated). Also raises whatever the
-      step raises (propagated). *)
+      if there is nothing to do, as {!S.step} (propagated). Also raises
+      whatever else the step raises (propagated). *)
 val step : Declare.Proof.t -> Declare.Proof.t
 
 (** [solve ?bound pstate] is [pstate] after the cached solver's steps
