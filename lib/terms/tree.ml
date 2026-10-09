@@ -75,7 +75,7 @@ module Make (Base : Base_.S) : S with type base = Base.t = struct
       Utils.compare_chain [ Node.compare a b; List.compare compare al bl ]
   ;;
 
-  (** {i See [tree.mli].} *)
+  (* See the [.mli] for these. *)
   let rec preorder : t -> Node.t list = function
     | N (x, cs) -> x :: List.concat_map preorder cs
   ;;

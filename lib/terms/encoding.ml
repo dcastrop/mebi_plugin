@@ -35,7 +35,7 @@ module Make (Base : Base_term.S) (X : Args with type t = Base.t) :
   let compare = Base.compare
   let hash = Base.hash
 
-  (* *)
+  (* The counter {!incr} hands out from; see the [.mli]. *)
   let counter : t ref = ref init
   let reset () : unit = counter := init
 

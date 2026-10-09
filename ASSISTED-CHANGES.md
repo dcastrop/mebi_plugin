@@ -6672,6 +6672,28 @@ Tooling 1.
 
 ---
 
+## 2026-10-09 — Documentation pass, part 10: `lib/terms`
+
+**Docs + Refactor.** On branch `docs/lib-terms`. Contracts in the `.mli`
+(`Base_`, `Base_term`, `Encoding`, `Tree`, `Trees`, `Constructor_tree`,
+`Constructor_trees`), pointers in the `.ml` (`212ac1f`, `650b01b`).
+Nothing here is unused. One split, `fewer_constructors` from `Trees.min`
+(`7f473f6`).
+
+**Verification.** On the head: `tests.exe` 103/103, the proof matrix in
+all three modes and `Test.v`'s 60 counts identical to `main`'s, `make`
+clean. With this, every library has had the pass
+(`TODO.md`'s item is closed).
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/lib-terms main`), or one commit.
+
+**Session tally (2026-10-09), cont.:** Docs 21 · Refactor 15 (11 splits, 4
+dead-code removals) · Bug fix 5 · Tooling 1 (`reflow.py` keeps code spans
+whole; local, in `notes/tools`).
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
