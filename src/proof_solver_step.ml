@@ -54,15 +54,19 @@ struct
   module Bindings = W.Bindings
   module ConstructorBindings = W.ConstructorBindings
 
-  (** [module Iter] is a custom wrapper around a [module Rocq_monad_utils] made for this specific iteration of the proof, where the [env] and [sigma] are obtained from the current [Proofview.Goal.t], and also contains specific helper functions.
-  *)
+  (* This step's own monad ({!Proof_solver_wrapper}), reading [env] and
+     [sigma] from the goal in focus rather than the global environment, with
+     helpers over that goal. Included: [mm], [run], [get_concl], ... below
+     are its. *)
   module Iter :
     Proof_solver_wrapper.S with type enc = Enc.t and type tree = Enc.Tree.t =
     Proof_solver_wrapper.Make (Enc) (X)
 
   include Iter
 
-  (** [module Theory] allows the current proof-iteration step [module Iter] to interface and reason with the contents of [module Theories]. It handles cases where we also need to use both the bisimilarity-checking wrapper [module W] {i {e.g., [module Model]}.}. *)
+  (* The plugin's theory as read in this goal ({!Iter}), including what
+     needs the bisimilarity result in [W] (whether a term is one of an FSM's
+     LTSs, say). *)
   module Theory :
     Proof_solver_theory.S
     with type 'a mm = 'a M.mm
@@ -71,8 +75,9 @@ struct
      and type fsm = W.Model.FSM.t =
     TheoryMaker (Iter)
 
-  (** [module Tacs] contains the tactics used to solve the proofs. Not to be confused with [module Tactic] which is our custom wrapper-type around ['a Proofview.tactic]. All tactics in [module Tacs] do return [Tactic.t].
-  *)
+  (* The tactics the solver uses, each a [Tactic.t] (not to be confused
+     with [Tactic], the wrapper around ['a Proofview.tactic] they are
+     built with). *)
   module Tacs :
     Proof_solver_tactics.S
     with type 'a mm = 'a Iter.mm
@@ -87,15 +92,76 @@ struct
      and type econstrset = Iter.EConstrSet.t =
     Proof_solver_tactics.Make (Enc) (Tactic) (W) (Iter) (Theory)
 
-  (** [module ReModel] is for extracting the model component {i (e.g., state, label in [module W.Model])} corresponding to an [EConstr.t] term in the proof.
-  *)
+  (** [is_lts_of_either_fsm x] is whether [x] is one of the LTSs either FSM
+      was extracted with ({!Theory.is_fsm_constructor}); [false] for an FSM
+      that has no metadata. Raises nothing. *)
+  let is_lts_of_either_fsm (x : EConstr.t) : bool =
+    (* [of_fsm m] is whether [x] is one of [m]'s LTSs *)
+    let of_fsm (m : Model.FSM.t) : bool =
+      try Theory.is_fsm_constructor x m with _ -> false
+    in
+    of_fsm (W.get_fsm_a ()) || of_fsm (W.get_fsm_b ())
+  ;;
+
+  (** [is_eq_inductive sigma x] is whether [x] is the inductive [eq].
+      Raises nothing. *)
+  let is_eq_inductive (sigma : Evd.evar_map) (x : EConstr.t) : bool =
+    match EConstr.kind sigma x with
+    | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
+    | _ -> false
+  ;;
+
+  (** [seq_opt acc y] is [acc] then [y], either of which may be absent.
+      Raises nothing. *)
+  let seq_opt (acc : Tactic.t option) (y : Tactic.t option) : Tactic.t option =
+    match y, acc with
+    | None, _ -> acc
+    | Some y, None -> Some y
+    | Some y, Some acc -> Some (Tactic.seq acc y)
+  ;;
+
+  (** [unfold_atomic ?in_hyp ty tys] is the tactic unfolding the constants
+      of the head [ty] ({!Tacs.try_unfold_any}, in the hypothesis [in_hyp]
+      if given), or, if there are none, those of each of its arguments
+      [tys] in turn, in sequence; [None] if nothing unfolds. Raises
+      nothing. *)
+  let unfold_atomic
+        ?(in_hyp : Rocq_utils.hyp option)
+        (ty : EConstr.t)
+        (tys : EConstr.t array)
+    : Tactic.t option mm
+    =
+    let open Syntax in
+    let* ty_opt : Tactic.t option = Tacs.try_unfold_any ?in_hyp ty in
+    match ty_opt with
+    | Some y -> return (Some y)
+    | None ->
+      (* [unfold_arg i acc] is [acc] then the [i]th argument's unfolding *)
+      let unfold_arg (i : int) (acc : Tactic.t option) : Tactic.t option mm =
+        let+ y = Tacs.try_unfold_any ?in_hyp tys.(i) in
+        seq_opt acc y
+      in
+      iterate 0 (Array.length tys - 1) None unfold_arg
+  ;;
+
+  (** Reading a term of the proof back as a part of the model: the state,
+      label or transition of {!W.Model} it stands for. *)
   module ReModel = struct
+    (** Raised by {!state}: no state of [states] is the term [x]. *)
     exception
       CouldNotFind_State of
         { x : EConstr.t
         ; states : Model.State.Set.t
         }
 
+    (** [state x ys] is the state of [ys] that the term [x] encodes, or, for
+        a state renamed apart from the other system's copy
+        ({!Wrapper.separate}), the one with an alias of that encoding. The
+        lookup runs while the computation is built, so its exception reaches
+        a handler around the call.
+
+        @raise CouldNotFind_State
+          if [x] has no encoding, or none of [ys] has it (raised here). *)
     let state (x : EConstr.t) (ys : Model.State.Set.t) : Model.State.t M.mm =
       Logger.trace __FUNCTION__;
       if Logger.is_enabled Output.Kind.Debug
@@ -126,30 +192,36 @@ struct
         raise (CouldNotFind_State { x; states = ys })
     ;;
 
-    let _state_opt (x : EConstr.t) (ys : Model.State.Set.t)
-      : Model.State.t option M.mm
-      =
-      Logger.trace __FUNCTION__;
-      try
-        let open M.Syntax in
-        let* z = state x ys in
-        M.return (Some z)
-      with
-      | CouldNotFind_State _ -> M.return None
-    ;;
-
+    (** Raised by {!label}: no label of [alphabet] is the term [x]. *)
     exception
       CouldNotFind_Label of
         { x : EConstr.t
         ; alphabet : Model.Label.Set.t
         }
 
+    (** [label x ys] is the label of the alphabet [ys] that the term [x]
+        encodes. A term whose encoding is not in [ys] is tried as the
+        theory's [None] (a silent action), then as [Some] (a visible one),
+        and looked up by that encoding. [x]'s own lookup runs while the
+        computation is built; the fallback's runs when it is run (it is in
+        a [let*] continuation).
+
+        @raise CouldNotFind_Label
+          if [x] has no encoding, or is neither [None] nor [Some] (raised
+          here).
+        @raise Not_found
+          if [x] is [None] or [Some] but that encoding is not in [ys]
+          (raised when run, past the handler: [TODO.md], "try around a
+          monadic value"). *)
     let label (x : EConstr.t) (ys : Model.Label.Set.t) : Model.Label.t M.mm =
       Logger.trace __FUNCTION__;
       if Logger.is_enabled Output.Kind.Debug
       then Logger.debug ~__FUNCTION__ ("key: " ^ M.classify_key x);
+      (* [f enc] is the label of [ys] encoded as [enc]; the lookup raises
+         [Not_found] while building, when there is none *)
       let f (enc : Enc.t) : Model.Label.t M.mm =
-        (* NOTE: [Model.Label.Set.compare] only cares about [is_silent=Some _] *)
+        (* NOTE: [Model.Label.Set.compare] only cares about [is_silent=Some _]
+        *)
         Model.Label.Set.find { base = enc; is_silent = None } ys |> M.return
       in
       try M.get_encoding x |> f with
@@ -180,18 +252,7 @@ struct
               raise (CouldNotFind_Label { x; alphabet = ys })))
     ;;
 
-    let _label_opt (x : EConstr.t) (ys : Model.Label.Set.t)
-      : Model.Label.t option M.mm
-      =
-      Logger.trace __FUNCTION__;
-      try
-        let open M.Syntax in
-        let* z = label x ys in
-        M.return (Some z)
-      with
-      | CouldNotFind_Label _ -> M.return None
-    ;;
-
+    (** Raised by {!transition}: [edges] has no [from -label-> goto]. *)
     exception
       CouldNotFind_Transition of
         { from : Model.State.t
@@ -200,6 +261,14 @@ struct
         ; edges : Model.EdgeMap.t'
         }
 
+    (** [transition from goto label edges] is the transition
+        [from -label-> goto] of [edges]: of the actions that reach [goto],
+        the one with the shortest annotation, and the least of its
+        derivation trees.
+
+        @raise CouldNotFind_Transition
+          if [from] has no edges, none labelled [label], or none of those
+          reaches [goto] (raised here). *)
     let transition
           (from : Model.State.t)
           (goto : Model.State.t)
@@ -256,18 +325,27 @@ struct
     ;;
   end
 
-  (** [module Hyp] is for a single proof hypothesis. *)
+  (** One hypothesis of the goal in focus: its grade for inversion, and
+      reading it as a transition. *)
   module Hyp = struct
     type t = Rocq_utils.hyp
 
+    (** [compare_name a b] compares [a]'s and [b]'s names. Raises
+        nothing. *)
     let compare_name (a : t) (b : t) : int =
       let a : Names.Id.t = Context.Named.Declaration.get_id a in
       let b : Names.Id.t = Context.Named.Declaration.get_id b in
       Names.Id.compare a b
     ;;
 
+    (** [name_to_string x] is [x]'s name, printed. Raises nothing. *)
     let name_to_string (x : t) : string = Strfy.hyp_name x
 
+    (** [to_atomic x] is [x]'s type, split into its head and arguments.
+
+        @raise Rocq_utils.Rocq_utils_HypIsNot_Atomic
+          when run, if that type is not atomic (propagated from
+          {!Rocq_utils.hyp_to_atomic}). *)
     let to_atomic (x : t) : EConstr.t Rocq_utils.kind_pair mm =
       let open Syntax in
       let* sigma = get_sigma in
@@ -285,11 +363,13 @@ struct
         the Step 0 loop. *)
     let open_premise_grade : int = 4
 
-    (** A premise hypothesis (not an LTS step): the top grade if it is
-        closed and provably false -- refuting it closes the goal outright,
-        the best move there is, done by [Tacs.refute_premise] -- else 0. A
-        branch whose constructor has a false guard ([3 <= 2]) closes only
-        that way. *)
+    (** [premise_grade x] is the grade of the premise hypothesis [x] (not
+        an LTS step): {!refutable_grade} if it is closed and provably false
+        -- refuting it closes the goal outright, the best move there is,
+        done by {!Tacs.refute_premise} -- and {!open_premise_grade} if it is
+        an inductive [Prop] other than [eq] that still mentions local
+        variables; else 0. A branch whose constructor has a false guard
+        ([3 <= 2]) closes only by refutation. Raises nothing. *)
     let premise_grade (x : t) : int mm =
       let open Syntax in
       let* env = get_env in
@@ -333,10 +413,14 @@ struct
         let hash = Constr.hash
       end)
 
+    (** {!closed_step_refuted}'s memo. *)
     let refuted_steps : bool ConstrTbl.t = ConstrTbl.create 64
 
-    (** [closed_step_refuted ty]: [ty] is a closed LTS step that the bounded
-        search refutes, i.e. a transition that does not exist. Inverting a
+    (** [closed_step_refuted env sigma ty] is whether [ty] is a closed LTS
+        step that the bounded search refutes, i.e. a transition that does
+        not exist. Raises nothing.
+
+        Inverting a
         constructor such as a handshake ([p -!n-> p'], [q -?n-> q'] gives
         [p | q -tau-> p' | q']) splits into one branch per way it could have
         been derived, and the impossible ones carry such steps, fully closed
@@ -366,8 +450,10 @@ struct
            r)
     ;;
 
-    (** [is_dead x]: the LTS step [x] has no instance whatever its local
-        variables are ({!Premise_search.dead}), so inverting it can only open
+    (** [is_dead x] is whether the LTS step [x] has no instance whatever its
+        local variables are ({!Premise_search.dead}). Raises nothing.
+
+        Inverting such a step can only open
         branches that are all refuted later, one layer at a time. On the CCS
         Alternating Bit Protocol 61% of all LTS inversions were of such
         steps -- a sender asked for an output it does not make, a medium for
@@ -382,8 +468,35 @@ struct
       return (Premise_search.dead env sigma ty)
     ;;
 
-    (** [invertibility x] returns an integer denoting whether [x] need be inverted, with the higher numbers being of more importance to invert and [0] denoting [x] does not need to be inverted.
-    *)
+    (** [mentions_var sigma x] is whether the term [x] is a local variable
+        or applies something to one, at any depth: what inverting a step
+        with [x] in it would determine. Raises nothing. *)
+    let rec mentions_var (sigma : Evd.evar_map) (x : EConstr.t) : bool =
+      match EConstr.kind sigma x with
+      | Var _ -> EConstr.isRef sigma x
+      | App (_, tys) -> Array.exists (mentions_var sigma) tys
+      | _ -> false
+    ;;
+
+    (** [step_grade sigma tys] is the grade of an LTS step
+        [lts term label goto] whose arguments are [tys]: 2 if [goto]
+        mentions a local variable, plus 1 if [label] does
+        ({!mentions_var}), so the step whose inversion determines the most
+        comes first. A missing argument counts 0. Raises nothing. *)
+    let step_grade (sigma : Evd.evar_map) (tys : EConstr.t array) : int =
+      (* [position_grade i] is [i] if argument [i] mentions a variable *)
+      let position_grade (i : int) : int =
+        if i < Array.length tys && mentions_var sigma tys.(i) then i else 0
+      in
+      position_grade 2 + position_grade 1
+    ;;
+
+    (** [invertibility x] is [x]'s grade: how much it needs inverting,
+        higher first, and [0] for not at all. A premise -- not atomic, an
+        equation, or not a step of either FSM's LTSs -- is graded by
+        {!premise_grade}. An LTS step [lts term label goto] gets 2 if
+        [goto] mentions a variable, plus 1 if [label] does: at most 3, below
+        both premise grades. Raises nothing. *)
     let invertibility (x : t) : int mm =
       Logger.trace __FUNCTION__;
       let open Syntax in
@@ -398,85 +511,53 @@ struct
            sides a local variable) 3, and inverting it changes nothing, so the
            solver picked it forever. Substitutable equations are handled by the
            [subst] after each step. *)
-        let is_eq : bool =
-          match EConstr.kind sigma ty with
-          | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
-          | _ -> false
-        in
+        let is_eq : bool = is_eq_inductive sigma ty in
         (* Only LTS steps are inverted. Any other premise hypothesis -- an
            [In], a [<=], an equation -- comes from a constructor premise; the
            shape-based grading below assumes [term label goto] and could pick
            it, and inverting it (e.g. [In], a fixpoint) is meaningless. *)
-        let is_lts : bool =
-          let lts_of (m : Model.FSM.t) : bool =
-            try Theory.is_fsm_constructor ty m with _ -> false
-          in
-          lts_of (W.get_fsm_a ()) || lts_of (W.get_fsm_b ())
-        in
+        let is_lts : bool = is_lts_of_either_fsm ty in
         if is_eq || Bool.not is_lts
         then premise_grade x
-        else (
-          (* NOTE: returns true if can be inverted *)
-          let rec f (x : EConstr.t) : bool =
-            match EConstr.kind sigma x with
-            | Var _ -> EConstr.isRef sigma x
-            | App (_, tys) -> Array.exists f tys
-            | _ -> false
-          in
-          (* NOTE: since [2] is the goto-state and [1] is the label, [g] allows us to clearly see which hyp needs to be inverted first. *)
-          let g (i : int) : int =
-            try if f tys.(i) then i else 0 with
-            (* NOTE: handles "Index out of bounds" for accessing [tys] array. *)
-            | Invalid_argument _ -> 0
-          in
-          g 2 + g 1 |> return)
+        else step_grade sigma tys |> return
     ;;
 
-    let _need_inversion (x : t) : bool mm =
-      Logger.trace __FUNCTION__;
-      let open Syntax in
-      let* n : int = invertibility x in
-      if Int.equal n 0 then return false else return true
-    ;;
-
+    (** [invert x] is the tactic inverting [x] ({!Tacs.inversion}). *)
     let invert (x : t) : Tactic.t mm = Tacs.inversion x
 
-    (** [try_unfold_any x] obtains the [Atomic (ty, tys)] of the given hyp [x], and first checks to see if there is anything that can be unfolded in [ty] (via [Tacs.try_unfold_any ~in_hyp:x]) then returns it. Else, if [ty] cannot be unfolded, then we check each of [tys] and return any.
-    *)
+    (** [try_unfold_any x] is the tactic unfolding, in [x], the constants
+        of its type's head ({!Tacs.try_unfold_any}), or, if there are none,
+        of each of its arguments in turn; [None] if nothing unfolds, or [x]'s
+        type is not atomic. Raises nothing: the [try] is inside the
+        computation, so it catches {!Rocq_utils.hyp_to_atomic}'s exception
+        when run. *)
     let try_unfold_any (x : t) : Tactic.t option mm =
       let open Syntax in
       let* sigma = get_sigma in
       try
         let ty, tys = Rocq_utils.hyp_to_atomic sigma x in
-        let* ty_opt : Tactic.t option = Tacs.try_unfold_any ~in_hyp:x ty in
-        match ty_opt with
-        | Some y -> return (Some y)
-        | None ->
-          (* NOTE: check if any in [tys] can be unfolded *)
-          let f (i : int) (acc : Tactic.t option) : Tactic.t option mm =
-            let y = tys.(i) in
-            let* y : Tactic.t option = Tacs.try_unfold_any ~in_hyp:x y in
-            match y with
-            | None -> return acc
-            | Some y ->
-              (match acc with
-               | None -> return (Some y)
-               | Some acc -> return (Some (Tactic.seq acc y)))
-          in
-          iterate 0 (Array.length tys - 1) None f
+        unfold_atomic ~in_hyp:x ty tys
       with
       | Rocq_utils.Rocq_utils_HypIsNot_Atomic _ -> return None
     ;;
 
+    (** Raised by {!get_transition}: [hyp] is not a transition of [fsm]. *)
     exception
       CouldNotGetTransition of
         { hyp : t
         ; fsm : Model.FSM.t
         }
 
-    (** [get_transition ?lts x m] reads hypothesis [x] as a transition of
-        [m]. With [lts], only a step of that relation is read: see
-        [Hyps.get_transition]. *)
+    (** [get_transition ?lts x m] is the hypothesis [x] read as a transition
+        of [m]: its source, label and target, looked up in [m]. With [lts],
+        only a step of that relation is read: see {!Hyps.get_transition}.
+
+        @raise CouldNotGetTransition
+          if [x] is not a step of one of [m]'s LTSs (of [lts], if given), or
+          its states, label or transition are not in [m] (raised here).
+        @raise Not_found
+          as {!ReModel.label}, for a [None]/[Some] label outside [m]'s
+          alphabet (propagated). *)
     let get_transition ?(lts : EConstr.t option) (x : t) (m : Model.FSM.t)
       : Model.Transition.t mm
       =
@@ -502,9 +583,6 @@ struct
           log_econstr ~__FUNCTION__ ~s:"label" (Decode.label label);
           ReModel.transition from goto label m.edges |> return
         with
-        (* | M.EncodingNotFound z ->
-            log_econstr ~__FUNCTION__ ~s:"Err: M.EncodingNotFound" z;
-            raise (CouldNotGetTransition { hyp = x; fsm = m }) *)
         | ReModel.CouldNotFind_State _ ->
           Logger.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_State";
           raise (CouldNotGetTransition { hyp = x; fsm = m })
@@ -520,23 +598,35 @@ struct
     ;;
   end
 
-  (** [module Concl] is for the proof conclusion. *)
+  (** The conclusion of the goal in focus: what kind of goal it is, and
+      what it says. *)
   module Concl = struct
+    (** [eq x] is whether the conclusion is [x] (syntactically, after
+        normalising both). Raises nothing. *)
     let eq (x : EConstr.t) : bool = get_concl () |> econstr_eq x |> run
 
+    (** [eq_hyp x] is whether the conclusion is [x]'s type. Raises
+        nothing. *)
     let eq_hyp (x : Rocq_utils.hyp) : bool =
       Context.Named.Declaration.get_type x |> eq
     ;;
 
-    (** Returns the first hypothesis whose type is the conclusion, rather than
-        just whether one exists: the caller closes the goal with that
-        hypothesis directly. *)
+    (** [eq_any_hyps hs] is the first of [hs] whose type is the conclusion,
+        if any -- the hypothesis, rather than whether one exists: the caller
+        closes the goal with it directly. Raises nothing. *)
     let rec eq_any_hyps : Rocq_utils.hyp list -> Rocq_utils.hyp option mm =
       function
       | [] -> return None
       | h :: tl -> if eq_hyp h then return (Some h) else eq_any_hyps tl
     ;;
 
+    (** [is_weak_refl ()] is whether the conclusion relates two equal
+        states over one LTS: [weak_sim] or [weak_bisimilar] with arguments
+        3 and 4 (the LTSs) equal and 5 and 6 (the states) equal.
+
+        @raise Invalid_argument
+          when run, if the conclusion has fewer than seven arguments
+          (propagated). Also raises as {!to_atomic} (propagated). *)
     let is_weak_refl () : bool mm =
       let open Syntax in
       let* ty, tys = get_concl () |> to_atomic in
@@ -545,28 +635,39 @@ struct
       else return false
     ;;
 
+    (** [is_weak_sim ()] is whether the conclusion is a [weak_sim]. Raises
+        nothing. *)
     let is_weak_sim () : bool mm = get_concl () |> Theory.is_weak_sim
 
+    (** [is_weak_bisimilar ()] is whether the conclusion is a
+        [weak_bisimilar]. Raises nothing. *)
     let is_weak_bisimilar () : bool mm =
       get_concl () |> Theory.is_weak_bisimilar
     ;;
 
-    (** [is_weak_goal ()] if the conclusion is one of the coinductive goals the
-        solver proves: [weak_sim], or [weak_bisimilar]. *)
+    (** [is_weak_goal ()] is whether the conclusion is one of the
+        coinductive goals the solver proves: [weak_sim], or
+        [weak_bisimilar]. Raises nothing. *)
     let is_weak_goal () : bool mm =
       let open Syntax in
       let* sim = is_weak_sim () in
       if sim then return true else is_weak_bisimilar ()
     ;;
 
+    (** [is_exists ()] is whether the conclusion is an [exists]: the
+        answer to a move, still to choose. Raises nothing. *)
     let is_exists () : bool mm = get_concl () |> Theory.is_exists
+
+    (** [is_tau ()] is whether the conclusion is a [tau] step. Raises
+        nothing. *)
     let is_tau () : bool mm = get_concl () |> Theory.is_tau
 
-    (** [is_premise ()] if the conclusion is a constructor premise that is
-        neither an LTS step nor one of the solver's own goals: a [Prop]
-        headed by an inductive that is not [eq] (see [is_eq]), not a MeBi
-        theory constant, not one of either FSM's LTSs, and not a [clos_*]
-        relation (backlog I2, stage 1). *)
+    (** [is_premise ()] is whether the conclusion is a constructor premise
+        that is neither an LTS step nor one of the solver's own goals: a
+        negation, a bounded universal, or a [Prop] headed by an inductive
+        that is not [eq] (see {!is_eq}), not a MeBi theory constant, not one
+        of either FSM's LTSs, and not a [clos_*] relation (backlog I2, stage
+        1). Raises nothing. *)
     let is_premise () : bool mm =
       let open Syntax in
       let* sigma = get_sigma in
@@ -575,19 +676,17 @@ struct
       let h, _ = EConstr.decompose_app sigma concl in
       (* A premise headed by a definition -- [n < 3] is [lt], which unfolds to
          [le (S n) 3] -- is classified by what it unfolds to. Judged on [lt]
-         itself it was not a premise, so after [go : n < 3 -> succ_rel n m -> st n a m] was applied the solver took [0 < 3] for the silent-step
-         goal it finishes with [rt1n_refl] (found 2026-10-02, [Test.v]
-         [InversionShapes.Computed]). The plugin's own definitions keep
-         their head: the theory checks below need it. *)
+         itself it was not a premise, so after
+         [go : n < 3 -> succ_rel n m -> st n a m] was applied the solver took
+         [0 < 3] for the silent-step goal it finishes with [rt1n_refl] (found
+         2026-10-02, [Test.v] [InversionShapes.Computed]). The plugin's own
+         definitions keep their head: the theory checks below need it. *)
       let h =
         if EConstr.isConst sigma h && Bool.not (Theory.is_any_theory h)
         then
           fst
             (EConstr.decompose_app sigma (Reductionops.whd_all env sigma concl))
         else h
-      in
-      let lts_of (m : Model.FSM.t) : bool =
-        try Theory.is_fsm_constructor h m with _ -> false
       in
       let is_negation : bool =
         match EConstr.kind sigma (Reductionops.whd_all env sigma concl) with
@@ -611,61 +710,57 @@ struct
            Premise_search.is_prop env sigma concl
            && Bool.not (String.starts_with ~prefix:"clos_" name)
            && Bool.not (Theory.is_any_theory h)
-           && Bool.not (lts_of (W.get_fsm_a ()))
-           && Bool.not (lts_of (W.get_fsm_b ()))
+           && Bool.not (is_lts_of_either_fsm h)
          | _ -> false)
     ;;
 
-    (** [is_eq ()] if the conclusion is an equation [_ = _]: an equation
-        premise of a constructor just applied (backlog I2). *)
+    (** [is_eq ()] is whether the conclusion is an equation [_ = _]: an
+        equation premise of a constructor just applied (backlog I2). Raises
+        nothing. *)
     let is_eq () : bool mm =
       let open Syntax in
       let* sigma = get_sigma in
       return
         (match EConstr.kind sigma (get_concl ()) with
-         | App (h, a) when Array.length a = 3 ->
-           (match EConstr.kind sigma h with
-            | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
-            | _ -> false)
+         | App (h, a) when Array.length a = 3 -> is_eq_inductive sigma h
          | _ -> false)
     ;;
 
-    (** [try_unfold_any ()] is similar to [Hyp.try_unfold_any _], except that instead of a hypothesis, it uses the conclusion. Uses [Tacs.try_unfold_any].
-    *)
+    (** [try_unfold_any ()] is {!Hyp.try_unfold_any} for the conclusion:
+        the tactic unfolding the constants of its head, or else of each of
+        its arguments in turn; [None] if nothing unfolds.
+
+        @raise Rocq_utils.Rocq_utils_EConstrIsNot_Atomic
+          when run, if the conclusion is not atomic (propagated from
+          {!to_atomic}). *)
     let try_unfold_any () : Tactic.t option mm =
       Logger.trace __FUNCTION__;
       let open Syntax in
       let* ty, tys = get_concl () |> to_atomic in
-      let* ty_opt : Tactic.t option = Tacs.try_unfold_any ty in
-      match ty_opt with
-      | Some y -> return (Some y)
-      | None ->
-        (* NOTE: check if any in [tys] can be unfolded *)
-        let f (i : int) (acc : Tactic.t option) : Tactic.t option mm =
-          let y = tys.(i) in
-          let* y : Tactic.t option = Tacs.try_unfold_any y in
-          match y with
-          | None -> return acc
-          | Some y ->
-            (match acc with
-             | None -> return (Some y)
-             | Some acc -> return (Some (Tactic.seq acc y)))
-        in
-        iterate 0 (Array.length tys - 1) None f
+      unfold_atomic ty tys
     ;;
 
+    (** The two conjuncts of an [exists] conclusion: the answering system's
+        weak transition, and the [weak_sim] or [weak_bisimilar] it must
+        reach. *)
     type wk_conj =
       { wk_trans : EConstr.t
       ; wk_sim : EConstr.t
       }
 
+    (** The states those conjuncts name: where the moving system went
+        ([a']), and where the answering one starts ([b]). *)
     type conj =
       { a' : Model.State.t
       ; b : Model.State.t
       }
 
-    (* [a'] is where the moving system went: the left argument of the
-       relation, or the right one when the roles are swapped ([bisim_r]). *)
+    (** [get_a'_from_wk_sim wk_sim] is FSM a's state that [wk_sim] relates,
+        where the moving system went: the left argument of the relation, or
+        the right one when the roles are swapped ([bisim_r]).
+
+        @raise ReModel.CouldNotFind_State
+          when run, if that term is not one of FSM a's states (propagated). *)
     let get_a'_from_wk_sim (wk_sim : EConstr.t) : Model.State.t mm =
       let open Syntax in
       let* _, tys = to_atomic wk_sim in
@@ -673,14 +768,27 @@ struct
       (W.get_fsm_a ()).states |> ReModel.state tys.(i) |> M.run |> return
     ;;
 
+    (** [get_b_from_wk_trans wk_trans] is FSM b's state that the weak
+        transition [wk_trans] starts from.
+
+        @raise ReModel.CouldNotFind_State
+          when run, if that term is not one of FSM b's states (propagated). *)
     let get_b_from_wk_trans (wk_trans : EConstr.t) : Model.State.t mm =
       let open Syntax in
       let* _, tys = to_atomic wk_trans in
       (W.get_fsm_b ()).states |> ReModel.state tys.(3) |> M.run |> return
     ;;
 
+    (** Raised by {!get_wk_conj}: the [exists]' body is not a conjunction
+        of two. *)
     exception ConclDoesNotMatchConj
 
+    (** [get_wk_conj ()] is the two conjuncts of the [exists] conclusion.
+
+        @raise Theories.EnsureFail
+          when run, if the conclusion is not an [exists] (propagated).
+        @raise ConclDoesNotMatchConj
+          when run, if its body is not a conjunction of two (raised here). *)
     let get_wk_conj () : wk_conj mm =
       Logger.trace __FUNCTION__;
       let open Syntax in
@@ -697,7 +805,7 @@ struct
         [weak_sim] or [weak_bisimilar] conjunct of an [exists] conclusion:
         [@weak_sim M N A ltsM ltsN m n] gives [ltsM], or [ltsN] when swapped,
         as {!get_a'_from_wk_sim} reads [m] or [n]. [None] for any other
-        conclusion. *)
+        conclusion. Raises nothing. *)
     let lts_a () : EConstr.t option mm =
       let open Syntax in
       match run (get_wk_conj ()) with
@@ -708,6 +816,12 @@ struct
         return (if i < Array.length tys then Some tys.(i) else None)
     ;;
 
+    (** [get_conj c] is the states [c]'s conjuncts name.
+
+        @raise Theories.EnsureFail
+          when run, if [c.wk_sim] is neither [weak_sim] nor [weak_bisimilar]
+          (propagated). Also raises as {!get_a'_from_wk_sim} and
+          {!get_b_from_wk_trans} (propagated). *)
     let get_conj ({ wk_trans; wk_sim } : wk_conj) : conj mm =
       Logger.trace __FUNCTION__;
       let open Syntax in
@@ -729,7 +843,10 @@ struct
         [exists n2, weak ltsN n1 n2 a /\ weak_bisimilar m2 n2] and
         [bisim_r]'s is [exists m2, weak ltsM m1 m2 a /\ weak_bisimilar m2 n2]:
         the witness sits on the left of the relation exactly when the
-        {e right} system moved. *)
+        {e right} system moved.
+
+        Raises as {!get_wk_conj} (propagated; {!handle_state} reads any
+        failure as [None]). *)
     let orientation () : bool option mm =
       let open Syntax in
       let* goal = is_weak_goal () in
@@ -751,10 +868,11 @@ struct
     ;;
   end
 
-  (** [module Hyps] is for all the proof's hypotheses. *)
+  (** All the hypotheses of the goal in focus: which to invert or unfold,
+      and which is the move to answer. *)
   module Hyps = struct
-    (** [get_cofixes ()] filters the hyps by name according to [get_all_cofix_hyp_names ()].
-    *)
+    (** [get_cofixes ()] is the coinduction hypotheses
+        ({!get_all_cofix_hyp_names}), sorted by name. Raises nothing. *)
     let get_cofixes () : Rocq_utils.hyp list =
       let cofix_names : Names.Id.Set.t = get_all_cofix_hyp_names () in
       get_hyps ()
@@ -776,7 +894,7 @@ struct
         Ordering by introduction removed that loop and saved 4-10% of steps
         on [Proc/Test3] and CADP, with no proof worse (backlog Step 0, note 7;
         [ASSISTED-CHANGES.md], 2026-10-02). [Proofview.Goal.hyps] is newest
-        first, hence the reversal. *)
+        first, hence the reversal. Raises nothing. *)
     let get_non_cofixes () : Rocq_utils.hyp list =
       let cofix_names : Names.Id.Set.t = get_all_non_cofix_hyp_names () in
       get_hyps ()
@@ -785,6 +903,9 @@ struct
       |> List.rev
     ;;
 
+    (** [log ?cofix_only ()] logs the hypotheses at [Debug]: all of them,
+        only the coinduction hypotheses ([Some true]), or only the others
+        ([Some false]). *)
     let log ?(cofix_only : bool option = None) () : unit =
       match cofix_only with
       | None -> log_hyps ()
@@ -797,13 +918,16 @@ struct
     (** [can_solve_concl_cofix ()] is the coinduction hypothesis in scope whose
         type is the current goal, if there is one. It used to answer only
         whether such a hypothesis existed, leaving [trivial] to find it again
-        by hint search. *)
+        by hint search. Raises nothing. *)
     let can_solve_concl_cofix () : Rocq_utils.hyp option mm =
       get_cofixes () |> Concl.eq_any_hyps
     ;;
 
-    (** [clear_non_cofix ()] returns a tactic that will clear all the hyps that are named according to [get_all_non_cofix_hyp_names ()]. This is to be used at the end of a case of the proof has been solved.
-        (* TODO: check if this is necessary -- or could be problematic? *) *)
+    (** [clear_non_cofix ()] is the tactic clearing every hypothesis that is
+        not a coinduction hypothesis ({!get_all_non_cofix_hyp_names}), as a
+        new cofix is introduced ({!handle_new_cofix}). Whether this is
+        needed, or could be a problem, is not checked (TODO). Raises
+        nothing. *)
     let clear_non_cofix () : Tactic.t =
       Tactic.create
         ~msg:"(Clearing non-cofix Hyps)"
@@ -811,103 +935,121 @@ struct
            (Names.Id.Set.to_seq (get_all_non_cofix_hyp_names ()) |> List.of_seq))
     ;;
 
-    (** [try_invert_any inverted_hyps] returns either [None] if no hyps can be inverted (as determined by [Hyp.invertibility]), else a [Tactic.t] that will invert the hypothesis deemed to be the most important to invert. (Only checks non-cofix hyps as by [get_non_cofixes ()].)
-    *)
+    (** [keep_highest best (grade, y)] is the better of [best] and the
+        hypothesis [y] of grade [grade]: the higher grade, and [y] on a tie,
+        so ties go to the later hypothesis (see below). Raises nothing. *)
+    let keep_highest (best : (int * Hyp.t) option) ((grade, y) : int * Hyp.t)
+      : (int * Hyp.t) option
+      =
+      match best with
+      | None -> Some (grade, y)
+      | Some (n, x) ->
+        (* Ties on [grade] go to the LATER hypothesis, and that is load
+           bearing. [invertibility] grades on shape -- whether the label and
+           goto positions hold a local variable -- so in a layered LTS a
+           whole chain of transitions grades identically:
+
+           H  : compLTS (cpar (cprc X) R) a (cpar (cprc Y) R)
+           H1 : termLTS X a Y
+           H4 : compLTS (cprc X) a (cprc Y)
+
+           all score 3, this keeps the last and so picks [H4], whose
+           inversion yields [termLTS X a Y] -- which is [H1] again. The goal
+           does not move and the context gains a duplicate; the next step
+           makes progress only because that duplicate sorts last and gets
+           picked instead. Steps whose goal is unchanged and whose only new
+           hypothesis is an exact duplicate were measured at 2.6% (Test1),
+           2.7-4.3% (Test2), 4.9% and 14.1% (CADP/Size1) and 12.0%
+           (Proc/Test3) of all steps.
+
+           Breaking ties toward the SMALLER hypothesis instead -- the
+           innermost transition, the one whose inversion actually determines
+           the label and destination -- was tried on 2026-09-29 and
+           REVERTED. It left 16 of the 18 baseline counts byte-identical,
+           but turned [wsim_lts] and [wsim_lts_bigstep], both 396
+           iterations, into proofs that had not closed after 5000
+           iterations, 10 minutes and 1.4GB. Which hypothesis gets inverted
+           steers the whole downstream path and the search has no plan to
+           fall back on, so a local improvement here can flip a proof from
+           converging to diverging. Do not change this tie-break without
+           running all five cheap suites. See ASSISTED-CHANGES.md,
+           2026-09-29.
+
+           Retried 2026-10-01 gated on the mutual block ([ac98c3c]) and
+           reverted the same day: the mutual block does NOT make it safe.
+           With [MutualCofix True] forced, CADP's [wsim_lts_bigstep] went
+           from 396 to not closing. Run the suites with the strategy forced
+           both ways, not just under [Auto]. See ASSISTED-CHANGES.md,
+           2026-10-01. *)
+        (match Int.compare grade n with
+         | -1 -> Some (n, x)
+         | _ -> Some (grade, y))
+    ;;
+
+    (** [invert_by_grade (grade, x)] is the tactic for the hypothesis [x]
+        of non-zero grade [grade]: refuting it if it is a refutable premise
+        ({!Tacs.refute_premise}), inverting it if it is an open one
+        ({!Tacs.invert_premise}), and, an LTS step, refuting it if it is dead
+        ({!Tacs.refute_dead}), else inverting it. Raises nothing. *)
+    let invert_by_grade ((grade, x) : int * Hyp.t) : Tactic.t mm =
+      let open Syntax in
+      if Int.equal grade Hyp.refutable_grade
+      then Tacs.refute_premise x
+      else if Int.equal grade Hyp.open_premise_grade
+      then Tacs.invert_premise x
+      else
+        (* An LTS step with no instance closes the goal by refutation: one
+           step instead of the inversions of every layer beneath it
+           (note 11, option D′). *)
+        let* dead = Hyp.is_dead x in
+        if dead then Tacs.refute_dead x else Hyp.invert x
+    ;;
+
+    (** [try_invert_any ()] is the tactic for the non-coinduction
+        hypothesis that most needs inverting ({!Hyp.invertibility}; ties go
+        to the later one, {!keep_highest}), by its grade
+        ({!invert_by_grade}), or [None] if every grade is 0. Raises
+        nothing. *)
     let try_invert_any () : Tactic.t option mm =
       Logger.trace __FUNCTION__;
-      (* log_econstrs ~__FUNCTION__ "inverted hyps" !inverted_hyps; *)
       let hyps : Hyp.t list = get_non_cofixes () in
       let open Syntax in
-      let f (i : int) (xopt : (int * Hyp.t) option) : (int * Hyp.t) option mm =
+      (* [grade_next i best] is [best] or the [i]th hypothesis, graded *)
+      let grade_next (i : int) (best : (int * Hyp.t) option)
+        : (int * Hyp.t) option mm
+        =
         let y : Hyp.t = List.nth hyps i in
         let* grade : int = Hyp.invertibility y in
         Logger.debug
           ~__FUNCTION__
           (Printf.sprintf "grade %i : %s" grade (Hyp.name_to_string y));
-        match xopt with
-        | None -> Some (grade, y) |> return
-        | Some (n, x) ->
-          (* Ties on [grade] go to the LATER hypothesis, and that is load
-             bearing. [invertibility] grades on shape -- whether the label and
-             goto positions hold a local variable -- so in a layered LTS a
-             whole chain of transitions grades identically:
-
-             H  : compLTS (cpar (cprc X) R) a (cpar (cprc Y) R)
-             H1 : termLTS X a Y
-             H4 : compLTS (cprc X) a (cprc Y)
-
-             all score 3, this keeps the last and so picks [H4], whose
-             inversion yields [termLTS X a Y] -- which is [H1] again. The goal
-             does not move and the context gains a duplicate; the next step
-             makes progress only because that duplicate sorts last and gets
-             picked instead. Steps whose goal is unchanged and whose only new
-             hypothesis is an exact duplicate were measured at 2.6% (Test1),
-             2.7-4.3% (Test2), 4.9% and 14.1% (CADP/Size1) and 12.0%
-             (Proc/Test3) of all steps.
-
-             Breaking ties toward the SMALLER hypothesis instead -- the
-             innermost transition, the one whose inversion actually determines
-             the label and destination -- was tried on 2026-09-29 and
-             REVERTED. It left 16 of the 18 baseline counts byte-identical,
-             but turned [wsim_lts] and [wsim_lts_bigstep], both 396
-             iterations, into proofs that had not closed after 5000
-             iterations, 10 minutes and 1.4GB. Which hypothesis gets inverted
-             steers the whole downstream path and the search has no plan to
-             fall back on, so a local improvement here can flip a proof from
-             converging to diverging. Do not change this tie-break without
-             running all five cheap suites. See ASSISTED-CHANGES.md,
-             2026-09-29.
-
-             Retried 2026-10-01 gated on the mutual block ([ac98c3c]) and
-             reverted the same day: the mutual block does NOT make it safe.
-             With [MutualCofix True] forced, CADP's [wsim_lts_bigstep] went
-             from 396 to not closing. Run the suites with the strategy forced
-             both ways, not just under [Auto]. See ASSISTED-CHANGES.md,
-             2026-10-01. *)
-          (match Int.compare grade n with
-           | -1 -> Some (n, x) |> return
-           | _ -> Some (grade, y) |> return)
+        return (keep_highest best (grade, y))
       in
-      let* to_invert_opt = iterate 0 (List.length hyps - 1) None f in
+      let* to_invert_opt = iterate 0 (List.length hyps - 1) None grade_next in
       match to_invert_opt with
-      | None -> return None
-      | Some (0, x) -> return None
-      (* NOTE: we only want to invert hyps with non-zero grades. *)
-      | Some (grade, x) when Int.equal grade Hyp.refutable_grade ->
-        let* y = Tacs.refute_premise x in
-        return (Some y)
-      | Some (grade, x) when Int.equal grade Hyp.open_premise_grade ->
-        let* y = Tacs.invert_premise x in
-        return (Some y)
-      | Some (grade, x) ->
-        (* An LTS step with no instance closes the goal by refutation: one
-           step instead of the inversions of every layer beneath it
-           (note 11, option D′). *)
-        let* dead = Hyp.is_dead x in
-        let* y = if dead then Tacs.refute_dead x else Hyp.invert x in
-        return (Some y)
+      (* only hypotheses with a non-zero grade are inverted *)
+      | None | Some (0, _) -> return None
+      | Some gx ->
+        let+ y = invert_by_grade gx in
+        Some y
     ;;
 
-    (** [try_unfold_any ()] returns the optional [Tactic.t] that is a sequence derived from all of the hyps ([xs]) from [Hyp.try_unfold_any x] (where [x] is a hyp in [xs]).
-    *)
+    (** [try_unfold_any ()] is the tactic unfolding what can be unfolded
+        in every non-coinduction hypothesis ({!Hyp.try_unfold_any}), in
+        sequence; [None] if nothing unfolds. Raises nothing. *)
     let try_unfold_any () : Tactic.t option mm =
       let hyps = get_non_cofixes () in
       let open Syntax in
-      let f (i : int) (acc : Tactic.t option) : Tactic.t option mm =
-        let x = List.nth hyps i in
-        let* x = Hyp.try_unfold_any x in
-        match x with
-        | None -> return acc
-        | Some x ->
-          (match acc with
-           | None -> return (Some x)
-           | Some acc -> return (Some (Tactic.seq acc x)))
+      (* [unfold_hyp i acc] is [acc] then the [i]th hypothesis' unfolding *)
+      let unfold_hyp (i : int) (acc : Tactic.t option) : Tactic.t option mm =
+        let+ y = Hyp.try_unfold_any (List.nth hyps i) in
+        seq_opt acc y
       in
-      iterate 0 (List.length hyps - 1) None f
+      iterate 0 (List.length hyps - 1) None unfold_hyp
     ;;
 
-    (* Number of nodes in a term: a smaller refutable step needs fewer
-       inversions to refute. *)
+    (** [term_size sigma t] is the number of nodes in [t]: a smaller
+        refutable step needs fewer inversions to refute. Raises nothing. *)
     let rec term_size (sigma : Evd.evar_map) (t : EConstr.t) : int =
       EConstr.fold sigma (fun n c -> n + term_size sigma c) 1 t
     ;;
@@ -917,20 +1059,18 @@ struct
         inversion opened for a derivation that does not exist, refuting it
         closes the branch. The smallest, because refuting a step inverts it
         down to the impossible part, and a large one ([res s0 (res s1 ...)])
-        can need more inversions than the refutation's depth allows. *)
+        can need more inversions than the refutation's depth allows. Raises
+        nothing. *)
     let refutable_step () : Rocq_utils.hyp option mm =
       Logger.trace __FUNCTION__;
       let open Syntax in
       let* env = get_env in
       let* sigma = get_sigma in
+      (* [is_step h] is whether [h] is a step of either FSM's LTSs *)
       let is_step (h : Rocq_utils.hyp) : bool =
         match Rocq_utils.hyp_to_atomic sigma h with
         | exception _ -> false
-        | ty, _ ->
-          let lts_of (m : Model.FSM.t) : bool =
-            try Theory.is_fsm_constructor ty m with _ -> false
-          in
-          lts_of (W.get_fsm_a ()) || lts_of (W.get_fsm_b ())
+        | ty, _ -> is_lts_of_either_fsm ty
       in
       get_non_cofixes ()
       |> List.filter is_step
@@ -943,6 +1083,8 @@ struct
       |> return
     ;;
 
+    (** Raised by {!get_transition}: no hypothesis reads as a transition of
+        the FSM. *)
     exception CannotGetTransition of Model.FSM.t
 
     (** [get_transition ?lts m] is the first hypothesis that reads as a
@@ -950,18 +1092,23 @@ struct
         relations include every one in [Using], and a premise's step left by
         inversion ([rb 2 a 3] under [open_rec 0 a 3]) can name states of [m]
         too. Read as a transition of [m] it was the wrong one, or, from a
-        state with no edges, an uncaught [Not_found] (2026-10-03). *)
+        state with no edges, an uncaught [Not_found] (2026-10-03).
+
+        @raise CannotGetTransition
+          when run, if none does (raised here).
+          Also raises as {!Hyp.get_transition}, other than
+          {!Hyp.CouldNotGetTransition} (propagated). *)
     let get_transition ?(lts : EConstr.t option) (m : Model.FSM.t)
       : Model.Transition.t mm
       =
       Logger.trace __FUNCTION__;
       let hyps = get_non_cofixes () in
       let open Syntax in
+      (* [f i found] is [found], or else the [i]th hypothesis read as a
+         transition of [m], if it reads as one *)
       let f (i : int)
         : Model.Transition.t option -> Model.Transition.t option mm
-        =
-        (* Logger.thing ~__FUNCTION__ Trace "i" i ( Utils.Strfy.int); *)
-        function
+        = function
         | Some x -> return (Some x)
         | None ->
           let y = List.nth hyps i in
@@ -976,9 +1123,10 @@ struct
     ;;
   end
 
-  (** The constructor and record of the coinductive goal in focus:
-      [In_sim]/[Pack_sim] for [weak_sim], [In_bisim]/[Pack_bisim] for
-      [weak_bisimilar]. *)
+  (** [constructors_of_goal ()] is the tactics applying the constructor and
+      record of the coinductive goal in focus: [In_sim] and [Pack_sim] for
+      [weak_sim], [In_bisim] and [Pack_bisim] for [weak_bisimilar]. Raises
+      nothing. *)
   let constructors_of_goal () : (Tactic.t * Tactic.t) mm =
     let open Syntax in
     let* bisim = Concl.is_weak_bisimilar () in
@@ -993,9 +1141,116 @@ struct
       return (i, p)
   ;;
 
-  (** [handle_open_block ()] opens the whole proof with a single mutual
-      cofixpoint, one definition per pair of the precomputed product relation
-      ([Model.Product.reachable]).
+  (** [block_pairs ~refl ~bisim fsm_a fsm_b root] is the pairs a mutual
+      cofix block covers: the answer plan's relation, if there is a plan,
+      else the product relation reachable from [root]
+      ({!Model.Product.reachable_bisim} for a [weak_bisimilar] goal,
+      [bisim], else {!Model.Product.reachable}). [fsm_b] is the saturated
+      FSM b; [refl] is whether both sides use the same LTS.
+
+      @raise Model.Product.Game_too_large
+        past a game cap (propagated; none is set here). *)
+  let block_pairs
+        ~(refl : bool)
+        ~(bisim : bool)
+        (fsm_a : Model.FSM.t)
+        (fsm_b : Model.FSM.t)
+        (root : Model.Product.Pair.t)
+    : Model.Product.Pair.Set.t
+    =
+    (* The unsaturated FSM still has the silent steps a silent move may be
+       answered with; see [Model.Product.respond]. *)
+    let silent : Model.EdgeMap.t' = (W.get_fsm_b ()).edges in
+    let pi : Model.Partition.t = W.get_bisimilar_partition () in
+    match !W.plan with
+    | Some p -> p.relation
+    | None ->
+      if bisim
+      then
+        Model.Product.reachable_bisim
+          ~refl
+          { a = fsm_a
+          ; a_saturated = W.get_fsm_a ~saturated:true ()
+          ; b = W.get_fsm_b ()
+          ; b_saturated = fsm_b
+          }
+          pi
+          root
+      else
+        Model.Product.reachable
+          ~silent
+          ?sim:!W.simulators
+          ~refl
+          fsm_a
+          fsm_b
+          pi
+          root
+  ;;
+
+  (** [block_members ~refl root pairs] is the pairs of [pairs] that get a
+      cofixpoint of their own besides [root]'s: all but [root], and, when
+      [refl], but the reflexive pairs. A reflexive leaf gets no cofixpoint
+      of its own. Its goal would be put through [In_sim; Pack_sim; intros]
+      with the rest of the block, past the point where [handle_weaksim] can
+      close it by [weak_sim_refl] -- and [reachable] did not follow its
+      successors, so the search would then stop with a pair-not-in-product
+      error. Left out, every goal that reaches it is still a bare
+      [weak_sim x x] and closes by reflexivity. Raises nothing. *)
+  let block_members
+        ~(refl : bool)
+        (root : Model.Product.Pair.t)
+        (pairs : Model.Product.Pair.Set.t)
+    : Model.Product.Pair.t list
+    =
+    Model.Product.Pair.Set.remove root pairs
+    |> Model.Product.Pair.Set.filter (fun ((a, b) : Model.Product.Pair.t) ->
+      not (refl && Model.State.equal a b))
+    |> Model.Product.Pair.Set.elements
+  ;;
+
+  (** [pair_goal ty tys (a, b)] is the goal [ty tys] (a [weak_sim] or
+      [weak_bisimilar]) with its two states, arguments 5 and 6, replaced by
+      [a] and [b], decoded. Raises nothing. *)
+  let pair_goal
+        (ty : EConstr.t)
+        (tys : EConstr.t array)
+        ((a, b) : Model.Product.Pair.t)
+    : EConstr.t
+    =
+    EConstr.mkApp
+      ( ty
+      , Array.mapi
+          (fun (i : int) (x : EConstr.t) ->
+            match i with 5 -> Decode.state a | 6 -> Decode.state b | _ -> x)
+          tys )
+  ;;
+
+  (** [fresh_cofix_names n] is [n] names for coinduction hypotheses
+      ([Cofix0], [Cofix1], ...), distinct from each other and from the
+      goal's hypotheses. All at once: {!new_cofix_name} measures against
+      the current goal, which does not change until the tactic runs. Raises
+      nothing. *)
+  let fresh_cofix_names (n : int) : Names.Id.t list =
+    (* [names used k] is [k] fresh names, none of them in [used] *)
+    let rec names (used : Names.Id.Set.t) (k : int) : Names.Id.t list =
+      if k <= 0
+      then []
+      else (
+        let x : Names.Id.t =
+          Namegen.next_ident_away (Names.Id.of_string "Cofix0") used
+        in
+        x :: names (Names.Id.Set.add x used) (k - 1))
+    in
+    names (get_hyp_names ()) n
+  ;;
+
+  (** [handle_open_block ()] is the tactic for the [OpenBlock] state: it
+      opens the whole proof with a single mutual cofixpoint, one definition
+      per pair of the precomputed product relation
+      ({!Model.Product.reachable}, or the answer plan's), then applies the
+      goal's constructors in every goal at once. If anything in the
+      conclusion unfolds, that comes first, as this step. The next state is
+      [WeakSim].
 
       This is the alternative to minting a fresh nested cofix each time the
       search meets a pair it has not seen. A nested cofix is visible only to
@@ -1004,7 +1259,12 @@ struct
       subtree is re-derived; the search then enumerates simple paths through
       the product rather than its states. See backlog item B2.
 
-      Enabled by [MeBi Config Solver MutualCofix True]; off by default. *)
+      Taken under [MeBi Config Solver MutualCofix True], or when [Auto]
+      chooses it ({!Proof_solver.init}).
+
+      @raise ReModel.CouldNotFind_State
+        if the goal's states are not the two FSMs' (propagated). Also raises
+        as {!Concl.try_unfold_any} (propagated). *)
   let handle_open_block () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -1020,10 +1280,6 @@ struct
       let* ty, tys = get_concl () |> to_atomic in
       let fsm_a : Model.FSM.t = W.get_fsm_a () in
       let fsm_b : Model.FSM.t = W.get_fsm_b ~saturated:true () in
-      (* The unsaturated FSM still has the silent steps a silent move may be
-         answered with; see [Model.Product.respond]. *)
-      let silent : Model.EdgeMap.t' = (W.get_fsm_b ()).edges in
-      let pi : Model.Partition.t = W.get_bisimilar_partition () in
       (* [weak_sim] applies as [| M; N; A; ltsM; ltsN; s; t |] -- see
          [Concl.is_weak_refl], which tests 3 against 4 and 5 against 6. Only
          the last two move; reusing the rest keeps the implicit and universe
@@ -1036,67 +1292,15 @@ struct
          by [weak_sim_refl] when both sides use the same LTS. *)
       let refl : bool = econstr_eq tys.(3) tys.(4) |> run in
       let* bisim : bool = Concl.is_weak_bisimilar () in
-      let pairs : Model.Product.Pair.Set.t =
-        match !W.plan with
-        | Some p -> p.relation
-        | None ->
-          if bisim
-          then
-            Model.Product.reachable_bisim
-              ~refl
-              { a = fsm_a
-              ; a_saturated = W.get_fsm_a ~saturated:true ()
-              ; b = W.get_fsm_b ()
-              ; b_saturated = fsm_b
-              }
-              pi
-              root
-          else
-            Model.Product.reachable
-              ~silent
-              ?sim:!W.simulators
-              ~refl
-              fsm_a
-              fsm_b
-              pi
-              root
-      in
-      (* A reflexive leaf gets no cofixpoint of its own. Its goal would be put
-         through [In_sim; Pack_sim; intros] with the rest of the block, past
-         the point where [handle_weaksim] can close it by [weak_sim_refl] --
-         and [reachable] did not follow its successors, so the search would
-         then stop with a pair-not-in-product error. Left out, every goal that reaches it
-         is still a bare [weak_sim x x] and closes by reflexivity. *)
       let others : Model.Product.Pair.t list =
-        Model.Product.Pair.Set.remove root pairs
-        |> Model.Product.Pair.Set.filter (fun ((a, b) : Model.Product.Pair.t) ->
-          not (refl && Model.State.equal a b))
-        |> Model.Product.Pair.Set.elements
+        block_pairs ~refl ~bisim fsm_a fsm_b root |> block_members ~refl root
       in
-      let type_of ((a, b) : Model.Product.Pair.t) : EConstr.t =
-        EConstr.mkApp
-          ( ty
-          , Array.mapi
-              (fun (i : int) (x : EConstr.t) ->
-                match i with
-                | 5 -> Decode.state a
-                | 6 -> Decode.state b
-                | _ -> x)
-              tys )
+      let names : Names.Id.t list =
+        fresh_cofix_names (1 + List.length others)
       in
-      (* All the names at once: [new_cofix_name] measures against the current
-         goal, which does not change until the tactic runs. *)
-      let used : Names.Id.Set.t ref = ref (get_hyp_names ()) in
-      let fresh () : Names.Id.t =
-        let n : Names.Id.t =
-          Namegen.next_ident_away (Names.Id.of_string "Cofix0") !used
-        in
-        used := Names.Id.Set.add n !used;
-        n
-      in
-      let root_name : Names.Id.t = fresh () in
+      let root_name : Names.Id.t = List.hd names in
       let block : (Names.Id.t * EConstr.t) list =
-        List.map (fun p -> fresh (), type_of p) others
+        List.combine (List.tl names) (List.map (pair_goal ty tys) others)
       in
       Logger.notice
         (Printf.sprintf "(Mutual cofix over %i pairs.)" (1 + List.length block));
@@ -1115,7 +1319,10 @@ struct
       Tactic.seq cofix setup |> return
   ;;
 
-  (** [handle_new_cofix ()] returns a sequence of tactics to handle the creation of a new cofix in the hyps, followed by the necessary application of constructors and introduction of terms to get started on a new case.
+  (** [handle_new_cofix ()] is the tactic introducing a new coinduction
+      hypothesis (a nested [cofix]): the cofix, clearing the other
+      hypotheses, the goal's constructor and record
+      ({!constructors_of_goal}), and [intros]. Raises nothing.
 
       Callers must have normalised the conclusion first: [handle_weaksim] runs
       [Concl.try_unfold_any] to exhaustion before reaching here, so a cofix is
@@ -1132,13 +1339,19 @@ struct
     Tactic.chain [ cofix; clear; apply_In; apply_Pack; intros_all ] |> return
   ;;
 
+  (** Raised by {!ensure_matching_states}: the two states differ. *)
   exception MisMatchedStates of (Model.State.t * Model.State.t)
 
+  (** [ensure_matching_states x y] does nothing if [x] and [y] are the same
+      state.
+
+      @raise MisMatchedStates otherwise (raised here). *)
   let ensure_matching_states (x : Model.State.t) (y : Model.State.t) : unit =
     Logger.trace __FUNCTION__;
     if Model.State.equal x y then () else raise (MisMatchedStates (x, y))
   ;;
 
+  (** Raised by {!handle_wk_concl}: FSM b has no answer from [b]. *)
   exception
     CouldNotGetGoalTransition of
       { b : Model.State.t
@@ -1156,7 +1369,14 @@ struct
       Until 2026-10-02 this decision was written out here a second time
       (a stay check, then [try_get_visible_transition] re-resolving [b] and
       the label from the goal, then the simulators fallback), kept in step
-      with [Product.successors] by hand. *)
+      with [Product.successors] by hand.
+
+      @raise MisMatchedStates
+        if the move's target is not the conclusion's [a'], or the answer
+        does not start from [b] (propagated).
+      @raise CouldNotGetGoalTransition
+        if there is no answer (raised here).
+        Also raises as {!Concl.get_conj} (propagated). *)
   let handle_wk_concl
         (hyp : Model.Transition.t)
         ({ wk_trans; wk_sim } : Concl.wk_conj)
@@ -1166,6 +1386,7 @@ struct
     let open Syntax in
     let* { a'; b } = Concl.get_conj { wk_trans; wk_sim } in
     ensure_matching_states hyp.goto a';
+    (* [move_by_move ()] is {!Model.Product.answer}'s answer to the move *)
     let move_by_move () : Model.Product.answer option =
       Model.Product.answer
         ~silent:(W.get_fsm_b ()).edges
@@ -1213,7 +1434,18 @@ struct
     | None -> raise (CouldNotGetGoalTransition { b; wk_trans })
   ;;
 
-  (* * [handle_hyp_transition ()] determines which term to introduce for [exists b'], checking whether we can do this via a silent/tau transition, and sets up the information we will need for the next state. *)
+  (** [handle_hyp_transition ()] is the tactic for an [exists] goal whose
+      move is not known yet: it reads the move from the hypotheses
+      ({!Hyps.get_transition}, a step of the relation being simulated),
+      records it ([Exists (Some hyp)]), and unfolds the two conjuncts if
+      anything in them unfolds, or else answers the move
+      ({!handle_wk_concl}). When no hypothesis reads as a transition but a
+      step hypothesis is refutable ({!Hyps.refutable_step}), it refutes
+      that one, closing the branch, and goes back to [WeakSim].
+
+      @raise Hyps.CannotGetTransition
+        if neither (raised here). Also raises as {!handle_wk_concl}
+        (propagated). *)
   let handle_hyp_transition () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -1241,7 +1473,9 @@ struct
        | None -> handle_wk_concl hyp { wk_trans; wk_sim })
   ;;
 
-  (** [handle_appconstrs_entry_point args] ... *)
+  (** [handle_appconstrs_entry_point label] is the tactic starting the
+      answer's weak step labelled [label]: [wk_none] for a silent label,
+      [wk_some] for a visible one, then [unfold silent]. Raises nothing. *)
   let handle_appconstrs_entry_point (label : Model.Label.t) : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -1254,7 +1488,9 @@ struct
     Tactic.seq constructor unfold_silent |> return
   ;;
 
-  (** [handle_appconstrs_stop ()] ... *)
+  (** [handle_appconstrs_stop ()] is the tactic ending the answer: [simpl]
+      and [subst] everywhere, then [rt1n_refl] for the empty rest of its
+      silent path. Raises nothing. *)
   let handle_appconstrs_stop () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -1263,6 +1499,9 @@ struct
     Tactic.seq simplify refl |> return
   ;;
 
+  (** [handle_appconstrs_update_args a] is the constructors of the first
+      step of the annotation [a] (its least derivation tree, in preorder)
+      and the rest of [a]. Raises nothing. *)
   let handle_appconstrs_update_args ({ this; next } : Model.Annotation.t)
     : Enc.Tree.Node.t list option * Model.Annotation.t option
     =
@@ -1273,7 +1512,12 @@ struct
     Some (Enc.Trees.min this.using |> Enc.Tree.preorder), next
   ;;
 
-  (** [handle_appconstrs_update label] ... *)
+  (** [handle_appconstrs_update label] is the tactic taking the answer's
+      next step: [rt1n_trans] via [label] ({!Tacs.eapply_rt1n_via}), after
+      unfolding the conclusion if anything in it unfolds.
+
+      @raise Rocq_utils.Rocq_utils_EConstrIsNot_Atomic
+        as {!Concl.try_unfold_any} (propagated). *)
   let handle_appconstrs_update (label : Model.Label.t) : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -1284,8 +1528,15 @@ struct
     | Some unfold -> Tactic.seq unfold rt1n |> return
   ;;
 
-  (** [handle_appconstrs_apply x] ...
-      (* NOTE: relies on the bindings we extract early on *) *)
+  (** [handle_appconstrs_apply ?goto x] is the tactic applying the constructor
+      [x] to the goal, an LTS step, with the bindings extraction recorded for it
+      ({!Tacs.apply_constructor}): the step's source, the label [None] for a
+      [tau] goal, and the target [goto], when known.
+
+      @raise CErrors.UserError
+        if the goal is not an LTS step (raised here, in
+        place of {!Tacs.GoalNotAnLTSStep}, which [apply_constructor] raises
+        while building, so the handler is reached). *)
   let handle_appconstrs_apply
         ?(goto : Model.State.t option = None)
         (x : Enc.Tree.Node.t)
@@ -1296,7 +1547,8 @@ struct
     let* _, tys = get_concl () |> to_atomic in
     let tys = Array.map (fun x -> econstr_normalize x |> run) tys in
     let* is_tau = Concl.is_tau () in
-    (* NOTE: we can't rely on the terms in [tys] being encoded since they may be from an intermediate layer of the LTS. *)
+    (* NOTE: we can't rely on the terms in [tys] being encoded since they may be
+       from an intermediate layer of the LTS. *)
     let args : Tacs.binding_args =
       if is_tau
       then (* NOTE: index (3) since [tau lts x] => [tau (term * label) x] *)
@@ -1324,15 +1576,24 @@ struct
               (Strfy.econstr (get_concl ()))))
   ;;
 
-  (** [handle_ ()] ... *)
-  (* let handle_ () : Tactic.t mm = raise NotImplemented *)
-
   (***********************************************************************)
 
+  (** Raised by {!handle_new_proof}: nothing to unfold; on to the next
+      state at once. *)
   exception SkipNewProof
+
+  (** Raised by {!handle_weaksim}: nothing to invert or unfold; on to
+      [Exists] at once. *)
   exception ExitWeakSim
+
+  (** Raised by {!handle_weaksim}: the proof is finished. *)
   exception ProofComplete
 
+  (** [handle_new_proof (a, b)] is the tactic for the [NewProof] state:
+      unfolding the two systems' terms [a] and [b]. The next state is
+      [OpenBlock] under a mutual cofix, else [WeakSim].
+
+      @raise SkipNewProof if neither unfolds (raised here). *)
   let handle_new_proof
         ((a, b) : Constrexpr.constr_expr * Constrexpr.constr_expr)
     : Tactic.t mm
@@ -1347,6 +1608,119 @@ struct
       return x
   ;;
 
+  (** [outside_block_error x y] reports a [weak_sim] goal for the pair of
+      states [x] and [y] outside the mutual cofix block. Every pair the
+      search can reach is supposed to be in the block. Reaching one that is
+      not means the product computed up front disagrees with what the
+      solver actually does -- name the pair rather than leaving a stuck
+      goal. A user error, not an uncaught exception: Rocq reports the
+      latter as an anomaly in Rocq itself.
+
+      @raise CErrors.UserError always (raised here). *)
+  let outside_block_error (x : EConstr.t) (y : EConstr.t) : 'a =
+    CErrors.user_err
+      (Pp.str
+         (Printf.sprintf
+            "MeBi: reached a weak_sim goal for a pair outside the mutual cofix \
+             block computed up front, so the proof cannot close it:\n\
+            \  %s\n\
+            \  %s\n\
+             This is a bug in the plugin's product computation \
+             (Model.Product). [MeBi Config Solver MutualCofix False] avoids \
+             the mutual block."
+            (Strfy.econstr x)
+            (Strfy.econstr y)))
+  ;;
+
+  (** [close_or_coinduct tys] is the tactic for a [weak_sim] or [weak_bisimilar]
+      goal of two states that are not trivially related ([tys] its arguments):
+      unfolding the conclusion if anything unfolds, else closing it by the
+      coinduction hypothesis that is the goal, else introducing one
+      ({!handle_new_cofix}).
+
+      @raise CErrors.UserError
+        under a mutual cofix, if no hypothesis is the
+        goal: the pair is outside the block ({!outside_block_error}; raised when
+        run). *)
+  let close_or_coinduct (tys : EConstr.t array) : Tactic.t mm =
+    let open Syntax in
+    (* Normalise the conclusion BEFORE consulting the coinduction
+       hypotheses. The unfolding used to live inside [handle_new_cofix],
+       which was harmless while every hypothesis was minted from whatever
+       the goal happened to look like -- a nested [cofix] copies the goal,
+       spelling included. It stops being harmless as soon as the
+       hypotheses are built ahead of time from decoded model states, since
+       [Concl.eq] is syntactic and would not match a goal still written in
+       terms of definitions. Unfolding first makes both sides normal. *)
+    let* unfold_opt : Tactic.t option = Concl.try_unfold_any () in
+    match unfold_opt with
+    | Some x ->
+      Logger.trace ~__FUNCTION__ "unfold before cofix lookup";
+      return x
+    | None ->
+      let* hyp_cofix : Rocq_utils.hyp option = Hyps.can_solve_concl_cofix () in
+      (match hyp_cofix with
+       | Some h -> Tacs.exact_hyp h
+       | None ->
+         if !Api.the_mutual_cofix
+         then outside_block_error tys.(5) tys.(6)
+         else handle_new_cofix ())
+  ;;
+
+  (** [handle_weak_goal ()] is the tactic for a [weak_sim] or
+      [weak_bisimilar] conclusion: reflexivity ([weak_bisimilar_refl] or
+      [weak_sim_refl]) for two equal states over one LTS, else
+      {!close_or_coinduct}.
+
+      Raises as {!Concl.is_weak_refl} and {!close_or_coinduct}
+      (propagated). *)
+  let handle_weak_goal () : Tactic.t mm =
+    let open Syntax in
+    let* _, tys = get_concl () |> to_atomic in
+    let* is_weak_refl : bool = Concl.is_weak_refl () in
+    if is_weak_refl
+    then (
+      Logger.trace ~__FUNCTION__ "is weak refl";
+      let* bisim = Concl.is_weak_bisimilar () in
+      if bisim
+      then Tacs.apply_weak_bisimilar_refl ()
+      else Tacs.apply_weak_sim_refl ())
+    else close_or_coinduct tys
+  ;;
+
+  (** [invert_or_unfold ()] is the tactic inverting the hypothesis that
+      most needs it ({!Hyps.try_invert_any}), or else unfolding what can be
+      unfolded in the hypotheses ({!Hyps.try_unfold_any}).
+
+      @raise ExitWeakSim if neither applies (raised here, when run). *)
+  let invert_or_unfold () : Tactic.t mm =
+    let open Syntax in
+    let* invert_opt = Hyps.try_invert_any () in
+    match invert_opt with
+    | Some x -> return x
+    | None ->
+      Logger.trace ~__FUNCTION__ "no hyps to invert";
+      let* unfold_opt = Hyps.try_unfold_any () in
+      (match unfold_opt with
+       | Some x -> return x
+       | None ->
+         Logger.trace ~__FUNCTION__ "no terms to unfold";
+         raise ExitWeakSim)
+  ;;
+
+  (** [handle_weaksim ()] is the tactic for the [WeakSim] state. On a [weak_sim]
+      or [weak_bisimilar] goal: reflexivity for two equal states over one LTS;
+      otherwise unfolding the conclusion if anything unfolds, then closing it by
+      the coinduction hypothesis that is the goal, or introducing one
+      ({!handle_new_cofix}). On any other goal: inverting the hypothesis that
+      most needs it ({!Hyps.try_invert_any}), or unfolding one.
+
+      @raise ProofComplete if the proof is finished (raised here).
+      @raise ExitWeakSim if there is nothing to invert or unfold (raised here).
+
+      @raise CErrors.UserError
+        under a mutual cofix, for a pair outside the
+        block (raised here). *)
   let handle_weaksim () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -1354,76 +1728,20 @@ struct
     if is_weak_sim
     then (
       Logger.trace ~__FUNCTION__ "is weak sim";
-      let* _, tys = get_concl () |> to_atomic in
-      let* is_weak_refl : bool = Concl.is_weak_refl () in
-      if is_weak_refl
-      then (
-        Logger.trace ~__FUNCTION__ "is weak refl";
-        let* bisim = Concl.is_weak_bisimilar () in
-        if bisim
-        then Tacs.apply_weak_bisimilar_refl ()
-        else Tacs.apply_weak_sim_refl ())
-      else
-        (* Normalise the conclusion BEFORE consulting the coinduction
-           hypotheses. The unfolding used to live inside [handle_new_cofix],
-           which was harmless while every hypothesis was minted from whatever
-           the goal happened to look like -- a nested [cofix] copies the goal,
-           spelling included. It stops being harmless as soon as the
-           hypotheses are built ahead of time from decoded model states, since
-           [Concl.eq] is syntactic and would not match a goal still written in
-           terms of definitions. Unfolding first makes both sides normal. *)
-        let* unfold_opt : Tactic.t option = Concl.try_unfold_any () in
-        match unfold_opt with
-        | Some x ->
-          Logger.trace ~__FUNCTION__ "unfold before cofix lookup";
-          return x
-        | None ->
-          let* hyp_cofix : Rocq_utils.hyp option =
-            Hyps.can_solve_concl_cofix ()
-          in
-          (match hyp_cofix with
-           | Some h -> Tacs.exact_hyp h
-           | None ->
-             if !Api.the_mutual_cofix
-             then
-               (* Every pair the search can reach is supposed to be in the
-                  block. Reaching one that is not means the product computed
-                  up front disagrees with what the solver actually does --
-                  name the pair rather than leaving a stuck goal. A user
-                  error, not an uncaught exception: Rocq reports the latter
-                  as an anomaly in Rocq itself. *)
-               CErrors.user_err
-                 (Pp.str
-                    (Printf.sprintf
-                       "MeBi: reached a weak_sim goal for a pair outside the \
-                        mutual cofix block computed up front, so the proof \
-                        cannot close it:\n\
-                       \  %s\n\
-                       \  %s\n\
-                        This is a bug in the plugin's product computation \
-                        (Model.Product). [MeBi Config Solver MutualCofix \
-                        False] avoids the mutual block."
-                       (Strfy.econstr tys.(5))
-                       (Strfy.econstr tys.(6))))
-             else handle_new_cofix ()))
+      handle_weak_goal ())
     else if ProofState.is_done ()
     then raise ProofComplete
-    else
-      (* NOTE: try invert any that need to be inverted *)
-      let* invert_opt = Hyps.try_invert_any () in
-      match invert_opt with
-      | Some x -> return x
-      | None ->
-        Logger.trace ~__FUNCTION__ "no hyps to invert";
-        (* NOTE: check if we need to unfold anything in the inverted hyps. *)
-        let* unfold_opt = Hyps.try_unfold_any () in
-        (match unfold_opt with
-         | Some x -> return x
-         | None ->
-           Logger.trace ~__FUNCTION__ "no terms to unfold";
-           raise ExitWeakSim)
+    else invert_or_unfold ()
   ;;
 
+  (** [handle_exists hyp_opt] is the tactic for the [Exists] state. On an
+      [exists] goal it reads the move ({!handle_hyp_transition}), or, with
+      the move known ([hyp_opt]), answers it ({!handle_wk_concl}). Any
+      other goal finishes a silent answer by reflexivity, and the next state
+      is [WeakSim].
+
+      Raises as {!handle_hyp_transition} and {!handle_wk_concl}
+      (propagated). *)
   let handle_exists (hyp_opt : Model.Transition.t option) : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -1444,11 +1762,80 @@ struct
       Tacs.do_refl ())
   ;;
 
-  (* let handle_goal_transition ({ hyp; goal } : Transition.t) : Tactic.t mm =
-      Logger.trace __FUNCTION__;
-      raise (StateNotImplemented (GoalTransition { hyp; goal }))
-    ;; *)
+  (** [prove_premise ()] is the tactic proving the constructor premise in focus
+      with the bounded search's proof ({!Premise_search.prove}): a proof term, a
+      refutation of a negation, or a bounded universal by cases. Extraction kept
+      this constructor because the same search proved the premise (backlog I2,
+      stage 1).
 
+      @raise CErrors.UserError
+        if the search does not prove it (raised here,
+        when run). *)
+  let prove_premise () : Tactic.t mm =
+    let open Syntax in
+    let* env = get_env in
+    let* sigma = get_sigma in
+    let concl = get_concl () in
+    match Premise_search.prove env sigma concl with
+    | Premise_search.Proved (Premise_search.Term p) -> Tacs.exact_term p
+    | Premise_search.Proved (Premise_search.ByRefutation _) ->
+      Tacs.prove_negation ()
+    | Premise_search.Proved Premise_search.ByCases -> Tacs.prove_bounded ()
+    | Premise_search.Refuted | Premise_search.Unknown ->
+      CErrors.user_err
+        (Pp.str
+           (Printf.sprintf
+              "MeBi: cannot prove the constructor premise\n\
+              \  %s\n\
+               It is not closed, or not decidable by MeBi's bounded search \
+               (see [MeBi Help Premises])."
+              (Strfy.econstr (get_concl ()))))
+  ;;
+
+  (** [next_constructor args] is the tactic for the next constructor of the
+      answer [args], updating the state machine to what is left after it:
+      the answer's entry point, if nothing is applied yet; the next step of
+      its annotation, when the current step's constructors are done; the
+      current step's next constructor, otherwise (only a step's first, top
+      level constructor gets its target bound). With nothing left, the
+      answer ends ({!handle_appconstrs_stop}) and the next state is
+      [WeakSim].
+
+      Raises as {!handle_appconstrs_apply} (propagated). *)
+  let next_constructor (args : ProofState.ApplicableConstructors.t)
+    : Tactic.t mm
+    =
+    match args with
+    | { current = None; label; _ } ->
+      ProofState.update_statem
+        (ApplyConstructors { args with current = Some [] });
+      handle_appconstrs_entry_point label
+    | { current = Some []; remaining = None; _ } ->
+      ProofState.update_statem WeakSim;
+      handle_appconstrs_stop ()
+    | { current = Some []; remaining = Some anno; _ } ->
+      let current, remaining = handle_appconstrs_update_args anno in
+      ProofState.update_statem
+        (ApplyConstructors
+           { args with current; remaining; step_goto = Some anno.this.goto });
+      handle_appconstrs_update anno.this.label
+    | { current = Some (h :: tl); step_goto; _ } ->
+      ProofState.update_statem
+        (ApplyConstructors { args with current = Some tl; step_goto = None });
+      handle_appconstrs_apply ~goto:step_goto h
+  ;;
+
+  (** [handle_apply_constructors args] is the tactic for the
+      [ApplyConstructors args] state. A constructor premise in focus is proved
+      by the bounded search, and an equation by reflexivity, leaving [args] as
+      it is. Otherwise it takes the next constructor of [args]: the answer's
+      entry point, the next step of its annotation, the next constructor of the
+      current step, or, with nothing left, the end of the answer (and the next
+      state is [WeakSim]).
+
+      @raise CErrors.UserError
+        if a premise cannot be proved (raised here). Also
+        raises as {!handle_appconstrs_apply} (propagated). *)
   let handle_apply_constructors (args : ProofState.ApplicableConstructors.t)
     : Tactic.t mm
     =
@@ -1458,27 +1845,7 @@ struct
     let* is_eq = Concl.is_eq () in
     let* is_premise = if is_eq then return false else Concl.is_premise () in
     if is_premise
-    then
-      (* Any other premise: extraction kept this constructor because the
-         bounded search proved the premise, so the same search yields a proof
-         term for it here (backlog I2, stage 1). *)
-      let* env = get_env in
-      let* sigma = get_sigma in
-      let concl = get_concl () in
-      match Premise_search.prove env sigma concl with
-      | Premise_search.Proved (Premise_search.Term p) -> Tacs.exact_term p
-      | Premise_search.Proved (Premise_search.ByRefutation _) ->
-        Tacs.prove_negation ()
-      | Premise_search.Proved Premise_search.ByCases -> Tacs.prove_bounded ()
-      | Premise_search.Refuted | Premise_search.Unknown ->
-        CErrors.user_err
-          (Pp.str
-             (Printf.sprintf
-                "MeBi: cannot prove the constructor premise\n\
-                \  %s\n\
-                 It is not closed, or not decidable by MeBi's bounded search \
-                 (see [MeBi Help Premises])."
-                (Strfy.econstr (get_concl ()))))
+    then prove_premise ()
     else if is_eq
     then
       (* An equation premise has the focus. Extraction only keeps a
@@ -1486,38 +1853,15 @@ struct
          are convertible, so [reflexivity] closes it; the constructor list is
          left as it is, for the goal that gets the focus next (backlog I2). *)
       Tacs.reflexivity ()
-    else (
-      match args with
-      | { current = None; label; _ } ->
-        (* NOTE: entry-point *)
-        ProofState.update_statem
-          (ApplyConstructors { args with current = Some [] });
-        handle_appconstrs_entry_point label
-      | { current = Some []; remaining; _ } ->
-        (match remaining with
-         | None ->
-           (* NOTE: stop *)
-           ProofState.update_statem WeakSim;
-           handle_appconstrs_stop ()
-         | Some anno ->
-           (* NOTE: update current, prepare for next transition *)
-           let current, remaining = handle_appconstrs_update_args anno in
-           ProofState.update_statem
-             (ApplyConstructors
-                { args with
-                  current
-                ; remaining
-                ; step_goto = Some anno.this.goto
-                });
-           handle_appconstrs_update anno.this.label)
-      | { current = Some (h :: tl); step_goto; _ } ->
-        (* NOTE: continue applying constructors; only the step's first (top
-           level) constructor gets its target bound *)
-        ProofState.update_statem
-          (ApplyConstructors { args with current = Some tl; step_goto = None });
-        handle_appconstrs_apply ~goto:step_goto h)
+    else next_constructor args
   ;;
 
+  (** [handle_state ()] is the tactic for the proof's state, after reading
+      from the goal which system moves ({!Concl.orientation}).
+
+      @raise NothingToDo
+        if the state is [Done] (raised here). Also raises
+        as each state's handler (propagated). *)
   let handle_state () : Tactic.t mm =
     ProofState.log ~__FUNCTION__ ();
     Hyps.log ~cofix_only:(Some false) ();
@@ -1533,12 +1877,14 @@ struct
     | OpenBlock -> handle_open_block ()
     | WeakSim -> handle_weaksim ()
     | Exists hyp_opt -> handle_exists hyp_opt
-    (* | GoalTransition args -> handle_goal_transition args *)
     | ApplyConstructors xs -> handle_apply_constructors xs
     | Done -> raise NothingToDo
   ;;
 
-  (** [step ()] ... *)
+  (* See the [.mli]. [ProofComplete], [SkipNewProof] and [ExitWeakSim] move
+     the state machine on: the first ends the proof with an empty tactic,
+     the other two take the next state's step at once. An encoding missing
+     from either table is logged, as both tables see it, and re-raised. *)
   let rec step () : Tactic.t =
     Logger.trace __FUNCTION__;
     try run (handle_state ()) with
