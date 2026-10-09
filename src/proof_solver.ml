@@ -1,5 +1,4 @@
 exception NothingToDo
-exception NotImplemented
 
 module type S = sig
   type enc
@@ -125,8 +124,6 @@ type t = { solver : (module S) }
 
 (** The cached solver, if {!make} has built one. *)
 let the_cache : t ref option ref = ref None
-
-let reset_the_cache () : unit = the_cache := None
 
 exception NoCachedModules
 

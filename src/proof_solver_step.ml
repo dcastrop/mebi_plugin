@@ -140,18 +140,6 @@ struct
         raise (CouldNotFind_State { x; states = ys })
     ;;
 
-    let _state_opt (x : EConstr.t) (ys : Model.State.Set.t)
-      : Model.State.t option M.mm
-      =
-      Logger.trace __FUNCTION__;
-      try
-        let open M.Syntax in
-        let* z = state x ys in
-        M.return (Some z)
-      with
-      | CouldNotFind_State _ -> M.return None
-    ;;
-
     (** Raised by {!label}: no label of [alphabet] is the term [x]. *)
     exception
       CouldNotFind_Label of
@@ -208,18 +196,6 @@ struct
                 ~__FUNCTION__
                 "miss: None/Some fallbacks did not match either";
               raise (CouldNotFind_Label { x; alphabet = ys })))
-    ;;
-
-    let _label_opt (x : EConstr.t) (ys : Model.Label.Set.t)
-      : Model.Label.t option M.mm
-      =
-      Logger.trace __FUNCTION__;
-      try
-        let open M.Syntax in
-        let* z = label x ys in
-        M.return (Some z)
-      with
-      | CouldNotFind_Label _ -> M.return None
     ;;
 
     (** Raised by {!transition}: [edges] has no [from -label-> goto]. *)
@@ -491,13 +467,6 @@ struct
           g 2 + g 1 |> return)
     ;;
 
-    let _need_inversion (x : t) : bool mm =
-      Logger.trace __FUNCTION__;
-      let open Syntax in
-      let* n : int = invertibility x in
-      if Int.equal n 0 then return false else return true
-    ;;
-
     (** [invert x] is the tactic inverting [x] ({!Tacs.inversion}). *)
     let invert (x : t) : Tactic.t mm = Tacs.inversion x
 
@@ -574,9 +543,6 @@ struct
           log_econstr ~__FUNCTION__ ~s:"label" (Decode.label label);
           ReModel.transition from goto label m.edges |> return
         with
-        (* | M.EncodingNotFound z ->
-            log_econstr ~__FUNCTION__ ~s:"Err: M.EncodingNotFound" z;
-            raise (CouldNotGetTransition { hyp = x; fsm = m }) *)
         | ReModel.CouldNotFind_State _ ->
           Logger.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_State";
           raise (CouldNotGetTransition { hyp = x; fsm = m })
@@ -958,7 +924,6 @@ struct
         ({!Tacs.refute_dead}), and inverts any other step. Raises nothing. *)
     let try_invert_any () : Tactic.t option mm =
       Logger.trace __FUNCTION__;
-      (* log_econstrs ~__FUNCTION__ "inverted hyps" !inverted_hyps; *)
       let hyps : Hyp.t list = get_non_cofixes () in
       let open Syntax in
       let f (i : int) (xopt : (int * Hyp.t) option) : (int * Hyp.t) option mm =
@@ -1111,9 +1076,7 @@ struct
       let open Syntax in
       let f (i : int)
         : Model.Transition.t option -> Model.Transition.t option mm
-        =
-        (* Logger.thing ~__FUNCTION__ Trace "i" i ( Utils.Strfy.int); *)
-        function
+        = function
         | Some x -> return (Some x)
         | None ->
           let y = List.nth hyps i in
@@ -1533,9 +1496,6 @@ struct
               (Strfy.econstr (get_concl ()))))
   ;;
 
-  (** [handle_ ()] ... *)
-  (* let handle_ () : Tactic.t mm = raise NotImplemented *)
-
   (***********************************************************************)
 
   (** Raised by {!handle_new_proof}: nothing to unfold; on to the next
@@ -1686,11 +1646,6 @@ struct
       Tacs.do_refl ())
   ;;
 
-  (* let handle_goal_transition ({ hyp; goal } : Transition.t) : Tactic.t mm =
-      Logger.trace __FUNCTION__;
-      raise (StateNotImplemented (GoalTransition { hyp; goal }))
-    ;; *)
-
   (** [handle_apply_constructors args] is the tactic for the
       [ApplyConstructors args] state. A constructor premise in focus is
       proved by the bounded search, and an equation by reflexivity, leaving
@@ -1792,7 +1747,6 @@ struct
     | OpenBlock -> handle_open_block ()
     | WeakSim -> handle_weaksim ()
     | Exists hyp_opt -> handle_exists hyp_opt
-    (* | GoalTransition args -> handle_goal_transition args *)
     | ApplyConstructors xs -> handle_apply_constructors xs
     | Done -> raise NothingToDo
   ;;

@@ -8,8 +8,6 @@
     there is nothing to do. {!solve} stops on it. *)
 exception NothingToDo
 
-exception NotImplemented
-
 (** A proof solver for one encoding: the command-time results it reads
     ({!W}), the proof's state machine ({!ProofState}), and the step built
     afresh for each goal ({!Step}). *)
@@ -77,8 +75,6 @@ module Make (Enc : Encoding.S) :
 (** The cached solver: the one {!make} built last, which every command of
     the proof then uses. *)
 type t = { solver : (module S) }
-
-val reset_the_cache : unit -> unit
 
 (** Raised by {!is_done}, {!step} and {!solve}: no solver has been built
     ({!make}, run by {!init}). *)
