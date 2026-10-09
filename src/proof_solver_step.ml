@@ -1129,6 +1129,108 @@ struct
       return (i, p)
   ;;
 
+  (** [block_pairs ~refl ~bisim fsm_a fsm_b root] is the pairs a mutual
+      cofix block covers: the answer plan's relation, if there is a plan,
+      else the product relation reachable from [root]
+      ({!Model.Product.reachable_bisim} for a [weak_bisimilar] goal,
+      [bisim], else {!Model.Product.reachable}). [fsm_b] is the saturated
+      FSM b; [refl] is whether both sides use the same LTS.
+
+      @raise Model.Product.Game_too_large
+        past a game cap (propagated; none is set here). *)
+  let block_pairs
+        ~(refl : bool)
+        ~(bisim : bool)
+        (fsm_a : Model.FSM.t)
+        (fsm_b : Model.FSM.t)
+        (root : Model.Product.Pair.t)
+    : Model.Product.Pair.Set.t
+    =
+    (* The unsaturated FSM still has the silent steps a silent move may be
+       answered with; see [Model.Product.respond]. *)
+    let silent : Model.EdgeMap.t' = (W.get_fsm_b ()).edges in
+    let pi : Model.Partition.t = W.get_bisimilar_partition () in
+    match !W.plan with
+    | Some p -> p.relation
+    | None ->
+      if bisim
+      then
+        Model.Product.reachable_bisim
+          ~refl
+          { a = fsm_a
+          ; a_saturated = W.get_fsm_a ~saturated:true ()
+          ; b = W.get_fsm_b ()
+          ; b_saturated = fsm_b
+          }
+          pi
+          root
+      else
+        Model.Product.reachable
+          ~silent
+          ?sim:!W.simulators
+          ~refl
+          fsm_a
+          fsm_b
+          pi
+          root
+  ;;
+
+  (** [block_members ~refl root pairs] is the pairs of [pairs] that get a
+      cofixpoint of their own besides [root]'s: all but [root], and, when
+      [refl], but the reflexive pairs. A reflexive leaf gets no cofixpoint
+      of its own. Its goal would be put through [In_sim; Pack_sim; intros]
+      with the rest of the block, past the point where [handle_weaksim] can
+      close it by [weak_sim_refl] -- and [reachable] did not follow its
+      successors, so the search would then stop with a pair-not-in-product
+      error. Left out, every goal that reaches it is still a bare
+      [weak_sim x x] and closes by reflexivity. Raises nothing. *)
+  let block_members
+        ~(refl : bool)
+        (root : Model.Product.Pair.t)
+        (pairs : Model.Product.Pair.Set.t)
+    : Model.Product.Pair.t list
+    =
+    Model.Product.Pair.Set.remove root pairs
+    |> Model.Product.Pair.Set.filter (fun ((a, b) : Model.Product.Pair.t) ->
+      not (refl && Model.State.equal a b))
+    |> Model.Product.Pair.Set.elements
+  ;;
+
+  (** [pair_goal ty tys (a, b)] is the goal [ty tys] (a [weak_sim] or
+      [weak_bisimilar]) with its two states, arguments 5 and 6, replaced by
+      [a] and [b], decoded. Raises nothing. *)
+  let pair_goal
+        (ty : EConstr.t)
+        (tys : EConstr.t array)
+        ((a, b) : Model.Product.Pair.t)
+    : EConstr.t
+    =
+    EConstr.mkApp
+      ( ty
+      , Array.mapi
+          (fun (i : int) (x : EConstr.t) ->
+            match i with 5 -> Decode.state a | 6 -> Decode.state b | _ -> x)
+          tys )
+  ;;
+
+  (** [fresh_cofix_names n] is [n] names for coinduction hypotheses
+      ([Cofix0], [Cofix1], ...), distinct from each other and from the
+      goal's hypotheses. All at once: {!new_cofix_name} measures against
+      the current goal, which does not change until the tactic runs. Raises
+      nothing. *)
+  let fresh_cofix_names (n : int) : Names.Id.t list =
+    let rec names (used : Names.Id.Set.t) (k : int) : Names.Id.t list =
+      if k <= 0
+      then []
+      else (
+        let x : Names.Id.t =
+          Namegen.next_ident_away (Names.Id.of_string "Cofix0") used
+        in
+        x :: names (Names.Id.Set.add x used) (k - 1))
+    in
+    names (get_hyp_names ()) n
+  ;;
+
   (** [handle_open_block ()] is the tactic for the [OpenBlock] state: it
       opens the whole proof with a single mutual cofixpoint, one definition
       per pair of the precomputed product relation
@@ -1165,10 +1267,6 @@ struct
       let* ty, tys = get_concl () |> to_atomic in
       let fsm_a : Model.FSM.t = W.get_fsm_a () in
       let fsm_b : Model.FSM.t = W.get_fsm_b ~saturated:true () in
-      (* The unsaturated FSM still has the silent steps a silent move may be
-         answered with; see [Model.Product.respond]. *)
-      let silent : Model.EdgeMap.t' = (W.get_fsm_b ()).edges in
-      let pi : Model.Partition.t = W.get_bisimilar_partition () in
       (* [weak_sim] applies as [| M; N; A; ltsM; ltsN; s; t |] -- see
          [Concl.is_weak_refl], which tests 3 against 4 and 5 against 6. Only
          the last two move; reusing the rest keeps the implicit and universe
@@ -1181,67 +1279,15 @@ struct
          by [weak_sim_refl] when both sides use the same LTS. *)
       let refl : bool = econstr_eq tys.(3) tys.(4) |> run in
       let* bisim : bool = Concl.is_weak_bisimilar () in
-      let pairs : Model.Product.Pair.Set.t =
-        match !W.plan with
-        | Some p -> p.relation
-        | None ->
-          if bisim
-          then
-            Model.Product.reachable_bisim
-              ~refl
-              { a = fsm_a
-              ; a_saturated = W.get_fsm_a ~saturated:true ()
-              ; b = W.get_fsm_b ()
-              ; b_saturated = fsm_b
-              }
-              pi
-              root
-          else
-            Model.Product.reachable
-              ~silent
-              ?sim:!W.simulators
-              ~refl
-              fsm_a
-              fsm_b
-              pi
-              root
-      in
-      (* A reflexive leaf gets no cofixpoint of its own. Its goal would be put
-         through [In_sim; Pack_sim; intros] with the rest of the block, past the
-         point where [handle_weaksim] can close it by [weak_sim_refl] -- and
-         [reachable] did not follow its successors, so the search would then
-         stop with a pair-not-in-product error. Left out, every goal that
-         reaches it is still a bare [weak_sim x x] and closes by reflexivity. *)
       let others : Model.Product.Pair.t list =
-        Model.Product.Pair.Set.remove root pairs
-        |> Model.Product.Pair.Set.filter (fun ((a, b) : Model.Product.Pair.t) ->
-          not (refl && Model.State.equal a b))
-        |> Model.Product.Pair.Set.elements
+        block_pairs ~refl ~bisim fsm_a fsm_b root |> block_members ~refl root
       in
-      let type_of ((a, b) : Model.Product.Pair.t) : EConstr.t =
-        EConstr.mkApp
-          ( ty
-          , Array.mapi
-              (fun (i : int) (x : EConstr.t) ->
-                match i with
-                | 5 -> Decode.state a
-                | 6 -> Decode.state b
-                | _ -> x)
-              tys )
+      let names : Names.Id.t list =
+        fresh_cofix_names (1 + List.length others)
       in
-      (* All the names at once: [new_cofix_name] measures against the current
-         goal, which does not change until the tactic runs. *)
-      let used : Names.Id.Set.t ref = ref (get_hyp_names ()) in
-      let fresh () : Names.Id.t =
-        let n : Names.Id.t =
-          Namegen.next_ident_away (Names.Id.of_string "Cofix0") !used
-        in
-        used := Names.Id.Set.add n !used;
-        n
-      in
-      let root_name : Names.Id.t = fresh () in
+      let root_name : Names.Id.t = List.hd names in
       let block : (Names.Id.t * EConstr.t) list =
-        List.map (fun p -> fresh (), type_of p) others
+        List.combine (List.tl names) (List.map (pair_goal ty tys) others)
       in
       Logger.notice
         (Printf.sprintf "(Mutual cofix over %i pairs.)" (1 + List.length block));
