@@ -6694,6 +6694,33 @@ whole; local, in `notes/tools`).
 
 ---
 
+## 2026-10-09 — Named exceptions as `@raise` tags, codebase-wide
+
+**Docs.** On branch `docs/raise-tags`, at Jonah's request, for the `odoc`
+site: a named exception is an `@raise` tag everywhere, so `odoc` gives it
+a "Raises" section. Of every "raise" in a comment, about 200 were tags
+already, about 550 name no single exception ("Raises nothing.", "Raises,
+when run, as {!f}", "Rocq's typing errors") and stay prose, and ten
+named one in prose: converted in one comments-only commit. Exceptions
+outside the documented libraries (`CErrors.UserError`, `Sys_error`) give
+an unresolved-reference warning each; accepted.
+
+**Found:** `NothingToBenchmark` and `LTSMapDoesNotContainPrimaryLTS` are
+not declared in their `.mli`, so callers cannot catch them by name
+(`TODO.md`). Left for a fix of its own: it changes an interface.
+
+**Verification.** Comments only: each file's code is unchanged with
+comments stripped. `dune build` and `make` clean. No proof suites run:
+the code is unchanged.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/raise-tags main`).
+
+**Session tally (2026-10-09), cont.:** Docs 24 · Refactor 15 · Bug fix 5 ·
+Tooling 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

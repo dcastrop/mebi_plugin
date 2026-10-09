@@ -245,8 +245,9 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
         argument pair, one [Arg] step deeper; where [y] is an index it
         records the binder whose evar [x] is; elsewhere it stops.
 
-        Raises [Rocq_bindings_CannotFindBindingName], when run, if an index's
-        evar is not a binder (propagated from {!find_name}). *)
+        @raise Rocq_bindings_CannotFindBindingName
+          when run, if an index's evar is not a binder (propagated from
+          {!find_name}). *)
     let rec walk
               (m : t')
               (name_pairs : (EConstr.t * Names.Name.t) list)

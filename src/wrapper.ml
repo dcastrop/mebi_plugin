@@ -530,7 +530,7 @@ module Make (Enc : Encoding.S) :
       demand makes costly, and [why] the walk is not allowed (and how to
       allow it).
 
-      Raises Rocq's [UserError] always (raised here). *)
+      @raise CErrors.UserError always (raised here). *)
   let refuse_walk (why : string) : 'a =
     CErrors.user_err
       (Pp.str
@@ -704,7 +704,7 @@ module Make (Enc : Encoding.S) :
         with the same moves -- both sides using the same relation -- is
         exact, and allowed.
 
-        Raises Rocq's [UserError] on such a state, when run (raised here). *)
+        @raise CErrors.UserError on such a state, when run (raised here). *)
     let refuse_conflicts (the_fsm_a : FSM.t) (the_fsm_b : FSM.t) : unit M.mm =
       let c : Model.State.Set.t =
         Model.Bisimilarity.conflicts the_fsm_a the_fsm_b
