@@ -110,6 +110,38 @@ struct
     | _ -> false
   ;;
 
+  (** [seq_opt acc y] is [acc] then [y], either of which may be absent.
+      Raises nothing. *)
+  let seq_opt (acc : Tactic.t option) (y : Tactic.t option) : Tactic.t option =
+    match y, acc with
+    | None, _ -> acc
+    | Some y, None -> Some y
+    | Some y, Some acc -> Some (Tactic.seq acc y)
+  ;;
+
+  (** [unfold_atomic ?in_hyp ty tys] is the tactic unfolding the constants
+      of the head [ty] ({!Tacs.try_unfold_any}, in the hypothesis [in_hyp]
+      if given), or, if there are none, those of each of its arguments
+      [tys] in turn, in sequence; [None] if nothing unfolds. Raises
+      nothing. *)
+  let unfold_atomic
+        ?(in_hyp : Rocq_utils.hyp option)
+        (ty : EConstr.t)
+        (tys : EConstr.t array)
+    : Tactic.t option mm
+    =
+    let open Syntax in
+    let* ty_opt : Tactic.t option = Tacs.try_unfold_any ?in_hyp ty in
+    match ty_opt with
+    | Some y -> return (Some y)
+    | None ->
+      let unfold_arg (i : int) (acc : Tactic.t option) : Tactic.t option mm =
+        let+ y = Tacs.try_unfold_any ?in_hyp tys.(i) in
+        seq_opt acc y
+      in
+      iterate 0 (Array.length tys - 1) None unfold_arg
+  ;;
+
   (** Reading a term of the proof back as a part of the model: the state,
       label or transition of {!W.Model} it stands for. *)
   module ReModel = struct
@@ -496,22 +528,7 @@ struct
       let* sigma = get_sigma in
       try
         let ty, tys = Rocq_utils.hyp_to_atomic sigma x in
-        let* ty_opt : Tactic.t option = Tacs.try_unfold_any ~in_hyp:x ty in
-        match ty_opt with
-        | Some y -> return (Some y)
-        | None ->
-          (* NOTE: check if any in [tys] can be unfolded *)
-          let f (i : int) (acc : Tactic.t option) : Tactic.t option mm =
-            let y = tys.(i) in
-            let* y : Tactic.t option = Tacs.try_unfold_any ~in_hyp:x y in
-            match y with
-            | None -> return acc
-            | Some y ->
-              (match acc with
-               | None -> return (Some y)
-               | Some acc -> return (Some (Tactic.seq acc y)))
-          in
-          iterate 0 (Array.length tys - 1) None f
+        unfold_atomic ~in_hyp:x ty tys
       with
       | Rocq_utils.Rocq_utils_HypIsNot_Atomic _ -> return None
     ;;
@@ -711,22 +728,7 @@ struct
       Logger.trace __FUNCTION__;
       let open Syntax in
       let* ty, tys = get_concl () |> to_atomic in
-      let* ty_opt : Tactic.t option = Tacs.try_unfold_any ty in
-      match ty_opt with
-      | Some y -> return (Some y)
-      | None ->
-        (* NOTE: check if any in [tys] can be unfolded *)
-        let f (i : int) (acc : Tactic.t option) : Tactic.t option mm =
-          let y = tys.(i) in
-          let* y : Tactic.t option = Tacs.try_unfold_any y in
-          match y with
-          | None -> return acc
-          | Some y ->
-            (match acc with
-             | None -> return (Some y)
-             | Some acc -> return (Some (Tactic.seq acc y)))
-        in
-        iterate 0 (Array.length tys - 1) None f
+      unfold_atomic ty tys
     ;;
 
     (** The two conjuncts of an [exists] conclusion: the answering system's
@@ -1010,17 +1012,12 @@ struct
     let try_unfold_any () : Tactic.t option mm =
       let hyps = get_non_cofixes () in
       let open Syntax in
-      let f (i : int) (acc : Tactic.t option) : Tactic.t option mm =
-        let x = List.nth hyps i in
-        let* x = Hyp.try_unfold_any x in
-        match x with
-        | None -> return acc
-        | Some x ->
-          (match acc with
-           | None -> return (Some x)
-           | Some acc -> return (Some (Tactic.seq acc x)))
+      (* [unfold_hyp i acc] is [acc] then the [i]th hypothesis' unfolding *)
+      let unfold_hyp (i : int) (acc : Tactic.t option) : Tactic.t option mm =
+        let+ y = Hyp.try_unfold_any (List.nth hyps i) in
+        seq_opt acc y
       in
-      iterate 0 (List.length hyps - 1) None f
+      iterate 0 (List.length hyps - 1) None unfold_hyp
     ;;
 
     (** [term_size sigma t] is the number of nodes in [t]: a smaller
