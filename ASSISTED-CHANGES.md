@@ -6599,6 +6599,45 @@ Tooling 1.
 
 ---
 
+## 2026-10-09 — Documentation pass, part 8: `lib/utils`
+
+**Docs + Refactor.** On branch `docs/lib-utils`: `Json`, `Logger`,
+`Output`, `Utils`.
+
+**Comments** (`77681d1`, `09a505d`, `12c6858`; comments only): contracts
+in the `.mli`, pointers or history in the `.ml`. Two old comments were
+wrong and now say what the code does: `split_at i l` is the first `i`
+elements, *reversed* (not "the i-th tail"), and `new_int_counter`'s first
+value is `start + 1`. `Sys_error` went to prose (`09a505d`, because `odoc`
+cannot resolve a stdlib exception and `Json.S` is included everywhere) and
+back to an `@raise` tag (`12c6858`), once `@raise` was settled on for the
+whole codebase, warnings accepted.
+
+**Dead code** (`bdb27e6`): `Utils`' `swap`, `try_seq_opt`, `strip_snd`,
+`get_key_of_val`, `option_str`; `Logger`'s `option` and `options`.
+`Logger`'s `enable`, `disable`, `quiet` and `reset_sink` are unused too,
+but kept as the configuration API.
+
+**Split** (`e07a7d5`): `clean_char`, from `clean_string`'s fold; checked
+against the old function on 20,000 random strings, identical.
+
+**Noticed, not changed** (`TODO.md`): the stdout sink prints a
+`thing`'s prefix as `"p: : body"` (`thing` adds `": "`, the sink adds it
+again; Rocq's sink does not), and `things` drops `__FUNCTION__` for its
+items. `clean_string` builds its result with one `sprintf` per character.
+
+**Verification.** On the head: `tests.exe` 103/103, the proof matrix in
+all three modes and `Test.v`'s 60 counts identical to `main`'s, `make`
+clean.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/lib-utils main`), or one commit.
+
+**Session tally (2026-10-09), cont.:** Docs 13 · Refactor 12 · Bug fix 5 ·
+Tooling 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
