@@ -1,6 +1,3 @@
-(** [swap (a, b)] is just [(b, a)]. *)
-let swap : 'a * 'b -> 'b * 'a = fun (a, b) -> b, a
-
 (* See the [.mli]: the elements are gathered onto an accumulator, hence
    reversed. *)
 let split_at (i : int) (l : 'a list) : 'a list =
@@ -19,31 +16,6 @@ let rec compare_chain : int list -> int = function
   | [] -> 0
   | 0 :: tl -> compare_chain tl
   | n :: _ -> n
-;;
-
-(** [try_seq_opt x fs] returns the first [f x] that returns [Some y], else
-    [None]. *)
-let rec try_seq_opt (x : 'a) : ('a -> 'b option) list -> 'b option = function
-  | [] -> None
-  | f :: tl -> (match f x with None -> try_seq_opt x tl | y -> y)
-;;
-
-(** [strip_snd l] is the list of rhs elements in a list of tuples [l] (typically
-    a [constr]). *)
-let rec strip_snd (l : ('a * 'a) list) : 'a list =
-  match l with [] -> [] | h :: t -> snd h :: strip_snd t
-;;
-
-(** [get_key_of_val tbl v] is a reverse-lookup in [tbl] for the key of value
-    [v]. *)
-let get_key_of_val (tbl : ('a, 'b) Hashtbl.t) (v : 'b) : 'a option =
-  match
-    List.find_opt
-      (fun ((_key, value) : 'a * 'b) -> v == value)
-      (List.of_seq (Hashtbl.to_seq tbl))
-  with
-  | None -> None
-  | Some (key, _value) -> Some key
 ;;
 
 (* See the [.mli]. *)
@@ -88,11 +60,6 @@ let rec filter_opt : 'a option list -> 'a list = function
   | [] -> []
   | None :: tl -> filter_opt tl
   | Some h :: tl -> h :: filter_opt tl
-;;
-
-let option_str : string option -> string = function
-  | None -> "None"
-  | Some x -> Printf.sprintf "Some (%s)" x
 ;;
 
 (* See the [.mli]. *)

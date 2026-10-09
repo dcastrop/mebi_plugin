@@ -111,22 +111,6 @@ module type S = sig
     -> 'a list
     -> ('a -> string)
     -> unit
-
-  val option
-    :  ?__FUNCTION__:string
-    -> Output.Kind.t
-    -> string
-    -> 'a option
-    -> ('a -> string)
-    -> unit
-
-  val options
-    :  ?__FUNCTION__:string
-    -> Output.Kind.t
-    -> string
-    -> 'a list option
-    -> ('a -> string)
-    -> unit
 end
 
 (** [Body (E)] is the logging API with [E.is_enabled] deciding whether a
@@ -217,32 +201,6 @@ module Body (E : sig
       e "start";
       List.iter fx xs;
       e "end")
-  ;;
-
-  let option
-        ?(__FUNCTION__ : string = "")
-        (k : Output.Kind.t)
-        (prefix : string)
-        (x : 'a option)
-        (f : 'a -> string)
-    : unit
-    =
-    match x with
-    | Some x -> thing ~__FUNCTION__ k prefix x f
-    | None -> thing ~__FUNCTION__ k prefix "None" (fun x -> x)
-  ;;
-
-  let options
-        ?(__FUNCTION__ : string = "")
-        (k : Output.Kind.t)
-        (prefix : string)
-        (xs : 'a list option)
-        (f : 'a -> string)
-    : unit
-    =
-    match xs with
-    | Some xs -> things ~__FUNCTION__ k prefix xs f
-    | None -> thing ~__FUNCTION__ k prefix "None" (fun x -> x)
   ;;
 end
 

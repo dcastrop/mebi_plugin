@@ -1,8 +1,6 @@
 (** Small helpers on lists, options and strings, and writing files. Plain
     OCaml: no Rocq runtime. *)
 
-val swap : 'a * 'b -> 'b * 'a
-
 (** [split_at i l] is the first [i] elements of [l] (all of them if [l] is
     shorter), {b in reverse order}. Raises nothing. *)
 val split_at : int -> 'a list -> 'a list
@@ -11,10 +9,6 @@ val split_at : int -> 'a list -> 'a list
     lexicographic comparison from its parts, most significant first.
     Raises nothing. *)
 val compare_chain : int list -> int
-
-val try_seq_opt : 'a -> ('a -> 'b option) list -> 'b option
-val strip_snd : ('a * 'a) list -> 'a list
-val get_key_of_val : ('a, 'b) Hashtbl.t -> 'b -> 'a option
 
 (** [new_int_counter ?start ()] is a new counter, from [start] (default 0):
     [((next, prev), r)], where [next ()] adds one and is the new value (so
@@ -38,8 +32,6 @@ val str_sep
 (** [filter_opt xs] is the values of the [Some]s of [xs], in order. Raises
     nothing. *)
 val filter_opt : 'a option list -> 'a list
-
-val option_str : string option -> string
 
 (** [option_fstr f x] is ["None"], or ["Some (s)"] with [s] being [f] of
     [x]'s value. Raises whatever [f] raises (propagated). *)

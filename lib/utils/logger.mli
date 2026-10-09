@@ -88,26 +88,6 @@ module type S = sig
     -> 'a list
     -> ('a -> string)
     -> unit
-
-  (** [option ?__FUNCTION__ k prefix x f] is {!thing} of [x]'s value, or
-      of ["None"]. *)
-  val option
-    :  ?__FUNCTION__:string
-    -> Output.Kind.t
-    -> string
-    -> 'a option
-    -> ('a -> string)
-    -> unit
-
-  (** [options ?__FUNCTION__ k prefix xs f] is {!things} of [xs]' value,
-      or {!thing} of ["None"]. *)
-  val options
-    :  ?__FUNCTION__:string
-    -> Output.Kind.t
-    -> string
-    -> 'a list option
-    -> ('a -> string)
-    -> unit
 end
 
 include S
