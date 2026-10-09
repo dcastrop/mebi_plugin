@@ -284,7 +284,7 @@ let explicit_whole_game_settings () : string list =
     whole game up front, on an FSM saturated on demand, saying [why] and
     the ways on.
 
-    @raise CErrors.UserError always (raised here). *)
+    Raises Rocq's [UserError] always (raised here). *)
 let refuse_whole_game (setting : string) (why : string) : 'a =
   CErrors.user_err
     (Pp.str
@@ -302,7 +302,7 @@ let refuse_whole_game (setting : string) (why : string) : 'a =
 (** [refuse_unbounded setting] is {!refuse_whole_game} for [setting] with
     no game bound set.
 
-    @raise CErrors.UserError always (raised here). *)
+    Raises Rocq's [UserError] always (raised here). *)
 let refuse_unbounded (setting : string) : 'a =
   refuse_whole_game
     setting
@@ -312,7 +312,7 @@ let refuse_unbounded (setting : string) : 'a =
 (** [refuse_exceeded setting n] is {!refuse_whole_game} for [setting], the
     game having more than [n] pairs, the bound set.
 
-    @raise CErrors.UserError always (raised here). *)
+    Raises Rocq's [UserError] always (raised here). *)
 let refuse_exceeded (setting : string) (n : int) : 'a =
   refuse_whole_game
     setting
@@ -360,19 +360,19 @@ module Init (Solver : S) = struct
         ~default:W.Model.State.Set.empty
   ;;
 
-  (** [fall_back_on_simulation ()] is for a [weak_sim] goal whose two
-      states are not bisimilar. A [weak_sim] goal asks for similarity, which
-      is coarser than bisimilarity: [a.b] is simulated by [a.(b + c)]. So it
-      computes the greatest weak simulation ({!Wrapper.S.similarity}: only
-      the pairs reachable from the two start states, and on demand only
-      within [MeBi Config Bounds Game]) and, if it relates the start states,
-      gives the solver each state's simulators to fall back on
-      ({!Results.S.simulators}, read by {!Model.Product.answer}). If it does
-      not, there is no proof to find.
+  (** [fall_back_on_simulation ()] is for a [weak_sim] goal whose two states are
+      not bisimilar. A [weak_sim] goal asks for similarity, which is coarser
+      than bisimilarity: [a.b] is simulated by [a.(b + c)]. So it computes the
+      greatest weak simulation ({!Wrapper.S.similarity}: only the pairs
+      reachable from the two start states, and on demand only within
+      [MeBi Config Bounds Game]) and, if it relates the start states, gives the
+      solver each state's simulators to fall back on ({!Results.S.simulators},
+      read by {!Model.Product.answer}). If it does not, there is no proof to
+      find.
 
-      @raise CErrors.UserError
-        if the left state is not simulated by the right one and
-        [FailIf NotBisimilar] is set (raised here; otherwise a warning). *)
+      Raises Rocq's [UserError] if the left state is not simulated by the right
+      one and [FailIf NotBisimilar] is set (raised here; otherwise a warning).
+  *)
   let fall_back_on_simulation () : unit =
     let fsm_a = W.get_fsm_a () in
     let fsm_b = W.get_fsm_b () in
@@ -419,18 +419,17 @@ module Init (Solver : S) = struct
       (try Ok (Product.with_cap n f) with Product.Game_too_large n -> Error n)
   ;;
 
-  (** [plan_answers ~goal_is_bisimilar ~refl bound] plans the answer to
-      every move the game can reach, under the answer policy in force
+  (** [plan_answers ~goal_is_bisimilar ~refl bound] plans the answer to every
+      move the game can reach, under the answer policy in force
       ({!Model.Product.Policy}), within [bound]. The plan becomes
-      {!Results.S.plan}, which the solver, the mutual block and the estimate
-      all read, so they cannot disagree; a [Default] plan is not kept, and a
-      plan that leaves moves unanswered is dropped with a warning (the
-      solver then answers move by move). [refl] is whether the two systems
-      are the same LTS.
+      {!Results.S.plan}, which the solver, the mutual block and the estimate all
+      read, so they cannot disagree; a [Default] plan is not kept, and a plan
+      that leaves moves unanswered is dropped with a warning (the solver then
+      answers move by move). [refl] is whether the two systems are the same LTS.
 
-      @raise CErrors.UserError
-        if the walk goes past [bound] (raised by {!refuse_exceeded}). Also
-        raises as {!Model.Product.Policy.plan} (propagated). *)
+      Raises Rocq's [UserError] if the walk goes past [bound] (raised by
+      {!refuse_exceeded}). Also raises as {!Model.Product.Policy.plan}
+      (propagated). *)
   let plan_answers ~(goal_is_bisimilar : bool) ~(refl : bool) bound : unit =
     let fsm_a = W.get_fsm_a () in
     let fsm_b = W.get_fsm_b () in
@@ -524,22 +523,20 @@ module Init (Solver : S) = struct
             | None -> "capped"))
   ;;
 
-  (** [choose_cofix_strategy ~on_demand ~goal_is_bisimilar ~refl bound]
-      sets the cofix strategy for the proof ({!Api.set_mutual_cofix}).
-      [Auto] decides here, once, before any proof step runs. The product is
-      already known at this point, so both strategies can simply be
-      measured: a mutual cofix visits each game state once and each move
-      once, while a nested cofix walks the tree of simple paths because it
-      can only close a repeat that is an ancestor. The nested walk is capped
-      at a small multiple of the mutual cost -- the exact figure does not
-      matter, only whether it is larger. See {!Model.Product.estimate}. On
-      an FSM saturated on demand, [Auto] estimates only within [bound], and
-      takes the nested cofix without one or past it; a forced [Mutual] is
-      checked against [bound] the same way.
+  (** [choose_cofix_strategy ~on_demand ~goal_is_bisimilar ~refl bound] sets the
+      cofix strategy for the proof ({!Api.set_mutual_cofix}). [Auto] decides
+      here, once, before any proof step runs. The product is already known at
+      this point, so both strategies can simply be measured: a mutual cofix
+      visits each game state once and each move once, while a nested cofix walks
+      the tree of simple paths because it can only close a repeat that is an
+      ancestor. The nested walk is capped at a small multiple of the mutual cost
+      -- the exact figure does not matter, only whether it is larger. See
+      {!Model.Product.estimate}. On an FSM saturated on demand, [Auto] estimates
+      only within [bound], and takes the nested cofix without one or past it; a
+      forced [Mutual] is checked against [bound] the same way.
 
-      @raise CErrors.UserError
-        if a forced [Mutual] walks past [bound] (raised by
-        {!refuse_exceeded}). *)
+      Raises Rocq's [UserError] if a forced [Mutual] walks past [bound] (raised
+      by {!refuse_exceeded}). *)
   let choose_cofix_strategy
         ~(on_demand : bool)
         ~(goal_is_bisimilar : bool)

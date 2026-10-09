@@ -1528,15 +1528,14 @@ struct
     | Some unfold -> Tactic.seq unfold rt1n |> return
   ;;
 
-  (** [handle_appconstrs_apply ?goto x] is the tactic applying the
-      constructor [x] to the goal, an LTS step, with the bindings extraction
-      recorded for it ({!Tacs.apply_constructor}): the step's source, the
-      label [None] for a [tau] goal, and the target [goto], when known.
+  (** [handle_appconstrs_apply ?goto x] is the tactic applying the constructor
+      [x] to the goal, an LTS step, with the bindings extraction recorded for it
+      ({!Tacs.apply_constructor}): the step's source, the label [None] for a
+      [tau] goal, and the target [goto], when known.
 
-      @raise CErrors.UserError
-        if the goal is not an LTS step (raised here, in place of
-        {!Tacs.GoalNotAnLTSStep}, which [apply_constructor] raises while
-        building, so the handler is reached). *)
+      Raises Rocq's [UserError] if the goal is not an LTS step (raised here, in
+      place of {!Tacs.GoalNotAnLTSStep}, which [apply_constructor] raises while
+      building, so the handler is reached). *)
   let handle_appconstrs_apply
         ?(goto : Model.State.t option = None)
         (x : Enc.Tree.Node.t)
@@ -1616,7 +1615,7 @@ struct
       goal. A user error, not an uncaught exception: Rocq reports the
       latter as an anomaly in Rocq itself.
 
-      @raise CErrors.UserError always (raised here). *)
+      Raises Rocq's [UserError] always (raised here). *)
   let outside_block_error (x : EConstr.t) (y : EConstr.t) : 'a =
     CErrors.user_err
       (Pp.str
@@ -1632,15 +1631,15 @@ struct
             (Strfy.econstr y)))
   ;;
 
-  (** [close_or_coinduct tys] is the tactic for a [weak_sim] or
-      [weak_bisimilar] goal of two states that are not trivially related
-      ([tys] its arguments): unfolding the conclusion if anything unfolds,
-      else closing it by the coinduction hypothesis that is the goal, else
-      introducing one ({!handle_new_cofix}).
+  (** [close_or_coinduct tys] is the tactic for a [weak_sim] or [weak_bisimilar]
+      goal of two states that are not trivially related ([tys] its arguments):
+      unfolding the conclusion if anything unfolds, else closing it by the
+      coinduction hypothesis that is the goal, else introducing one
+      ({!handle_new_cofix}).
 
-      @raise CErrors.UserError
-        under a mutual cofix, if no hypothesis is the goal: the pair is
-        outside the block ({!outside_block_error}; raised when run). *)
+      Raises Rocq's [UserError] under a mutual cofix, if no hypothesis is the
+      goal: the pair is outside the block ({!outside_block_error}; raised when
+      run). *)
   let close_or_coinduct (tys : EConstr.t array) : Tactic.t mm =
     let open Syntax in
     (* Normalise the conclusion BEFORE consulting the coinduction
@@ -1707,19 +1706,19 @@ struct
          raise ExitWeakSim)
   ;;
 
-  (** [handle_weaksim ()] is the tactic for the [WeakSim] state. On a
-      [weak_sim] or [weak_bisimilar] goal: reflexivity for two equal states
-      over one LTS; otherwise unfolding the conclusion if anything unfolds,
-      then closing it by the coinduction hypothesis that is the goal, or
-      introducing one ({!handle_new_cofix}). On any other goal: inverting
-      the hypothesis that most needs it ({!Hyps.try_invert_any}), or
-      unfolding one.
+  (** [handle_weaksim ()] is the tactic for the [WeakSim] state. On a [weak_sim]
+      or [weak_bisimilar] goal: reflexivity for two equal states over one LTS;
+      otherwise unfolding the conclusion if anything unfolds, then closing it by
+      the coinduction hypothesis that is the goal, or introducing one
+      ({!handle_new_cofix}). On any other goal: inverting the hypothesis that
+      most needs it ({!Hyps.try_invert_any}), or unfolding one.
+
+      Raises Rocq's [UserError] under a mutual cofix, for a pair outside the
+      block (raised here).
 
       @raise ProofComplete if the proof is finished (raised here).
-      @raise ExitWeakSim if there is nothing to invert or unfold (raised
-                         here).
-      @raise CErrors.UserError
-        under a mutual cofix, for a pair outside the block (raised here). *)
+      @raise ExitWeakSim if there is nothing to invert or unfold (raised here).
+  *)
   let handle_weaksim () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -1761,14 +1760,14 @@ struct
       Tacs.do_refl ())
   ;;
 
-  (** [prove_premise ()] is the tactic proving the constructor premise in
-      focus with the bounded search's proof ({!Premise_search.prove}): a
-      proof term, a refutation of a negation, or a bounded universal by
-      cases. Extraction kept this constructor because the same search
-      proved the premise (backlog I2, stage 1).
+  (** [prove_premise ()] is the tactic proving the constructor premise in focus
+      with the bounded search's proof ({!Premise_search.prove}): a proof term, a
+      refutation of a negation, or a bounded universal by cases. Extraction kept
+      this constructor because the same search proved the premise (backlog I2,
+      stage 1).
 
-      @raise CErrors.UserError
-        if the search does not prove it (raised here, when run). *)
+      Raises Rocq's [UserError] if the search does not prove it (raised here,
+      when run). *)
   let prove_premise () : Tactic.t mm =
     let open Syntax in
     let* env = get_env in
@@ -1824,16 +1823,15 @@ struct
   ;;
 
   (** [handle_apply_constructors args] is the tactic for the
-      [ApplyConstructors args] state. A constructor premise in focus is
-      proved by the bounded search, and an equation by reflexivity, leaving
-      [args] as it is. Otherwise it takes the next constructor of [args]:
-      the answer's entry point, the next step of its annotation, the next
-      constructor of the current step, or, with nothing left, the end of
-      the answer (and the next state is [WeakSim]).
+      [ApplyConstructors args] state. A constructor premise in focus is proved
+      by the bounded search, and an equation by reflexivity, leaving [args] as
+      it is. Otherwise it takes the next constructor of [args]: the answer's
+      entry point, the next step of its annotation, the next constructor of the
+      current step, or, with nothing left, the end of the answer (and the next
+      state is [WeakSim]).
 
-      @raise CErrors.UserError
-        if a premise cannot be proved (raised here). Also raises as
-        {!handle_appconstrs_apply} (propagated). *)
+      Raises Rocq's [UserError] if a premise cannot be proved (raised here).
+      Also raises as {!handle_appconstrs_apply} (propagated). *)
   let handle_apply_constructors (args : ProofState.ApplicableConstructors.t)
     : Tactic.t mm
     =
