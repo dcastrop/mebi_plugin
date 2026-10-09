@@ -96,6 +96,7 @@ struct
       was extracted with ({!Theory.is_fsm_constructor}); [false] for an FSM
       that has no metadata. Raises nothing. *)
   let is_lts_of_either_fsm (x : EConstr.t) : bool =
+    (* [of_fsm m] is whether [x] is one of [m]'s LTSs *)
     let of_fsm (m : Model.FSM.t) : bool =
       try Theory.is_fsm_constructor x m with _ -> false
     in
@@ -135,6 +136,7 @@ struct
     match ty_opt with
     | Some y -> return (Some y)
     | None ->
+      (* [unfold_arg i acc] is [acc] then the [i]th argument's unfolding *)
       let unfold_arg (i : int) (acc : Tactic.t option) : Tactic.t option mm =
         let+ y = Tacs.try_unfold_any ?in_hyp tys.(i) in
         seq_opt acc y
@@ -215,6 +217,8 @@ struct
       Logger.trace __FUNCTION__;
       if Logger.is_enabled Output.Kind.Debug
       then Logger.debug ~__FUNCTION__ ("key: " ^ M.classify_key x);
+      (* [f enc] is the label of [ys] encoded as [enc]; the lookup raises
+         [Not_found] while building, when there is none *)
       let f (enc : Enc.t) : Model.Label.t M.mm =
         (* NOTE: [Model.Label.Set.compare] only cares about [is_silent=Some _]
         *)
@@ -257,8 +261,10 @@ struct
         ; edges : Model.EdgeMap.t'
         }
 
-    (** [transition from goto label edges] is the transition [from -label-> goto] of [edges]: of the actions that reach [goto], the one with the
-        shortest annotation, and the least of its derivation trees.
+    (** [transition from goto label edges] is the transition
+        [from -label-> goto] of [edges]: of the actions that reach [goto],
+        the one with the shortest annotation, and the least of its
+        derivation trees.
 
         @raise CouldNotFind_Transition
           if [from] has no edges, none labelled [label], or none of those
@@ -472,11 +478,13 @@ struct
       | _ -> false
     ;;
 
-    (** [step_grade sigma tys] is the grade of an LTS step [lts term label goto] whose arguments are [tys]: 2 if [goto] mentions a local
-        variable, plus 1 if [label] does ({!mentions_var}), so the step whose
-        inversion determines the most comes first. A missing argument counts
-        0. Raises nothing. *)
+    (** [step_grade sigma tys] is the grade of an LTS step
+        [lts term label goto] whose arguments are [tys]: 2 if [goto]
+        mentions a local variable, plus 1 if [label] does
+        ({!mentions_var}), so the step whose inversion determines the most
+        comes first. A missing argument counts 0. Raises nothing. *)
     let step_grade (sigma : Evd.evar_map) (tys : EConstr.t array) : int =
+      (* [position_grade i] is [i] if argument [i] mentions a variable *)
       let position_grade (i : int) : int =
         if i < Array.length tys && mentions_var sigma tys.(i) then i else 0
       in
@@ -668,10 +676,11 @@ struct
       let h, _ = EConstr.decompose_app sigma concl in
       (* A premise headed by a definition -- [n < 3] is [lt], which unfolds to
          [le (S n) 3] -- is classified by what it unfolds to. Judged on [lt]
-         itself it was not a premise, so after [go : n < 3 -> succ_rel n m -> st n a m] was applied the solver took [0 < 3] for the silent-step goal it
-         finishes with [rt1n_refl] (found 2026-10-02, [Test.v]
-         [InversionShapes.Computed]). The plugin's own definitions keep their
-         head: the theory checks below need it. *)
+         itself it was not a premise, so after
+         [go : n < 3 -> succ_rel n m -> st n a m] was applied the solver took
+         [0 < 3] for the silent-step goal it finishes with [rt1n_refl] (found
+         2026-10-02, [Test.v] [InversionShapes.Computed]). The plugin's own
+         definitions keep their head: the theory checks below need it. *)
       let h =
         if EConstr.isConst sigma h && Bool.not (Theory.is_any_theory h)
         then
@@ -1057,6 +1066,7 @@ struct
       let open Syntax in
       let* env = get_env in
       let* sigma = get_sigma in
+      (* [is_step h] is whether [h] is a step of either FSM's LTSs *)
       let is_step (h : Rocq_utils.hyp) : bool =
         match Rocq_utils.hyp_to_atomic sigma h with
         | exception _ -> false
@@ -1094,6 +1104,8 @@ struct
       Logger.trace __FUNCTION__;
       let hyps = get_non_cofixes () in
       let open Syntax in
+      (* [f i found] is [found], or else the [i]th hypothesis read as a
+         transition of [m], if it reads as one *)
       let f (i : int)
         : Model.Transition.t option -> Model.Transition.t option mm
         = function
@@ -1219,6 +1231,7 @@ struct
       the current goal, which does not change until the tactic runs. Raises
       nothing. *)
   let fresh_cofix_names (n : int) : Names.Id.t list =
+    (* [names used k] is [k] fresh names, none of them in [used] *)
     let rec names (used : Names.Id.Set.t) (k : int) : Names.Id.t list =
       if k <= 0
       then []
@@ -1373,6 +1386,7 @@ struct
     let open Syntax in
     let* { a'; b } = Concl.get_conj { wk_trans; wk_sim } in
     ensure_matching_states hyp.goto a';
+    (* [move_by_move ()] is {!Model.Product.answer}'s answer to the move *)
     let move_by_move () : Model.Product.answer option =
       Model.Product.answer
         ~silent:(W.get_fsm_b ()).edges

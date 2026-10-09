@@ -206,6 +206,7 @@ let step (pstate : Declare.Proof.t) : Declare.Proof.t =
 let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
   Logger.trace __FUNCTION__;
   let module Ps : S = (val !(get_the_proof_solver ())) in
+  (* [finished p] is whether [p] has no goals left *)
   let finished (p : Declare.Proof.t) : bool =
     Proof.is_done (Declare.Proof.get p)
   in
@@ -370,8 +371,8 @@ module Init (Solver : S) = struct
       not, there is no proof to find.
 
       @raise CErrors.UserError
-        if the left state is not simulated by the right one and [FailIf NotBisimilar] is set (raised here; otherwise a warning).
-  *)
+        if the left state is not simulated by the right one and
+        [FailIf NotBisimilar] is set (raised here; otherwise a warning). *)
   let fall_back_on_simulation () : unit =
     let fsm_a = W.get_fsm_a () in
     let fsm_b = W.get_fsm_b () in
@@ -558,6 +559,8 @@ module Init (Solver : S) = struct
       (match fsm_a.init, fsm_b.init with
        | Some ra, Some rb ->
          let silent = (W.get_fsm_b ()).edges in
+         (* [estimate ()] is the cost of both strategies: the plan's, if
+            there is one, else the game's from [(ra, rb)] *)
          let estimate () : Product.cost =
            match !W.plan with
            | Some p -> Product.estimate_plan p
@@ -729,6 +732,7 @@ let start
 (** [contains ~sub s] is whether [sub] occurs in [s]. Raises nothing. *)
 let contains ~(sub : string) (s : string) : bool =
   let n = String.length sub in
+  (* [from i] is whether [sub] occurs in [s] at [i] or after *)
   let rec from (i : int) : bool =
     i + n <= String.length s
     && (String.equal (String.sub s i n) sub || from (i + 1))
