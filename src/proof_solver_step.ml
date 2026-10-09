@@ -1747,6 +1747,68 @@ struct
       Tacs.do_refl ())
   ;;
 
+  (** [prove_premise ()] is the tactic proving the constructor premise in
+      focus with the bounded search's proof ({!Premise_search.prove}): a
+      proof term, a refutation of a negation, or a bounded universal by
+      cases. Extraction kept this constructor because the same search
+      proved the premise (backlog I2, stage 1).
+
+      @raise CErrors.UserError
+        if the search does not prove it (raised here, when run). *)
+  let prove_premise () : Tactic.t mm =
+    let open Syntax in
+    let* env = get_env in
+    let* sigma = get_sigma in
+    let concl = get_concl () in
+    match Premise_search.prove env sigma concl with
+    | Premise_search.Proved (Premise_search.Term p) -> Tacs.exact_term p
+    | Premise_search.Proved (Premise_search.ByRefutation _) ->
+      Tacs.prove_negation ()
+    | Premise_search.Proved Premise_search.ByCases -> Tacs.prove_bounded ()
+    | Premise_search.Refuted | Premise_search.Unknown ->
+      CErrors.user_err
+        (Pp.str
+           (Printf.sprintf
+              "MeBi: cannot prove the constructor premise\n\
+              \  %s\n\
+               It is not closed, or not decidable by MeBi's bounded search \
+               (see [MeBi Help Premises])."
+              (Strfy.econstr (get_concl ()))))
+  ;;
+
+  (** [next_constructor args] is the tactic for the next constructor of the
+      answer [args], updating the state machine to what is left after it:
+      the answer's entry point, if nothing is applied yet; the next step of
+      its annotation, when the current step's constructors are done; the
+      current step's next constructor, otherwise (only a step's first, top
+      level constructor gets its target bound). With nothing left, the
+      answer ends ({!handle_appconstrs_stop}) and the next state is
+      [WeakSim].
+
+      Raises as {!handle_appconstrs_apply} (propagated). *)
+  let next_constructor (args : ProofState.ApplicableConstructors.t)
+    : Tactic.t mm
+    =
+    match args with
+    | { current = None; label; _ } ->
+      ProofState.update_statem
+        (ApplyConstructors { args with current = Some [] });
+      handle_appconstrs_entry_point label
+    | { current = Some []; remaining = None; _ } ->
+      ProofState.update_statem WeakSim;
+      handle_appconstrs_stop ()
+    | { current = Some []; remaining = Some anno; _ } ->
+      let current, remaining = handle_appconstrs_update_args anno in
+      ProofState.update_statem
+        (ApplyConstructors
+           { args with current; remaining; step_goto = Some anno.this.goto });
+      handle_appconstrs_update anno.this.label
+    | { current = Some (h :: tl); step_goto; _ } ->
+      ProofState.update_statem
+        (ApplyConstructors { args with current = Some tl; step_goto = None });
+      handle_appconstrs_apply ~goto:step_goto h
+  ;;
+
   (** [handle_apply_constructors args] is the tactic for the
       [ApplyConstructors args] state. A constructor premise in focus is
       proved by the bounded search, and an equation by reflexivity, leaving
@@ -1767,27 +1829,7 @@ struct
     let* is_eq = Concl.is_eq () in
     let* is_premise = if is_eq then return false else Concl.is_premise () in
     if is_premise
-    then
-      (* Any other premise: extraction kept this constructor because the
-         bounded search proved the premise, so the same search yields a proof
-         term for it here (backlog I2, stage 1). *)
-      let* env = get_env in
-      let* sigma = get_sigma in
-      let concl = get_concl () in
-      match Premise_search.prove env sigma concl with
-      | Premise_search.Proved (Premise_search.Term p) -> Tacs.exact_term p
-      | Premise_search.Proved (Premise_search.ByRefutation _) ->
-        Tacs.prove_negation ()
-      | Premise_search.Proved Premise_search.ByCases -> Tacs.prove_bounded ()
-      | Premise_search.Refuted | Premise_search.Unknown ->
-        CErrors.user_err
-          (Pp.str
-             (Printf.sprintf
-                "MeBi: cannot prove the constructor premise\n\
-                \  %s\n\
-                 It is not closed, or not decidable by MeBi's bounded search \
-                 (see [MeBi Help Premises])."
-                (Strfy.econstr (get_concl ()))))
+    then prove_premise ()
     else if is_eq
     then
       (* An equation premise has the focus. Extraction only keeps a
@@ -1795,36 +1837,7 @@ struct
          are convertible, so [reflexivity] closes it; the constructor list is
          left as it is, for the goal that gets the focus next (backlog I2). *)
       Tacs.reflexivity ()
-    else (
-      match args with
-      | { current = None; label; _ } ->
-        (* NOTE: entry-point *)
-        ProofState.update_statem
-          (ApplyConstructors { args with current = Some [] });
-        handle_appconstrs_entry_point label
-      | { current = Some []; remaining; _ } ->
-        (match remaining with
-         | None ->
-           (* NOTE: stop *)
-           ProofState.update_statem WeakSim;
-           handle_appconstrs_stop ()
-         | Some anno ->
-           (* NOTE: update current, prepare for next transition *)
-           let current, remaining = handle_appconstrs_update_args anno in
-           ProofState.update_statem
-             (ApplyConstructors
-                { args with
-                  current
-                ; remaining
-                ; step_goto = Some anno.this.goto
-                });
-           handle_appconstrs_update anno.this.label)
-      | { current = Some (h :: tl); step_goto; _ } ->
-        (* NOTE: continue applying constructors; only the step's first (top
-           level) constructor gets its target bound *)
-        ProofState.update_statem
-          (ApplyConstructors { args with current = Some tl; step_goto = None });
-        handle_appconstrs_apply ~goto:step_goto h)
+    else next_constructor args
   ;;
 
   (** [handle_state ()] is the tactic for the proof's state, after reading
