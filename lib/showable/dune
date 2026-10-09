@@ -15,7 +15,7 @@
  (name showable)
  (public_name rocq-mebi.showable)
  (libraries rocq-mebi.showable.type)
- (modules Set_ Map_ Showable)
+ (modules Set_ Showable)
  (wrapped true))
 
 ; Unifies Showable's pp/show/equal/compare with the JSON-dump mechanism

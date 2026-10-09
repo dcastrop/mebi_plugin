@@ -158,7 +158,6 @@ lib/json/yojson_compare.ml
 
 lib/showable/type_.ml
 lib/showable/set_.ml
-lib/showable/map_.ml
 lib/showable/showable.ml
 lib/showable/thing.ml
 
