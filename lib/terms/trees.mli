@@ -13,7 +13,7 @@ module type S = sig
   exception EmptyHasNoMin
 
   (** [min ts] is the derivation of [ts] with the fewest constructors to
-      apply ({!Tree.S.size}); on a tie, the least in the set's order.
+      apply ([Tree.size]); on a tie, the least in the set's order.
 
       @raise EmptyHasNoMin if [ts] is empty (raised here). *)
   val min : t -> tree
