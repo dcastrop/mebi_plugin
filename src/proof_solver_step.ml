@@ -1533,9 +1533,10 @@ struct
       ({!Tacs.apply_constructor}): the step's source, the label [None] for a
       [tau] goal, and the target [goto], when known.
 
-      Raises Rocq's [UserError] if the goal is not an LTS step (raised here, in
-      place of {!Tacs.GoalNotAnLTSStep}, which [apply_constructor] raises while
-      building, so the handler is reached). *)
+      @raise CErrors.UserError
+        if the goal is not an LTS step (raised here, in
+        place of {!Tacs.GoalNotAnLTSStep}, which [apply_constructor] raises
+        while building, so the handler is reached). *)
   let handle_appconstrs_apply
         ?(goto : Model.State.t option = None)
         (x : Enc.Tree.Node.t)
@@ -1615,7 +1616,7 @@ struct
       goal. A user error, not an uncaught exception: Rocq reports the
       latter as an anomaly in Rocq itself.
 
-      Raises Rocq's [UserError] always (raised here). *)
+      @raise CErrors.UserError always (raised here). *)
   let outside_block_error (x : EConstr.t) (y : EConstr.t) : 'a =
     CErrors.user_err
       (Pp.str
@@ -1637,9 +1638,10 @@ struct
       coinduction hypothesis that is the goal, else introducing one
       ({!handle_new_cofix}).
 
-      Raises Rocq's [UserError] under a mutual cofix, if no hypothesis is the
-      goal: the pair is outside the block ({!outside_block_error}; raised when
-      run). *)
+      @raise CErrors.UserError
+        under a mutual cofix, if no hypothesis is the
+        goal: the pair is outside the block ({!outside_block_error}; raised when
+        run). *)
   let close_or_coinduct (tys : EConstr.t array) : Tactic.t mm =
     let open Syntax in
     (* Normalise the conclusion BEFORE consulting the coinduction
@@ -1713,12 +1715,12 @@ struct
       ({!handle_new_cofix}). On any other goal: inverting the hypothesis that
       most needs it ({!Hyps.try_invert_any}), or unfolding one.
 
-      Raises Rocq's [UserError] under a mutual cofix, for a pair outside the
-      block (raised here).
-
       @raise ProofComplete if the proof is finished (raised here).
       @raise ExitWeakSim if there is nothing to invert or unfold (raised here).
-  *)
+
+      @raise CErrors.UserError
+        under a mutual cofix, for a pair outside the
+        block (raised here). *)
   let handle_weaksim () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -1766,8 +1768,9 @@ struct
       this constructor because the same search proved the premise (backlog I2,
       stage 1).
 
-      Raises Rocq's [UserError] if the search does not prove it (raised here,
-      when run). *)
+      @raise CErrors.UserError
+        if the search does not prove it (raised here,
+        when run). *)
   let prove_premise () : Tactic.t mm =
     let open Syntax in
     let* env = get_env in
@@ -1830,8 +1833,9 @@ struct
       current step, or, with nothing left, the end of the answer (and the next
       state is [WeakSim]).
 
-      Raises Rocq's [UserError] if a premise cannot be proved (raised here).
-      Also raises as {!handle_appconstrs_apply} (propagated). *)
+      @raise CErrors.UserError
+        if a premise cannot be proved (raised here). Also
+        raises as {!handle_appconstrs_apply} (propagated). *)
   let handle_apply_constructors (args : ProofState.ApplicableConstructors.t)
     : Tactic.t mm
     =

@@ -284,7 +284,7 @@ let explicit_whole_game_settings () : string list =
     whole game up front, on an FSM saturated on demand, saying [why] and
     the ways on.
 
-    Raises Rocq's [UserError] always (raised here). *)
+    @raise CErrors.UserError always (raised here). *)
 let refuse_whole_game (setting : string) (why : string) : 'a =
   CErrors.user_err
     (Pp.str
@@ -302,7 +302,7 @@ let refuse_whole_game (setting : string) (why : string) : 'a =
 (** [refuse_unbounded setting] is {!refuse_whole_game} for [setting] with
     no game bound set.
 
-    Raises Rocq's [UserError] always (raised here). *)
+    @raise CErrors.UserError always (raised here). *)
 let refuse_unbounded (setting : string) : 'a =
   refuse_whole_game
     setting
@@ -312,7 +312,7 @@ let refuse_unbounded (setting : string) : 'a =
 (** [refuse_exceeded setting n] is {!refuse_whole_game} for [setting], the
     game having more than [n] pairs, the bound set.
 
-    Raises Rocq's [UserError] always (raised here). *)
+    @raise CErrors.UserError always (raised here). *)
 let refuse_exceeded (setting : string) (n : int) : 'a =
   refuse_whole_game
     setting
@@ -370,8 +370,9 @@ module Init (Solver : S) = struct
       read by {!Model.Product.answer}). If it does not, there is no proof to
       find.
 
-      Raises Rocq's [UserError] if the left state is not simulated by the right
-      one and [FailIf NotBisimilar] is set (raised here; otherwise a warning).
+      @raise CErrors.UserError
+        if the left state is not simulated by the right
+        one and [FailIf NotBisimilar] is set (raised here; otherwise a warning).
   *)
   let fall_back_on_simulation () : unit =
     let fsm_a = W.get_fsm_a () in
@@ -427,9 +428,10 @@ module Init (Solver : S) = struct
       that leaves moves unanswered is dropped with a warning (the solver then
       answers move by move). [refl] is whether the two systems are the same LTS.
 
-      Raises Rocq's [UserError] if the walk goes past [bound] (raised by
-      {!refuse_exceeded}). Also raises as {!Model.Product.Policy.plan}
-      (propagated). *)
+      @raise CErrors.UserError
+        if the walk goes past [bound] (raised by
+        {!refuse_exceeded}). Also raises as {!Model.Product.Policy.plan}
+        (propagated). *)
   let plan_answers ~(goal_is_bisimilar : bool) ~(refl : bool) bound : unit =
     let fsm_a = W.get_fsm_a () in
     let fsm_b = W.get_fsm_b () in
@@ -535,8 +537,9 @@ module Init (Solver : S) = struct
       only within [bound], and takes the nested cofix without one or past it; a
       forced [Mutual] is checked against [bound] the same way.
 
-      Raises Rocq's [UserError] if a forced [Mutual] walks past [bound] (raised
-      by {!refuse_exceeded}). *)
+      @raise CErrors.UserError
+        if a forced [Mutual] walks past [bound] (raised
+        by {!refuse_exceeded}). *)
   let choose_cofix_strategy
         ~(on_demand : bool)
         ~(goal_is_bisimilar : bool)

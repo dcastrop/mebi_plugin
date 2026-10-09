@@ -102,17 +102,19 @@ val is_done : unit -> bool
       [Default];
     - under [Auto], chooses the cofix strategy by estimating both
       ({!Model.Product.estimate}), and announces the mutual path;
-    - starts the state machine at [NewProof] with [x] and [y]. On an FSM
-      saturated on demand, planning or estimating would walk the whole game, so
-      it is done only within [MeBi Config Bounds Game], and a setting made
-      explicitly ([MutualCofix True], an answer policy other than [Default]) is
-      refused without that bound or past it.
+    - starts the state machine at [NewProof] with [x] and [y].
 
-    Raises Rocq's [UserError] if a [weak_sim] goal's left state is not even
-    simulated by the right one while [FailIf NotBisimilar] is set, or an
-    explicit whole-game setting is refused (raised here). Also raises as
-    {!Results.S.check_bisimilarity} (propagated; among others, when a
-    [weak_bisimilar] goal's states are not bisimilar). *)
+    On an FSM saturated on demand, planning or estimating would walk the whole
+    game, so it is done only within [MeBi Config Bounds Game], and a setting
+    made explicitly ([MutualCofix True], an answer policy other than [Default])
+    is refused without that bound or past it.
+
+    @raise CErrors.UserError
+      if a [weak_sim] goal's left state is not even
+      simulated by the right one while [FailIf NotBisimilar] is set, or an
+      explicit whole-game setting is refused (raised here). Also raises as
+      {!Results.S.check_bisimilarity} (propagated; among others, when a
+      [weak_bisimilar] goal's states are not bisimilar). *)
 val init
   :  ?enc:(unit -> (module Encoding.S))
   -> Declare.Proof.t
@@ -133,9 +135,11 @@ type goal_kind =
     [MeBi Sim Begin a x And b y Using refs] would ({!init}), so [MeBi Sim Solve]
     can follow at once.
 
-    Raises Rocq's [UserError] if the statement does not typecheck (propagated
-    from Rocq's interpretation). Also raises as {!init} (propagated; it refuses,
-    and no proof is opened, if the two are not bisimilar, or not similar). *)
+    @raise CErrors.UserError
+      if the statement does not typecheck (propagated
+      from Rocq's interpretation). Also raises as {!init} (propagated; it
+      refuses, and no proof is opened, if the two are not bisimilar, or not
+      similar). *)
 val start
   :  kind:goal_kind
   -> name:Names.Id.t
@@ -170,7 +174,8 @@ val solve : ?bound:int -> Declare.Proof.t -> Declare.Proof.t
     handled, which Rocq would report as an Anomaly in Rocq itself, becomes a
     user error that names it.
 
-    Raises Rocq's [UserError] in place of a non-critical exception Rocq has no
-    printer for, looked for through a tactic's wrapper (raised here). Other
-    exceptions pass through unchanged (propagated). *)
+    @raise CErrors.UserError
+      in place of a non-critical exception Rocq has no
+      printer for, looked for through a tactic's wrapper (raised here). Other
+      exceptions pass through unchanged (propagated). *)
 val guard : (unit -> 'a) -> 'a

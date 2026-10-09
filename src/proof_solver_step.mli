@@ -37,13 +37,14 @@ module type S = sig
       machine is updated for the next step as it goes, and a state with nothing
       to do here passes to the next state within the same step.
 
-      Raises Rocq's [UserError] if the goal is one the solver cannot continue
-      from: a pair outside the mutual block, a premise it cannot prove, a
-      constructor whose goal is not an LTS step (raised here). Also raises the
-      step's internal failures, such as no hypothesis reading as a transition
-      (raised here or propagated; {!Proof_solver.guard} reports them).
+      @raise NothingToDo if the state is [Done] (raised here).
 
-      @raise NothingToDo if the state is [Done] (raised here). *)
+      @raise CErrors.UserError
+        if the goal is one the solver cannot continue
+        from: a pair outside the mutual block, a premise it cannot prove, a
+        constructor whose goal is not an LTS step (raised here). Also raises the
+        step's internal failures, such as no hypothesis reading as a transition
+        (raised here or propagated; {!Proof_solver.guard} reports them). *)
   val step : unit -> tactic
 end
 
