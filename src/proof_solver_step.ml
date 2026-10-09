@@ -102,6 +102,14 @@ struct
     of_fsm (W.get_fsm_a ()) || of_fsm (W.get_fsm_b ())
   ;;
 
+  (** [is_eq_inductive sigma x] is whether [x] is the inductive [eq].
+      Raises nothing. *)
+  let is_eq_inductive (sigma : Evd.evar_map) (x : EConstr.t) : bool =
+    match EConstr.kind sigma x with
+    | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
+    | _ -> false
+  ;;
+
   (** Reading a term of the proof back as a part of the model: the state,
       label or transition of {!W.Model} it stands for. *)
   module ReModel = struct
@@ -422,6 +430,27 @@ struct
       return (Premise_search.dead env sigma ty)
     ;;
 
+    (** [mentions_var sigma x] is whether the term [x] is a local variable
+        or applies something to one, at any depth: what inverting a step
+        with [x] in it would determine. Raises nothing. *)
+    let rec mentions_var (sigma : Evd.evar_map) (x : EConstr.t) : bool =
+      match EConstr.kind sigma x with
+      | Var _ -> EConstr.isRef sigma x
+      | App (_, tys) -> Array.exists (mentions_var sigma) tys
+      | _ -> false
+    ;;
+
+    (** [step_grade sigma tys] is the grade of an LTS step [lts term label goto] whose arguments are [tys]: 2 if [goto] mentions a local
+        variable, plus 1 if [label] does ({!mentions_var}), so the step whose
+        inversion determines the most comes first. A missing argument counts
+        0. Raises nothing. *)
+    let step_grade (sigma : Evd.evar_map) (tys : EConstr.t array) : int =
+      let position_grade (i : int) : int =
+        if i < Array.length tys && mentions_var sigma tys.(i) then i else 0
+      in
+      position_grade 2 + position_grade 1
+    ;;
+
     (** [invertibility x] is [x]'s grade: how much it needs inverting,
         higher first, and [0] for not at all. A premise -- not atomic, an
         equation, or not a step of either FSM's LTSs -- is graded by
@@ -442,11 +471,7 @@ struct
            sides a local variable) 3, and inverting it changes nothing, so the
            solver picked it forever. Substitutable equations are handled by the
            [subst] after each step. *)
-        let is_eq : bool =
-          match EConstr.kind sigma ty with
-          | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
-          | _ -> false
-        in
+        let is_eq : bool = is_eq_inductive sigma ty in
         (* Only LTS steps are inverted. Any other premise hypothesis -- an
            [In], a [<=], an equation -- comes from a constructor premise; the
            shape-based grading below assumes [term label goto] and could pick
@@ -454,22 +479,7 @@ struct
         let is_lts : bool = is_lts_of_either_fsm ty in
         if is_eq || Bool.not is_lts
         then premise_grade x
-        else (
-          (* NOTE: returns true if can be inverted *)
-          let rec f (x : EConstr.t) : bool =
-            match EConstr.kind sigma x with
-            | Var _ -> EConstr.isRef sigma x
-            | App (_, tys) -> Array.exists f tys
-            | _ -> false
-          in
-          (* NOTE: since [2] is the goto-state and [1] is the label, [g] allows
-             us to clearly see which hyp needs to be inverted first. *)
-          let g (i : int) : int =
-            try if f tys.(i) then i else 0 with
-            (* NOTE: handles "Index out of bounds" for accessing [tys] array. *)
-            | Invalid_argument _ -> 0
-          in
-          g 2 + g 1 |> return)
+        else step_grade sigma tys |> return
     ;;
 
     (** [invert x] is the tactic inverting [x] ({!Tacs.inversion}). *)
@@ -686,10 +696,7 @@ struct
       let* sigma = get_sigma in
       return
         (match EConstr.kind sigma (get_concl ()) with
-         | App (h, a) when Array.length a = 3 ->
-           (match EConstr.kind sigma h with
-            | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
-            | _ -> false)
+         | App (h, a) when Array.length a = 3 -> is_eq_inductive sigma h
          | _ -> false)
     ;;
 
