@@ -6638,6 +6638,40 @@ Tooling 1.
 
 ---
 
+## 2026-10-09 — Documentation pass, part 9: `lib/showable`, and `lib/json` removed
+
+**Docs + Refactor.** On branch `docs/lib-showable`.
+
+**Comments** (`a01084d`, `8e0737e`): on what stays. No `.mli` here, so the
+contracts are above the definitions.
+
+**Dead code** -- about half the library, and all of `lib/json`:
+- `1098146`: `Map_` (`Showable.Map`, the whole module, out of all three
+  module lists) and the `Type_.Sa` signature only it used; the `Unit`,
+  `String`, `Int` and `Bool` instances; and `Set_.Make`'s extras
+  (`subset`, `subseteq`, `supset`, `supseteq`, `bfold`, `disjunction`,
+  `conjunction`, `make`, `random`). Two of those were wrong: `subset`
+  rebound the standard library's non-strict one, so it equalled
+  `subseteq`, and `supseteq a b` was `subset b a` (meant `subseteq b a`),
+  so `supset` and `supseteq` were the same too. Nothing called any of
+  them.
+- `1dbd636`: `Type_.Json` was unused, and it was `lib/json`'s
+  (`Yojson_compare`'s) only user, so that library goes too. This takes
+  the place of the `lib/json` documentation pass planned in `TODO.md`.
+  Model components get their JSON from `lib/utils`' `Json`, untouched.
+
+**Verification.** `scripts/check_module_lists.py` agrees (57 modules).
+On the head: `tests.exe` 103/103, the proof matrix in all three modes and
+`Test.v`'s 60 counts identical to `main`'s, `make` clean.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/lib-showable main`), or one commit.
+
+**Session tally (2026-10-09), cont.:** Docs 17 · Refactor 14 · Bug fix 5 ·
+Tooling 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
