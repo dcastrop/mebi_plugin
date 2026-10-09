@@ -1,10 +1,19 @@
+(** Types the plugin can print, and order. Plain OCaml, hand-written: see
+    the note below on why there is no [ppx]. *)
+
+(** A type that can be printed. *)
 module type S = sig
   type t
 
+  (** [pp ppf x] prints [x] on [ppf]. *)
   val pp : Format.formatter -> t -> unit
+
+  (** [show x] is [x], printed. *)
   val show : t -> string
 end
 
+(** A type with one parameter that can be printed, given a printer for the
+    parameter. *)
 module type Sa = sig
   type 'a t
 
@@ -12,6 +21,8 @@ module type Sa = sig
   val show : (Format.formatter -> 'a -> unit) -> 'a t -> string
 end
 
+(** A type that can be ordered, compared for equality and printed: what a
+    set ({!Set_.Make}) needs of its elements. *)
 module type Ordered = sig
   type t
 
