@@ -25,19 +25,18 @@ module Make (Tree : Tree.S) : S with type tree = Tree.t = struct
 
   exception EmptyHasNoMin
 
-  (* See the [.mli]. The fold keeps the earlier of two of equal size, and
-     [to_list] is in the set's order. *)
+  (** [fewer_constructors acc x] is [x] if it has fewer constructors to
+      apply than [acc] ({!Tree.size}), else [acc]: so of two the same size,
+      the earlier. Raises nothing. *)
+  let fewer_constructors (acc : elt) (x : elt) : elt =
+    match Int.compare (Tree.size x) (Tree.size acc) with -1 -> x | _ -> acc
+  ;;
+
+  (* See the [.mli]. [to_list] is in the set's order. *)
   let min (xs : t) : elt =
     match to_list xs with
     | [] -> raise EmptyHasNoMin
-    | h :: tl ->
-      List.fold_left
-        (fun (acc : elt) (x : elt) ->
-          match Int.compare (Tree.size x) (Tree.size acc) with
-          | -1 -> x
-          | _ -> acc)
-        h
-        tl
+    | h :: tl -> List.fold_left fewer_constructors h tl
   ;;
 
   let min_opt (xs : t) : elt option =
