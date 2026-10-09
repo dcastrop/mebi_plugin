@@ -28,15 +28,17 @@ module Make
   open M
   module Th = Mebi_theories
 
-  (* See the [.mli], including why the handler below cannot see what
-     [to_atomic] raises. *)
+  (* See the [.mli]. [x] is split here, in the continuation, so the
+     handler runs with the check rather than around building it. *)
   let is_theory (x : EConstr.t) (y : EConstr.t) : bool mm =
-    try
-      let open Syntax in
-      let* xty, _tys = to_atomic x in
-      econstr_eq xty y
-    with
-    | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> return false
+    let open Syntax in
+    let* sigma = get_sigma in
+    match Rocq_utils.econstr_to_atomic sigma x with
+    | xty, _tys -> econstr_eq xty y
+    | exception
+        ( Rocq_utils.Rocq_utils_EConstrIsNotA_Type _
+        | Rocq_utils.Rocq_utils_EConstrIsNot_Atomic _ ) ->
+      return false
   ;;
 
   (* See the [.mli]. Compares [x] with every loaded constant, running each
