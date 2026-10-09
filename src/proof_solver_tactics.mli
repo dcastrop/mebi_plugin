@@ -116,8 +116,11 @@ module type S = sig
   val apply : Evd.econstr -> tactic mm
 
   (** [apply_Pack_sim ()] is [apply Pack_sim] (from [MEBI.Bisimilarity], as
-      the other [apply_]/[eapply_] tactics). Raises [Failure] if the theory
-      term is not loaded ({!Mebi_theories.get}; propagated). *)
+      the other [apply_]/[eapply_] tactics).
+
+      @raise Failure
+        if the theory term is not loaded ({!Mebi_theories.get};
+        propagated). *)
   val apply_Pack_sim : unit -> tactic mm
 
   (** [apply_In_sim ()] is [apply In_sim]. *)

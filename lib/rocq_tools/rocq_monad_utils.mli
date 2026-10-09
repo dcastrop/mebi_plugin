@@ -402,8 +402,9 @@ module type S = sig
       (** [fresh env sigma p] is [p] with [to_check] replaced by a new evar of
           its type, and the evar map with it.
 
-          Raises Rocq's typing errors, or
-          [Rocq_utils.CouldNotGetNextFreshEvarName] (propagated). *)
+          Raises Rocq's typing errors (propagated).
+
+          @raise Rocq_utils.CouldNotGetNextFreshEvarName (propagated). *)
       val fresh : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * t
 
       (** [make env sigma to_check acc] is the pair, [to_check] made a fresh

@@ -11,9 +11,11 @@ module type S = sig
       state type first. [weak] names the silent label.
 
       Raises, when run, Rocq's errors if [t] does not typecheck or a name is
-      unknown, [LTSMapDoesNotContainPrimaryLTS] if [lts] is not among
-      [using], and whatever extracting a constructor raises (all
-      propagated). *)
+      unknown, and whatever extracting a constructor raises (both
+      propagated).
+
+      @raise LTSMapDoesNotContainPrimaryLTS
+        when run, if [lts] is not among [using] (propagated). *)
   val build
     :  ?weak:weak option
     -> Constrexpr.constr_expr

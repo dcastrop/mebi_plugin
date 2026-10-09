@@ -110,8 +110,9 @@ module type S = sig
       saturates state after state, so it needs [MeBi Config Bounds Game <n>]
       and stays within it.
 
-      Raises Rocq's [UserError] when an FSM is saturated on demand and no
-      game bound is set, or the game is larger than it (raised here). *)
+      @raise CErrors.UserError
+        when an FSM is saturated on demand and no game bound is set, or the
+        game is larger than it (raised here). *)
   val similarity : Model.Bisimilarity.t -> Model.Product.Pair.Set.t option
 
   (** The [MeBi Run] commands. *)
@@ -223,9 +224,11 @@ module type S = sig
         simulated by [b]'s ([MeBi Run Sim]), reporting the verdict: bisimilar
         states are similar outright; otherwise {!similarity} decides.
 
-        Raises Rocq's [UserError] when they are not similar and [FailIf NotBisimilar] is set (the default; a warning otherwise), and as
-        {!similarity} (raised here). Also raises as {!do_check_bisim}'s
-        checks, apart from the verdict. *)
+        @raise CErrors.UserError
+          when they are not similar and [FailIf NotBisimilar] is set (the
+          default; a warning otherwise), and as {!similarity} (raised here).
+          Also raises as {!do_check_bisim}'s checks, apart from the
+          verdict. *)
     val do_check_sim
       :  rocq_pair
       -> Libnames.qualid list
@@ -237,8 +240,9 @@ module type S = sig
         times ({!Benchmarking}), and logs the samples ([MeBi Benchmark]).
         [None].
 
-        Raises, when run, [NothingToBenchmark] for a list type that is not
-        Rocq's [list] (raised here), and as {!extract_lts}. *)
+        @raise NothingToBenchmark
+          when run, for a list type that is not Rocq's [list] (raised here).
+          Also raises as {!extract_lts}. *)
     val do_benchmark_graph
       :  rocq_args * (int * int)
       -> Libnames.qualid list
