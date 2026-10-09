@@ -926,84 +926,103 @@ struct
            (Names.Id.Set.to_seq (get_all_non_cofix_hyp_names ()) |> List.of_seq))
     ;;
 
+    (** [keep_highest best (grade, y)] is the better of [best] and the
+        hypothesis [y] of grade [grade]: the higher grade, and [y] on a tie,
+        so ties go to the later hypothesis (see below). Raises nothing. *)
+    let keep_highest (best : (int * Hyp.t) option) ((grade, y) : int * Hyp.t)
+      : (int * Hyp.t) option
+      =
+      match best with
+      | None -> Some (grade, y)
+      | Some (n, x) ->
+        (* Ties on [grade] go to the LATER hypothesis, and that is load
+           bearing. [invertibility] grades on shape -- whether the label and
+           goto positions hold a local variable -- so in a layered LTS a
+           whole chain of transitions grades identically:
+
+           H  : compLTS (cpar (cprc X) R) a (cpar (cprc Y) R)
+           H1 : termLTS X a Y
+           H4 : compLTS (cprc X) a (cprc Y)
+
+           all score 3, this keeps the last and so picks [H4], whose
+           inversion yields [termLTS X a Y] -- which is [H1] again. The goal
+           does not move and the context gains a duplicate; the next step
+           makes progress only because that duplicate sorts last and gets
+           picked instead. Steps whose goal is unchanged and whose only new
+           hypothesis is an exact duplicate were measured at 2.6% (Test1),
+           2.7-4.3% (Test2), 4.9% and 14.1% (CADP/Size1) and 12.0%
+           (Proc/Test3) of all steps.
+
+           Breaking ties toward the SMALLER hypothesis instead -- the
+           innermost transition, the one whose inversion actually determines
+           the label and destination -- was tried on 2026-09-29 and
+           REVERTED. It left 16 of the 18 baseline counts byte-identical,
+           but turned [wsim_lts] and [wsim_lts_bigstep], both 396
+           iterations, into proofs that had not closed after 5000
+           iterations, 10 minutes and 1.4GB. Which hypothesis gets inverted
+           steers the whole downstream path and the search has no plan to
+           fall back on, so a local improvement here can flip a proof from
+           converging to diverging. Do not change this tie-break without
+           running all five cheap suites. See ASSISTED-CHANGES.md,
+           2026-09-29.
+
+           Retried 2026-10-01 gated on the mutual block ([ac98c3c]) and
+           reverted the same day: the mutual block does NOT make it safe.
+           With [MutualCofix True] forced, CADP's [wsim_lts_bigstep] went
+           from 396 to not closing. Run the suites with the strategy forced
+           both ways, not just under [Auto]. See ASSISTED-CHANGES.md,
+           2026-10-01. *)
+        (match Int.compare grade n with
+         | -1 -> Some (n, x)
+         | _ -> Some (grade, y))
+    ;;
+
+    (** [invert_by_grade (grade, x)] is the tactic for the hypothesis [x]
+        of non-zero grade [grade]: refuting it if it is a refutable premise
+        ({!Tacs.refute_premise}), inverting it if it is an open one
+        ({!Tacs.invert_premise}), and, an LTS step, refuting it if it is dead
+        ({!Tacs.refute_dead}), else inverting it. Raises nothing. *)
+    let invert_by_grade ((grade, x) : int * Hyp.t) : Tactic.t mm =
+      let open Syntax in
+      if Int.equal grade Hyp.refutable_grade
+      then Tacs.refute_premise x
+      else if Int.equal grade Hyp.open_premise_grade
+      then Tacs.invert_premise x
+      else
+        (* An LTS step with no instance closes the goal by refutation: one
+           step instead of the inversions of every layer beneath it
+           (note 11, option D′). *)
+        let* dead = Hyp.is_dead x in
+        if dead then Tacs.refute_dead x else Hyp.invert x
+    ;;
+
     (** [try_invert_any ()] is the tactic for the non-coinduction
         hypothesis that most needs inverting ({!Hyp.invertibility}; ties go
-        to the later one, see below), or [None] if every grade is 0: it
-        refutes a refutable premise ({!Tacs.refute_premise}), inverts an
-        open one ({!Tacs.invert_premise}), refutes a dead LTS step
-        ({!Tacs.refute_dead}), and inverts any other step. Raises nothing. *)
+        to the later one, {!keep_highest}), by its grade
+        ({!invert_by_grade}), or [None] if every grade is 0. Raises
+        nothing. *)
     let try_invert_any () : Tactic.t option mm =
       Logger.trace __FUNCTION__;
       let hyps : Hyp.t list = get_non_cofixes () in
       let open Syntax in
-      let f (i : int) (xopt : (int * Hyp.t) option) : (int * Hyp.t) option mm =
+      (* [grade_next i best] is [best] or the [i]th hypothesis, graded *)
+      let grade_next (i : int) (best : (int * Hyp.t) option)
+        : (int * Hyp.t) option mm
+        =
         let y : Hyp.t = List.nth hyps i in
         let* grade : int = Hyp.invertibility y in
         Logger.debug
           ~__FUNCTION__
           (Printf.sprintf "grade %i : %s" grade (Hyp.name_to_string y));
-        match xopt with
-        | None -> Some (grade, y) |> return
-        | Some (n, x) ->
-          (* Ties on [grade] go to the LATER hypothesis, and that is load
-             bearing. [invertibility] grades on shape -- whether the label and
-             goto positions hold a local variable -- so in a layered LTS a
-             whole chain of transitions grades identically:
-
-             H  : compLTS (cpar (cprc X) R) a (cpar (cprc Y) R)
-             H1 : termLTS X a Y
-             H4 : compLTS (cprc X) a (cprc Y)
-
-             all score 3, this keeps the last and so picks [H4], whose
-             inversion yields [termLTS X a Y] -- which is [H1] again. The goal
-             does not move and the context gains a duplicate; the next step
-             makes progress only because that duplicate sorts last and gets
-             picked instead. Steps whose goal is unchanged and whose only new
-             hypothesis is an exact duplicate were measured at 2.6% (Test1),
-             2.7-4.3% (Test2), 4.9% and 14.1% (CADP/Size1) and 12.0%
-             (Proc/Test3) of all steps.
-
-             Breaking ties toward the SMALLER hypothesis instead -- the
-             innermost transition, the one whose inversion actually determines
-             the label and destination -- was tried on 2026-09-29 and
-             REVERTED. It left 16 of the 18 baseline counts byte-identical,
-             but turned [wsim_lts] and [wsim_lts_bigstep], both 396
-             iterations, into proofs that had not closed after 5000
-             iterations, 10 minutes and 1.4GB. Which hypothesis gets inverted
-             steers the whole downstream path and the search has no plan to
-             fall back on, so a local improvement here can flip a proof from
-             converging to diverging. Do not change this tie-break without
-             running all five cheap suites. See ASSISTED-CHANGES.md,
-             2026-09-29.
-
-             Retried 2026-10-01 gated on the mutual block ([ac98c3c]) and
-             reverted the same day: the mutual block does NOT make it safe.
-             With [MutualCofix True] forced, CADP's [wsim_lts_bigstep] went
-             from 396 to not closing. Run the suites with the strategy forced
-             both ways, not just under [Auto]. See ASSISTED-CHANGES.md,
-             2026-10-01. *)
-          (match Int.compare grade n with
-           | -1 -> Some (n, x) |> return
-           | _ -> Some (grade, y) |> return)
+        return (keep_highest best (grade, y))
       in
-      let* to_invert_opt = iterate 0 (List.length hyps - 1) None f in
+      let* to_invert_opt = iterate 0 (List.length hyps - 1) None grade_next in
       match to_invert_opt with
-      | None -> return None
-      | Some (0, x) -> return None
-      (* NOTE: we only want to invert hyps with non-zero grades. *)
-      | Some (grade, x) when Int.equal grade Hyp.refutable_grade ->
-        let* y = Tacs.refute_premise x in
-        return (Some y)
-      | Some (grade, x) when Int.equal grade Hyp.open_premise_grade ->
-        let* y = Tacs.invert_premise x in
-        return (Some y)
-      | Some (grade, x) ->
-        (* An LTS step with no instance closes the goal by refutation: one
-           step instead of the inversions of every layer beneath it
-           (note 11, option D′). *)
-        let* dead = Hyp.is_dead x in
-        let* y = if dead then Tacs.refute_dead x else Hyp.invert x in
-        return (Some y)
+      (* only hypotheses with a non-zero grade are inverted *)
+      | None | Some (0, _) -> return None
+      | Some gx ->
+        let+ y = invert_by_grade gx in
+        Some y
     ;;
 
     (** [try_unfold_any ()] is the tactic unfolding what can be unfolded
