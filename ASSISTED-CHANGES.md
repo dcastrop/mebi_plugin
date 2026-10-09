@@ -6467,6 +6467,177 @@ dead-code removals) · Tooling 2 (`relock.sh`, `reflow.py`).
 
 ---
 
+## 2026-10-09 — Documentation pass, part 7: the proof solver core
+
+**Docs + Refactor.** On branch `docs/src-solver-core`: `proof_solver` and
+`proof_solver_step`, the last of `src/` (part 6 was the support modules).
+
+**Comments** (`5f5053c`, `d3d77f8`, `2c43e45`, `652e81b`; comments only): contracts
+in the `.mli` for what the two export (`init`, `start`, `solve`, `step`,
+`guard`; the step's dispatch over the state machine), a full contract on
+each `.ml`-only definition (`ReModel`, `Hyp`, `Concl`, `Hyps`, the state
+handlers), history kept where it is the "how" (`solve`'s completion
+check, `try_invert_any`'s tie-break, why `get_non_cofixes` is oldest
+first). Each contract says whether an exception is raised while a
+monadic value is built or when it runs, which is what decides whether a
+handler around the call sees it.
+
+**The "try around a monadic value" sites** (`8198cf2`, `TODO.md`): each
+analysed, the outcome at the site and in `TODO.md`. Of the seven in
+`proof_solver_step.ml`, two were in dead code, four work (the exception
+is raised while building, or the `try` is inside the continuation), and
+one is half broken: `ReModel.label`'s `None`/`Some` fallback leaked a
+bare `Not_found`. `proof_solver_tactics.ml:525` works. Found on the way,
+same family: `find_lts`/`find_constructor` wrap a partial application of
+`List.find`, and `Proof_solver` and `Proof_solver_step` each declared a
+`NothingToDo`, so `solve` could not catch the step's. Fixed on a branch
+of their own (next entry).
+
+**Dead code** (`ff1d1d2`): `Proof_solver.reset_the_cache` and
+`NotImplemented`; `Proof_solver_step`'s `_state_opt`, `_label_opt`,
+`_need_inversion`; six commented-out pieces.
+
+**Splits**, one commit each: `Proof_solver.init` (330 lines) into
+`goal_head_is`, the whole-game refusals and an `Init` functor
+(`fall_back_on_simulation`, `plan_answers`, `choose_cofix_strategy`, ...;
+`14991d9`); `is_lts_of_either_fsm`, from three copies of one closure
+(`df0d069`); `Hyp.invertibility` (`mentions_var`, `step_grade`,
+`is_eq_inductive`; `e413ec9`); `unfold_atomic` and `seq_opt`, from three
+`try_unfold_any`s (`49a5bcb`); `Hyps.try_invert_any` (`keep_highest`,
+carrying the tie-break history, and `invert_by_grade`; `bcb431d`);
+`handle_open_block` (`9881b80`); `handle_weaksim` (`151ff9e`);
+`handle_apply_constructors` (`19752d7`); `contains`, from `guard`
+(`7ef065c`).
+
+**Verification.** Each code commit except `7ef065c` in its own worktree:
+the proof matrix in all three solver modes against `main`, every `Solve`
+identical. `7ef065c` (`guard`'s error path only) is covered by the head's
+run. The head (`d3d77f8`; what follows it is comments) also: ABP
+(6494 / 9914) and the `Test4` suite (48,821 / 61,161) identical, `Test.v`'s
+60 counts identical, `tests.exe` 103/103, `make` clean.
+
+**Mistakes, caught before pushing.** Inserting `mentions_var` and
+`step_grade` put them between `invertibility`'s doc comment and its
+definition (the doc-comment gotcha in the notes); moved before
+committing. Three doc comments were ambiguous to `make` (warning 50),
+caught by the `make` gate. The `init` split was committed by a command
+that chained `dune build && git commit` after a comment edit that had
+failed: the commit was right, but one comment stayed past 80 columns
+until `d3d77f8`. User errors went round in a circle: I wrote them as
+`@raise CErrors.UserError`, then (`2c43e45`) switched them to
+`wrapper.mli`'s prose ("Raises Rocq's [UserError] ...") to match it and
+avoid an `odoc` warning, though `@raise` is the form everywhere else (196
+tags against about 30 prose sentences). With Jonah, `@raise` was settled
+on for the whole codebase, and `652e81b` puts the tags back, accepting the
+warning; the remaining prose sentences on `main` get a branch of their
+own. A reflow had also merged `init`'s closing paragraph into its last
+list item (fixed in `652e81b`). And
+`notes/tools/reflow.py` split `[code spans]` that `ocamlformat` then
+joined back past the margin; the tool now keeps a span whole.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/src-solver-core main`), or one commit.
+
+**Session tally (2026-10-09):** Docs 6 · Refactor 10 (9 splits, 1
+dead-code removal) · Tooling 1 (`reflow.py` keeps code spans whole; local,
+in `notes/tools`).
+
+---
+
+## 2026-10-09 — Fixes for the "try around a monadic value" handlers
+
+**Bug fix.** On branch `fix/try-handler-latent-bugs`, from the solver
+core's documentation pass (previous entry). Every site in `TODO.md`'s
+list analysed there; one commit for each handler that was broken:
+- `Proof_solver_tactics.find_lts` and `find_constructor` (`0ae1dc7`):
+  the `try` wrapped a partial application of `List.find`, so a missing
+  LTS or constructor escaped as `Not_found`, not the exception the
+  interface names.
+- `Proof_solver_step.ReModel.label` (`49ba897`): the `None`/`Some`
+  fallback's lookup ran in a `let*` continuation, past the handlers, so
+  an encoding missing from the alphabet escaped as a bare `Not_found`
+  and ended the step. It is now `CouldNotFind_Label`, which
+  `Hyps.get_transition` skips like any other unreadable label.
+- `Theories.is_theory` (`45a3c34`): false for a term that is not an
+  atomic type, decided inside the check, and for a product too (it named
+  `EConstrIsNotA_Type` but not `EConstrIsNot_Atomic`). Every `is_*` check
+  is `is_theory`, so all now raise nothing.
+- `Constructor_bindings.get_bound_term` (`809b591`): an undefined binding
+  names the outermost term, as its handler meant to; the handler now
+  runs inside the computation (`naming_outer`).
+- `Proof_solver.NothingToDo` (`f1d0558`) is now the step's exception, and
+  `S.step` unwraps it from the tactic engine's `TacticFailure`, so `solve`
+  can stop on it. No suite reaches it (the state machine is `Done` only
+  once the proof has no goals, which `S.step` checks first): it makes
+  the handler mean what it says rather than fixing something observed.
+
+The sites that work (`graph.ml`, `graph_type.ml`, `graph_builder.ml`,
+`ReModel.state`, `Hyp.try_unfold_any`, `unfold_opt_constrexpr_list`) are
+unchanged, with a comment saying why they work. `TODO.md`'s item is
+closed.
+
+**No new tests**: as for the `lib/rocq_tools` fixes, these need a Rocq
+runtime, and no `Test.v` input reaches the failing paths -- which is why
+the suites did not see them. Only the error a user would see changes for
+`find_lts`, `find_constructor` and `get_bound_term`; `label` and
+`is_theory` change control flow where they used to fail.
+
+**Verification.** Each fix commit in its own worktree: the proof matrix in
+all three solver modes, ABP (6494 / 9914) and `Test.v`'s 60 counts, each
+identical to `main`. The head also: the `Test4` suite (48,821 / 61,161)
+identical, `tests.exe` 103/103, `make` clean.
+
+**Mistake:** `45a3c34`'s message first said the solver's callers "already
+caught" these exceptions; only two do. Reworded before pushing.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep fix/try-handler-latent-bugs main`), or one fix
+by its commit.
+
+**Session tally (2026-10-09), cont.:** Docs 8 · Refactor 10 · Bug fix 5 ·
+Tooling 1.
+
+---
+
+## 2026-10-09 — Documentation pass, part 8: `lib/utils`
+
+**Docs + Refactor.** On branch `docs/lib-utils`: `Json`, `Logger`,
+`Output`, `Utils`.
+
+**Comments** (`77681d1`, `09a505d`, `12c6858`; comments only): contracts
+in the `.mli`, pointers or history in the `.ml`. Two old comments were
+wrong and now say what the code does: `split_at i l` is the first `i`
+elements, *reversed* (not "the i-th tail"), and `new_int_counter`'s first
+value is `start + 1`. `Sys_error` went to prose (`09a505d`, because `odoc`
+cannot resolve a stdlib exception and `Json.S` is included everywhere) and
+back to an `@raise` tag (`12c6858`), once `@raise` was settled on for the
+whole codebase, warnings accepted.
+
+**Dead code** (`bdb27e6`): `Utils`' `swap`, `try_seq_opt`, `strip_snd`,
+`get_key_of_val`, `option_str`; `Logger`'s `option` and `options`.
+`Logger`'s `enable`, `disable`, `quiet` and `reset_sink` are unused too,
+but kept as the configuration API.
+
+**Split** (`e07a7d5`): `clean_char`, from `clean_string`'s fold; checked
+against the old function on 20,000 random strings, identical.
+
+**Noticed, not changed** (`TODO.md`): the stdout sink prints a
+`thing`'s prefix as `"p: : body"` (`thing` adds `": "`, the sink adds it
+again; Rocq's sink does not), and `things` drops `__FUNCTION__` for its
+items. `clean_string` builds its result with one `sprintf` per character.
+
+**Verification.** On the head: `tests.exe` 103/103, the proof matrix in
+all three modes and `Test.v`'s 60 counts identical to `main`'s, `make`
+clean.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/lib-utils main`), or one commit.
+
+**Session tally (2026-10-09), cont.:** Docs 13 · Refactor 12 · Bug fix 5 ·
+Tooling 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
