@@ -3,9 +3,8 @@
     afresh for each goal by {!Proof_solver.Make}. *)
 
 (** Raised by {!S.step}: the state machine is [Done], so there is nothing
-    to do. Not {!Proof_solver.NothingToDo}, which {!Proof_solver.solve}
-    stops on: this one reaches the command ([TODO.md], "try around a
-    monadic value"). *)
+    to do. {!Proof_solver.NothingToDo} is the same exception, which
+    {!Proof_solver.solve} stops on. *)
 exception NothingToDo
 
 (** A proof step over one goal: its monad and helpers

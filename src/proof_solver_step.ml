@@ -208,11 +208,8 @@ struct
 
         @raise CouldNotFind_Label
           if [x] has no encoding, or is neither [None] nor [Some] (raised
-          here).
-        @raise Not_found
-          if [x] is [None] or [Some] but that encoding is not in [ys]
-          (raised when run, past the handler: [TODO.md], "try around a
-          monadic value"). *)
+          here, while building), or is [None] or [Some] but that encoding is
+          not in [ys] (raised here, when run). *)
     let label (x : EConstr.t) (ys : Model.Label.Set.t) : Model.Label.t M.mm =
       Logger.trace __FUNCTION__;
       if Logger.is_enabled Output.Kind.Debug
@@ -223,6 +220,17 @@ struct
         (* NOTE: [Model.Label.Set.compare] only cares about [is_silent=Some _]
         *)
         Model.Label.Set.find { base = enc; is_silent = None } ys |> M.return
+      in
+      (* [fallback enc] is [f enc], for the fallback's encoding: it runs in a
+         [let*] continuation, past the handlers below, so a miss is reported
+         here as what it is *)
+      let fallback (enc : Enc.t) : Model.Label.t M.mm =
+        try f enc with
+        | Not_found ->
+          Logger.debug
+            ~__FUNCTION__
+            "miss: None/Some encoding not among the given alphabet";
+          raise (CouldNotFind_Label { x; alphabet = ys })
       in
       try M.get_encoding x |> f with
       | M.EncodingNotFound _ ->
@@ -237,13 +245,13 @@ struct
         (* NOTE: is it [None]? (i.e., a silent action) *)
         (try
            let* term : Enc.t = Theory.get_None_enc_if_eq x in
-           f term
+           fallback term
          with
          | Theory.NotEqTheory ->
            (* NOTE: is it [Some]? (i.e., a visible action) *)
            (try
               let* term : Enc.t = Theory.get_Some_enc_if_eq x in
-              f term
+              fallback term
             with
             | Theory.NotEqTheory ->
               Logger.debug
@@ -554,10 +562,7 @@ struct
 
         @raise CouldNotGetTransition
           if [x] is not a step of one of [m]'s LTSs (of [lts], if given), or
-          its states, label or transition are not in [m] (raised here).
-        @raise Not_found
-          as {!ReModel.label}, for a [None]/[Some] label outside [m]'s
-          alphabet (propagated). *)
+          its states, label or transition are not in [m] (raised here). *)
     let get_transition ?(lts : EConstr.t option) (x : t) (m : Model.FSM.t)
       : Model.Transition.t mm
       =

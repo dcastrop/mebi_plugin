@@ -6544,6 +6544,61 @@ in `notes/tools`).
 
 ---
 
+## 2026-10-09 — Fixes for the "try around a monadic value" handlers
+
+**Bug fix.** On branch `fix/try-handler-latent-bugs`, from the solver
+core's documentation pass (previous entry). Every site in `TODO.md`'s
+list analysed there; one commit for each handler that was broken:
+- `Proof_solver_tactics.find_lts` and `find_constructor` (`0ae1dc7`):
+  the `try` wrapped a partial application of `List.find`, so a missing
+  LTS or constructor escaped as `Not_found`, not the exception the
+  interface names.
+- `Proof_solver_step.ReModel.label` (`49ba897`): the `None`/`Some`
+  fallback's lookup ran in a `let*` continuation, past the handlers, so
+  an encoding missing from the alphabet escaped as a bare `Not_found`
+  and ended the step. It is now `CouldNotFind_Label`, which
+  `Hyps.get_transition` skips like any other unreadable label.
+- `Theories.is_theory` (`45a3c34`): false for a term that is not an
+  atomic type, decided inside the check, and for a product too (it named
+  `EConstrIsNotA_Type` but not `EConstrIsNot_Atomic`). Every `is_*` check
+  is `is_theory`, so all now raise nothing.
+- `Constructor_bindings.get_bound_term` (`809b591`): an undefined binding
+  names the outermost term, as its handler meant to; the handler now
+  runs inside the computation (`naming_outer`).
+- `Proof_solver.NothingToDo` (`f1d0558`) is now the step's exception, and
+  `S.step` unwraps it from the tactic engine's `TacticFailure`, so `solve`
+  can stop on it. No suite reaches it (the state machine is `Done` only
+  once the proof has no goals, which `S.step` checks first): it makes
+  the handler mean what it says rather than fixing something observed.
+
+The sites that work (`graph.ml`, `graph_type.ml`, `graph_builder.ml`,
+`ReModel.state`, `Hyp.try_unfold_any`, `unfold_opt_constrexpr_list`) are
+unchanged, with a comment saying why they work. `TODO.md`'s item is
+closed.
+
+**No new tests**: as for the `lib/rocq_tools` fixes, these need a Rocq
+runtime, and no `Test.v` input reaches the failing paths -- which is why
+the suites did not see them. Only the error a user would see changes for
+`find_lts`, `find_constructor` and `get_bound_term`; `label` and
+`is_theory` change control flow where they used to fail.
+
+**Verification.** Each fix commit in its own worktree: the proof matrix in
+all three solver modes, ABP (6494 / 9914) and `Test.v`'s 60 counts, each
+identical to `main`. The head also: the `Test4` suite (48,821 / 61,161)
+identical, `tests.exe` 103/103, `make` clean.
+
+**Mistake:** `45a3c34`'s message first said the solver's callers "already
+caught" these exceptions; only two do. Reworded before pushing.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep fix/try-handler-latent-bugs main`), or one fix
+by its commit.
+
+**Session tally (2026-10-09), cont.:** Docs 8 · Refactor 10 · Bug fix 5 ·
+Tooling 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

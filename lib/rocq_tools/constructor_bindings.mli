@@ -54,12 +54,8 @@ module type S = sig
       the path continues into argument [index]; [Done] is [x] itself.
 
       @raise BindingInstruction_Undefined
-        if [path] is [Undefined], at once
-        when applied, or when run if reached deeper (raised here). The outer
-        handler meant to replace the carried term by the outermost one
-        surrounds only the construction of the value, so a deeper failure
-        still names the innermost term ([TODO.md], "try around a monadic
-        value").
+        if [path] is [Undefined], at once when applied, or when run if
+        reached deeper, naming [x] as the outer term (raised here).
       @raise BindingInstruction_NotApp
         when run, if a step meets a term that
         is not an application (raised here).
