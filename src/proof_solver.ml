@@ -726,6 +726,16 @@ let start
   init pstate refs a b
 ;;
 
+(** [contains ~sub s] is whether [sub] occurs in [s]. Raises nothing. *)
+let contains ~(sub : string) (s : string) : bool =
+  let n = String.length sub in
+  let rec from (i : int) : bool =
+    i + n <= String.length s
+    && (String.equal (String.sub s i n) sub || from (i + 1))
+  in
+  from 0
+;;
+
 (* See the [.mli]. An exception from inside the plugin that nothing handled
    would reach Rocq as an Anomaly ("please report at rocq-prover.org"),
    blaming Rocq for a plugin failure -- as [BindingInstruction_NotApp] and
@@ -748,14 +758,9 @@ let guard (f : unit -> 'a) : 'a =
      plugin's own [lib/] libraries are not [Mebi_plugin.]-prefixed
      ([Rocq_utils_HypIsNot_Atomic], 2026-10-02). *)
   let internal (e : exn) : bool =
-    let printed = Pp.string_of_ppcmds (CErrors.print_no_report e) in
-    let sub = "Uncaught exception" in
-    let n = String.length sub in
-    let rec has (i : int) : bool =
-      i + n <= String.length printed
-      && (String.equal (String.sub printed i n) sub || has (i + 1))
-    in
-    has 0
+    contains
+      ~sub:"Uncaught exception"
+      (Pp.string_of_ppcmds (CErrors.print_no_report e))
   in
   try f () with
   | e when CErrors.noncritical e && internal (root e) ->
