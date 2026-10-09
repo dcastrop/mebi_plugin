@@ -40,9 +40,8 @@ module type S = sig
       session's timestamp, the source location and [name], creating [dir]
       if needed.
 
-      @raise Sys_error
-        if the directory or file cannot be created or written (propagated;
-        the file is closed first). *)
+      Raises [Sys_error] if the directory or file cannot be created or
+      written (propagated; the file is closed first). *)
   val write : ?dir:string -> string -> k -> unit
 end
 
