@@ -68,37 +68,41 @@ let option_fstr (f : 'a -> string) : 'a option -> string = function
   | Some x -> Printf.sprintf "Some (%s)" (f x)
 ;;
 
-(* See the [.mli]. [writing_space] is whether the last character written
-   was a space (or nothing is written yet), so the next whitespace is
-   dropped. *)
+(** [clean_char after_space c] is what [c] becomes in {!clean_string}: a
+    newline, tab or space is one space, or nothing just after a space; a
+    double quote is a single quote; anything else is itself.
+    [after_space] is whether the last character written was a space (or
+    nothing is written yet), and is updated. Raises nothing. *)
+let clean_char (after_space : bool ref) (c : char) : string =
+  if String.contains "\n\r\t" c
+  then
+    if !after_space
+    then ""
+    else (
+      after_space := true;
+      " ")
+  else (
+    let c_str : string = String.make 1 c in
+    if String.contains "\"" c
+    then "'"
+    else (
+      match String.equal " " c_str, !after_space with
+      | true, true -> ""
+      | true, false ->
+        after_space := true;
+        c_str
+      | false, true ->
+        after_space := false;
+        c_str
+      | false, false -> c_str))
+;;
+
+(* See the [.mli]. *)
 let clean_string (s : string) : string =
-  let writing_space : bool ref = ref true in
+  let after_space : bool ref = ref true in
   String.fold_left
     (fun (acc : string) (c : char) ->
-      Printf.sprintf
-        "%s%s"
-        acc
-        (if String.contains "\n\r\t" c
-         then
-           if !writing_space
-           then ""
-           else (
-             writing_space := true;
-             " ")
-         else (
-           let c_str : string = String.make 1 c in
-           if String.contains "\"" c
-           then "'"
-           else (
-             match String.equal " " c_str, !writing_space with
-             | true, true -> ""
-             | true, false ->
-               writing_space := true;
-               c_str
-             | false, true ->
-               writing_space := false;
-               c_str
-             | false, false -> c_str))))
+      Printf.sprintf "%s%s" acc (clean_char after_space c))
     ""
     s
 ;;
