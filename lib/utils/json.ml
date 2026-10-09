@@ -1,3 +1,4 @@
+(* See the [.mli] for everything here. *)
 let option ?(as_elt : bool = false) (f : ?as_elt:bool -> 'a -> Yojson.t)
   : 'a option -> Yojson.t
   = function
@@ -168,7 +169,6 @@ module List = struct
 
       let name = X.name
 
-      (** ... *)
       let json ?(as_elt : bool = false) (xs : k) : Yojson.t =
         let y : Yojson.t =
           `List
