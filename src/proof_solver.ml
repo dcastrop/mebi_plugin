@@ -43,28 +43,33 @@ module Make (Enc : Encoding.S) :
   type tree = Enc.Tree.t
   type trees = Enc.Trees.t
 
-  (** [module Tactic] is our own wrapper-module for the ['a Proofview.tactic]. The key distinction is that we enable tactics to be attached with an optional message to print {i (each with configurable [module Feedback.level])}, and have a clearer approach to sequencing and chaining tactics together. Tactics built using this must be {b unpacked} in order to by used via function [unpack].
-  *)
+  (* Our own wrapper for ['a Proofview.tactic]: a tactic can carry a message
+     to print (at a configurable [Feedback.level]), and sequencing and
+     chaining are explicit. A tactic built with it must be unpacked
+     ([Tactic.unpack]) before Rocq can run it. *)
   module Tactic : Proof_solver_tactic.S = Proof_solver_tactic.Make
 
-  (** [module W] is for running the main part of the algorithm (pre-proof). It is a standard [module Wrapper.S] which itself is wrapped in a [module Results.S] which stores the results and provides some useful functions for using the bisimilarity result.
-  *)
+  (* The main part of the algorithm, run before the proof: a [Wrapper.S]
+     inside a [Results.S], which keeps the bisimilarity result and reads it
+     for the search. *)
   module W = Results.Make (Enc)
 
-  (** [module ProofState] sets up the different internal states of the proof-solver. We require [module Results.S] since some of the internal states {i (e.g., [Exists transition_opt])} store some information from the proof that corresponds to information captured in the initial run of the bisimilarity checking algorithm. {i {b Note:} this 'proof-state-machine' is not actually handled here, it is only the structure.}
-    @see [module Proof_solver_step] for how these states are traversed in order to solve the proof.
-    *)
+  (* The proof solver's state machine. It needs [W] because some states
+     ([Exists t], say) hold what the bisimilarity check found. Only the
+     structure is here: [Proof_solver_step] walks it. *)
   module ProofState = Proof_solver_statem.Make (Enc) (W)
 
-  (** [module TheoryMaker] is a functor that allows us to create a [module Proof_solver_theory.S] for each iteration (step) of the proof-solver. Since a fair amount of it only relies on [module Enc] and the results of the command in [module W], this functor just takes the [module Proof_solver_wrapper.S] created from the [Proofview.Goal.t] of the proof in each proof-step.
-  *)
+  (* A [Proof_solver_theory.S] for each step. Most of it depends only on
+     [Enc] and [W], so the functor takes just the step's own
+     [Proof_solver_wrapper.S], built from that step's goal. *)
   module TheoryMaker = Proof_solver_theory.Make (Enc) (W)
 
-  (** [module Step] is a functor for returning a [module Proof_solver_step.S] for handling the current [Proofview.Goal.t], which is the only thing that will change for each proof-step.
-  *)
+  (* A [Proof_solver_step.S] for the goal in focus, the only thing that
+     changes from one step to the next. *)
   module Step =
     Proof_solver_step.Make (Enc) (Tactic) (W) (ProofState) (TheoryMaker)
 
+  (** [make gl] is a {!Step} for the goal [gl]. Raises nothing. *)
   let make (gl : Proofview.Goal.t)
     : (module Proof_solver_step.S with type tactic = Tactic.t)
     =
@@ -73,7 +78,7 @@ module Make (Enc : Encoding.S) :
        end))
   ;;
 
-  (** [get_updated_pstate x] returns the [pstate] updated by tactic [x]. *)
+  (* See the [.mli]. *)
   let get_updated_pstate (x : unit Proofview.tactic) : Declare.Proof.t =
     Logger.trace __FUNCTION__;
     let new_pstate, is_safe_tactic =
@@ -84,13 +89,17 @@ module Make (Enc : Encoding.S) :
     new_pstate
   ;;
 
+  (** [exit_proof ()] sets the state machine to [Done] and stops the step.
+
+      @raise NothingToDo always (raised here). *)
   let exit_proof () : unit =
     ProofState.update_statem Done;
     raise NothingToDo
   ;;
 
-  (** [step pstate] enters a fresh [module Step] for [pstate] and returns it after being updated by [Step.step ()] (followed by [simpl in *] and [subst]).
-  *)
+  (* See the [.mli]. A fresh {!Step} is entered for the goal in focus
+     ([Proofview.Goal.enter]), so each step reads that goal's [env] and
+     [sigma]. *)
   let step (pstate : Declare.Proof.t) : Declare.Proof.t =
     Logger.trace __FUNCTION__;
     ProofState.update_pstate pstate;
@@ -114,22 +123,33 @@ end
    only the solver is left. *)
 type t = { solver : (module S) }
 
+(** The cached solver, if {!make} has built one. *)
 let the_cache : t ref option ref = ref None
+
 let reset_the_cache () : unit = the_cache := None
 
 exception NoCachedModules
 
+(** [get_the_cache ()] is the cached solver.
+
+    @raise NoCachedModules if none has been built (raised here). *)
 let get_the_cache () : t ref =
   match !the_cache with None -> raise NoCachedModules | Some x -> x
 ;;
 
+(** [get_the_proof_solver ()] is the cached solver's module, in a fresh
+    reference.
+
+    @raise NoCachedModules if none has been built (propagated). *)
 let get_the_proof_solver () : (module S) ref = ref !(get_the_cache ()).solver
 
+(* See the [.mli]. *)
 let is_done () : bool =
   let module Ps = (val !(get_the_proof_solver ())) in
   Ps.ProofState.is_done ()
 ;;
 
+(* See the [.mli]. *)
 let make (module Enc : Encoding.S) () : t ref =
   Logger.trace __FUNCTION__;
   let module Solver : S with type enc = Enc.t = Make (Enc) in
@@ -139,6 +159,10 @@ let make (module Enc : Encoding.S) () : t ref =
 
 (***********************************************************************)
 
+(** [stop_msg n] is the line {!solve} ends with:
+    ["(Stopped) Solved after n iterations."], or [Unsolved].
+
+    @raise NoCachedModules if no solver has been built (propagated). *)
 let stop_msg (x : int) : string =
   Printf.sprintf
     "(Stopped) %s after %i iterations."
@@ -146,11 +170,12 @@ let stop_msg (x : int) : string =
     x
 ;;
 
-(** What to say when [MeBi Sim Solve N] runs out of steps: which cofix
-    strategy was in force (and whether [Auto] picked it), and the two ways on.
-    An unsolved stop is not always a mistake -- a proof can be driven by
-    several smaller [Solve]s -- so this rides on the [Notice] above rather
-    than raising its own warning. *)
+(** [exhausted_msg bound] is what to say when [MeBi Sim Solve bound] runs
+    out of steps: which cofix strategy was in force (and whether [Auto]
+    picked it), and the two ways on. An unsolved stop is not always a
+    mistake -- a proof can be driven by several smaller [Solve]s -- so this
+    rides on the [Notice] above rather than raising its own warning. Raises
+    nothing. *)
 let exhausted_msg (bound : int) : string =
   let mutual : bool = !Api.the_mutual_cofix in
   Printf.sprintf
@@ -166,23 +191,21 @@ let exhausted_msg (bound : int) : string =
     (if mutual then "False" else "True")
 ;;
 
-(** [step] ... *)
+(* See the [.mli]. *)
 let step (pstate : Declare.Proof.t) : Declare.Proof.t =
   let module Ps : S = (val !(get_the_proof_solver ())) in
   Ps.step pstate
 ;;
 
-(** [solve ?bound pstate] steps the proof until it closes or [bound] is reached.
-
-    Completion is checked here, after each step, rather than being left to the
-    next call to [step] (which raises [NothingToDo] once [Proof.is_done]). Doing
-    it there cost a whole iteration to notice a proof that had already closed:
-    with [bound] one below the number of productive steps the proof still
-    closed and [Qed] succeeded, but the loop exited on the bound instead, so
-    [statem] was never set to [Done] and this reported "Unsolved". That is why
-    every [MeBi Sim Solve N] in the examples needed [N] to be one more than the
-    work actually required. Existing bounds all still hold -- the requirement
-    only ever got weaker. *)
+(* See the [.mli]. Completion is checked here, after each step, rather than
+   being left to the next call to [step] (which raises [NothingToDo] once
+   [Proof.is_done]). Doing it there cost a whole iteration to notice a proof
+   that had already closed: with [bound] one below the number of productive
+   steps the proof still closed and [Qed] succeeded, but the loop exited on
+   the bound instead, so [statem] was never set to [Done] and this reported
+   "Unsolved". That is why every [MeBi Sim Solve N] in the examples needed
+   [N] to be one more than the work actually required. Existing bounds all
+   still hold -- the requirement only ever got weaker. *)
 let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
   Logger.trace __FUNCTION__;
   let module Ps : S = (val !(get_the_proof_solver ())) in
@@ -223,7 +246,8 @@ let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
   pstate
 ;;
 
-(** [init ] ... *)
+(* See the [.mli]. The steps run in the order listed there; each block
+   below says what it decides. *)
 let init
       ?(enc : unit -> (module Encoding.S) = Api.make_enc_int)
       (pstate : Declare.Proof.t)
@@ -532,8 +556,8 @@ let init
            (* Only the mutual path is announced. It is the deviation from what
               the solver has always done, it changes the iteration count a
               checked-in [MeBi Sim Solve] bound was measured against, and on a
-              product where it matters it is the difference between finishing and
-              not. Staying on the nested path is the status quo and says
+              product where it matters it is the difference between finishing
+              and not. Staying on the nested path is the status quo and says
               nothing. *)
            if use_mutual
            then
@@ -560,15 +584,15 @@ let init
   pstate
 ;;
 
-(** Which goal {!start} states: [weak_bisimilar] ([Bisim], for [MeBi Run Bisim ... As]) or [weak_sim] ([Sim]).
-*)
+(* See the [.mli]. *)
 type goal_kind =
   | Bisim
   | Sim
 
-(** [goal_statement kind (x, a) (y, b)]: the statement to prove, as an
-    expression to interpret: [weak_bisimilar a b x y] or [weak_sim a b x y], [x] stepping by the relation [a] and [y] by [b].
-*)
+(** [goal_statement kind (x, a) (y, b)] is the statement to prove, as an
+    expression still to interpret: [weak_bisimilar a b x y] ([Bisim]) or
+    [weak_sim a b x y] ([Sim]), [x] stepping by the relation [a] and [y] by
+    [b]. Raises nothing. *)
 let goal_statement
       (kind : goal_kind)
       ((x, a) : Constrexpr.constr_expr * Libnames.qualid)
@@ -585,12 +609,8 @@ let goal_statement
     , [ Constrexpr_ops.mkRefC a; Constrexpr_ops.mkRefC b; x; y ] )
 ;;
 
-(** [start ~kind ~name refs a b]: open a proof named [name] (an [Example])
-    of {!goal_statement}, and begin the proof search on it with {!init}, so
-    that [MeBi Sim Solve] can follow at once. The check is the one
-    [MeBi Sim Begin] would run, done once: nothing is kept after the
-    command. If the two are not bisimilar ([Bisim]) or not similar ([Sim]),
-    [init] refuses and no proof is opened. *)
+(* See the [.mli]. The check is the one [MeBi Sim Begin] would run, done
+   once: nothing is kept after the command. *)
 let start
       ~(kind : goal_kind)
       ~(name : Names.Id.t)
@@ -614,14 +634,14 @@ let start
   init pstate refs a b
 ;;
 
-(** [guard f] runs a [MeBi Sim] command. An exception from inside the plugin
-    that nothing handled would reach Rocq as an {e Anomaly} ("please report
-    at rocq-prover.org"), blaming Rocq for a plugin failure -- as
-    [BindingInstruction_NotApp] and [CannotGetTransition] did on 2026-10-01.
-    Those -- any exception Rocq has no printer for, which it would report
-    as "Uncaught exception" -- become a user error that names the exception
-    and says whose problem it is. Exceptions with a registered printer -- Rocq's own errors,
-    tactic failures, [MEBI_exn] -- pass through unchanged. *)
+(* See the [.mli]. An exception from inside the plugin that nothing handled
+   would reach Rocq as an Anomaly ("please report at rocq-prover.org"),
+   blaming Rocq for a plugin failure -- as [BindingInstruction_NotApp] and
+   [CannotGetTransition] did on 2026-10-01. Those -- any exception Rocq has
+   no printer for, which it would report as "Uncaught exception" -- become a
+   user error that names the exception and says whose problem it is.
+   Exceptions with a registered printer -- Rocq's own errors, tactic
+   failures, [MEBI_exn] -- pass through unchanged. *)
 let guard (f : unit -> 'a) : 'a =
   (* The step logic runs inside a tactic ([Proofview.Goal.enter]), whose
      engine wraps an exception raised there: look through that wrapper, or a
