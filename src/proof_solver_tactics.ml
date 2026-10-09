@@ -668,13 +668,15 @@ module Make
   exception NoRocqLTSFoundWithEnc of Enc.t
 
   (* See the [.mli]. *)
-  let find_lts (lts_enc : Enc.t)
-    : Model.Info.Meta.RocqLTS.t list -> Model.Info.Meta.RocqLTS.t
+  let find_lts (lts_enc : Enc.t) (ltss : Model.Info.Meta.RocqLTS.t list)
+    : Model.Info.Meta.RocqLTS.t
     =
     Logger.trace __FUNCTION__;
     try
-      List.find (fun ({ base; _ } : Model.Info.Meta.RocqLTS.t) ->
-        Enc.equal base lts_enc)
+      List.find
+        (fun ({ base; _ } : Model.Info.Meta.RocqLTS.t) ->
+          Enc.equal base lts_enc)
+        ltss
     with
     | Not_found -> raise (NoRocqLTSFoundWithEnc lts_enc)
   ;;
@@ -682,13 +684,17 @@ module Make
   exception NoConstructorFoundWithIndex of int
 
   (* See the [.mli]. *)
-  let find_constructor (constructor_index : int)
-    : ConstructorBindings.t list -> ConstructorBindings.t
+  let find_constructor
+        (constructor_index : int)
+        (constructors : ConstructorBindings.t list)
+    : ConstructorBindings.t
     =
     Logger.trace __FUNCTION__;
     try
-      List.find (fun ({ index; _ } : ConstructorBindings.t) ->
-        Int.equal index constructor_index)
+      List.find
+        (fun ({ index; _ } : ConstructorBindings.t) ->
+          Int.equal index constructor_index)
+        constructors
     with
     | Not_found -> raise (NoConstructorFoundWithIndex constructor_index)
   ;;

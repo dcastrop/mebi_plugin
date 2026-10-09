@@ -5,16 +5,9 @@ module type S = sig
   type 'a im
 
   (** [is_theory x y] is whether the head of [x], read as an atomic type,
-      is the theory term [y].
-
-      @raise Rocq_utils.Rocq_utils_EConstrIsNot_Atomic
-        when run, if [x] is a
-        type but not an atomic one (propagated from [to_atomic]).
-      @raise Rocq_utils.Rocq_utils_EConstrIsNotA_Type
-        when run, if [x] is
-        not a type (propagated from [to_atomic]; the handler meant to turn
-        it into [false] surrounds only the construction of the value, so it
-        does not see it -- see [TODO.md], "try around a monadic value"). *)
+      is the theory term [y]; [false] if [x] is not an atomic type (a
+      product such as a negation, a sort, or not a type at all). Raises
+      nothing. *)
   val is_theory : Evd.econstr -> Evd.econstr -> bool im
 
   (** [is_any_theory x] is whether [x] equals any of the terms
@@ -23,7 +16,7 @@ module type S = sig
 
   (** [is_exists x] is whether [x]'s head is [ex] ([exists]). Each of the
       [is_*] checks below is {!is_theory} against one theory term, and
-      raises as it does. *)
+      like it raises nothing. *)
   val is_exists : Evd.econstr -> bool im
 
   (** [is_weak_sim x] is whether [x]'s head is [weak_sim]. *)
