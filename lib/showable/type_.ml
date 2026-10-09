@@ -25,14 +25,3 @@ module type Ordered = sig
 
   include S with type t := t
 end
-
-(* [Yojson.t] (included into [Yojson_compare]) already provides pp/show/equal
-   directly -- no need to derive or hand-write them here. *)
-module Json : Ordered with type t = Yojson_compare.t = struct
-  type t = Yojson_compare.t
-
-  let compare = Yojson_compare.compare
-  let equal = Yojson_compare.equal
-  let pp = Yojson_compare.pp
-  let show = Yojson_compare.show
-end
