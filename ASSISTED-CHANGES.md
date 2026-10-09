@@ -6467,6 +6467,83 @@ dead-code removals) · Tooling 2 (`relock.sh`, `reflow.py`).
 
 ---
 
+## 2026-10-09 — Documentation pass, part 7: the proof solver core
+
+**Docs + Refactor.** On branch `docs/src-solver-core`: `proof_solver` and
+`proof_solver_step`, the last of `src/` (part 6 was the support modules).
+
+**Comments** (`5f5053c`, `d3d77f8`, `2c43e45`, `652e81b`; comments only): contracts
+in the `.mli` for what the two export (`init`, `start`, `solve`, `step`,
+`guard`; the step's dispatch over the state machine), a full contract on
+each `.ml`-only definition (`ReModel`, `Hyp`, `Concl`, `Hyps`, the state
+handlers), history kept where it is the "how" (`solve`'s completion
+check, `try_invert_any`'s tie-break, why `get_non_cofixes` is oldest
+first). Each contract says whether an exception is raised while a
+monadic value is built or when it runs, which is what decides whether a
+handler around the call sees it.
+
+**The "try around a monadic value" sites** (`8198cf2`, `TODO.md`): each
+analysed, the outcome at the site and in `TODO.md`. Of the seven in
+`proof_solver_step.ml`, two were in dead code, four work (the exception
+is raised while building, or the `try` is inside the continuation), and
+one is half broken: `ReModel.label`'s `None`/`Some` fallback leaked a
+bare `Not_found`. `proof_solver_tactics.ml:525` works. Found on the way,
+same family: `find_lts`/`find_constructor` wrap a partial application of
+`List.find`, and `Proof_solver` and `Proof_solver_step` each declared a
+`NothingToDo`, so `solve` could not catch the step's. Fixed on a branch
+of their own (next entry).
+
+**Dead code** (`ff1d1d2`): `Proof_solver.reset_the_cache` and
+`NotImplemented`; `Proof_solver_step`'s `_state_opt`, `_label_opt`,
+`_need_inversion`; six commented-out pieces.
+
+**Splits**, one commit each: `Proof_solver.init` (330 lines) into
+`goal_head_is`, the whole-game refusals and an `Init` functor
+(`fall_back_on_simulation`, `plan_answers`, `choose_cofix_strategy`, ...;
+`14991d9`); `is_lts_of_either_fsm`, from three copies of one closure
+(`df0d069`); `Hyp.invertibility` (`mentions_var`, `step_grade`,
+`is_eq_inductive`; `e413ec9`); `unfold_atomic` and `seq_opt`, from three
+`try_unfold_any`s (`49a5bcb`); `Hyps.try_invert_any` (`keep_highest`,
+carrying the tie-break history, and `invert_by_grade`; `bcb431d`);
+`handle_open_block` (`9881b80`); `handle_weaksim` (`151ff9e`);
+`handle_apply_constructors` (`19752d7`); `contains`, from `guard`
+(`7ef065c`).
+
+**Verification.** Each code commit except `7ef065c` in its own worktree:
+the proof matrix in all three solver modes against `main`, every `Solve`
+identical. `7ef065c` (`guard`'s error path only) is covered by the head's
+run. The head (`d3d77f8`; what follows it is comments) also: ABP
+(6494 / 9914) and the `Test4` suite (48,821 / 61,161) identical, `Test.v`'s
+60 counts identical, `tests.exe` 103/103, `make` clean.
+
+**Mistakes, caught before pushing.** Inserting `mentions_var` and
+`step_grade` put them between `invertibility`'s doc comment and its
+definition (the doc-comment gotcha in the notes); moved before
+committing. Three doc comments were ambiguous to `make` (warning 50),
+caught by the `make` gate. The `init` split was committed by a command
+that chained `dune build && git commit` after a comment edit that had
+failed: the commit was right, but one comment stayed past 80 columns
+until `d3d77f8`. User errors went round in a circle: I wrote them as
+`@raise CErrors.UserError`, then (`2c43e45`) switched them to
+`wrapper.mli`'s prose ("Raises Rocq's [UserError] ...") to match it and
+avoid an `odoc` warning, though `@raise` is the form everywhere else (196
+tags against about 30 prose sentences). With Jonah, `@raise` was settled
+on for the whole codebase, and `652e81b` puts the tags back, accepting the
+warning; the remaining prose sentences on `main` get a branch of their
+own. A reflow had also merged `init`'s closing paragraph into its last
+list item (fixed in `652e81b`). And
+`notes/tools/reflow.py` split `[code spans]` that `ocamlformat` then
+joined back past the margin; the tool now keeps a span whole.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/src-solver-core main`), or one commit.
+
+**Session tally (2026-10-09):** Docs 6 · Refactor 10 (9 splits, 1
+dead-code removal) · Tooling 1 (`reflow.py` keeps code spans whole; local,
+in `notes/tools`).
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
