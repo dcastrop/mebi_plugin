@@ -15,7 +15,7 @@ module type S = sig
 end
 
 (** A type that can be ordered, compared for equality and printed: what a
-    set ({!Set_.Make}) needs of its elements. *)
+    set ([Set_.Make]) needs of its elements. *)
 module type Ordered = sig
   type t
 
