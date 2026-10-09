@@ -63,8 +63,9 @@ module FileWriter : sig
   val get_loc : unit -> string
 
   (** [create_parent_dir path] creates the directory that will hold the
-      file [path], and any of its parents that are missing. Raises
-      [Sys_error] if a directory cannot be created (propagated). *)
+      file [path], and any of its parents that are missing.
+
+      @raise Sys_error if a directory cannot be created (propagated). *)
   val create_parent_dir : string -> unit
 
   (** The local time, as ["yyyy mm dd - hh:mm:ss"], when the plugin was

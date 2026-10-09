@@ -36,12 +36,12 @@ module type S = sig
   val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
 
   (** [write ?dir name x] writes {!json} of [x], indented, to a new file in
-      [dir] (default {!Utils.FileWriter.default_dir}) named after the
-      session's timestamp, the source location and [name], creating [dir]
-      if needed.
+      [dir] (default {!Utils.FileWriter.default_dir}) named after the session's
+      timestamp, the source location and [name], creating [dir] if needed.
 
-      Raises [Sys_error] if the directory or file cannot be created or
-      written (propagated; the file is closed first). *)
+      @raise Sys_error
+        if the directory or file cannot be created or written
+        (propagated; the file is closed first). *)
   val write : ?dir:string -> string -> k -> unit
 end
 
