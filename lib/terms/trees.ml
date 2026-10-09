@@ -25,8 +25,8 @@ module Make (Tree : Tree.S) : S with type tree = Tree.t = struct
 
   exception EmptyHasNoMin
 
-  (** The derivation with the fewest constructors to apply ({!Tree.size});
-      on a tie, the least in the set's order. *)
+  (* See the [.mli]. The fold keeps the earlier of two of equal size, and
+     [to_list] is in the set's order. *)
   let min (xs : t) : elt =
     match to_list xs with
     | [] -> raise EmptyHasNoMin
