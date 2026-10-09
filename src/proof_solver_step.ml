@@ -92,6 +92,16 @@ struct
      and type econstrset = Iter.EConstrSet.t =
     Proof_solver_tactics.Make (Enc) (Tactic) (W) (Iter) (Theory)
 
+  (** [is_lts_of_either_fsm x] is whether [x] is one of the LTSs either FSM
+      was extracted with ({!Theory.is_fsm_constructor}); [false] for an FSM
+      that has no metadata. Raises nothing. *)
+  let is_lts_of_either_fsm (x : EConstr.t) : bool =
+    let of_fsm (m : Model.FSM.t) : bool =
+      try Theory.is_fsm_constructor x m with _ -> false
+    in
+    of_fsm (W.get_fsm_a ()) || of_fsm (W.get_fsm_b ())
+  ;;
+
   (** Reading a term of the proof back as a part of the model: the state,
       label or transition of {!W.Model} it stands for. *)
   module ReModel = struct
@@ -441,12 +451,7 @@ struct
            [In], a [<=], an equation -- comes from a constructor premise; the
            shape-based grading below assumes [term label goto] and could pick
            it, and inverting it (e.g. [In], a fixpoint) is meaningless. *)
-        let is_lts : bool =
-          let lts_of (m : Model.FSM.t) : bool =
-            try Theory.is_fsm_constructor ty m with _ -> false
-          in
-          lts_of (W.get_fsm_a ()) || lts_of (W.get_fsm_b ())
-        in
+        let is_lts : bool = is_lts_of_either_fsm ty in
         if is_eq || Bool.not is_lts
         then premise_grade x
         else (
@@ -647,9 +652,6 @@ struct
             (EConstr.decompose_app sigma (Reductionops.whd_all env sigma concl))
         else h
       in
-      let lts_of (m : Model.FSM.t) : bool =
-        try Theory.is_fsm_constructor h m with _ -> false
-      in
       let is_negation : bool =
         match EConstr.kind sigma (Reductionops.whd_all env sigma concl) with
         | Prod (_, _, b) ->
@@ -672,8 +674,7 @@ struct
            Premise_search.is_prop env sigma concl
            && Bool.not (String.starts_with ~prefix:"clos_" name)
            && Bool.not (Theory.is_any_theory h)
-           && Bool.not (lts_of (W.get_fsm_a ()))
-           && Bool.not (lts_of (W.get_fsm_b ()))
+           && Bool.not (is_lts_of_either_fsm h)
          | _ -> false)
     ;;
 
@@ -1036,11 +1037,7 @@ struct
       let is_step (h : Rocq_utils.hyp) : bool =
         match Rocq_utils.hyp_to_atomic sigma h with
         | exception _ -> false
-        | ty, _ ->
-          let lts_of (m : Model.FSM.t) : bool =
-            try Theory.is_fsm_constructor ty m with _ -> false
-          in
-          lts_of (W.get_fsm_a ()) || lts_of (W.get_fsm_b ())
+        | ty, _ -> is_lts_of_either_fsm ty
       in
       get_non_cofixes ()
       |> List.filter is_step
