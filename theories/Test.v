@@ -1456,6 +1456,108 @@ Module CheckerVerdicts.
 End CheckerVerdicts.
 
 (* [MeBi Help]: every topic parses and prints (backlog item F). *)
+MeBi Divider "Theories.Test.ParameterisedLTS".
+Module ParameterisedLTS.
+  (* KNOWN LIMIT: an LTS cannot have parameters. [Using]/[With] name an
+     inductive (a reference, not a term), and extraction reads its
+     constructors as relations over exactly three arguments. Parameters are
+     a common style in Rocq (an LTS generic in its label type, or defined in
+     a [Section]), so these pin the limit for a future pass: each [Fail]
+     below should become a positive test if parameters are supported.
+     Refused up front since 2026-10-10 ([LTS_Has_Parameters]; before, an
+     internal assertion failed during extraction). *)
+
+  (* 1. A value parameter: count up to [k]. *)
+  Inductive countLTS (k : nat) : nat -> option unit -> nat -> Prop :=
+  | up n : n < k -> countLTS k n (Some tt) (S n).
+  Fail MeBi Run LTS 0 Using countLTS.
+  (* An alias is not an inductive ([Invalid_Ref_LTS]); [countLTS 3] cannot
+     be written where an LTS is named at all. *)
+  Definition count3 := countLTS 3.
+  Fail MeBi Run LTS 0 Using count3.
+  (* The proof side refuses the same way. *)
+  Example wsim_count : weak_sim (countLTS 3) (countLTS 3) 0 0.
+  Proof. Fail MeBi Sim Begin countLTS 0 And countLTS 0 Using countLTS. Abort.
+
+  (* The workaround: fix the value in a module. *)
+  Module Count3.
+    Inductive countLTS : nat -> option unit -> nat -> Prop :=
+    | up n : n < 3 -> countLTS n (Some tt) (S n).
+    MeBi Config Bounds As Num States 4.
+    MeBi Run LTS 0 Using countLTS.
+    MeBi Config Bounds As Num States 3.
+    Fail MeBi Run LTS 0 Using countLTS.
+    MeBi Config Reset Bounds.
+  End Count3.
+
+  (* 2. Generic in its label type, with the type implicit. *)
+  Inductive popLTS {A : Type} : list A -> A -> list A -> Prop :=
+  | pop a l : popLTS (a :: l) a l.
+  Fail MeBi Run LTS (cons 1 (cons 2 nil)) Using popLTS.
+
+  (* 3. Defined in a [Section]: outside it, [Context] variables are
+     parameters. *)
+  Section Sectioned.
+    Context (A : Type).
+    Inductive sectLTS : list A -> A -> list A -> Prop :=
+    | spop a l : sectLTS (a :: l) a l.
+  End Sectioned.
+  Fail MeBi Run LTS (cons 1 (cons 2 nil)) Using sectLTS.
+End ParameterisedLTS.
+
+MeBi Divider "Theories.Test.GoalShapes".
+Module GoalShapes.
+  (* What [MeBi Sim Begin] accepts as a goal (2026-10-10). Every example in
+     the repository states a closed [weak_sim] or [weak_bisimilar] goal and
+     gives [Begin] its two states, so the cases below were never exercised.
+     Before, the refused ones stopped [Solve] on an internal error. *)
+  Import MultipleDerivations.
+  MeBi Config Reset Weak.
+  MeBi Config Weak As Option action.
+
+  (* The same states written differently are fine (conversion). *)
+  Example unfolded : weak_sim termLTS termLTS p q.
+  Proof. MeBi Sim Begin termLTS (tfix (tpar A A trec)) And termLTS q Using termLTS.
+    MeBi Sim Solve 1000. Qed.
+
+  (* [Begin]'s terms must be the goal's two states, in order. *)
+  Example mismatch : weak_sim termLTS termLTS p q.
+  Proof. Fail MeBi Sim Begin termLTS p And termLTS p Using termLTS.
+    Fail MeBi Sim Begin termLTS q And termLTS p Using termLTS. Abort.
+
+  (* An existential goal: give the witness first. *)
+  Example exists_hand : exists r, weak_sim termLTS termLTS p r.
+  Proof. exists q. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
+    MeBi Sim Solve 1000. Qed.
+  Example exists_plugin : exists r, weak_sim termLTS termLTS p r.
+  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+
+  (* A goal behind a definition of one's own: unfold it first. *)
+  Definition my_sim x y := weak_sim termLTS termLTS x y.
+  Example wrapped : my_sim p q.
+  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS.
+    unfold my_sim. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
+    MeBi Sim Solve 1000. Qed.
+
+  (* KNOWN LIMIT: open terms. A law for every [t] (as CTrees proves CCS's
+     laws, where [examples/Bisimilarity/CCS/LawProofs.v] proves closed
+     instances): [Begin] reads its terms in the global environment, and
+     an LTS cannot be built from a variable, whose steps are unknown. *)
+  Example open_law : forall t, weak_sim termLTS termLTS (tact A t) (tact A t).
+  Proof. intros t.
+    Fail MeBi Sim Begin termLTS (tact A t) And termLTS (tact A t) Using termLTS.
+  Abort.
+
+  (* KNOWN LIMIT: a local name, even for a closed term, is not found;
+     substituting it away works. *)
+  Example local_name : forall r, r = q -> weak_sim termLTS termLTS p r.
+  Proof. intros r H.
+    Fail MeBi Sim Begin termLTS p And termLTS r Using termLTS.
+    subst r. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
+    MeBi Sim Solve 1000. Qed.
+  MeBi Config Reset Weak.
+End GoalShapes.
+
 MeBi Divider "Theories.Test.Help".
 MeBi Help.
 MeBi Help Run.

@@ -155,6 +155,7 @@ module type S = sig
       | Invalid_Sort_Type of Sorts.Quality.t
       | Invalid_Ref_LTS of Names.GlobRef.t
       | Invalid_Ref_Type of Names.GlobRef.t
+      | LTS_Has_Parameters of string
       | Invalid_Arity of (Environ.env * Evd.evar_map * Constr.t)
       | InvalidCheckUpdatedCtx of
           (Environ.env
@@ -175,6 +176,7 @@ module type S = sig
     val invalid_sort_type : Sorts.Quality.t -> exn
     val invalid_ref_lts : Names.GlobRef.t -> exn
     val invalid_ref_type : Names.GlobRef.t -> exn
+    val lts_has_parameters : string -> exn
     val invalid_arity : Environ.env -> Evd.evar_map -> Constr.t -> exn
 
     val invalid_check_updated_ctx
@@ -204,6 +206,7 @@ module type S = sig
     val invalid_sort_type : Sorts.Quality.t -> 'a
     val invalid_ref_lts : Names.GlobRef.t -> 'a
     val invalid_ref_type : Names.GlobRef.t -> 'a
+    val lts_has_parameters : string -> 'a
     val invalid_arity : Constr.t -> 'a mm
 
     val invalid_check_updated_ctx
@@ -319,8 +322,12 @@ module type S = sig
       :  Names.GlobRef.t
       -> (Names.inductive * Declarations.mind_specif) mm
 
-    (** [lts_prop_mind r] is {!lts_mind}, checked to live in [Prop]. Raises as
-        {!lts_mind}, and, when run, {!assert_mip_arity_is_prop}'s error. *)
+    (** [lts_prop_mind r] is {!lts_mind}, checked to live in [Prop] and to
+        have no parameters. Raises as {!lts_mind}, and, when run,
+        {!assert_mip_arity_is_prop}'s error.
+
+        @raise Errors.MEBI_exn
+          [LTS_Has_Parameters] if the inductive has parameters (when run). *)
     val lts_prop_mind
       :  Names.GlobRef.t
       -> (Names.inductive * Declarations.mind_specif) mm
