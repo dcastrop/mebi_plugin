@@ -82,7 +82,7 @@ module type Label_sig = sig
       different {!field-is_silent}s only when the two systems of a command
       are configured differently ([MeBi Config Weak2] without [Weak1]); such
       labels are then kept apart. To find a label by its base alone, use
-      {!Labels_sig.find_base}. Raises nothing. *)
+      {!Components.Labels_sig.find_base}. Raises nothing. *)
   val compare : t -> t -> int
 
   (** [hash x] is the hash of [x]'s base term, consistent with {!equal}.
@@ -102,7 +102,7 @@ module type Labels_sig = sig
   include Json.S with type k = t
 
   (** [find_base b xs] is the label of [xs] whose base term is [b], whatever
-      it knows of being silent (the least, by {!Label_sig.compare}, if
+      it knows of being silent (the least, by {!Components.Label_sig.compare}, if
       several have [b]).
 
       @raise Not_found if none has (raised here). *)
