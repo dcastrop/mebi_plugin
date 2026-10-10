@@ -6964,6 +6964,64 @@ code changed, so no proof-suite run.
 
 ---
 
+## 2026-10-10 — Clean refusals: parameterised LTSs, `Sim Begin` goals
+
+On branch `fix/clean-refusals`. Two limits found while sizing B1 and note
+14 item 2, each refused up front now instead of failing deep inside, and
+pinned in `Test.v` so a future pass can lift them.
+
+**Bug fix: an LTS with parameters.** `Using`/`With` take a reference, so
+`termLTS 2` cannot be written, and an alias of it was refused with a bare
+`Invalid_Ref_LTS`. The parameterised inductive itself was *accepted*: the
+arity check counts the real indices only. Extraction then met a
+four-argument conclusion and stopped with `assertion: Array.length args
+== 3 failed. Got 4`. Now `lts_prop_mind` refuses it (`LTS_Has_Parameters`,
+naming the LTS, its parameter count and the workaround: fix the values in
+a module), and `Invalid_Ref_LTS` says what it means. `Test.v`'s
+`ParameterisedLTS` pins the limit: a value parameter, an alias, the proof
+side, a label type as an implicit parameter (`{A : Type}`, a common Rocq
+style), and an LTS defined in a `Section`. Each should become a positive
+test if parameters are ever supported, which would be **new capability**
+(medium: command syntax, and every place the LTS term is rebuilt). The
+old `Fail MeBi Run LTS 0 Using test_lts` now fails for this reason.
+
+**Bug fix: `MeBi Sim Begin` checked neither the goal nor its terms.**
+Jonah asked whether the examples' curation had hidden the limit on goals
+with an unknown state. It had: every example states a closed `weak_sim`
+or `weak_bisimilar` goal and gives `Begin` those two states. Probing other
+shapes on `main` found:
+- an `exists` goal (no witness): taken for `weak_bisimilar`, then `Solve`
+  stopped on an internal error (`CannotGetTransition`);
+- `Begin` terms other than the goal's, or swapped: internal errors
+  (`CouldNotFind_State`, `CannotGetTransition`);
+- a goal behind a user definition: a unification error.
+`Begin` now refuses a goal that is neither `weak_sim` nor `weak_bisimilar`
+(saying: give an existential's witness with `exists t.`, prove a
+conjunction's parts, unfold a definition), and checks its two terms are
+the goal's states up to conversion (naming the one that is not).
+`Test.v`'s `GoalShapes` pins each case, the hand-given witness and the
+unfolded term as positive tests, and two `KNOWN LIMIT`s that are Rocq's
+own errors: open terms (a law for every `t`, as CTrees proves CCS's laws)
+and local names (`subst` works around it). Not checked: `Begin`'s LTSs
+against the goal's.
+
+**Verification.**
+- The proof matrix in all three modes and ABP against `main`: "Every
+  Solve identical".
+- `Test.v`: identical to `main` apart from the four new `GoalShapes`
+  proofs (39, 38, 38, 38; the one given the unfolded term takes one step
+  more than the same goal given `p`, not investigated).
+- Every new `Fail` checked for its reason by cutting the file there.
+- `make` gate clean; `tests.exe` 110/110.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep fix/clean-refusals main`).
+
+**Session tally (2026-10-10, second session), cont.:** Docs 1 · Tooling 1
+· Bug fix 2.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
