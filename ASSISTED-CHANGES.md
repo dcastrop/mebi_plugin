@@ -6898,6 +6898,21 @@ Optimization 2.
 
 ---
 
+## 2026-10-10 — `tests.exe` baseline corrected in `CLAUDE.md`
+
+**Docs.** `CLAUDE.md` told sessions to expect `tests.exe` 99/99. The
+suite has had more tests since PR #35 (101), and 110 since #52-#54, so a
+session following it would have read a clean run as a discrepancy. It now
+says 110/110, measured on `main` (`59ee03f`). Earlier entries that report
+99/99 are left as written: they were true at the time.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/tests-baseline main`).
+
+**Session tally (2026-10-10, second session):** Docs 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
