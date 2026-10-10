@@ -6721,6 +6721,45 @@ Tooling 1.
 
 ---
 
+## 2026-10-10 — The documentation pass's follow-ups
+
+On branch `fix/todo-followups`, the three items the documentation pass
+left in `TODO.md`:
+
+- **Refactor (interface): three exceptions exported.** `Wrapper`'s
+  `NothingToBenchmark` and `Graph`'s `LTSMapDoesNotContainPrimaryLTS`
+  were declared only in the `.ml`, so a caller could not catch them by
+  name and `odoc` could not link their `@raise` tags. Each is now in its
+  signature; `Graph.S` gains an abstract `indmap` for the payload. A third
+  with the same problem, `Theories.EnsureFail` (named in `@raise` tags in
+  `src/`), turned up during the cross-reference pass and is exported in a
+  second commit.
+- **Bug fix (cosmetic): `Logger`'s stdout sink doubled a prefix's
+  colon.** `thing` passes its prefix with its separator (`"p: "`), and
+  `default_sink` added another. The sink now prints the prefix as is,
+  which is what Rocq's sink already did; `Output.message.prefix` says the
+  separator is included. `things` now passes `__FUNCTION__` on to its
+  items. Not visible in `tests.exe`, which never calls `thing`.
+- **Optimization: `Utils.clean_string` was quadratic** (one `sprintf` per
+  character). It now fills a `Buffer`. The old version is kept in
+  `tests.ml` as a reference, and a new test compares the two on edge cases,
+  including the quirk that a quote does not reset "after a space" (2 new
+  checks, 105 in all).
+
+**Verification.** `tests.exe` 105/105; `dune build` and `make` clean. On
+`84f259e`: the proof matrix in all three modes is identical to `main`'s
+("Every Solve identical"), and `Test.v`'s counts are identical.
+`clean_string` is on the term-printing path, hence the full run.
+`EnsureFail`'s commit changes only an interface: built, `make`-gated and
+tested.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep fix/todo-followups main`).
+
+**Session tally (2026-10-10):** Refactor 1 · Bug fix 1 · Optimization 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
