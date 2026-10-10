@@ -105,13 +105,35 @@ bench_capped() {
 
 # bench_rows SUITE MODE NAME LOG SOLVES RUNS: from one proof file's LOG,
 # append a row per [MeBi Sim Solve] to SOLVES (suite, mode, file, index,
-# Solved/Unsolved, iterations) and one row for the file to RUNS (suite,
-# mode, file, exit, seconds, peak MB, errors).
+# Solved/Unsolved, iterations, then from [rocq compile -time]'s lines: the
+# proof's name and the seconds its Begin, Solve and Qed took, "?" for any
+# missing) and one row for the file to RUNS (suite, mode, file, exit,
+# seconds, peak MB, errors).
 bench_rows() {
   local suite=$1 mode=$2 name=$3 log=$4 solves=$5 runs=$6
-  grep -oE '(Uns|S)olved after [0-9]+' "$log" \
-    | awk -v s="$suite" -v m="$mode" -v f="$name" \
-      '{ print s "\t" m "\t" f "\t" NR "\t" $1 "\t" $3 }' >> "$solves"
+  # A proof's lines come in the order: its statement, Begin's time, the
+  # "Solved after" message, Solve's time, Qed's time.
+  awk -v s="$suite" -v m="$mode" -v f="$name" '
+    function secs(line) {
+      sub(/ secs.*/, "", line); sub(/.*\] /, "", line); return line
+    }
+    /^Chars .* \[(Example|Lemma|Theorem|Corollary|Fact|Remark|Proposition)~/ {
+      p = $0; sub(/.*\[[A-Za-z]+~/, "", p); sub(/[~.:(].*/, "", p)
+      proof = p; begun = "?"; open = 0; next
+    }
+    /^Chars .* \[MeBi~Sim~Begin~/ { begun = secs($0); next }
+    /^Chars .* \[MeBi~Sim~Solve~/ { if (n) solve[n] = secs($0); open = n; next }
+    /^Chars .* \[(Qed|Defined)\.\]/ { if (open) qed[open] = secs($0); open = 0; next }
+    /(Uns|S)olved after [0-9]+/ {
+      match($0, /(Uns|S)olved after [0-9]+/)
+      split(substr($0, RSTART, RLENGTH), w, " ")
+      n++; st[n] = w[1]; it[n] = w[3]; nm[n] = proof; bg[n] = begun
+    }
+    END {
+      for (i = 1; i <= n; i++)
+        print s "\t" m "\t" f "\t" i "\t" st[i] "\t" it[i] "\t" nm[i] "\t" \
+          bg[i] "\t" ((i in solve) ? solve[i] : "?") "\t" ((i in qed) ? qed[i] : "?")
+    }' "$log" >> "$solves"
   local exit secs kb errs
   exit=$(sed -n 's/^BENCH_EXIT //p' "$log" | tail -1)
   secs=$(sed -n 's/.*BENCH_SECONDS \([0-9.]*\).*/\1/p' "$log" | tail -1)

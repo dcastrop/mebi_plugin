@@ -7079,6 +7079,102 @@ application reads the goal the previous one left.
 
 ---
 
+## 2026-10-10 — Benchmarking: per-proof timings, scaled levers, OCaml bench
+
+Third session of the day, on branch `bench/evaluation`. Jonah asked to
+continue down `notes/README.md`: the OCaml benchmarking and OCaml examples
+from `TODO.md`, and an `eval` suite for the levers, scaled up. None of it
+changes the plugin. The OCaml bench's design ("fixtures dumped from the
+examples, plus generated families") was put to Jonah and agreed before any
+of it was written.
+
+**Tooling: `bench/proofs.sh`.**
+- Every proof file is compiled with `rocq compile -time`. Each
+  `solves.tsv` row gains the proof's name and the seconds its `Begin`,
+  `Solve` and `Qed` took. The columns are appended at the end, so
+  `compare.sh` and older runs are unaffected. An evaluation file holds one
+  size per proof, so per-file times could not give a series.
+- New suites: `eval` runs `examples/Evaluation/{Width,Layers,Depth}.v`
+  (~40s); `eval-large` runs the scaled-up copies below.
+- `-f FILES` runs a subset of a suite.
+
+**Tooling (examples): `examples/Evaluation/*Large.v`**, commented out of
+`_CoqProject` (too slow for the default build), least bounds pinned as in
+the small files:
+
+| file | sizes | steps (Solve s, Qed s) |
+|---|---|---|
+| `WidthLarge.v` | n = 3, 162 states | 55,963 (386, 33); 3.9GB peak |
+| `LayersLarge.v` | 16, 32, 64 layers (`Nested`) | 316, 540, 988 (0.7/1.7/7.0; Qed 0.7/5.5/71) |
+| `DepthLarge.v` | K = 12, 16 | 15,168 (86, 12), 35,136 (438, 43); 3.1GB |
+
+- **Finding:** with layers, Qed grows about 13 times per doubling, the
+  solver 3-4 times; at 64 layers the kernel takes 10 times the solver's
+  time. This bears on `TODO.md`'s "replay a derivation tree in one step"
+  idea, which would only save solver overhead; the item now says so.
+- `DepthLarge.v` at K = 16 needs `MeBi Config Premise Depth` above its
+  default of 16. With the default, `fix_depth t < 16` was left undecided and
+  the extraction became approximate (and unbounded). `Reset Bounds` also
+  resets the depth, so the file sets it after each reset.
+- Stopped rather than pinned: 128 layers (Qed alone would take on the order
+  of 15 minutes) and K = 32 (extrapolated at ~260k steps).
+
+**Tooling: `bench/ocaml/`**, the `TODO.md` items "Benchmarking Tools
+(Algorithms)" and "OCaml examples".
+- `mebi_bench.exe` links `rocq-mebi.model` and `benchmark` only, like
+  `tests.exe`. It times `FSM.saturate`, `Minimization.fsm` and
+  `Bisimilarity.fsm` per input (CPU ms per run, mean and least over
+  repeats), after checking each pair's verdict.
+- **Fixtures:** 47 FSM pairs, ~200KB. `make-fixtures.sh` compiles a copy
+  of each proof file in which every proof running `MeBi Sim Begin` is
+  admitted, with a `MeBi Run Bisim` on the pair in its place and dumps on.
+  `fixtures.py` turns the dumps into compact fixtures that record the
+  plugin's verdict, so three of the CCS pairs are non-bisimilar.
+- **Generated families** rebuild `Width.v` and `Depth.v` in OCaml. At
+  every size both have (width 0-2, depth 1-8), states and edges match the
+  dumped fixtures exactly.
+- **CI** runs `mebi_bench.exe --check` (0.1s): every verdict, on every
+  fixture and family.
+- **Finding:** the model is not where the time goes. At width n = 3,
+  `Bisimilarity.fsm` takes 19ms and the proof 7 minutes. At width n = 5
+  (1,458 states a side), bisimilarity still takes 0.85s.
+
+**Mistakes, caught while generating the fixtures (none is in the
+committed version):**
+- The proof regex matched proofs inside comments (`Proc/Test3` has nine).
+  It now skips comment spans, nested ones included.
+- It took `Qed` as the only terminator, so a `Fail MeBi Sim Begin ...
+  Abort.` swallowed everything up to the next `Qed`, including two
+  definitions. Proofs ending in `Abort`, or whose `Begin` is under `Fail`,
+  are now left alone.
+- `Run Bisim` errs on a non-bisimilar pair. The command now runs under
+  `FailIf NotBisimilar False`.
+- Dumps written with `DecodeResults False` hold bare encodings, not
+  `{enc, term}`; the converter reads both.
+- A dump's file name embeds the full source path. Under the session's
+  scratch directory, that exceeded the file-name limit, so the script now
+  uses a short temporary directory of its own.
+- The four `Depth.v` pairs shared a name (only their relations differ).
+  Names now include the relations where needed, and a collision is an
+  error.
+- In the scaled files, `WidthLarge.v` first failed in `Begin`: the default
+  bound of 100 states was restored before the proof. It now stays raised.
+
+**Verification.**
+- `dune build`; `scripts/check_module_lists.py`; `mebi_bench.exe --check`
+  (56 inputs, 0 wrong).
+- `bench/proofs.sh -s eval` reproduces `Width.v`, `Layers.v` and
+  `Depth.v`'s counts.
+- `-s eval-large` runs all three files with the pinned bounds.
+- Two default-suite files (`Proc/Test1`, `CADP/Size1/Glued/
+  MutualExclusion`) match `CLAUDE.md`'s counts, with the new columns
+  filled.
+- Only the new bench code was reformatted by `dune fmt`.
+
+**Session tally (2026-10-10, third session):** Tooling 3 · Docs 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
