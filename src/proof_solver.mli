@@ -40,7 +40,8 @@ module type S = sig
      and type annotation = W.Model.Annotation.t
      and type transition = W.Model.Transition.t
 
-  (** One proof step, over the goal in focus given as [Args]. *)
+  (** One proof step, over the goal in focus given as {!Proof_solver_wrapper.Args}.
+  *)
   module Step : (_ : Proof_solver_wrapper.Args) ->
     Proof_solver_step.S with type tactic = Tactic.t
 

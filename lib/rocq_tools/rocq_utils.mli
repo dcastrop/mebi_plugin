@@ -98,7 +98,7 @@ exception
 
     @raise Rocq_utils_HypIsNot_Atomic
       if that type is not atomic (raised
-      here, for {!econstr_to_atomic}'s [Rocq_utils_EConstrIsNot_Atomic]).
+      here, for {!econstr_to_atomic}'s {!Rocq_utils_EConstrIsNot_Atomic}).
     @raise Rocq_utils_EConstrIsNotA_Type if it is not a type (propagated). *)
 val hyp_to_atomic : Evd.evar_map -> hyp -> Evd.econstr kind_pair
 
@@ -211,7 +211,7 @@ module Strfy : sig
       under its binders [ctx], as [ctx |- t]. Raises nothing. *)
   val ind_constr : Environ.env -> Evd.evar_map -> ind_constr -> string
 
-  (** [ind_constrs env sigma cs] is each of [cs] printed ({!ind_constr}),
+  (** [ind_constrs env sigma cs] is each of [cs] printed ({!val-ind_constr}),
       as a list. Raises nothing. *)
   val ind_constrs : Environ.env -> Evd.evar_map -> ind_constr array -> string
 
@@ -340,7 +340,7 @@ val map_decl_evar_pairs
   -> EConstr.Vars.substl
   -> (Evd.econstr * Names.Name.t) list
 
-(** Raised by {!constructor_args}: not three arguments. *)
+(** Raised by {!val-constructor_args}: not three arguments. *)
 exception ConstructorArgsExpectsArraySize3 of unit
 
 (** An LTS step's source, label and target. *)

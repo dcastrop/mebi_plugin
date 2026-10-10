@@ -279,5 +279,5 @@ val make : ?enc:(unit -> (module Encoding.S)) -> unit -> (module S)
     the module tree. *)
 val get : unit -> (module S)
 
-(** Drops the shared instance so the next [get] builds a fresh one. *)
+(** Drops the shared instance so the next {!get} builds a fresh one. *)
 val reset : unit -> unit

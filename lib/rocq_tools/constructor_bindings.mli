@@ -21,10 +21,10 @@ module type S = sig
 
   (** [extract_info ind] is, for each constructor of the LTS [ind] (the
       last first), its index, name and binder locations
-      ({!Bindings.extract}), read from its source, label and target.
+      ([Bindings.S.extract]), read from its source, label and target.
 
       Raises nothing directly; when run, propagates whatever
-      {!Bindings.extract} raises, and [Rocq_utils]'s errors for a
+      [Bindings.S.extract] raises, and {!Rocq_utils}'s errors for a
       constructor whose type is not an application of its LTS. *)
   val extract_info : ind -> t list mm
 

@@ -4,11 +4,11 @@
     [sigma] through Rocq calls is implicit.
 
     {b Exceptions are deferred.} An ['a mm] does nothing until it is run
-    ({!run}), so an exception raised inside it -- by a [state] function, or
+    ({!S.run}), so an exception raised inside it -- by a [state] function, or
     in the continuation of a [let*] -- is raised when it runs, not when it
     is built. A [try ... with] around the {e construction} of a monadic
-    value therefore does not catch it; handle it around {!run}, or inside
-    the function given to {!state}. [TODO.md] ("try around a monadic
+    value therefore does not catch it; handle it around {!S.run}, or inside
+    the function given to {!S.val-state}. [TODO.md] ("try around a monadic
     value") lists the places that get this wrong. *)
 module type S = sig
   include Bi_encoding.S
@@ -76,7 +76,7 @@ module type S = sig
 
   (** Binding operators: [let*] binds a computation, [let+] maps one,
       [and+] pairs two, and [let$] / [let$*] / [let$+] run a function of
-      [env] and [sigma] ({!state}) that returns a new [sigma] and a value,
+      [env] and [sigma] ({!val-state}) that returns a new [sigma] and a value,
       only a new [sigma], or only a value. *)
   module type SYNTAX = sig
     val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm

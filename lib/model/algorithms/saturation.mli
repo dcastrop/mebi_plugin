@@ -24,7 +24,7 @@ module type S = sig
       each with the annotation and the length of a shortest such path
       ([None] and [0] for [s] itself). The proof solver answers a silent
       move with one of these when standing still will not do (see
-      {!Product.respond}).
+      [Product.S.respond]).
 
       Raises nothing. *)
   val silent_paths : edgemap -> state -> (state * annotation option * int) list

@@ -1,6 +1,6 @@
 (** The size of an FSM's saturation, computed without saturating it.
 
-    {!FSM.saturate} materialises one weak action per distinct
+    [FSM.S.saturate] materialises one weak action per distinct
     [(from, a, goto)] with [from -tau*-> s -a-> t -tau*-> goto] (of the many
     witnessing paths only the shortest is kept), so the size of its output is
     the number of such triples -- which can be orders of magnitude more than
@@ -26,7 +26,7 @@ module type S = sig
     ; sccs : int (** silent strongly-connected components *)
     ; largest_scc : int
     ; strong : int (** transitions, silent and visible, before saturating *)
-    ; weak : int (** weak (visible) actions {!FSM.saturate} would produce *)
+    ; weak : int (** weak (visible) actions [FSM.S.saturate] would produce *)
     }
 
   (** [fsm x] is [x]'s size: its states, silent SCCs, strong transitions,

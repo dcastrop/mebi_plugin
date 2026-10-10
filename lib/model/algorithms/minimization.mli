@@ -122,7 +122,7 @@ module type S = sig
   val partition_states : ?silent:edgemap -> fsm -> partition
 
   (** [fsm x] is [x] with the partition of its states into weak
-      bisimilarity classes: [x] saturated ({!FSM.saturate}, a no-op without
+      bisimilarity classes: [x] saturated ([FSM.S.saturate], a no-op without
       silent labels) and partitioned by {!partition_states}, splitting by
       [=ε=>] from [x]'s own silent steps.
 

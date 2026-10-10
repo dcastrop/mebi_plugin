@@ -5,7 +5,7 @@
     the Rocq half: a sink rendering messages with [Pp] onto [Feedback], and the
     source-location provider used to name dump files.
 
-    [install] runs on module initialisation, so nothing normally needs to call
+    {!install} runs on module initialisation, so nothing normally needs to call
     it; [g_mebi.mlg] calls it explicitly to make the dependency visible. *)
 
 (** [sink m] prints the message [m] through Rocq's [Feedback], at the level

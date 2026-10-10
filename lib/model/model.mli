@@ -23,9 +23,9 @@ module type S = sig
 
   (** {1 Model Components}
 
-      [State] (with nested [Set]), [Label] (with [Set]), [Note], [Annotation]
-      (with [Set]), [Transition] (with [Set]), [Action] (with [Set], [Map]
-      and [Pair]), [EdgeMap], [Partition] and [Info] --
+      {!State} (with nested [Set]), {!Label} (with [Set]), {!Note}, {!Annotation}
+      (with [Set]), {!Transition} (with [Set]), {!Action} (with [Set], [Map]
+      and [Pair]), {!EdgeMap}, {!Partition} and {!Info} --
       see {!Components.S} for each. *)
   include
     Components.S

@@ -1,38 +1,38 @@
 (** {i See {!Model.S.FSM}.} *)
 module type S = sig
-  (** See {!Model.S.State.t} *)
+  (** See {!Components.S.State.t} *)
   type state
 
-  (** See {!Model.S.States.t} *)
+  (** See {!Components.S.State.Set.t} *)
   type states
 
-  (** See {!Model.S.Labels.t} *)
+  (** See {!Components.S.Label.Set.t} *)
   type labels
 
-  (** See {!Model.S.EdgeMap.t'} *)
+  (** See {!Components.S.EdgeMap.t'} *)
   type edgemap
 
-  (** See {!Model.S.Info.t} *)
+  (** See {!Components.S.Info.t} *)
   type info
 
-  (** See {!Model.S.LTS.t} *)
+  (** See [LTS.S.t] *)
   type lts
 
   type t =
     { init : state option
-      (** Initial state (see {!Model.S.State.t}). {i {b Note:} we use an [option] type as this is [None] when we {!val:merge} two FSMs.}.
+      (** Initial state (see {!Components.S.State.t}). {i {b Note:} we use an [option] type as this is [None] when we {!val:merge} two FSMs.}.
       *)
     ; alphabet : labels
-      (** {!Model.S.Labels.t} that may be found in the {!Model.S.Action}s of {!field:edges}.
+      (** {!Components.S.Label.Set.t} that may be found in the {!Components.S.Action}s of {!field:edges}.
       *)
-    ; states : states (** {!Model.S.States.t} of the system. *)
+    ; states : states (** {!Components.S.State.Set.t} of the system. *)
     ; edges : edgemap
-      (** See {!Model.S.EdgeMap.t'} for the system. Maps from a {!Model.S.State.t} to a {!Model.S.ActionMap.t'} (which in turn maps from an {!Model.S.Action.t} to a {!Model.S.States.t} of {i destinations}).
+      (** See {!Components.S.EdgeMap.t'} for the system. Maps from a {!Components.S.State.t} to a {!Components.S.Action.Map.t'} (which in turn maps from an {!Components.S.Action.t} to a {!Components.S.State.Set.t} of {i destinations}).
       *)
     ; terminals : states
       (** Subset of {!field:states} for states with no {b outgoing edges}, i.e., states that are {i {b not a key}} in {!field:edges}.
       *)
-    ; info : info (** {!Model.S.Info.t} of the system. *)
+    ; info : info (** {!Components.S.Info.t} of the system. *)
     ; fill : (state -> unit) option
       (** [Some f] for an FSM saturated on demand ({!saturate_on_demand}):
           {!field:edges} holds only the states asked about so far, and [f s]
@@ -48,7 +48,7 @@ module type S = sig
 
   (** [merge a b] is the FSM with the states, terminals, alphabet and edges
       of both [a] and [b] (whose states should be disjoint), with no initial
-      state, information merged ({!Model.S.Info.merge}) with fresh counts,
+      state, information merged ({!Components.S.Info.merge}) with fresh counts,
       and not saturated on demand: a merged FSM holds the edges [a] and [b]
       hold now. Raises nothing. *)
   val merge : t -> t -> t
@@ -58,7 +58,7 @@ module type S = sig
   val is_weak_mode : t -> bool
 
   (** [saturate ?only_if_weak x] is [x] with every weak action added to its
-      edges ({!Model.S.Saturation}), and the states that become terminal
+      edges ([Saturation]), and the states that become terminal
       added to its terminals; [x] itself if it has no weak labels and
       [only_if_weak] (the default). [x]'s edges are copied, not changed.
       Raises nothing. *)

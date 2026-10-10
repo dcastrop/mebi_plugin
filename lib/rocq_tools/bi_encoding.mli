@@ -93,7 +93,7 @@ module type S = sig
 
       @raise CannotDecode
         if [e] encodes none (raised here, for
-        {!get_econstr}'s [DecodingNotFound]).
+        {!get_econstr}'s {!DecodingNotFound}).
       @raise MapsNotInitialised as {!get_the_maps} (propagated). *)
   val decode : enc -> EConstr.t
 
@@ -141,9 +141,9 @@ module type S = sig
       Raises nothing. *)
   val aliases_of : enc -> enc list
 
-  (** [set_ctx s] makes [s] the context the term keys of [F] are compared
+  (** [set_ctx s] makes [s] the context the term keys of {!F} are compared
       and hashed under. Install it once, when the instance is created; it
-      defaults to [Rocq_context.global]. A table whose context moves can
+      defaults to {!Rocq_context.global}. A table whose context moves can
       hash an entry under one [sigma] and look it up under another, so
       nothing should call this repeatedly. Raises nothing. *)
   val set_ctx : Rocq_context.source -> unit

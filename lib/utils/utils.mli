@@ -53,7 +53,7 @@ module FileWriter : sig
 
   (** [set_loc_provider f] makes [f] what {!get_loc} calls. Reading the
       source location needs Rocq's [Loc], so [src/] installs an
-      implementation at plugin load ([Mebi_plugin.Rocq_output]); until then
+      implementation at plugin load ({!Mebi_plugin.Rocq_output}); until then
       {!get_loc} is ["Unknown Location"]. Raises nothing. *)
   val set_loc_provider : (unit -> string) -> unit
 

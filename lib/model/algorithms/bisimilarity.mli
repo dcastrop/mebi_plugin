@@ -4,7 +4,7 @@ module type S = sig
   type partition
   type fsm
 
-  (** An FSM as given and as saturated ({!FSM.saturate}; the same FSM if it
+  (** An FSM as given and as saturated ([FSM.S.saturate]; the same FSM if it
       has no silent labels). *)
   module FSMPair : sig
     type t =
@@ -16,7 +16,7 @@ module type S = sig
 
     (** [get ?on_demand x] is [x] with its saturation alongside: whole, or,
         with [on_demand], saturated on demand holding at most that many weak
-        actions ({!FSM.saturate_on_demand}).
+        actions ([FSM.S.saturate_on_demand]).
 
         Raises nothing. *)
     val get : ?on_demand:int -> fsm -> t
@@ -80,10 +80,10 @@ module type S = sig
   val get_the_result : unit -> t
 
   (** For FSMs too large to saturate whole (notes/13): which of the two to
-      saturate on demand ({!FSM.saturate_on_demand}, at most [budget] weak
+      saturate on demand ([FSM.S.saturate_on_demand], at most [budget] weak
       actions held), and how to partition without saturating: on the
       silent-SCC quotient of the merged originals
-      ({!Saturation_estimate.S.partition}). *)
+      ({!Saturation_estimate.S.val-partition}). *)
   type on_demand =
     { a : bool
     ; b : bool
@@ -92,9 +92,9 @@ module type S = sig
     }
 
   (** [fsm ?on_demand a b] is the result of checking [a] and [b] for (weak)
-      bisimilarity: both saturated, merged ({!FSM.merge}; their states must
+      bisimilarity: both saturated, merged ([FSM.S.merge]; their states must
       be disjoint, as the plugin's encoding makes them), the merge
-      partitioned by {!Minimization.partition_states}, and the result split.
+      partitioned by [Minimization.S.partition_states], and the result split.
 
       With [on_demand] and either FSM on demand, that FSM is saturated on
       demand, [merged] is the merge of the originals, and the partition is
@@ -102,14 +102,14 @@ module type S = sig
       (checked in [tests.exe]).
 
       Raises nothing in practice; would propagate
-      {!Minimization.partition_states}'s exceptions. *)
+      [Minimization.S.partition_states]'s exceptions. *)
   val fsm : ?on_demand:on_demand -> fsm -> fsm -> t
 
   (** [conflicts a b] is the set of states [a] and [b] share (the same
       term, hence the same encoding) whose moves differ between the two:
       labels or targets.
 
-      {!fsm} merges [a] and [b] assuming a shared state is one state, which
+      {!val-fsm} merges [a] and [b] assuming a shared state is one state, which
       is exact when both sides use the same relation (so the same term has
       the same moves) and wrong otherwise: two relations over [nat], both
       from [0], conflate their [0]s. Empty in every checked-in example.
