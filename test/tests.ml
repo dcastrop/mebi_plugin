@@ -1395,6 +1395,36 @@ let test_encoding_counter () : unit =
   check_int "reset restarts at init" E.init (E.incr ())
 ;;
 
+(** [Label.compare] is total: one base known silent in one system and
+    unknown in the other gives two labels, and a union keeps both whatever
+    its argument order. [Label.Set.find_base] finds a label by base alone. *)
+let test_label_order () : unit =
+  print_endline "components: label order";
+  let l (b : int) (s : bool option) : M.Label.t = { base = b; is_silent = s } in
+  let unknown = M.Label.Set.singleton (l 2 None) in
+  let silent = M.Label.Set.singleton (l 2 (Some true)) in
+  let u1 = M.Label.Set.union unknown silent in
+  let u2 = M.Label.Set.union silent unknown in
+  check "union keeps both" true (M.Label.Set.cardinal u1 = 2);
+  check "union is symmetric" true (M.Label.Set.equal u1 u2);
+  check
+    "None < Some false < Some true"
+    true
+    (M.Label.compare (l 2 None) (l 2 (Some false)) < 0
+     && M.Label.compare (l 2 (Some false)) (l 2 (Some true)) < 0);
+  let s = M.Label.Set.of_list [ l 0 (Some false); l 2 (Some true) ] in
+  check
+    "find_base ignores is_silent"
+    true
+    (M.Label.Set.find_base 2 s = l 2 (Some true));
+  check
+    "find_base raises Not_found"
+    true
+    (match M.Label.Set.find_base 1 s with
+     | _ -> false
+     | exception Not_found -> true)
+;;
+
 (** [clean_string_reference s] is {!Utils.clean_string} as it was before it
     used a [Buffer] (one [sprintf] per character), kept to check the rewrite
     against. *)
@@ -1496,6 +1526,7 @@ let () =
   test_tree_order ();
   test_tree_preorder ();
   test_encoding_counter ();
+  test_label_order ();
   test_clean_string ();
   test_json ();
   Printf.printf "\n%i/%i passed\n" (!total - !failures) !total;

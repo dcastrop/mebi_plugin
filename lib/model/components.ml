@@ -76,10 +76,13 @@ module type Label_sig = sig
       {!field-is_silent} is not compared. Raises nothing. *)
   val equal : t -> t -> bool
 
-  (** [compare a b] orders labels by base term, then by {!field-is_silent} when
-      both know it. Not a total order: a label whose {!field-is_silent} is [None]
-      compares equal to the same base with [Some true] and with [Some false],
-      which differ from each other ([TODO.md]). Raises nothing. *)
+  (** [compare a b] orders labels by base term, then by {!field-is_silent}
+      ([None] before [Some false] before [Some true]): a total order, unlike
+      {!equal}, which ignores {!field-is_silent}. One base can carry
+      different {!field-is_silent}s only when the two systems of a command
+      are configured differently ([MeBi Config Weak2] without [Weak1]); such
+      labels are then kept apart. To find a label by its base alone, use
+      {!Labels_sig.find_base}. Raises nothing. *)
   val compare : t -> t -> int
 
   (** [hash x] is the hash of [x]'s base term, consistent with {!equal}.
@@ -93,8 +96,17 @@ end
 
 (** A set of labels. *)
 module type Labels_sig = sig
+  type base
+
   include Set.S
   include Json.S with type k = t
+
+  (** [find_base b xs] is the label of [xs] whose base term is [b], whatever
+      it knows of being silent (the least, by {!Label_sig.compare}, if
+      several have [b]).
+
+      @raise Not_found if none has (raised here). *)
+  val find_base : base -> t -> elt
 
   (** [non_silent xs] is the labels of [xs] not known to be silent. Raises
       nothing. *)
@@ -500,7 +512,7 @@ module type S = sig
 
   module Label : sig
     include Label_sig with type base = base
-    module Set : Labels_sig with type elt = t
+    module Set : Labels_sig with type elt = t and type base = base
   end
 
   module Note :
@@ -674,11 +686,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         let compare (a : t) (b : t) : int =
           Utils.compare_chain
             [ Base.compare a.base b.base
-            ; Stdlib.Option.fold
-                ~none:0
-                ~some:(fun (a : bool) ->
-                  Stdlib.Option.fold ~none:0 ~some:(Bool.compare a) b.is_silent)
-                a.is_silent
+            ; Stdlib.Option.compare Bool.compare a.is_silent b.is_silent
             ]
         ;;
       end
@@ -701,6 +709,17 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           (struct
             let name = "Labels"
           end)
+
+      type base = Base.t
+
+      (* See {!module-type:Labels_sig}. Labels are ordered by base first, so
+         the first label at or after [b] is the one, if any. *)
+      let find_base (b : base) (xs : t) : Label.t =
+        let (x : Label.t) =
+          find_first (fun (x : Label.t) -> Base.compare x.base b >= 0) xs
+        in
+        if Base.equal x.base b then x else raise Not_found
+      ;;
 
       (* See {!module-type:Labels_sig}. *)
       let non_silent (xs : t) : t =

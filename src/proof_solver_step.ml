@@ -217,9 +217,7 @@ struct
       (* [f enc] is the label of [ys] encoded as [enc]; the lookup raises
          [Not_found] while building, when there is none *)
       let f (enc : Enc.t) : Model.Label.t M.mm =
-        (* NOTE: [Model.Label.Set.compare] only cares about [is_silent=Some _]
-        *)
-        Model.Label.Set.find { base = enc; is_silent = None } ys |> M.return
+        Model.Label.Set.find_base enc ys |> M.return
       in
       (* [fallback enc] is [f enc], for the fallback's encoding: it runs in a
          [let*] continuation, past the handlers below, so a miss is reported
