@@ -32,7 +32,7 @@ module type S = sig
   val to_string : ?pretty:bool -> k -> string
 
   (** [log ?__FUNCTION__ ?m ?s x] logs {!to_string} of [x] at kind [m]
-      (default [Debug]), headed [s] (default {!name}). Raises nothing. *)
+      (default [Debug]), headed [s] (default {!val-name}). Raises nothing. *)
   val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
 
   (** [write ?dir name x] writes {!json} of [x], indented, to a new file in

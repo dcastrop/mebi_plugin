@@ -26,13 +26,11 @@ module type S = sig
       @raise Bi_encoding.S.CannotDecode if [x] encodes no term (propagated). *)
   val enc : enc -> EConstr.t
 
-  (** [handle x e] is {!enc} of [x], raising [e] instead if it encodes no
-      term.
-
-      @raise e if [x] encodes no term (raised here). *)
+  (** [handle x e] is {!val-enc} of [x], raising [e] instead if it encodes no
+      term. Raises [e] if [x] encodes no term (raised here). *)
   val handle : enc -> exn -> EConstr.t
 
-  (** Raised by {!state}: the state's encoding stands for no term. *)
+  (** Raised by {!val-state}: the state's encoding stands for no term. *)
   exception CouldNotDecode_State of state
 
   (** [state s] is the term the state [s] stands for.
@@ -40,7 +38,7 @@ module type S = sig
       @raise CouldNotDecode_State if there is none (raised here). *)
   val state : state -> EConstr.t
 
-  (** Raised by {!label}: the label's encoding stands for no term. *)
+  (** Raised by {!val-label}: the label's encoding stands for no term. *)
   exception CouldNotDecode_Label of label
 
   (** [label l] is the term the label [l] stands for.
@@ -58,7 +56,7 @@ module type S = sig
 
   (** JSON printers for the model with each encoding shown as its Rocq
       term, for results and dumps; one per component. Each [json] raises
-      [Bi_encoding.S.CannotDecode] if an encoding stands for no term
+      {!Bi_encoding.S.CannotDecode} if an encoding stands for no term
       (propagated). *)
   module Base : Json.S with type k = enc
 

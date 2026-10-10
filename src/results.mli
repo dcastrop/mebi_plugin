@@ -43,8 +43,8 @@ module type S = sig
   val simulators : (Model.State.t -> Model.State.Set.t) option ref
 
   (** The answer plan for the proof now being solved, when the answer policy
-      is not [Default] ({!Model.Product.Policy.plan}); [None] otherwise, and
-      the solver answers with {!Model.Product.answer}. *)
+      is not [Default] ({!Model.Product.Policy.type-plan}); [None] otherwise, and
+      the solver answers with {!Model.Product.val-answer}. *)
   val plan : Model.Product.Policy.plan option ref
 
   (** [check_bisimilarity ?fail_if_not_bisim using (t1, lts1) (t2, lts2)]

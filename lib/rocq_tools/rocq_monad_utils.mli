@@ -586,7 +586,7 @@ module type S = sig
         is decided now or deferred until the LTS premises are unified.
 
         Raises as {!check_valid_constructors}; also
-        [Errors.MEBI_exn] [InvalidCheckUpdatedCtx] when run, if [substl] and
+        {!Errors.MEBI_exn} [InvalidCheckUpdatedCtx] when run, if [substl] and
         [decls] differ in length (cannot happen). *)
     val check_updated_ctx
       :  enc
