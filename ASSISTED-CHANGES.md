@@ -6760,6 +6760,68 @@ tested.
 
 ---
 
+## 2026-10-10 — odoc cross-references, and stale references fixed
+
+**Docs.** On branch `docs/odoc-refs`, closing `TODO.md`'s cross-reference
+item (Jonah, 2026-10-05): plain code spans naming a repo item are now
+`{!X}` references where `odoc` resolves them to that item. Broken
+references are fixed. One commit per library group (`lib/utils`,
+`lib/showable`, `lib/terms`; `lib/model`; `lib/rocq_tools` and `src/`).
+The plan was one PR per group, but the whole pass came to 25 files and
+about 100 changed lines (references on changed lines: 78 before, 99 after), so it is one PR.
+
+**What changed.**
+- **Stale references.** `Model.S.States.t`, `Labels.t`, `ActionMap.t'`
+  and the like date from before the component collapse; they now name
+  `Components.S`'s `State.Set.t`, `Label.Set.t`, `Action.Map.t'`. Two
+  comments named functions that no longer exist (`opt_is_empty`,
+  `Action_sig.shorter_annotation`), and are corrected.
+- **Ambiguous names** get a kind (`{!val-fsm}`, `{!field-sigma}`,
+  `{!type-measure}`).
+- **New references.** About 35 spans, proposed by a throwaway script
+  (`notes/tools/to_ref.py`, local) that only suggests names declared in
+  the repo. The doc build then decided: anything `odoc` could not resolve
+  was put back (`notes/tools/revert_refs.py`).
+
+**Mistakes caught on review.** Resolving is not the same as being right.
+The first B1 run linked `[Set]` (meaning the stdlib's) and `[Result]`
+(an output level) to repo modules, and linked functor parameters
+(`Make (Tree)`) to the units of the same name. In `src/`, `[cofix]`,
+`[trivial]` and `[split]` (Rocq tactics), `[LTS]` (Rocq's constant),
+`[Step]` (the `MeBi Sim Step` command) and `[Info]` (an output level) all
+resolved to OCaml items of the same name. Each was put back by hand, and
+the script now skips stdlib module names, names in a comment's header,
+and functor parameter names. Every diff was read before committing.
+
+**Limits found.** `odoc` (3.2.1, under dune) does not follow references
+across the library graph against the dependency order: `lib/model`'s
+algorithms cannot link `FSM` or `Model`, which depend on them. It also
+cannot see a unit whose name a functor parameter in the same file
+shadows (`Bisimilarity.Make (FSM : FSM.S)`: every `{!FSM.S.x}` in that
+file fails). odoc 3's root-anchored `{!//FSM...}` is not supported by
+dune's driver. Such mentions stay plain spans, now with their current
+names (`[FSM.S.saturate]`). Renaming functor parameters would fix this,
+but that is a code change and was not made.
+
+**Result.** `dune build @doc` from a clean build directory: 1133
+warnings before, 898 after; 160 distinct warning sites before
+(the rest are repeats at each `include`), 72 after. All 72 are `@raise`
+tags naming exceptions outside the documented libraries (`Sys_error`,
+`Not_found`, `CErrors.UserError`, ...), accepted in #51; the 55
+`Sys_error` sites are mostly `Json.S`'s, repeated at each include.
+
+**Verification.** Comments only: all 25 files have identical code with
+comments stripped. `dune build`, `make` (warning-50 gate) and `tests.exe`
+105/105 pass. No proof suites run: the code is unchanged.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep docs/odoc-refs main`).
+
+**Session tally (2026-10-10), cont.:** Docs 1 · Refactor 1 · Bug fix 1 ·
+Optimization 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
