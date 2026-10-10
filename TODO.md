@@ -67,6 +67,44 @@ they are in the code (the comments point here); each needs a fix with a test.
 - [x] **Two exceptions are raised but not exported** (found 2026-10-09, making named exceptions `@raise` tags): `Wrapper`'s `NothingToBenchmark` and `Graph`'s `LTSMapDoesNotContainPrimaryLTS` are declared only in the `.ml`, so a caller cannot catch them by name and `odoc` cannot link their tags. As with `Mebi_theories.ErrorWithGlobalOfPath` (fixed 2026-10-04), the fix is to declare each in its `.mli`. -- fixed 2026-10-10 (branch `fix/todo-followups`); `Graph.S` gains an abstract `indmap` for the payload.
 - [x] **Named exceptions as `@raise` tags everywhere** (Jonah, 2026-10-09): ten prose "Raises <exception> ..." sentences converted (branch `docs/raise-tags`). Prose stays where no single exception is named. Exceptions outside the documented libraries (`CErrors.UserError`, stdlib ones such as `Sys_error`) give `odoc` an unresolved-reference warning each; accepted.
 
+## Known limits and ideas (found 2026-10-10)
+
+Each limit is pinned in `theories/Test.v` (a `Fail` with a `KNOWN LIMIT`
+comment) so lifting it turns the pin into a positive test.
+
+- [ ] **LTSs with parameters** -- *new capability, medium.* An LTS must be
+  an inductive with no parameters: `Using`/`With` take a reference, so
+  `termLTS 2` cannot be written, and an inductive with parameters is refused
+  (`LTS_Has_Parameters`, since PR #57). This rules out a common Rocq style:
+  an LTS generic in its label type (`Inductive step {A : Type} ...`) or
+  defined in a `Section` with `Context` variables. Workaround: fix the
+  values in a module (a functor over a module defining them, as
+  `examples/Evaluation/Depth.v`). Pinned by `Test.v` `ParameterisedLTS`.
+  Sketch: accept a term (`constr`) where an LTS is named; instantiate the
+  parameters in the constructor types (`mind_nf_lc`); apply them wherever
+  extraction and the proof solver rebuild the LTS term.
+- [ ] **`MeBi Sim Begin` does not check its LTSs against the goal's** (its
+  terms are checked since PR #57). Probe first: a goal over one LTS with
+  `Begin` given another. If that ends on an internal error, it is a bug fix
+  of the same kind as #57's.
+- [ ] **Open terms and witness search** -- *possible new capabilities.* A
+  law for every `p` (as CTrees proves CCS's laws; `LawProofs.v` proves closed
+  instances) cannot be started: `Begin` reads its terms in the global
+  environment, and a variable's steps are unknown. An `exists` goal needs the
+  witness by hand (`exists t.`). Pinned by `Test.v` `GoalShapes`.
+- [ ] **Replay a derivation tree in one solver step?** -- *optimization,
+  measure first.* `examples/Evaluation/Layers.v` adds 14 steps a semantic
+  layer: each step applies one constructor of a derivation tree, in preorder
+  (`Proof_solver_step.handle_appconstrs_update_args`), so a layer adds one
+  step per strong step the proof replays. Applying a whole tree at once
+  would cut the iteration count, but each application reads the goal left by
+  the previous one and premises open sibling goals a step cannot see (steps
+  run focused on the first goal), so it would be one tactic inspecting goals
+  as it runs, not a fixed sequence. The constructors and the proof term stay
+  the same: only the solver's per-step overhead would be saved, and every
+  checked-in bound would change. Scale `Layers.v` up and split solver
+  overhead from tactic time before building anything.
+
 ## To discuss with @dcastrop
 
 *Every decision that is @dcastrop's, or that Jonah made alone and wants to
