@@ -7063,6 +7063,22 @@ strategy forced) and with `make` (CI's route); `make dune` after.
 
 ---
 
+## 2026-10-10 — `TODO.md`: the limits and an idea found this session
+
+**Docs.** `TODO.md` gains a "Known limits and ideas" section: LTSs with
+parameters (new capability, pinned by `ParameterisedLTS`); `Begin` not
+checking its LTSs against the goal's (to probe; likely a bug fix like
+#57's); open terms and witness search (pinned by `GoalShapes`); and
+whether to replay a derivation tree in one solver step, prompted by
+`Layers.v`'s 14 steps a layer. That last item has not been measured, and
+the item says why it is not a simple batching: each constructor
+application reads the goal the previous one left.
+
+**Session tally (2026-10-10, second session), final:** Docs 2 · Tooling 2
+· Bug fix 2.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
