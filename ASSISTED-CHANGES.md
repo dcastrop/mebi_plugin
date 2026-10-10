@@ -6822,6 +6822,82 @@ Optimization 1.
 
 ---
 
+## 2026-10-10 — `Label.compare` total; `Action.Map.update` scan removed
+
+On branch `fix/label-order-actionmap`, the two `lib/model` items left in
+`TODO.md`, each investigated before changing anything, as Jonah asked.
+
+**Bug fix: `Label.compare` was not a total order.** A label whose
+`is_silent` was `None` compared equal to the same base with `Some true`
+and with `Some false`.
+- **What relied on it:** one place. The proof solver's label lookup
+  (`proof_solver_step.ml`, `ReModel.label`) searched a set with
+  `is_silent = None` as a wildcard. Every other lookup by label uses
+  `Label.equal`, which compares the base only.
+- **When it matters:** one base can carry different `is_silent`s only
+  when the two systems of a command are configured differently:
+  `MeBi Config Weak2` without `Weak1`. The first system then has no silent
+  label (its labels say `None`), and the second does (`Some _`).
+- **Small example:** a pure-OCaml probe showed the union of `{tau, None}`
+  and `{tau, Some true}` keeping whichever argument came first.
+- **Counterexample in Rocq:** with only `Weak2` set, `p = None·A·0`,
+  `q = A·0`. `main` said strong `p` was bisimilar to weak `p` but not to
+  weak `q`, although weak `p` and weak `q` are equivalent: the merged
+  alphabet had kept the second system's *silent* copy of `None`'s label, so
+  the first system's visible `None` step went unchecked. With a total order
+  both pairs are not bisimilar. Checked on the label change alone.
+- **Fix:** `compare` orders `None < Some false < Some true`. The solver's
+  wildcard lookup is now explicit: `Label.Set.find_base`. Jonah's
+  suggestion, an optional flag on `compare` with a shadowing definition,
+  was weighed: a set needs one fixed total order, and base-only comparison
+  already exists as `Label.equal`, so the flag would have added a third
+  comparison for no caller.
+- **Tests:** `tests.ml` checks the order, a symmetric union and
+  `find_base` (fails on the old order: confirmed). `Test.v`'s new
+  `MixedSilence` pins the counterexample; its first `Fail` fails with
+  `Not_Bisimilar`, as checked by cutting the file there.
+
+**Optimization: `Action.Map.update` scanned every key for nothing.**
+After finding the action, it scanned the whole table for actions equal
+to it and merged their derivation trees in. Equal actions have equal
+trees (`Action.equal` compares them; tree equality is structural, on
+encodings), so the merge never changed anything, and each update was
+linear in the table's size. Removed. `replace` still stores the new
+action as the key, as before (`Label.equal` ignores `is_silent`, so an
+equal key's label can differ). The `TODO.md` item also asked whether the
+merge it *described* should be built: no. One action per derivation tree
+is what the solver relies on (`Test.v`'s `MultipleDerivations`), and the
+comment now says so.
+
+**Docs (no change kept): the functor-parameter renames.** #53's entry
+said references such as `{!FSM.S.saturate}` failed because a functor
+parameter named `FSM` shadows the unit. **That was wrong.** With all nine
+parameters renamed (`FSM` to `F`, `LTS` to `L`, and so on; it compiled),
+every one of those references still failed. They resolve at a file's top
+level in the form `{!FSM.module-type-S.val-saturate}`, but not from inside
+the signatures where they are written, for a reason not found within the
+time spent. The renames were reverted; those mentions stay plain spans
+with their current names. Only two new references from the label fix were
+qualified (`{!Components.Label_sig.compare}`). `TODO.md` and the notes
+are corrected.
+
+**Verification.**
+- **Experiment first:** both changes on a scratch branch, against `main`.
+  The proof matrix was identical in all three modes ("Every Solve
+  identical"), ABP identical, `Test.v` identical, `tests.exe` 105/105,
+  and `satdiff -- 200` byte-identical.
+- **On the branch (`fd01d29`):** the proof matrix in all three modes, ABP, `Test.v`
+  (`MixedSilence` adds no `Solve`) identical to `main`; `tests.exe` 110/110.
+- `dune build`, `make` (warning-50 gate) clean; `tests.exe` 110/110.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep fix/label-order-actionmap main`).
+
+**Session tally (2026-10-10), cont.:** Docs 2 · Refactor 1 · Bug fix 2 ·
+Optimization 2.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
