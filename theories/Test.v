@@ -458,9 +458,15 @@ End ProofTest. *)
 End BisimDef. *)
 
 
-(* Cannot capture things like below due to cases like [tfix t --> tfix (tfix
- t')] leading to infinite states *)
-(* Module Test3.
+MeBi Divider "Theories.Test.Collapsing".
+Module Collapsing.
+  (* Backlog item B1: "collapsing" self-referential definitions. [do_fix]
+     wraps its target in [tfix] again ([tfix t --a--> tfix t'], unlike
+     [Test1]'s [tfix t --a--> t']), so every pass through [trec] can add a
+     level, and [do_collapse] removes one. Unguarded, the state space is
+     infinite; with [do_fix] allowed only below a depth [K] it is finite,
+     with [2K + 1] states for [tfix X]. Probed 2026-10-10; this module
+     replaces the commented-out [Test3]/[Test4] that sketched the problem. *)
   Inductive action : Set := | TheAction1 | TheAction2 | Collapse.
   Inductive term : Set :=
   | trec : term
@@ -479,77 +485,103 @@ End BisimDef. *)
     | tpar a b t => tpar a b (subst t1 t)
     end.
 
-  Inductive termLTS : term -> action -> term -> Prop :=
-  | do_act : forall a t, termLTS (tact a t) a t
+  Fixpoint fix_depth (t : term) : nat :=
+    match t with tfix u => S (fix_depth u) | _ => 0 end.
 
-  | do_par1 : forall a b t, termLTS (tpar a b t) a (tact b t)
+  Definition X := tact TheAction1 (tact TheAction2 trec).
 
-  | do_par2 : forall a b t, termLTS (tpar a b t) b (tact a t)
+  Module Unguarded.
+    Inductive termLTS : term -> action -> term -> Prop :=
+    | do_act : forall a t, termLTS (tact a t) a t
+    | do_par1 : forall a b t, termLTS (tpar a b t) a (tact b t)
+    | do_par2 : forall a b t, termLTS (tpar a b t) b (tact a t)
+    | do_fix : forall a t t',
+        termLTS (subst (tfix t) t) a t' ->
+        termLTS (tfix t) a (tfix t')
+    | do_collapse : forall t, termLTS (tfix (tfix t)) Collapse (tfix t).
 
-  | do_fix : forall a t t',
-      termLTS (subst (tfix t) t) a t' ->
-      termLTS (tfix t) a (tfix t')
-  | do_collapse : forall t, termLTS (tfix (tfix t)) Collapse (tfix t).
+    (* Without recursion it is finite: 2 states. *)
+    MeBi Config Bounds As Num States 2.
+    MeBi Run LTS (tfix (tact TheAction1 tend)) Using termLTS.
 
-  MeBi Run LTS termLTS (tfix (tact TheAction1 tend)).
-  MeBi Run LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
+    (* Cannot be finite. [tfix X --A1--> tfix (tact A2 (tfix X)) --A2-->
+       tfix (tfix X)], and [do_fix] lets the inner level move again, so
+       [tfix^n X] is reachable for every [n]. It does exactly [n - 1]
+       [Collapse]s in a row, so no two depths are bisimilar: there is no
+       finite LTS to find. Refused with [LTS_Incomplete] at the bound
+       (checked by cutting the file here). *)
+    MeBi Config Bounds As Num States 40.
+    Fail MeBi Run LTS (tfix X) Using termLTS.
 
-  MeBi Run LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
-End Test3. *)
+    (* KNOWN LIMIT: with [Collapse] silent, every level can fall back to
+       [tfix X] silently, so (informally) the system is weakly bisimilar to
+       [Guarded]'s [K = 1] below, a finite one. Extraction still enumerates
+       the infinitely many terms and stops at the bound ([LTS_Incomplete],
+       checked as above). Worth revisiting if B1 is designed. *)
+    MeBi Config Weak As Collapse Of action.
+    Fail MeBi Run Bisim (tfix X) With termLTS
+                    And (tfix (tfix X)) With termLTS.
+    MeBi Config Reset Weak.
+    MeBi Config Reset Bounds.
+  End Unguarded.
 
-(* FIXME: The case below is hard to implement. *)
-(* Solution 1:
-   - Formalise CIC inductive types to state machines (bounded). Throw error if LTS definition does
-not match input shape (e.g. we can simply prevent these "shape restrictions" as below, and throw
-an error stating we do not support them).
-   - Do a "heuristic" approach. Any parameter, e.g. "forall a t t'", instantiate with metavariables.
-Any term that *depends* on parameters ("a", "t", "t'"), try to find all terms that inhabit it, and
-try to find all possible ways that this constructor can be instantiated. If we can't figure out if it
-is inhabited, or we have no way to check if we exhaustively cover all possible cases, fail.
- *)
-(* Module Test4.
-  Inductive action : Set := | TheAction1 | TheAction2 | Collapse.
-  Inductive term : Set :=
-  | trec : term
-  | tend : term
-  | tfix : term -> term
-  | tact : action -> term -> term
-  | tpar : action -> action -> term -> term
-  .
+  Module Type BOUND. Parameter K : nat. End BOUND.
 
-  Fixpoint subst (t1 : term) (t2 : term) :=
-    match t2 with
-    | trec => t1
-    | tend => tend
-    | tfix t => tfix t
-    | tact a t => tact a (subst t1 t)
-    | tpar a b t => tpar a b (subst t1 t)
-    end.
+  (* [do_fix] only below depth [K]: deeper, a term must collapse first. The
+     guard bounds the body's depth, so [K = 0] disables [do_fix], and
+     [K = 1] is the old sketch's [not_fix t]. *)
+  Module Guarded (B : BOUND).
+    Inductive termLTS : term -> action -> term -> Prop :=
+    | do_act : forall a t, termLTS (tact a t) a t
+    | do_par1 : forall a b t, termLTS (tpar a b t) a (tact b t)
+    | do_par2 : forall a b t, termLTS (tpar a b t) b (tact a t)
+    | do_fix : forall a t t',
+        fix_depth t < B.K ->
+        termLTS (subst (tfix t) t) a t' ->
+        termLTS (tfix t) a (tfix t')
+    | do_collapse : forall t, termLTS (tfix (tfix t)) Collapse (tfix t).
+  End Guarded.
 
-  Definition not_fix t :=
-    match t with
-    | tfix _ => False
-    | _ => True
-    end.
+  Module K1 <: BOUND. Definition K := 1. End K1.
+  Module K2 <: BOUND. Definition K := 2. End K2.
+  Module K3 <: BOUND. Definition K := 3. End K3.
+  Module G1 := Guarded K1.
+  Module G2 := Guarded K2.
+  Module G3 := Guarded K3.
 
-  Inductive termLTS : term -> action -> term -> Prop :=
-  | do_act : forall a t, termLTS (tact a t) a t
+  (* [tfix X] has [2K + 1] states. At [K = 2]: [tfix X], [tfix (tact A2
+     (tfix X))], [tfix^2 X], [tfix^2 (tact A2 (tfix X))], [tfix^3 X]. *)
+  MeBi Config Bounds As Num States 3.
+  MeBi Run LTS (tfix X) Using G1.termLTS.
+  MeBi Config Bounds As Num States 2.
+  Fail MeBi Run LTS (tfix X) Using G1.termLTS.
+  MeBi Config Bounds As Num States 5.
+  MeBi Run LTS (tfix X) Using G2.termLTS.
+  MeBi Config Bounds As Num States 4.
+  Fail MeBi Run LTS (tfix X) Using G2.termLTS.
+  MeBi Config Bounds As Num States 7.
+  MeBi Run LTS (tfix X) Using G3.termLTS.
+  MeBi Config Bounds As Num States 6.
+  Fail MeBi Run LTS (tfix X) Using G3.termLTS.
 
-  | do_par1 : forall a b t, termLTS (tpar a b t) a (tact b t)
+  (* Deeper than [K] at the start, a term only collapses down: [tfix^3 X]
+     at [K = 1] reaches [tfix^2 X] and then [K = 1]'s three states. *)
+  MeBi Config Bounds As Num States 4.
+  MeBi Run LTS (tfix (tfix (tfix X))) Using G1.termLTS.
+  MeBi Config Bounds As Num States 3.
+  Fail MeBi Run LTS (tfix (tfix (tfix X))) Using G1.termLTS.
+  MeBi Config Reset Bounds.
 
-  | do_par2 : forall a b t, termLTS (tpar a b t) b (tact a t)
-
-  | do_fix : forall a t t',
-      not_fix t ->
-      termLTS (subst (tfix t) t) a t' ->
-      termLTS (tfix t) a (tfix t')
-  | do_collapse : forall t, termLTS (tfix (tfix t)) Collapse (tfix t).
-
-  MeBi Run LTS termLTS (tfix (tact TheAction1 tend)).
-  MeBi Run LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
-
-  MeBi Run LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
-End Test4. *)
+  (* [tfix X] and [tfix (tfix X)] differ only by a [Collapse]: not
+     bisimilar while it is visible ([Not_Bisimilar]), bisimilar when it is
+     silent. *)
+  Fail MeBi Run Bisim (tfix X) With G1.termLTS
+                  And (tfix (tfix X)) With G1.termLTS.
+  MeBi Config Weak As Collapse Of action.
+  MeBi Run Bisim (tfix X) With G1.termLTS
+             And (tfix (tfix X)) With G1.termLTS.
+  MeBi Config Reset Weak.
+End Collapsing.
 
 
 

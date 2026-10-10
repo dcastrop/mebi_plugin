@@ -6913,6 +6913,57 @@ says 110/110, measured on `main` (`59ee03f`). Earlier entries that report
 
 ---
 
+## 2026-10-10 — B1's collapsing definitions as live tests
+
+On branch `test/collapsing-fix`. Backlog item B1 ("collapsing"
+self-referential definitions) was two commented-out modules in `Test.v`,
+`Test3` and `Test4`, with a note that the plugin could not handle them.
+Jonah chose B1 as the first deferred new-capability item to size. A probe
+showed that **no new capability is needed** for what can be finite, so this
+change is tests only.
+
+**Tooling (tests): `Test.v`'s `Collapsing` module** replaces the
+commented-out sketch. `do_fix` wraps its target in `tfix` again
+(`tfix t -a-> tfix t'`, where `Test1` uses `tfix t -a-> t'`), so each pass
+through `trec` can add a level, and `do_collapse` removes one.
+- **`Unguarded`** (the old `Test3`): finite without recursion (2 states).
+  With recursion, `tfix^n X` is reachable for every `n` and does exactly
+  `n - 1` `Collapse`s in a row, so no two depths are bisimilar and no
+  finite LTS exists. The plugin refuses it with `LTS_Incomplete` at the
+  bound; pinned as a `Fail`. With `Collapse` silent it is (informally)
+  weakly bisimilar to a finite system, but extraction still cannot stop:
+  pinned `KNOWN LIMIT`. This is the case to revisit if B1 is ever designed.
+- **`Guarded`**: `do_fix` only while the body's depth is below `K`. The
+  old `Test4`'s `not_fix t` is `K = 1`. `tfix X` has `2K + 1` states
+  (3, 5, 7 for `K` = 1, 2, 3), pinned as least completing bounds.
+  `tfix X` and `tfix (tfix X)` are `Not_Bisimilar` while `Collapse` is
+  visible and bisimilar when it is silent.
+- **Probed first** (scratch files): `fix_depth t < K`, `Nat.ltb ... =
+  true` and a computed `Prop` give identical, complete LTSs for `K` = 0..3
+  on five terms, and every count matched a hand count. `K` comes from a
+  functor argument, because the plugin refuses a parameterised LTS
+  (`Inductive termLTS (k : nat)` used as `termLTS 2`: `Invalid_Ref_LTS`).
+  Supporting that would be a new capability, so it is not built.
+- **A mistake, corrected before it reached code:** I first told Jonah
+  `not_fix` was the `K = 0` case. The guard bounds the *body*'s depth, so
+  `K = 0` disables `do_fix`; the probe showed it.
+- The old comment's two designs (formalised shape restrictions; a
+  heuristic exhaustiveness search) are not carried over. Neither can make
+  `Unguarded` finite, and both would be new capability.
+
+**Verification.** `dune build` with `Test.v`'s messages present; every
+new `Fail` checked for its reason by cutting the file there and dropping
+the `Fail` (six `LTS_Incomplete`, one `Not_Bisimilar`); `make` gate
+clean; `bench/testv-counts.sh` identical to `main` (60 lines). No plugin
+code changed, so no proof-suite run.
+
+**How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
+--merges --oneline --grep test/collapsing-fix main`).
+
+**Session tally (2026-10-10, second session), cont.:** Docs 1 · Tooling 1.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
