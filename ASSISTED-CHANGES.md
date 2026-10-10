@@ -7022,6 +7022,47 @@ against the goal's.
 
 ---
 
+## 2026-10-10 — Evaluation series: width, layers, depth
+
+On branch `examples/evaluation-series` (stacked on `fix/clean-refusals`).
+Jonah asked for the evaluation-centric examples to sit apart from
+`Test.v`, as levers for benchmarking and the paper.
+
+**Tooling (examples): `examples/Evaluation/`.** Each file varies one
+lever with the others fixed. Sizes and each `Solve` are pinned with least
+bounds, so any increase fails the build. All are small (about 40s
+together), built by default and in CI; the benchmarking session can scale
+them up.
+- `Base.v`: a small interleaving calculus. An instance's size is an
+  argument of a *term* builder (`spawn n P`, `wrap^n`), not of the LTS,
+  since an LTS cannot have parameters.
+- `Width.v`: `n + 1` copies of a 3-state process beside a 2-state one,
+  `2 * 3^(n+1)` states (6, 18, 54); `weak_bisimilar` in 77, 1163 and 8256
+  steps.
+- `Layers.v`: a fixed 6-state system under `n` semantic layers, either one
+  LTS wrapping its own steps (`n` = 0, 2, 4, 8: 92, 120, 148, 204 steps)
+  or one LTS per layer as in `Proc.Layered` (1-3: 91, 105, 119). Both add
+  14 steps a layer.
+- `Depth.v`: `Test.v`'s `Collapsing.Guarded` with `option` labels, so
+  proofs can be stated (`Collapse` is the silent `None`): `tfix X` has
+  `2K + 1` states; `tfix X` against `tfix (tfix X)` takes 21, 108, 672 and
+  4704 steps for `K` = 1, 2, 4, 8. `Test.v` keeps its own copy, as a test.
+- **A mistake, caught before committing:** the first pair for width and
+  layers was `spawn n P` against the same copies nested the other way.
+  For one copy the two terms are *identical*, and the solver closes a pair
+  of identical states in one step, so every layers proof "took" 1 step.
+  The pair is now a second component on either side, which never
+  coincides.
+
+**Verification.** Each file compiled against the dune build (counts as
+above, under the default `MutualCofix Auto`; not measured with the
+strategy forced) and with `make` (CI's route); `make dune` after.
+
+**Session tally (2026-10-10, second session), cont.:** Docs 1 · Tooling 2
+· Bug fix 2.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
