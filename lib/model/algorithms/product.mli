@@ -8,28 +8,28 @@
     time and could not be tested without a Rocq runtime.
 
     It is pure model code, so it lives here. {i See [ASSISTED-CHANGES.md],
-    2026-09-29: an offline re-implementation of {!val:respond} that mirrored
+    2026-09-29: an offline re-implementation of {!S.respond} that mirrored
     the original rather than sharing it got the right pairs but the wrong
     response in 8 of 16 cases, because the tie-breaks run through the
     ordering of actions ([Action.compare]). Everything that needs this
     decision must call this function, never reproduce it.} *)
 module type S = sig
-  (** See {!Model.S.State.t}. *)
+  (** See {!Components.S.State.t}. *)
   type state
 
-  (** See {!Model.S.State.Set.t}. *)
+  (** See {!Components.S.State.Set.t}. *)
   type states
 
-  (** See {!Model.S.Label.t}. *)
+  (** See {!Components.S.Label.t}. *)
   type label
 
-  (** See {!Model.S.Transition.t}. *)
+  (** See {!Components.S.Transition.t}. *)
   type transition
 
-  (** See {!Model.S.FSM.t}. *)
+  (** See [FSM.S.t]. *)
   type fsm
 
-  (** See {!Model.S.Partition.t}. *)
+  (** See {!Components.S.Partition.t}. *)
   type partition
 
   (** A state of the simulation game: a state of the left-hand FSM paired
@@ -58,7 +58,7 @@ module type S = sig
       ; label : label
       }
 
-  (** See {!Model.S.EdgeMap.t'}. *)
+  (** See {!Components.S.EdgeMap.t'}. *)
   type edgemap
 
   (** [respond ?silent m from label bisimilar] is the transition [m] takes
@@ -116,7 +116,7 @@ module type S = sig
       class. Failing both, and given [sim], the same two tries against
       [x']'s simulators.
 
-      Raises nothing ({!val:respond}'s [NoBisimilarResponse] is caught). *)
+      Raises nothing ({!val:respond}'s {!NoBisimilarResponse} is caught). *)
   val answer
     :  ?silent:edgemap
     -> ?sim:(state -> states)
@@ -306,7 +306,7 @@ module type S = sig
 
     (** A policy's answers over a whole game: the [relation] (pairs reached
         from [root]), the answer [chosen] for each move, each pair's
-        successors ([next]), and the [measure]. *)
+        successors ([next]), and the {!type-measure}. *)
     type plan =
       { policy : t
       ; root : Pair.t
@@ -327,7 +327,7 @@ module type S = sig
     (** [minimal_relation game_of root] is the relation [Minimal] answers
         within: from every pair any answer reaches, pairs removed while
         every remaining pair can still answer all its moves within what
-        remains (the first removable in [Pair.Set] order each time), then
+        remains (the first removable in {!Pair.Set} order each time), then
         trimmed to what [root] reaches. If even that starting relation
         leaves some move unanswered, it is returned as is. Exposed for
         [tests.exe]'s check against the original algorithm.

@@ -73,11 +73,11 @@ module type Label_sig = sig
   include Json.S with type k = t
 
   (** [equal a b] is whether the labels [a] and [b] have equal base terms;
-      [is_silent] is not compared. Raises nothing. *)
+      {!field-is_silent} is not compared. Raises nothing. *)
   val equal : t -> t -> bool
 
-  (** [compare a b] orders labels by base term, then by [is_silent] when
-      both know it. Not a total order: a label whose [is_silent] is [None]
+  (** [compare a b] orders labels by base term, then by {!field-is_silent} when
+      both know it. Not a total order: a label whose {!field-is_silent} is [None]
       compares equal to the same base with [Some true] and with [Some false],
       which differ from each other ([TODO.md]). Raises nothing. *)
   val compare : t -> t -> int
@@ -125,7 +125,7 @@ module type Annotation_note_sig = sig
       Raises nothing. *)
   val compare : t -> t -> int
 
-  (** [is_silent n] is whether [n]'s label is silent ({!Label_sig.is_silent}).
+  (** [is_silent n] is whether [n]'s label is silent ({!Components.Label_sig.val-is_silent}).
       Raises nothing. *)
   val is_silent : t -> bool
 end
@@ -151,7 +151,7 @@ module type Annotation_sig = sig
       it is a prefix). Raises nothing. *)
   val compare : t -> t -> int
 
-  (** Raised by {!opt_is_empty} and {!opt_length} on [None] when asked to. *)
+  (** Raised by {!opt_length} on [None] when asked to. *)
   exception AnnotationIsNone
 
   (** [length a] is the number of notes in [a] (at least 1). Raises nothing. *)
@@ -268,7 +268,7 @@ module type Actionpair_sig = sig
   val compare : t -> t -> int
 
   (** [shorter_annotation p q] is the one of the pairs [p] and [q] whose
-      action has the shorter witness ({!Action_sig.shorter_annotation}); [p]
+      action has the shorter witness (by {!Components.Annotation_sig.opt_length}); [p]
       if they are as long. Raises nothing. *)
   val shorter_annotation : t -> t -> t
 end
@@ -315,7 +315,7 @@ module type Actionmap_sig = sig
 
   (** [update m a d] adds the destinations [d] to the action [a] in [m]
       (nothing if [d] is empty). Meant also to merge the derivation trees of
-      equal actions, but since {!Action_sig.equal} compares the trees, the
+      equal actions, but since {!Components.Action_sig.equal} compares the trees, the
       actions it finds already have them ([TODO.md]). Raises nothing. *)
   val update : t' -> action -> states -> unit
 
@@ -378,7 +378,8 @@ module type Edgemap_sig = sig
   val of_transitions : transitions -> t'
 
   (** [merge a b] is a copy of [a] with [b]'s entries added; a state in both
-      gets its action tables merged ({!Actionmap_sig.merge}). Raises nothing. *)
+      gets its action tables merged ({!Components.Actionmap_sig.merge}). Raises nothing.
+  *)
   val merge : t' -> t' -> t'
 end
 
