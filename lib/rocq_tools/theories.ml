@@ -16,6 +16,9 @@ module type S = sig
   val is_list : Evd.econstr -> bool im
   val is_cons : Evd.econstr -> bool im
   val is_nil : Evd.econstr -> bool im
+
+  exception EnsureFail
+
   val ensure : Evd.econstr -> (Evd.econstr -> bool im) -> unit im
 end
 
@@ -70,7 +73,7 @@ module Make
   let is_cons (x : EConstr.t) : bool mm = is_theory x (Th.get "cons")
   let is_nil (x : EConstr.t) : bool mm = is_theory x (Th.get "nil")
 
-  (** Raised by {!ensure}. *)
+  (* See the [.mli]. *)
   exception EnsureFail
 
   (* See the [.mli]. *)

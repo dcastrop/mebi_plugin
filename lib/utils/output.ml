@@ -65,5 +65,6 @@ type message =
   { kind : Kind.t
   ; fn : string (** [__FUNCTION__] of the emitting site, or [""]. *)
   ; prefix : string option
+    (** Printed just before [body], separator included (as ["p: "]). *)
   ; body : string
   }

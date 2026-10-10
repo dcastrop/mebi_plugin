@@ -1395,6 +1395,65 @@ let test_encoding_counter () : unit =
   check_int "reset restarts at init" E.init (E.incr ())
 ;;
 
+(** [clean_string_reference s] is {!Utils.clean_string} as it was before it
+    used a [Buffer] (one [sprintf] per character), kept to check the rewrite
+    against. *)
+let clean_string_reference (s : string) : string =
+  let after_space : bool ref = ref true in
+  let clean_char (c : char) : string =
+    if String.contains "\n\r\t" c
+    then
+      if !after_space
+      then ""
+      else (
+        after_space := true;
+        " ")
+    else (
+      let c_str : string = String.make 1 c in
+      if String.contains "\"" c
+      then "'"
+      else (
+        match String.equal " " c_str, !after_space with
+        | true, true -> ""
+        | true, false ->
+          after_space := true;
+          c_str
+        | false, true ->
+          after_space := false;
+          c_str
+        | false, false -> c_str))
+  in
+  String.fold_left (fun acc c -> acc ^ clean_char c) "" s
+;;
+
+(** [Utils.clean_string] agrees with its old, quadratic version. *)
+let test_clean_string () : unit =
+  print_endline "utils: clean_string";
+  let cases : string list =
+    [ ""
+    ; "   "
+    ; "abc"
+    ; "  lead and trail  "
+    ; "a\n\n\tb\r\nc"
+    ; "\"quoted\" \"x\""
+    ; "a \" b"
+    ; "a \"\n b"
+    ; "\t\"a\""
+    ; "fun x =>\n  match x with\n  | O => \"z\"\n  end"
+    ]
+  in
+  check
+    "agrees with the reference on edge cases"
+    true
+    (List.for_all
+       (fun s -> String.equal (Utils.clean_string s) (clean_string_reference s))
+       cases);
+  check
+    "collapses and requotes"
+    true
+    (String.equal (Utils.clean_string "  a\n\t \"b\"") "a 'b'")
+;;
+
 let test_json () : unit =
   print_endline "json serialisation";
   let f = fsm 0 [ transition 0 a 1 ] in
@@ -1437,6 +1496,7 @@ let () =
   test_tree_order ();
   test_tree_preorder ();
   test_encoding_counter ();
+  test_clean_string ();
   test_json ();
   Printf.printf "\n%i/%i passed\n" (!total - !failures) !total;
   if !failures > 0 then exit 1
