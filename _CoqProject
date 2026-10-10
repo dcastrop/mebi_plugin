@@ -35,6 +35,16 @@ examples/Bisimilarity/CCS/LawProofs.v ### Success (CTrees' CCS laws, tau-laws; ~
 # examples/Bisimilarity/CCS/ABPBisimProofs.v ### Success (ABP: weak_bisimilar; ~3.8 min, peaks ~4.2GB: separate file, both in one process exceed 6GB)
 
 ###############################################################################
+### Evaluation series: one lever each (width, semantic layers, nesting
+### depth), sizes and Solve counts pinned with least bounds. Small instances,
+### ~40s together, so built by default and in CI; scale them up for
+### benchmarking.
+examples/Evaluation/Base.v ### REQUIRED FOR BELOW
+examples/Evaluation/Width.v ### Success (6, 18, 54 states; ~22s)
+examples/Evaluation/Layers.v ### Success (6 states, 0-8 layers; ~2s)
+examples/Evaluation/Depth.v ### Success (K = 1-8; ~16s)
+
+###############################################################################
 ### Proc
 examples/Proc.v ### REQUIRED FOR BELOW
 examples/ProcCongruence.v ### structural congruence made explicit: a normalised semantics for Proc.Layered, proved weakly bisimilar to it (fast, no plugin calls)
