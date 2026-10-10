@@ -7210,6 +7210,34 @@ shrink.
 
 ---
 
+## 2026-10-10 — `TODO.md` folded into `OUTSTANDING.md`
+
+On branch `docs/outstanding`. Jonah asked whether anything would be left
+in `TODO.md` once trimmed. Nothing was:
+- every unchecked item was already in `OUTSTANDING.md`;
+- every checked item is history, recorded here in more detail.
+
+**Docs.**
+- `TODO.md` is now a pointer to `OUTSTANDING.md`, naming the commit that
+  holds the full old list.
+- `OUTSTANDING.md` now holds the detail it used to send readers to
+  `TODO.md` for: the `Auto` defaults' figures, the semantics examples, the
+  sketch for LTSs with parameters, and why the derivation-tree replay is
+  not simple batching.
+- "Both directions of a bisimilarity in one command" is removed from
+  `OUTSTANDING.md`: Jonah confirmed it is covered by `weak_bisimilar`
+  (PR #3) and `MeBi Run Bisim ... As` (PR #34).
+- References to `TODO.md` updated:
+  - `README.md`'s "Status & Remaining Work", which also still listed
+    similarity and CI as remaining (both done);
+  - a doc comment in `lib/rocq_tools/rocq_monad.mli`, whose list of
+    wrong `try` sites was all fixed on 2026-10-09;
+  - `CLAUDE.md`.
+
+**Session tally (2026-10-10, third session), cont.:** Tooling 3 · Docs 3.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

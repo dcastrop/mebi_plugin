@@ -29,7 +29,8 @@ decisions for @dcastrop, the tool's limitations, possible work and what
 was set aside. It should only shrink. When an item is resolved, delete it
 there and record the resolution in `ASSISTED-CHANGES.md`. When something
 new is found, add it with its kind and a pointer to the detail. Don't
-grow open-item lists elsewhere (`TODO.md`, `notes/`).
+grow open-item lists elsewhere: `TODO.md` is only a pointer now, and
+`notes/` is local.
 
 ## Verifying changes to `lib/model` or the proof solver
 
@@ -160,9 +161,6 @@ anything the proof solver reads.
 - `notes/` holds local planning notes and is excluded via
   `.git/info/exclude` (not `.gitignore`) — it will not appear in a fresh
   clone's `git status` as untracked, but is not shared upstream either.
-- `TODO.md` tracks known structural/tooling debt (repo size dominated by
-  `paper/`, no CI, no LICENSE, overlapping module lists across `_CoqProject`/
-  `dune`/`.mlpack`, etc.) separately from plugin feature work.
 - Adding, renaming or deleting an OCaml module means updating **three**
   lists by hand: `_CoqProject`, `src/mebi_plugin.mlpack` and the relevant
   dune `(modules ...)`. `python3 scripts/check_module_lists.py` checks all

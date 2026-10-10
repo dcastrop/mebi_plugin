@@ -8,8 +8,8 @@
     in the continuation of a [let*] -- is raised when it runs, not when it
     is built. A [try ... with] around the {e construction} of a monadic
     value therefore does not catch it; handle it around {!S.run}, or inside
-    the function given to {!S.val-state}. [TODO.md] ("try around a monadic
-    value") lists the places that get this wrong. *)
+    the function given to {!S.val-state}. [ASSISTED-CHANGES.md]
+    (2026-10-09) lists the places that got this wrong, all since fixed. *)
 module type S = sig
   include Bi_encoding.S
 

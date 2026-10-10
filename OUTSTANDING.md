@@ -9,10 +9,10 @@ limits, possible work, and what was set aside on purpose. This file should
 Add an item only when something new is found, with a pointer to its
 detail.
 
-It supersedes the open-item lists in `TODO.md` ("To discuss with
-@dcastrop", "Known limits and ideas"), `ASSISTED-CHANGES.md`
-("Outstanding") and Jonah's local planning notes (`notes/`, not in the
-repository). Those keep the history; this file holds what is still open.
+It replaces `TODO.md` (reduced to a pointer on 2026-10-10) and the
+open-item lists in `ASSISTED-CHANGES.md` ("Outstanding") and Jonah's local
+planning notes (`notes/`, not in the repository). `ASSISTED-CHANGES.md`
+keeps the history; this file holds what is still open.
 Started 2026-10-10. Each item names its kind:
 - *decision*: someone has to choose;
 - *limit*: what the tool cannot do today;
@@ -23,8 +23,9 @@ Started 2026-10-10. Each item names its kind:
 
 ## 1. To discuss with @dcastrop
 
-His repository and project, so his decisions. Detail for each is in
-`TODO.md` (same headings) and the `ASSISTED-CHANGES.md` entries named.
+His repository and project, so his decisions. Merged changes went in one
+merge commit per branch, and `ASSISTED-CHANGES.md` gives each one's revert
+command, so any of them can be backed out if he disagrees.
 
 **Repository**
 - **LICENSE** (*decision*). There is none, and `dune-project`'s
@@ -47,22 +48,31 @@ His repository and project, so his decisions. Detail for each is in
 
 **Defaults** (each changes what a checked-in `MeBi Sim Solve N` bound
 means, so deciding one way means re-measuring every bound)
-- `MeBi Config Solver MutualCofix Auto` as the default (*decision*). It is
-  correct on all checked-in proofs, and fewer steps than either fixed
-  strategy, but it can silently change a proof's iteration count. Two
-  sub-questions:
+- `MeBi Config Solver MutualCofix Auto` as the default (*decision*;
+  `ASSISTED-CHANGES.md` 2026-09-29). The solver can introduce coinduction
+  hypotheses as a nested `cofix` per new pair (what it always did) or as
+  one mutual `cofix` over the precomputed product. `Auto` costs both on the
+  model and picks one, with a `Notice` when it goes mutual. Over the 18
+  cheap proofs it takes 2565 steps, against 3794 always-nested and 2654
+  always-mutual, with no regression anywhere. Against it: it can silently
+  change a proof's iteration count. Two sub-questions:
   - whether to tighten `Proc/Test2`'s deliberately loose bounds;
   - whether `Proc/Test3` should drop its explicit `MutualCofix True`.
-- `MeBi Config Solver Answers Auto` as the default (*decision*). It is
-  never slower than today's default on the 41 proofs, and has 60% fewer
-  steps on `weak_bisimilar`; it was not measured with `MutualCofix`
-  forced.
+- `MeBi Config Solver Answers Auto` as the default (*decision*; PR #9,
+  `ASSISTED-CHANGES.md` 2026-10-02). It plans every answer at `Sim Begin`
+  and keeps the cheapest of three policies. On all 41 checked-in proofs it
+  was never slower than today's `Default`. It cut `weak_sim` proofs by 17%
+  and `weak_bisimilar` proofs by 60% (Test3 `wbis_p3`: 14,427 → 3,579). It
+  was not measured with `MutualCofix` forced.
 
 **Semantics** (Jonah's decisions of 2026-10-02, for review)
 - Classical, divergence-insensitive weak bisimilarity is the target
   notion. A τ-loop and a stuck state are therefore equivalent (see §3).
+  The checker decides it properly since PR #1 (rooted verdict, `=ε⇒`
+  split). Before, `Run Bisim` could call `a.b.x` and `b.a.y` bisimilar.
 - `weak_bisim` in `theories/Bisimilarity.v` is mutual similarity, which is
-  strictly weaker than bisimilarity. `mutual_sim` (its honest name) and
+  strictly weaker than bisimilarity: `a.b + a` and `a.b` satisfy it but
+  are not bisimilar (proved in `Test.v`). `mutual_sim` (its honest name) and
   `weak_bisimilar` (a real bisimulation) were added beside it. *Decision:*
   deprecate or rename `weak_bisim`, and whether the `ManualProofs.v`/
   `LtacProofs.v` theorems should be restated.
@@ -150,7 +160,11 @@ turns the pin into a positive test.
   pinned `ParameterisedLTS`). This rules out an LTS generic in its label
   type, or one defined in a `Section`. Workaround: fix the values in a
   module (`examples/Evaluation/Depth.v`). Making this work would be a new
-  *capability* (medium); a sketch is in `TODO.md`.
+  *capability* (medium). Sketch:
+  - accept a term (`constr`) where an LTS is named;
+  - instantiate the parameters in the constructor types (`mind_nf_lc`);
+  - apply them wherever extraction and the proof solver rebuild the LTS
+    term.
 - **Size.** Extraction costs ~0.01-0.07MB per state, and is roughly
   quadratic in time on the ABP-with-data series. Whole saturation is
   refused above `Bounds Saturation` (default 1M weak actions;
@@ -215,11 +229,18 @@ and 12)
 
 **Optimization**
 - **Replay a derivation tree in one solver step** (*optimization*,
-  measure first). Today each constructor application is one solver step,
-  so a layer adds 14 steps (`Layers.v`). It would only save solver
-  overhead: the proof term, and so `Qed`, would be unchanged. At depth,
-  `Qed` dominates (§3). Every checked-in bound would change. Detail in
-  `TODO.md`.
+  measure first). Today each step applies one constructor of a
+  transition's derivation tree, in preorder
+  (`Proof_solver_step.handle_appconstrs_update_args`), so a layer adds 14
+  steps (`Layers.v`). Why it is not simple batching:
+  - each application reads the goal the previous one left;
+  - premises open sibling goals, which a step cannot see, because steps
+    run focused on the first goal.
+
+  So it would be one tactic inspecting goals as it runs. It would save only
+  the solver's per-step overhead: the proof term, and so `Qed`, would be
+  unchanged, and at depth `Qed` dominates (§3). Every checked-in bound
+  would change.
 - **`Auto` mis-estimate** (*optimization*, small). On `LawProofs.tau1`,
   `Auto` picks nested (42 steps) where mutual takes 29. A data point for
   `Product.estimate`, if it is revisited.
@@ -243,9 +264,6 @@ reason in mind.
   sterile steps measured at zero after options A and D′.
 - **Divergence-sensitive equivalences**: out of scope for the current
   definitions.
-- **Both directions of a bisimilarity in one command**: overtaken by
-  `weak_bisimilar` (PR #3) and `MeBi Run Bisim ... As` (PR #34). *To
-  confirm with Jonah* that nothing is left.
 - **Module lists** (`_CoqProject`, `.mlpack`, dune) are still maintained
   by hand. A drift is caught by `scripts/check_module_lists.py` (CI)
   rather than prevented.
