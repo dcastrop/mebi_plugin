@@ -1,5 +1,5 @@
 (** The kinds of message the plugin can emit. Contains no reference to the Rocq
-    API — see [Logger.set_sink] for how messages reach Rocq's [Feedback]. *)
+    API — see {!Logger.set_sink} for how messages reach Rocq's [Feedback]. *)
 
 module Kind : sig
   (** [Debug] .. [Error] mirror Rocq's [Feedback.level]; [Trace], [Result]

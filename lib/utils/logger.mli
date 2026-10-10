@@ -2,8 +2,8 @@
 
     There is no [Logger.S] functor parameter any more. [S] had no abstract type,
     so passing it to a functor cost a parameter on every module in [lib/] and
-    bought nothing. Call [Logger.trace], [Logger.info] etc. directly; the
-    Rocq-vs-stdout choice is made once via [set_sink]. *)
+    bought nothing. Call {!Logger.trace}, {!Logger.info} etc. directly; the
+    Rocq-vs-stdout choice is made once via {!set_sink}. *)
 
 (** Where a message goes once it passes the configuration. *)
 type sink = Output.message -> unit
@@ -46,7 +46,7 @@ val quiet : (unit -> 'a) -> 'a
 
 (** {1 Emission} *)
 
-(** The logging API: at the top level of [Logger] against the global
+(** The logging API: at the top level of {!Logger} against the global
     configuration, and through {!Scoped} with a module's own. None of it
     raises, beyond what the sink or a given printer raises. *)
 module type S = sig
@@ -55,7 +55,7 @@ module type S = sig
   val is_enabled : Output.Kind.t -> bool
 
   (** [debug ?__FUNCTION__ s] emits [s] at [Debug], naming the calling
-      function if given; an empty [s] emits nothing. [info] ... [show] are
+      function if given; an empty [s] emits nothing. {!info} ... {!show} are
       the same for their kinds. *)
   val debug : ?__FUNCTION__:string -> string -> unit
 
@@ -95,8 +95,8 @@ include S
 (** [Scoped (X)] is a logger with its own per-kind overrides [X.overrides]
     (a kind not listed follows the global configuration), sharing the
     global sink and global on/off. Declared and used within a single file,
-    never threaded through a functor. Only [Rocq_utils] and
-    [Mebi_theories] need it.
+    never threaded through a functor. Only {!Rocq_utils} and
+    {!Mebi_theories} need it.
 
     {b E.g.:}
     {[
