@@ -9,10 +9,11 @@ limits, possible work, and what was set aside on purpose. This file should
 Add an item only when something new is found, with a pointer to its
 detail.
 
-It replaces `TODO.md` (reduced to a pointer on 2026-10-10) and the
-open-item lists in `ASSISTED-CHANGES.md` ("Outstanding") and Jonah's local
-planning notes (`notes/`, not in the repository). `ASSISTED-CHANGES.md`
-keeps the history; this file holds what is still open.
+It replaces `TODO.md` (deleted 2026-10-10; the old list is `git show
+a1b1470:TODO.md`) and the open-item lists in `ASSISTED-CHANGES.md`
+("Outstanding") and Jonah's local planning notes (`notes/`, not in the
+repository). `ASSISTED-CHANGES.md` keeps the history; this file holds
+what is still open.
 Started 2026-10-10. Each item names its kind:
 - *decision*: someone has to choose;
 - *limit*: what the tool cannot do today;

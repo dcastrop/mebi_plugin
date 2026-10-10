@@ -7218,8 +7218,8 @@ in `TODO.md` once trimmed. Nothing was:
 - every checked item is history, recorded here in more detail.
 
 **Docs.**
-- `TODO.md` is now a pointer to `OUTSTANDING.md`, naming the commit that
-  holds the full old list.
+- `TODO.md` became a pointer to `OUTSTANDING.md`, then, at Jonah's
+  request, was deleted. The full old list is `git show a1b1470:TODO.md`.
 - `OUTSTANDING.md` now holds the detail it used to send readers to
   `TODO.md` for: the `Auto` defaults' figures, the semantics examples, the
   sketch for LTSs with parameters, and why the derivation-tree replay is
@@ -7235,6 +7235,24 @@ in `TODO.md` once trimmed. Nothing was:
   - `CLAUDE.md`.
 
 **Session tally (2026-10-10, third session), cont.:** Tooling 3 · Docs 3.
+
+---
+
+## 2026-10-10 — Session close: `TODO.md` deleted, gotchas into `CLAUDE.md`
+
+On branch `docs/outstanding`, at Jonah's request.
+
+**Docs.**
+- `TODO.md` is deleted (see the entry above).
+- `CLAUDE.md` gains "Working conventions and gotchas", moved from the
+  "Practical gotchas" in Jonah's local notes. It covers the publishing
+  conventions, Rocq's reuse of hypothesis names, steps focused on the first
+  goal, encodings renumbered per command, `Reset Bounds` also resetting
+  `Saturation OnDemand` and `Premise Depth`, `make`'s packed build, stale
+  example copies, attributing time, and two shell traps. A fresh session
+  reads `CLAUDE.md` automatically, and these were only in `notes/`.
+
+**Session tally (2026-10-10, third session), final:** Tooling 3 · Docs 4.
 
 ---
 
