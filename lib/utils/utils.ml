@@ -68,43 +68,31 @@ let option_fstr (f : 'a -> string) : 'a option -> string = function
   | Some x -> Printf.sprintf "Some (%s)" (f x)
 ;;
 
-(** [clean_char after_space c] is what [c] becomes in {!clean_string}: a
-    newline, tab or space is one space, or nothing just after a space; a
-    double quote is a single quote; anything else is itself.
-    [after_space] is whether the last character written was a space (or
-    nothing is written yet), and is updated. Raises nothing. *)
-let clean_char (after_space : bool ref) (c : char) : string =
-  if String.contains "\n\r\t" c
-  then
-    if !after_space
-    then ""
-    else (
-      after_space := true;
-      " ")
-  else (
-    let c_str : string = String.make 1 c in
-    if String.contains "\"" c
-    then "'"
-    else (
-      match String.equal " " c_str, !after_space with
-      | true, true -> ""
-      | true, false ->
-        after_space := true;
-        c_str
-      | false, true ->
-        after_space := false;
-        c_str
-      | false, false -> c_str))
+(** [clean_char b after_space c] appends what [c] becomes in
+    {!clean_string} to [b]: a newline, tab or space is one space, or nothing
+    just after a space; a double quote is a single quote; anything else is
+    itself. [after_space] is whether the last character written was a space
+    (or nothing is written yet), and is updated; a quote leaves it as it is.
+    Raises nothing. *)
+let clean_char (b : Buffer.t) (after_space : bool ref) (c : char) : unit =
+  match c with
+  | '\n' | '\r' | '\t' | ' ' ->
+    if Bool.not !after_space
+    then (
+      Buffer.add_char b ' ';
+      after_space := true)
+  | '"' -> Buffer.add_char b '\''
+  | c ->
+    after_space := false;
+    Buffer.add_char b c
 ;;
 
 (* See the [.mli]. *)
 let clean_string (s : string) : string =
+  let b : Buffer.t = Buffer.create (String.length s) in
   let after_space : bool ref = ref true in
-  String.fold_left
-    (fun (acc : string) (c : char) ->
-      Printf.sprintf "%s%s" acc (clean_char after_space c))
-    ""
-    s
+  String.iter (clean_char b after_space) s;
+  Buffer.contents b
 ;;
 
 module FileWriter = struct

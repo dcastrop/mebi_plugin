@@ -19,7 +19,7 @@ let default_sink : sink =
     "%s [%s] %s\n%!"
     (match fn with "" -> "" | z -> Printf.sprintf "%s:" z)
     (Output.Kind.to_string kind)
-    (match prefix with None -> body | Some p -> Printf.sprintf "%s: %s" p body)
+    (match prefix with None -> body | Some p -> p ^ body)
 ;;
 
 (** The installed sink. *)
@@ -195,7 +195,7 @@ module Body (E : sig
       let index : int ref = ref 0 in
       (* [fx x] emits [x] headed by its index *)
       let fx (x : 'a) : unit =
-        thing k (Printf.sprintf "%i" !index) x f;
+        thing ~__FUNCTION__ k (Printf.sprintf "%i" !index) x f;
         index := !index + 1
       in
       e "start";

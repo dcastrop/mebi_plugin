@@ -152,6 +152,8 @@ module type S = sig
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
+    exception NothingToBenchmark
+
     val do_benchmark_graph
       :  rocq_args * (int * int)
       -> Libnames.qualid list
@@ -899,8 +901,7 @@ module Make (Enc : Encoding.S) :
       M.return (Some result)
     ;;
 
-    (** Raised by {!extract_benchmark_args}: a list type that is not Rocq's
-        [list]. *)
+    (* See the [.mli]. *)
     exception NothingToBenchmark
 
     (** [extract_benchmark_args xs] is the elements of the Rocq list [xs], or

@@ -3,6 +3,9 @@ module type S = sig
   type 'a mm
   type t
   type lts
+  type indmap
+
+  exception LTSMapDoesNotContainPrimaryLTS of indmap * Libnames.qualid
 
   val build
     :  ?weak:weak option
@@ -92,9 +95,10 @@ struct
     M.return ltsmap
   ;;
 
-  (** Raised by {!get_primary_lts}: the LTS explored is not among those
-      given in [Using]. *)
-  exception LTSMapDoesNotContainPrimaryLTS of G.indmap * Libnames.qualid
+  type indmap = G.indmap
+
+  (* See the [.mli]. *)
+  exception LTSMapDoesNotContainPrimaryLTS of indmap * Libnames.qualid
 
   (** [get_primary_lts ltsmap q] is the LTS named [q], checked to be in
       [ltsmap].

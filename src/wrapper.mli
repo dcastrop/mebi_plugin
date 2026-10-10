@@ -234,6 +234,10 @@ module type S = sig
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
+    (** Raised by {!do_benchmark_graph}: the terms to benchmark have a list
+        type that is not Rocq's [list]. *)
+    exception NothingToBenchmark
+
     (** [do_benchmark_graph ((ts, lts), (time, repeat)) using] times the LTS
         extraction of each term of the list [ts] (or of [ts] alone, if it is
         not a list) by [lts], each run for at least [time] seconds, [repeat]
