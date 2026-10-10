@@ -55,6 +55,9 @@ module type S = sig
   (** [is_nil x] is whether [x]'s head is [nil]. *)
   val is_nil : Evd.econstr -> bool im
 
+  (** Raised by {!ensure}: the check failed. *)
+  exception EnsureFail
+
   (** [ensure x f] checks that [f x] holds.
 
       @raise EnsureFail
