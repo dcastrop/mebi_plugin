@@ -22,6 +22,15 @@ owns the upstream repo) as a transparency record of what Claude contributed
 and of what kind — be honest about mistakes and reversals there; that
 candour is the point of the log.
 
+## Keep `OUTSTANDING.md` current
+
+`OUTSTANDING.md` (repo root) is the one list of what is still open:
+decisions for @dcastrop, the tool's limitations, possible work and what
+was set aside. It should only shrink. When an item is resolved, delete it
+there and record the resolution in `ASSISTED-CHANGES.md`. When something
+new is found, add it with its kind and a pointer to the detail. Don't
+grow open-item lists elsewhere (`TODO.md`, `notes/`).
+
 ## Verifying changes to `lib/model` or the proof solver
 
 `theories/Test.v` and `DevTest.v` alone are **not** sufficient coverage for

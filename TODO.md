@@ -22,7 +22,7 @@
   - [ ] `examples/CADP.v`
     - [ ] *Size 1*
       - [x] Original vs Glued (`examples/CADP_Glued.v`)
-      - [ ] Properties (E.g., mutual exclusion, no starvation -- ***see example in draft-paper***) -- mutual exclusion done; no starvation is a liveness/fairness property needing a spec LTS that encodes fairness, left for the authors (2026-10-01)
+      - [ ] Properties (E.g., mutual exclusion, no starvation -- ***see example in draft-paper***) -- mutual exclusion done; no starvation is a liveness/fairness property needing a spec LTS that encodes fairness, left for the authors (2026-10-01); since 2026-10-10 to be written with Jonah, outlined in `OUTSTANDING.md` §2
     - [ ] ~~***Size 2***~~ *(this may be infeasible -- state explosion)*
 - [x] ~~Solve both directions in main bisimilarity proof~~ -- **closed 2026-10-04** as covered: `weak_bisimilar` (`theories/Bisimilarity.v`) is one coinductive relation proved in both directions by one `MeBi Sim` proof (since 2026-10-02; `examples/Bisimilarity/**/PluginProofs.v` end with such proofs). No separate command is planned.
 
@@ -69,6 +69,8 @@ they are in the code (the comments point here); each needs a fix with a test.
 
 ## Known limits and ideas (found 2026-10-10)
 
+*Open items are tracked in [`OUTSTANDING.md`](OUTSTANDING.md) since 2026-10-10; this section keeps the detail.*
+
 Each limit is pinned in `theories/Test.v` (a `Fail` with a `KNOWN LIMIT`
 comment) so lifting it turns the pin into a positive test.
 
@@ -112,6 +114,8 @@ comment) so lifting it turns the pin into a positive test.
 
 ## To discuss with @dcastrop
 
+*Open items are tracked in [`OUTSTANDING.md`](OUTSTANDING.md) since 2026-10-10; this section keeps the detail.*
+
 *Every decision that is @dcastrop's, or that Jonah made alone and wants to
 review with him, in one place. Each item names where the detail is. Changes
 already merged into `fork/main` were made as one merge commit per branch,
@@ -139,7 +143,7 @@ be backed out if he disagrees.*
 
 - [ ] ***Move `paper/` out of this repository*** -- 73 tracked PDFs, ~36MB, is 96% of the repo (the pack is 38.8MiB; all of `lib/ src/ theories/ examples/ test/` together is ~1.2MB). Untouched for ~18 months. Note that deleting it from `HEAD` will ***not*** shrink anyone's clone -- that needs `git filter-repo` and a force-push, so it has to be coordinated with @dcastrop. There is also a licensing question in redistributing third-party papers from a public repo. A separate repo or a reference manager is the usual home for these.
 - [ ] Add a `LICENSE` and uncomment `(license ...)` in `dune-project` -- currently commented out, so the generated `rocq-mebi.opam` carries no license field either. Needs @dcastrop's sign-off before picking one, since he owns the upstream repo.
-- [ ] **CADP "no starvation"**: a liveness/fairness property whose intended formulation is in the draft paper; it needs a spec LTS that encodes fairness. The authors' call.
+- [ ] **CADP "no starvation"**: a liveness/fairness property whose intended formulation is in the draft paper; it needs a spec LTS that encodes fairness. Was the authors' call; since 2026-10-10 to be written with Jonah (`OUTSTANDING.md` §2: it needs `Size2`, as `Size1` has one process).
 
 ## Project Structure & Tooling
 

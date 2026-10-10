@@ -7175,7 +7175,44 @@ committed version):**
 
 ---
 
+## 2026-10-10 — `OUTSTANDING.md`: one list of what is open
+
+On branch `docs/outstanding`, stacked on `bench/evaluation`. Jonah asked
+for a single file of everything still open, because `ASSISTED-CHANGES.md`
+has grown too large to track remaining issues in. It is meant to only
+shrink.
+
+**Docs.** `OUTSTANDING.md` gathers the open items from `CLAUDE.md`,
+`TODO.md`, this file's "Outstanding" section and Jonah's local notes
+(notes 4, 12 and 14). Its sections:
+1. a concise outline of @dcastrop's decisions (licence, `paper/`,
+   upstreaming, the `Auto` defaults, the semantics questions, provenance);
+2. CADP "no starvation", moved from "the authors' call" to a fresh
+   session with Jonah, and outlined;
+3. the tool's current limitations, planned or not;
+4. possible work;
+5. what was set aside, and why.
+
+`TODO.md` and this file's "Outstanding" section now point to it.
+`CLAUDE.md` says to keep it current.
+
+**Findings while gathering:**
+- CADP `Size1` composes a single process (`composition_create 0`), so
+  no-starvation is vacuous there. It needs `Size2`, which is a known size
+  limit (its glued proofs fail). This had not been written down.
+- `perf` is installed but blocked for unprivileged users
+  (`perf_event_paranoid` = 4). Nix or opam cannot change that; a
+  one-time `sysctl` (until reboot) or timers inside the plugin would.
+- The switch has no frame pointers, so a `perf` profile would need
+  `--call-graph dwarf`.
+
+**Session tally (2026-10-10, third session), cont.:** Tooling 3 · Docs 2.
+
+---
+
 ## Outstanding
+
+**Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
 - The term-equality problem in `ReModel` is unaddressed: goal terms are resolved to model elements by syntactic hashtable lookup, which can miss on evars, universe instances or local context. **Measured 2026-09-28 (see above) and found latent** — zero misses across all five cheap `PluginProofs.v` suites — so the unification rewrite is deliberately not done. Still unmeasured on the *failing* examples (`Proc/Test3`, `CADP/Size2/Glued`), which is where a miss would actually explain something.
