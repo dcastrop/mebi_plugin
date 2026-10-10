@@ -287,6 +287,80 @@ let explicit_whole_game_settings () : string list =
   @ Stdlib.Option.to_list (answer_policy_setting ())
 ;;
 
+(** [refuse_goal ()] refuses a goal [MeBi Sim Begin] cannot prove: one
+    that is neither [weak_sim] nor [weak_bisimilar]. Before 2026-10-10 such
+    a goal was taken for [weak_bisimilar], and an existential one ([exists r, weak_sim lts lts p r]) stopped [Solve] on an internal error.
+
+    @raise CErrors.UserError always (raised here). *)
+let refuse_goal () : 'a =
+  CErrors.user_err
+    (Pp.str
+       "MeBi: [MeBi Sim Begin] proves a goal [weak_sim ...] or [weak_bisimilar \
+        ...], and the goal in focus is neither. For an existential goal, give \
+        the witness first ([exists t.]); for a conjunction such as \
+        [mutual_sim], prove each [weak_sim] on its own; for a goal stated with \
+        a definition of your own, unfold it first.")
+;;
+
+(** [check_goal_states pstate x y] checks [x] and [y], the terms given to
+    [MeBi Sim Begin], are the two states of the goal in focus (its last two
+    arguments), up to conversion: the proof search looks the goal's states
+    up in the LTSs built from [x] and [y]. Before 2026-10-10 a mismatch
+    stopped [Solve] on an internal error ([CouldNotFind_State],
+    [CannotGetTransition]). Assumes the goal is [weak_sim] or
+    [weak_bisimilar].
+
+    @raise CErrors.UserError if they are not (raised here). *)
+let check_goal_states
+      (pstate : Declare.Proof.t)
+      (x : Constrexpr.constr_expr)
+      (y : Constrexpr.constr_expr)
+  : unit
+  =
+  let { Proof.goals; sigma; _ } = Proof.data (Declare.Proof.get pstate) in
+  match goals with
+  | [] -> ()
+  | g :: _ ->
+    let env = Global.env () in
+    let concl = Evd.evar_concl (Evd.find_undefined sigma g) in
+    let _, args = EConstr.decompose_app sigma concl in
+    let n = Array.length args in
+    if n >= 2
+    then (
+      let sigma, x' = Constrintern.interp_constr_evars env sigma x in
+      let sigma, y' = Constrintern.interp_constr_evars env sigma y in
+      let s = args.(n - 2)
+      and t = args.(n - 1) in
+      let pr = Printer.pr_econstr_env env sigma in
+      let mismatch (which : string) (given : EConstr.t) (goal : EConstr.t) =
+        Pp.(
+          str (Printf.sprintf "the %s term given, " which)
+          ++ pr given
+          ++ str ", is not the goal's "
+          ++ str which
+          ++ str " state, "
+          ++ pr goal
+          ++ str ".")
+      in
+      let errs =
+        (if Reductionops.is_conv env sigma x' s
+         then []
+         else [ mismatch "first" x' s ])
+        @
+        if Reductionops.is_conv env sigma y' t
+        then []
+        else [ mismatch "second" y' t ]
+      in
+      if errs <> []
+      then
+        CErrors.user_err
+          Pp.(
+            str
+              "MeBi: [MeBi Sim Begin <lts> <x> And <lts> <y>] needs [x] and \
+               [y] to be the goal's two states, in order: "
+            ++ prlist_with_sep spc (fun e -> e) errs))
+;;
+
 (** [refuse_whole_game setting why] refuses [setting], which walks the
     whole game up front, on an FSM saturated on demand, saying [why] and
     the ways on.
@@ -635,6 +709,8 @@ let init
      fine)? *)
   let goal_is_bisimilar : bool = goal_head_is pstate "weak_bisimilar" in
   let goal_is_sim : bool = goal_head_is pstate "weak_sim" in
+  if Bool.not (goal_is_bisimilar || goal_is_sim) then refuse_goal ();
+  check_goal_states pstate (fst a) (fst b);
   Solver.W.check_bisimilarity ~fail_if_not_bisim:(Bool.not goal_is_sim) refs a b;
   Solver.W.swapped := false;
   Solver.W.simulators := None;

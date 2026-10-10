@@ -65,6 +65,7 @@ module type S = sig
       | Invalid_Sort_Type of Sorts.Quality.t
       | Invalid_Ref_LTS of Names.GlobRef.t
       | Invalid_Ref_Type of Names.GlobRef.t
+      | LTS_Has_Parameters of string
       | Invalid_Arity of (Environ.env * Evd.evar_map * Constr.t)
       | InvalidCheckUpdatedCtx of
           (Environ.env
@@ -85,6 +86,7 @@ module type S = sig
     val invalid_sort_type : Sorts.Quality.t -> exn
     val invalid_ref_lts : Names.GlobRef.t -> exn
     val invalid_ref_type : Names.GlobRef.t -> exn
+    val lts_has_parameters : string -> exn
     val invalid_arity : Environ.env -> Evd.evar_map -> Constr.t -> exn
 
     val invalid_check_updated_ctx
@@ -110,6 +112,7 @@ module type S = sig
     val invalid_sort_type : Sorts.Quality.t -> 'a
     val invalid_ref_lts : Names.GlobRef.t -> 'a
     val invalid_ref_type : Names.GlobRef.t -> 'a
+    val lts_has_parameters : string -> 'a
     val invalid_arity : Constr.t -> 'a mm
 
     val invalid_check_updated_ctx
@@ -557,6 +560,7 @@ module Make (Enc : Encoding.S) :
       (* NOTE: *)
       | Invalid_Ref_LTS of Names.GlobRef.t
       | Invalid_Ref_Type of Names.GlobRef.t
+      | LTS_Has_Parameters of string
       (* NOTE: *)
       | Invalid_Arity of (Environ.env * Evd.evar_map * Constr.types)
       (* NOTE: *)
@@ -587,6 +591,7 @@ module Make (Enc : Encoding.S) :
     (* NOTE: *)
     val invalid_ref_lts : Names.GlobRef.t -> exn
     val invalid_ref_type : Names.GlobRef.t -> exn
+    val lts_has_parameters : string -> exn
 
     (* NOTE: *)
     val invalid_arity : Environ.env -> Evd.evar_map -> Constr.types -> exn
@@ -620,6 +625,7 @@ module Make (Enc : Encoding.S) :
       (* NOTE: *)
       | Invalid_Ref_LTS of Names.GlobRef.t
       | Invalid_Ref_Type of Names.GlobRef.t
+      | LTS_Has_Parameters of string
       (* NOTE: *)
       | Invalid_Arity of (Environ.env * Evd.evar_map * Constr.types)
       (* NOTE: *)
@@ -658,6 +664,7 @@ module Make (Enc : Encoding.S) :
       MEBI_exn (Invalid_Ref_Type x)
     ;;
 
+    let lts_has_parameters (msg : string) = MEBI_exn (LTS_Has_Parameters msg)
     let invalid_arity env sigma x = MEBI_exn (Invalid_Arity (env, sigma, x))
 
     let invalid_check_updated_ctx env sigma x y =
@@ -686,8 +693,14 @@ module Make (Enc : Encoding.S) :
       | Invalid_Sort_LTS x -> "Invalid_Sort_LTS"
       | Invalid_Sort_Type x -> "Invalid_Sort_Type"
       (* NOTE: *)
-      | Invalid_Ref_LTS x -> "Invalid_Ref_LTS"
+      | Invalid_Ref_LTS x ->
+        Printf.sprintf
+          "Invalid_Ref_LTS: %s is not an inductive relation. An LTS is named \
+           by its inductive; a definition (an alias, or an LTS applied to \
+           arguments) is not accepted."
+          (Pp.string_of_ppcmds (Printer.pr_global x))
       | Invalid_Ref_Type x -> "Invalid_Ref_Type"
+      | LTS_Has_Parameters x -> Printf.sprintf "LTS_Has_Parameters: %s" x
       (* NOTE: *)
       | Invalid_Arity (env, sigma, x) ->
         Printf.sprintf "Invalid_Arity: %s" (Rocq_utils.Strfy.constr env sigma x)
@@ -736,6 +749,7 @@ module Make (Enc : Encoding.S) :
     (* NOTE: *)
     val invalid_ref_lts : Names.GlobRef.t -> 'a
     val invalid_ref_type : Names.GlobRef.t -> 'a
+    val lts_has_parameters : string -> 'a
 
     (* NOTE: *)
     val invalid_arity : Constr.types -> 'a mm
@@ -781,6 +795,10 @@ module Make (Enc : Encoding.S) :
 
     let invalid_ref_type (x : Names.GlobRef.t) : 'a =
       raise (Errors.invalid_ref_type x)
+    ;;
+
+    let lts_has_parameters (msg : string) : 'a =
+      raise (Errors.lts_has_parameters msg)
     ;;
 
     let invalid_arity (x : Constr.types) : 'a mm =
@@ -953,6 +971,37 @@ module Make (Enc : Encoding.S) :
       (ind, (mib, mip)) |> return
     ;;
 
+    (** [assert_mib_has_no_parameters r mib] checks the inductive [mib] (named
+        by [r]) has no parameters. Extraction reads an LTS's constructors as
+        relations over exactly three arguments, so a parameter would be
+        taken for one of them; refused here instead (2026-10-10; before, an
+        internal assertion failed during extraction).
+
+        @raise Errors.MEBI_exn
+          [LTS_Has_Parameters] if it has some (raised
+          when run). *)
+    let assert_mib_has_no_parameters
+          (x : Names.GlobRef.t)
+          (mib : Declarations.mutual_inductive_body)
+      : unit mm
+      =
+      let n : int = mib.mind_nparams in
+      if n = 0
+      then return ()
+      else
+        Err.lts_has_parameters
+          (Printf.sprintf
+             "%s has %i parameter%s. MeBi does not support an LTS with \
+              parameters (including an implicit type, or a [Context] variable \
+              of a [Section]): it needs a relation [term -> label -> term -> \
+              Prop] with nothing before it. Fix the parameters' values in a \
+              module, e.g. a functor over a module that defines them, or one \
+              module per value."
+             (Pp.string_of_ppcmds (Printer.pr_global x))
+             n
+             (if n = 1 then "" else "s"))
+    ;;
+
     (* See the [.mli]. *)
     let lts_prop_mind (x : Names.GlobRef.t)
       : (Names.inductive * Declarations.mind_specif) mm
@@ -961,6 +1010,7 @@ module Make (Enc : Encoding.S) :
       let open Syntax in
       let* ind, (mib, mip) = lts_mind x in
       let* () = assert_mip_arity_is_prop mip in
+      let* () = assert_mib_has_no_parameters x mib in
       (ind, (mib, mip)) |> return
     ;;
 
