@@ -76,10 +76,13 @@ module type Label_sig = sig
       {!field-is_silent} is not compared. Raises nothing. *)
   val equal : t -> t -> bool
 
-  (** [compare a b] orders labels by base term, then by {!field-is_silent} when
-      both know it. Not a total order: a label whose {!field-is_silent} is [None]
-      compares equal to the same base with [Some true] and with [Some false],
-      which differ from each other ([TODO.md]). Raises nothing. *)
+  (** [compare a b] orders labels by base term, then by {!field-is_silent}
+      ([None] before [Some false] before [Some true]): a total order, unlike
+      {!equal}, which ignores {!field-is_silent}. One base can carry
+      different {!field-is_silent}s only when the two systems of a command
+      are configured differently ([MeBi Config Weak2] without [Weak1]); such
+      labels are then kept apart. To find a label by its base alone, use
+      {!Components.Labels_sig.find_base}. Raises nothing. *)
   val compare : t -> t -> int
 
   (** [hash x] is the hash of [x]'s base term, consistent with {!equal}.
@@ -93,8 +96,17 @@ end
 
 (** A set of labels. *)
 module type Labels_sig = sig
+  type base
+
   include Set.S
   include Json.S with type k = t
+
+  (** [find_base b xs] is the label of [xs] whose base term is [b], whatever
+      it knows of being silent (the least, by {!Components.Label_sig.compare}, if
+      several have [b]).
+
+      @raise Not_found if none has (raised here). *)
+  val find_base : base -> t -> elt
 
   (** [non_silent xs] is the labels of [xs] not known to be silent. Raises
       nothing. *)
@@ -314,9 +326,11 @@ module type Actionmap_sig = sig
   val size : t' -> int
 
   (** [update m a d] adds the destinations [d] to the action [a] in [m]
-      (nothing if [d] is empty). Meant also to merge the derivation trees of
-      equal actions, but since {!Components.Action_sig.equal} compares the trees, the
-      actions it finds already have them ([TODO.md]). Raises nothing. *)
+      (nothing if [d] is empty), keeping [a] as the key. Actions are equal
+      only with equal derivation trees ({!Components.Action_sig.equal}), so
+      one strong step derived two ways is two actions: the proof solver
+      relies on that (it picks between derivations; [Test.v]'s
+      [MultipleDerivations]). Raises nothing. *)
   val update : t' -> action -> states -> unit
 
   (** [destinations m] is the union of [m]'s destinations. Raises nothing. *)
@@ -500,7 +514,7 @@ module type S = sig
 
   module Label : sig
     include Label_sig with type base = base
-    module Set : Labels_sig with type elt = t
+    module Set : Labels_sig with type elt = t and type base = base
   end
 
   module Note :
@@ -674,11 +688,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         let compare (a : t) (b : t) : int =
           Utils.compare_chain
             [ Base.compare a.base b.base
-            ; Stdlib.Option.fold
-                ~none:0
-                ~some:(fun (a : bool) ->
-                  Stdlib.Option.fold ~none:0 ~some:(Bool.compare a) b.is_silent)
-                a.is_silent
+            ; Stdlib.Option.compare Bool.compare a.is_silent b.is_silent
             ]
         ;;
       end
@@ -701,6 +711,17 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
           (struct
             let name = "Labels"
           end)
+
+      type base = Base.t
+
+      (* See {!module-type:Labels_sig}. Labels are ordered by base first, so
+         the first label at or after [b] is the one, if any. *)
+      let find_base (b : base) (xs : t) : Label.t =
+        let (x : Label.t) =
+          find_first (fun (x : Label.t) -> Base.compare x.base b >= 0) xs
+        in
+        if Base.equal x.base b then x else raise Not_found
+      ;;
 
       (* See {!module-type:Labels_sig}. *)
       let non_silent (xs : t) : t =
@@ -1076,14 +1097,12 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         fold (fun _ (ys : States.t) (z : int) -> z + States.cardinal ys) x 0
       ;;
 
-      (** [with_trees_of a b] is the action [a] with [b]'s derivation trees
-          added to its own. Raises nothing. *)
-      let with_trees_of (a : Action.t) (b : Action.t) : Action.t =
-        { a with trees = Base.Trees.union a.trees b.trees }
-      ;;
-
-      (* See {!module-type:Actionmap_sig}. The scan over every key, for the trees of equal
-         actions, makes each update linear in the table's size. *)
+      (* See {!module-type:Actionmap_sig}. Until 2026-10-10 this also
+         scanned every key for actions equal to [action] and merged their
+         trees into it: a no-op, as equal actions have equal trees, that
+         made each update linear in the table's size. [replace] still
+         stores [action] as the key: [Label.equal] ignores [is_silent], so
+         an equal key's label can differ. *)
       let update (x : t') (action : Action.t) (states : States.t) : unit =
         Logger.trace __FUNCTION__;
         if States.is_empty states
@@ -1091,13 +1110,7 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
         else (
           match find_opt x action with
           | None -> add x action states
-          | Some old_states ->
-            let action : Action.t =
-              to_seq_keys x
-              |> Seq.filter (Action.equal action)
-              |> Seq.fold_left with_trees_of action
-            in
-            replace x action (States.union old_states states))
+          | Some old_states -> replace x action (States.union old_states states))
       ;;
 
       (* See {!module-type:Actionmap_sig}. *)

@@ -1981,3 +1981,32 @@ Module CircularTransfer.
     inversion PRE; subst; [ inversion ACT | match goal with H : tau nx _ _ |- _ => inversion H end ].
   Qed.
 End CircularTransfer.
+
+(* One label term silent on one side and visible on the other: only
+   [Weak2] is set, so the first system has no silent label (its labels do
+   not know whether they are silent) and the second treats [None] as
+   silent. Until 2026-10-10 [Label.compare] treated "unknown" as equal to
+   both [Some true] and [Some false], so the merged alphabet kept one copy
+   of [None]'s label, whichever the set kept: here the second system's
+   silent one, and the first system's visible [None] step went unchecked.
+   Strong [p] was then "bisimilar" to weak [p] but not to weak [q], though
+   weak [p] and weak [q] are equivalent. *)
+MeBi Divider "Theories.Test.MixedSilence".
+Module MixedSilence.
+  Inductive act := A.
+  Inductive term := done | step (l : option act) (t : term).
+  Inductive lts : term -> option act -> term -> Prop :=
+  | do_step : forall l t, lts (step l t) l t.
+
+  Example p := step None (step (Some A) done).
+  Example q := step (Some A) done.
+
+  MeBi Config Reset Weak.
+  MeBi Config Weak2 As Option act.
+  (* strong [p] has a visible [None] step that weak [p] and [q] cannot match *)
+  Fail MeBi Run Bisim p With lts And p With lts Using lts.
+  Fail MeBi Run Bisim p With lts And q With lts Using lts.
+  (* strong [q] is weak [p] without its silent step *)
+  MeBi Run Bisim q With lts And p With lts Using lts.
+  MeBi Config Reset Weak.
+End MixedSilence.
