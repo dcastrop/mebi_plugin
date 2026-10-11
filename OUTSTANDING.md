@@ -257,13 +257,6 @@ and 12)
 **Reusable theory** (agreed 2026-10-11: machinery a user could reuse
 goes into `theories/` once two examples use it, which keeps `examples/`
 minimal)
-- **The normalised-semantics transfer** (*refactor*, medium). An
-  equivalence that steps preserve, a normalising function and an
-  invariant together give `lts ≈ normalised lts`, with `weak_sim` and
-  `weak_bisimilar` transfer theorems. `examples/ProcCongruence.v`,
-  `CADP_Norm.v` and `CADP_Obs.v` each prove an instance of it by hand,
-  and `CADP_Norm.link`/`CADP_Obs.link_obs` duplicate each other. After
-  the lift, each keeps only its model-specific obligations.
 - **Hiding (relabelling)** (*capability* of `theories/`, not of the
   plugin; small). A relabelling operator and the lemma that it preserves
   weak bisimilarity. For CADP it turns "plain `bigstep` is `bigstep_obs`
@@ -276,9 +269,10 @@ minimal)
   These would state what "carries over" from glued to layered. Divergence
   ("eventually"), internal states and step counts do not carry over.
 
-  Constraint on all three: the plugin cannot explore an LTS with
-  parameters (§3), so `theories/` can hold the generic *theorems*, but
-  each example still states its concrete relation (a couple of lines).
+  Constraint on both: the plugin cannot explore an LTS with parameters
+  (§3), so `theories/` can hold the generic *theorems*, but each example
+  still states its concrete relation, linked by a characterisation lemma
+  (as `theories/Transfer.v` does for normalised semantics).
 
 **Examples**
 - `examples/Bisimilarity/_nat_streams.v`: unfinished, kept as real work,

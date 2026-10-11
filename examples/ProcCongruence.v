@@ -15,7 +15,10 @@
    target. From the same four components it has 82 states. [link] proves the
    two semantics weakly bisimilar on congruent terms, once and for all terms,
    so a [weak_sim] or [weak_bisimilar] proved by the plugin over [nLTS]
-   transfers to [compLTS] ([wsim_transfer], [wbis_transfer]).
+   transfers to [compLTS] ([wsim_transfer], [wbis_transfer]). [link] is
+   an instance of [MEBI.Transfer.stutter_bisimilar]: a [compLTS] step is
+   matched by one [nLTS] step, or is a congruence step, matched by not
+   moving.
 
    Note what makes the difference: a canonical representative, not merely
    explicit congruence rules. Used as a premise ([p == p' -> p' -a-> q' ->
@@ -28,6 +31,7 @@
 From Stdlib Require Import List Permutation Bool Relations.Relation_Operators.
 Import ListNotations.
 Require Import MEBI.Bisimilarity.
+Require Import MEBI.Transfer.
 Require Import MEBI.Examples.Proc.
 Import Layered.
 
@@ -251,30 +255,30 @@ Module Normalised.
   Lemma link : forall c d, Permutation (comps c) (comps d) ->
     weak_bisimilar compLTS nLTS c d.
   Proof.
-    cofix CH; intros c d P; constructor; constructor.
-    - intros c' a T.
+    intros c d P.
+    refine (stutter_bisimilar compLTS nLTS
+              (fun c d => Permutation (comps c) (comps d)) _ _ c d P);
+      clear c d P; cbv beta.
+    - intros c d c' a P T.
       destruct (comp_cases _ _ _ T) as [[l1 [l2 [t [t' [E [E' Tt]]]]]] | [Ha P']].
-      + destruct (find_in c d l1 l2 t a t' E Tt P) as [m1 [m2 F]].
+      + left.
+        destruct (find_in c d l1 l2 t a t' E Tt P) as [m1 [m2 F]].
         destruct (core_at d m1 t m2 t' a F Tt) as [d'' [C F'']].
-        exists (norm d''); split.
-        * apply inject_weak; constructor; exact C.
-        * apply CH.
-          eapply Permutation_trans; [| apply Permutation_sym, comps_norm].
-          unfold comps in *; rewrite E', F''; rewrite E, F in P.
-          eapply perm_replace; [eapply nonend_step; eauto | exact P].
-      + subst a; exists d; split.
-        * apply wk_none; apply rt1n_refl.
-        * apply CH; eapply Permutation_trans; [apply Permutation_sym, P' | exact P].
-    - intros e a T; inversion T as [d0 a0 d'' C]; subst.
+        exists (norm d''); split; [constructor; exact C|].
+        eapply Permutation_trans; [| apply Permutation_sym, comps_norm].
+        unfold comps in *; rewrite E', F''; rewrite E, F in P.
+        eapply perm_replace; [eapply nonend_step; eauto | exact P].
+      + right; split; [exact Ha|].
+        eapply Permutation_trans; [apply Permutation_sym, P' | exact P].
+    - intros c d e a P T; left.
+      inversion T as [d0 a0 d'' C]; subst.
       destruct (core_split _ _ _ C) as [m1 [m2 [t [t' [F [F'' Tt]]]]]].
       destruct (find_in d c m1 m2 t a t' F Tt (Permutation_sym P)) as [l1 [l2 E]].
       destruct (core_at c l1 t l2 t' a E Tt) as [c'' [Cc E'']].
-      exists c''; split.
-      + apply inject_weak, core_comp, Cc.
-      + apply CH.
-        eapply Permutation_trans; [| apply Permutation_sym, comps_norm].
-        unfold comps in *; rewrite E'', F''; rewrite E, F in P.
-        eapply perm_replace; [eapply nonend_step; eauto | exact P].
+      exists c''; split; [apply core_comp, Cc|].
+      eapply Permutation_trans; [| apply Permutation_sym, comps_norm].
+      unfold comps in *; rewrite E'', F''; rewrite E, F in P.
+      eapply perm_replace; [eapply nonend_step; eauto | exact P].
   Qed.
 
   Lemma congr_comps : forall c d, congr c d -> Permutation (comps c) (comps d).
@@ -294,25 +298,22 @@ Module Normalised.
   Theorem congr_link : forall c d, congr c d -> weak_bisimilar compLTS nLTS c d.
   Proof. intros c d H; apply link, congr_comps, H. Qed.
 
-  (* What the plugin proves over [nLTS] holds over [compLTS]. *)
+  (* What the plugin proves over [nLTS] holds over [compLTS]: moved on the
+     left, then on the right. *)
   Theorem wsim_transfer : forall p q,
     weak_sim nLTS nLTS p q -> weak_sim compLTS compLTS p q.
   Proof.
     intros p q H.
-    apply (weak_sim_trans compLTS nLTS compLTS p p q).
-    - apply weak_bisimilar_sim, link; reflexivity.
-    - apply (weak_sim_trans nLTS nLTS compLTS p q q H).
-      apply weak_bisimilar_sim, weak_bisimilar_sym, link; reflexivity.
+    apply (transfer_wsim_r compLTS nLTS compLTS p q); [apply link; reflexivity|].
+    apply (transfer_wsim_l compLTS nLTS nLTS p q); [apply link; reflexivity | exact H].
   Qed.
 
   Theorem wbis_transfer : forall p q,
     weak_bisimilar nLTS nLTS p q -> weak_bisimilar compLTS compLTS p q.
   Proof.
     intros p q H.
-    apply (weak_bisimilar_trans compLTS nLTS compLTS p p q).
-    - apply link; reflexivity.
-    - apply (weak_bisimilar_trans nLTS nLTS compLTS p q q H).
-      apply weak_bisimilar_sym, link; reflexivity.
+    apply (transfer_wbis_r compLTS nLTS compLTS p q); [apply link; reflexivity|].
+    apply (transfer_wbis_l compLTS nLTS nLTS p q); [apply link; reflexivity | exact H].
   Qed.
 
 End Normalised.

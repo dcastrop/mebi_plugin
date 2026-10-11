@@ -100,7 +100,9 @@ Lemma link : forall c d, Permutation (comps c) (comps d) ->
   weak_bisimilar compLTS nLTS c d.
 ```
 
-This is a coinduction (`cofix`) with one case per direction:
+No coinduction needs writing: `link` is an instance of
+`MEBI.Transfer.stutter_bisimilar`, whose hypotheses are one case per
+direction:
 
 - **A `compLTS` step from `c`** is either a component step or a congruence
   step (`comp_cases`). A component step is matched by the same component
@@ -111,7 +113,7 @@ This is a coinduction (`cofix`) with one case per direction:
   The same component moves in `c` (`core_at`, `core_comp`).
 
 In both cases the invariants still agree afterwards (`perm_replace`,
-`comps_norm`), so the coinduction closes.
+`comps_norm`), and `stutter_bisimilar` does the coinduction.
 
 The step that makes this work is answering a congruence step by standing
 still. It needs those steps to be **silent** and **invariant-preserving**;
@@ -121,7 +123,7 @@ behaviour, this recipe does not apply as is.
 ### 5. Derive the transfer theorems
 
 Using `link` at a state and itself (`Permutation` is reflexive) and the
-transitivity lemmas in `MEBI.Bisimilarity`, prove:
+`transfer_*` theorems in `MEBI.Transfer`, prove:
 
 ```coq
 Theorem wsim_transfer : forall p q,
@@ -177,7 +179,13 @@ read again:
 - two copies the resource keeps of the last value read, which nothing reads.
 
 `tidy` erases that data, `bigstep_norm` takes `tidy` of every target, and
-`link` proves the two weakly bisimilar on states equal up to `tidy`. There
+`link` proves the two weakly bisimilar on states equal up to `tidy`. Here
+`link` is an instance of `MEBI.Transfer.normalised_bisimilar`, which
+covers this shape (a semantics against itself with normalised targets).
+The example supplies `tidy`, the invariant, a two-line lemma saying
+`bigstep_norm` is "a `bigstep` step, then `tidy`" (`norm_spec`), and the
+one model-specific obligation: states equal up to `tidy` step alike
+(`step_tidy`). `CADP_Obs.v` reuses all of it for its observing variant. There
 is no sorting, because the arrangement is fixed: the canonical
 representative is just the state with its dead data reset.
 
@@ -208,12 +216,14 @@ in ~35s.
 3. Write a computable `norm` that keeps the invariant.
 4. Define `nLTS` as `core` with normalised targets. Do not use congruence
    premises.
-5. Prove `link` by coinduction. The obligations are: a step of the original
+5. Prove `link` with `MEBI.Transfer.stutter_bisimilar` (or, if your
+   normalised semantics is the original with normalised targets,
+   `normalised_bisimilar`). The obligations are: a step of the original
    semantics is a component step or an invariant-preserving silent step; a
    core step moves one component; and that component can make the same
    move wherever it sits in a congruent term.
-6. Derive `wsim_transfer` / `wbis_transfer`, then use `MeBi Sim` on
-   `nLTS`.
+6. Derive `wsim_transfer` / `wbis_transfer` with `MEBI.Transfer`'s
+   `transfer_*` theorems, then use `MeBi Sim` on `nLTS`.
 
 The plugin needs no changes for any of this. If you apply the recipe to a
 second calculus and find the same boilerplate recurring, tell us: a plugin

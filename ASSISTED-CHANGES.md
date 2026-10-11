@@ -7687,6 +7687,60 @@ deleted; it now points at the timer patch and §5.1.
 
 ---
 
+## 2026-10-11 — `theories/Transfer.v`: the normalised-semantics transfer, made generic
+
+On branch `refactor/theories-transfer`. Closes the `OUTSTANDING.md` §4
+item "The normalised-semantics transfer" (agreed with Jonah, notes/16).
+No plugin change.
+
+**Refactor** (plus new `theories/` content, not a plugin capability).
+`ProcCongruence.v`, `CADP_Norm.v` and `CADP_Obs.v` each proved by hand,
+with their own `cofix`, that a normalised semantics is weakly bisimilar
+to the original, then derived transfer theorems from it. Reading them
+side by side, the common core was not normalisation itself but a more
+general lemma, which `theories/Transfer.v` now holds:
+- `stutter_bisimilar`: a relation under which every step is matched by
+  one step with the same label, or, for a silent step, by not moving, is
+  contained in `weak_bisimilar`. `ProcCongruence.link` is an instance (its
+  congruence steps are matched by not moving).
+- `normalised_bisimilar`: a corollary for "the same semantics with every
+  target normalised by `f`", given an invariant and the one
+  model-specific obligation (states with the same normal form step
+  alike). `CADP_Norm.link` and `CADP_Obs.link_obs` are instances, and
+  their duplication is gone.
+- `transfer_wsim_l`/`_r`, `transfer_wbis_l`/`_r`: results over a
+  stand-in semantics hold over the original.
+
+The plugin cannot explore an LTS with parameters, so the examples keep
+their concrete normalised relations. Each links to `normalised_bisimilar`
+with a two-line `norm_spec` lemma (`norm_spec`, `norm_spec_obs`). Every
+theorem name in the examples is kept, so no proof file changed.
+
+To be candid about the size of the gain, the examples barely shrink (318
+→ 319, 509 → 504 and 159 → 157 lines). The value is that none carries a
+coinduction any more, and the next normalised semantics needs only its
+obligations. `doc/structural-congruence.md` and `examples/README.md` now
+point at `Transfer.v`. One fix while writing: `eq_sym` on a section's
+type raised Rocq's `bad-template-constraint` warning, so `Transfer.v`
+uses a local `eq_flip`.
+
+Verified: `dune build`; `make` of the plugin, `Transfer.v` and `Test.v`;
+and every file importing the three examples, each compiled in its own
+process under a 6GB cap, with Solve counts unchanged: `Size1/Norm/Fifo`
+119, `Size2/Norm/Fifo` 2,228, `Size2/Norm/MutualExclusion` 1,038 and 153,
+`Size3/Norm/MutualExclusion` 326, `Size3/Norm/TermTests` and
+`Test4/NormTermTests` passing, `Test4/NormProofs` 48,821 (398s, 3.8GB),
+`Test4/NormBisimProofs` 61,161 (247s, 2.8GB). A first run was invalid
+(I rebuilt `Transfer.vo` under it), so it was stopped and rerun.
+
+Revert: `git revert -m 1 <merge commit>`. Additive in `theories/`:
+nothing existing there changed.
+
+**Session tally (2026-10-11, later session), cont.:** Refactor 1 · Bug
+fix 1 · Docs 5.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

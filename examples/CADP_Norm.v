@@ -15,7 +15,10 @@
    states equal up to [tidy], so a [weak_sim] or [weak_bisimilar] the plugin
    proves over [bigstep_norm] transfers to [bigstep] ([wsim_transfer],
    [wsim_transfer_r], [wbis_transfer]), for every size
-   ([composition_create_wf]).
+   ([composition_create_wf]). The generic parts of that argument are
+   [MEBI.Transfer]'s ([normalised_bisimilar] and the [transfer_*]
+   theorems); this file discharges CADP's obligations ([step_tidy],
+   [step_wf], [wf_tidy]).
 
    One caveat makes this hold only for well-formed states ([wf]): every
    pid, the lock and every qnode's [next] index a qnode. Outside them a
@@ -29,6 +32,7 @@
 From Stdlib Require Import List Lia.
 Import ListNotations.
 Require Import MEBI.Bisimilarity.
+Require Import MEBI.Transfer.
 Require Import MEBI.Examples.CADP.
 Require Import MEBI.Examples.CADP_Glued.
 
@@ -435,22 +439,19 @@ Qed.
 (******************************************************************************)
 (** The two semantics agree, up to [tidy] *)
 
+(* [bigstep_norm] is [bigstep] with every target tidied, as
+   [MEBI.Transfer.normalised_bisimilar] needs it stated. *)
+Lemma norm_spec : forall c a d,
+  bigstep_norm c a d <-> exists c', bigstep c a c' /\ d = tidy c'.
+Proof.
+  split; [intros T; inversion T; subst; eauto | intros [c' [T ->]]; constructor; exact T].
+Qed.
+
 Lemma link : forall c d, wf c -> tidy c = tidy d ->
   weak_bisimilar bigstep bigstep_norm c d.
 Proof.
-  cofix CH; intros c d W E; constructor; constructor.
-  - intros c' a T.
-    destruct (step_tidy _ _ _ T W d (eq_sym E)) as [d' [T' E']].
-    exists (tidy d'); split.
-    + apply inject_weak; constructor; exact T'.
-    + apply CH; [exact (proj1 (step_wf _ _ _ T W))|].
-      rewrite tidy_idem; exact (eq_sym E').
-  - intros e a T; inversion T as [d0 a0 d' T']; subst.
-    destruct (step_tidy _ _ _ T' (wf_tidy _ _ E W) c E) as [c' [Tc Ec]].
-    exists c'; split.
-    + apply inject_weak; exact Tc.
-    + apply CH; [exact (proj1 (step_wf _ _ _ Tc W))|].
-      rewrite tidy_idem; exact Ec.
+  exact (normalised_bisimilar bigstep bigstep_norm tidy wf norm_spec tidy_idem
+           wf_tidy (fun c a c' T W => proj1 (step_wf c a c' T W)) step_tidy).
 Qed.
 
 (* What the plugin proves over [bigstep_norm] holds over [bigstep], from
@@ -458,25 +459,19 @@ Qed.
 Theorem wsim_transfer {N : Type} (ltsN : LTS N label) : forall c n,
   wf c -> weak_sim bigstep_norm ltsN c n -> weak_sim bigstep ltsN c n.
 Proof.
-  intros c n W H.
-  apply (weak_sim_trans bigstep bigstep_norm ltsN c c n); [|exact H].
-  apply weak_bisimilar_sim, link; [exact W | reflexivity].
+  intros c n W; apply (transfer_wsim_l bigstep bigstep_norm ltsN c n), link; [exact W | reflexivity].
 Qed.
 
 Theorem wsim_transfer_r {N : Type} (ltsN : LTS N label) : forall n c,
   wf c -> weak_sim ltsN bigstep_norm n c -> weak_sim ltsN bigstep n c.
 Proof.
-  intros n c W H.
-  apply (weak_sim_trans ltsN bigstep_norm bigstep n c c H).
-  apply weak_bisimilar_sim, weak_bisimilar_sym, link; [exact W | reflexivity].
+  intros n c W; apply (transfer_wsim_r bigstep bigstep_norm ltsN n c), link; [exact W | reflexivity].
 Qed.
 
 Theorem wbis_transfer {N : Type} (ltsN : LTS N label) : forall c n,
   wf c -> weak_bisimilar bigstep_norm ltsN c n -> weak_bisimilar bigstep ltsN c n.
 Proof.
-  intros c n W H.
-  apply (weak_bisimilar_trans bigstep bigstep_norm ltsN c c n); [|exact H].
-  apply link; [exact W | reflexivity].
+  intros c n W; apply (transfer_wbis_l bigstep bigstep_norm ltsN c n), link; [exact W | reflexivity].
 Qed.
 
 (******************************************************************************)
