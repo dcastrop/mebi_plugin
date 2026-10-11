@@ -247,11 +247,6 @@ and 12)
 - `examples/Bisimilarity/_nat_streams.v`: unfinished, kept as real work,
   status unclear.
 - CADP `Size2`/`Size3`: see §2.
-- CADP `Size1/MutualExclusion/PluginProofs.v` is misnamed: it proves
-  glued against layered, duplicating `Size1/Glued/PluginProofs.v`, not
-  anything against `spec_lts` (found 2026-10-11). Delete or rename it;
-  its counts are part of `CLAUDE.md`'s baseline, so that changes the
-  baseline listing too.
 
 ## 5. Set aside (deliberately)
 

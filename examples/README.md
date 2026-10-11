@@ -107,10 +107,9 @@ yet.
 - **`_no_starvation.v`**: a draft monitor, not built. It is superseded by
   the `spec_fifo` design below.
 
-**One process.** `spec_lts` is weakly *bisimilar* to the system
-(`Size1/Glued/MutualExclusion/PluginProofs.v`). Despite its name,
-`Size1/MutualExclusion/PluginProofs.v` proves glued against layered, not
-against `spec_lts`; it duplicates `Size1/Glued/PluginProofs.v`.
+**One process.** `spec_lts` is weakly *bisimilar* to the system, in both
+semantics: layered (`Size1/MutualExclusion/PluginProofs.v`) and glued
+(`Size1/Glued/MutualExclusion/PluginProofs.v`).
 
 **Two processes.** The system and `spec_lts` are mutually similar but *not*
 bisimilar (`Size2/Glued/MutualExclusion/PluginProofs.v`):

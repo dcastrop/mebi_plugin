@@ -7325,7 +7325,8 @@ for the three `Size2` files are updated.
 **Finding.** `Size1/MutualExclusion/PluginProofs.v` proves glued against
 layered, duplicating `Size1/Glued/PluginProofs.v`, not anything against
 `spec_lts`. Recorded in `OUTSTANDING.md` §4. Its counts are part of
-`CLAUDE.md`'s baseline, so it was not touched.
+`CLAUDE.md`'s baseline, so it was not touched here (restored in the
+next entry).
 
 **Verification.** `dune build` clean. `Size2/TermTests.v` compiles
 (82s, 1.1GB). `Size2/Glued/MutualExclusion/PluginProofs.v` compiles as
@@ -7333,6 +7334,40 @@ checked in, under a 6GB cap. No OCaml and no `Size1` file changed, so the
 default suite's counts are unaffected.
 
 **Session tally (2026-10-11):** Bug fix 1 · Docs 3.
+
+---
+
+## 2026-10-11 — CADP `Size1/MutualExclusion`: restore what it proves
+
+On branch `fix/cadp-size2-mutex`, at Jonah's request.
+
+**Bug fix (example).** `Size1/MutualExclusion/PluginProofs.v` was a copy
+of `Size1/Glued/PluginProofs.v` (glued against layered), found earlier
+today. Its history explains it:
+- at `3cc6f10` (2026-03-13) it proved the layered `lts` against the
+  mutual-exclusion property, as its name says;
+- `37d997a` (2026-03-16, a restructure while debugging `Size2`) replaced
+  its contents with the glued file's, divider and all.
+
+Jonah chose to restore its intent over deleting it. It now proves `lts`
+against `spec_lts` for one process: both `weak_sim`s, `mutual_sim` and
+`weak_bisimilar`, mirroring `Glued/MutualExclusion`.
+- Counts: 259, 212, then `weak_bisimilar` 1442.
+- `Auto` takes the nested path for the two `weak_sim`s and the mutual
+  path for `weak_bisimilar`.
+- Forced `True` gives the same counts. Forced `False` gives the same
+  `weak_sim`s and leaves `weak_bisimilar` unsolved after 50,001 steps,
+  like every other file.
+- Compiles in ~16s.
+
+**Docs.**
+- `CLAUDE.md`'s baseline: `CADP/Size1` is now `259, 212, 268, 355, 81, 63`
+  and `1442, 2760, 185`. The duplicated 268, 355 and 2760 are gone; the
+  total is still 27 + 14. A dated note says why.
+- `examples/README.md` updated.
+- The `OUTSTANDING.md` §4 item is removed.
+
+**Session tally (2026-10-11), cont.:** Bug fix 2 · Docs 3.
 
 ---
 
