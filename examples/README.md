@@ -54,6 +54,14 @@ The same names recur in every directory:
 
 ## CADP
 
+CADP is the running example: it shows what the plugin can do and where
+it stops. The contribution is the plugin, not the model. The model is
+kept faithful to CADP's demo and is not reformulated (for example with
+program counters) to reach more processes, so a size the plugin cannot
+handle is reported as a limit. The glued and normalised semantics exist
+to make proofs tractable; the point is that results proved for them carry
+over to the layered model (below).
+
 ### The model
 
 `CADP.v` models the MCS queue lock (Mellor-Crummey and Scott) as CADP's
