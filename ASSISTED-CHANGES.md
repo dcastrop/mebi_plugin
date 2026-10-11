@@ -7583,6 +7583,53 @@ lose no history, but they stay until Jonah has spoken with @dcastrop.
 
 ---
 
+## 2026-10-11 — Two probes: `Run Bisim` memory, and the solver's time split
+
+On branch `docs/probe-findings`. Measurements only; no plugin change.
+
+**`Run Bisim` running out of memory on glued `Size3`** (`OUTSTANDING.md`
+§2 *bug?*): the cause is found. `Model.SaturationEstimate` allocates a
+dense bitset of K bits for each of the K silent SCCs (`tau_reach`), and
+another K² per label (`weak_of`). `Run Bisim` and `Sim Begin` run it
+after extraction, and `Run FSM` does not. Glued CADP has one SCC per state
+(`Size2`: 772 states, 772 SCCs; layered `Size2`: 12,027 states, 10,083
+SCCs), so glued `Size3` (128,044) needs ~4GB for the estimate on top of
+the ~4.7GB FSM. That is the 9GB OOM. A pure-OCaml probe on a silent DAG
+(scratch executable over `bench/ocaml/input.ml`) measured the estimate's
+heap at +5, +27, +101 and +402MB for K = 5k, 10k, 20k, 40k: quadratic. The
+on-demand partition reads the same sets, so a fix is not just the
+estimate. Recorded in `OUTSTANDING.md` §4 as an *optimization* to agree
+on, not fixed.
+
+**The solver's own work against its tactics' time** (`OUTSTANDING.md` §4,
+which decides the derivation-tree replay idea). Scratch CPU timers
+(`Sys.time`) around each `Proof_solver.step` separate the decision
+(building the step's tactic inside `Goal.enter`) from the rest of
+`Declare.Proof.by` (Rocq running it). Over the default and `eval`
+suites:
+
+| file | steps | decision | tactic | decision per step |
+|---|---|---|---|---|
+| `Proc/Test1` | 1,946 | 25% | 75% | 0.43ms |
+| `Proc/Test3` | 43,290 | 28% | 72% | 0.81ms |
+| `CCS/LawProofs` | 4,576 | 20% | 80% | 0.78ms |
+| `CADP/Size1/Glued` | 3,383 | 43% | 57% | 4.87ms |
+| `CADP/Size1/Glued/MutualExclusion` | 329 | 81% | 19% | 7.74ms |
+| `Evaluation/Width` | 9,496 | 31% | 69% | 0.55ms |
+| `Evaluation/Depth` | 5,505 | 65% | 35% | 1.51ms |
+| `Evaluation/Layers` | 879 | 39% | 60% | 0.67ms |
+
+Replaying a derivation tree in one step would still make each decision,
+so it could save at most part of the tactic share. The decision's cost on
+CADP, ~10× that on `Proc` per step, looks the larger lever. Added as an
+unprobed item; the `perf`-or-timers item is deleted. The patch is kept
+locally (`notes/tools/solver-profile.diff`).
+
+**Session tally (2026-10-11, later session), cont.:** Docs 1 (two
+investigations).
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

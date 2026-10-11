@@ -138,10 +138,8 @@ follows under a fair scheduler, which is stated, not proved.
   carries the whole program text, so the proof term grows with term size
   as well as steps (*limit*/*optimization*, unprobed).
 - `Run Bisim` on glued `Size3` against `spec_lts` was OOM-killed at 9GB
-  twice, the second time before `Run FSM`'s extraction time had even
-  passed. So `Run Bisim` seems to need far more memory than `Run FSM` for
-  the same extraction (*bug?*, unprobed). `bigstep_norm` sidesteps it for
-  CADP.
+  twice, after extraction. `bigstep_norm` sidesteps it for CADP. The
+  cause, found 2026-10-11, is in §4 ("Saturation estimate memory").
 - Glued ≈ normalised is proved by hand for every size
   (`CADP_Norm.link`); the observing variant should be built over
   `bigstep_norm` too.
@@ -219,15 +217,14 @@ turns the pin into a positive test.
 
 **Profiling and evaluation** (*evaluation*; detail in Jonah's notes 10
 and 12)
-- **Split the proof solver's own overhead from its tactics' time.** This
-  decides the derivation-tree idea below. `perf` is installed but blocked
-  for unprivileged users (`kernel.perf_event_paranoid` = 4); a package
-  from nix or opam cannot change that. Either:
-  - run `sudo sysctl kernel.perf_event_paranoid=1` once (it lasts until
-    reboot), then `perf record --call-graph dwarf` (the switch has no
-    frame pointers); or
-  - add timers inside the plugin around the solver step and its tactic
-    calls, which needs no privileges and measures exactly that split.
+- **The solver's per-step decision is slow on CADP** (*optimization*,
+  unprobed). Choosing a step costs ~0.4-0.8ms on `Proc` and `CCS`, but
+  2-8ms on CADP (`Size1/Glued` 4.9ms, `Glued/MutualExclusion` 7.7ms), and
+  1.5ms on `Evaluation/Depth`. One guess is cost that grows with term
+  size (lookups or conversions on states that carry the whole program
+  text). The same guess is made for `Size3`'s proof memory in §2.
+  Measured with CPU timers around each step (2026-10-11, method in
+  `ASSISTED-CHANGES.md`).
 - **Time per state in extraction** grows with size (27ms → 60ms per state,
   ABP-with-data n = 1..4). Cause unknown: term size, label count, or
   something linear in the states seen so far (which would be a bug).
@@ -251,6 +248,31 @@ and 12)
   the solver's per-step overhead: the proof term, and so `Qed`, would be
   unchanged, and at depth `Qed` dominates (§3). Every checked-in bound
   would change.
+
+  Measured 2026-10-11 (CPU time inside `Solve`, default and `eval`
+  suites): the plugin's own decision of what to do next is 20-30% on
+  `Proc` and the CCS laws, 40-80% on CADP and 65% on `Depth`. Rocq
+  running the chosen tactic (with `Declare.Proof.by`'s bookkeeping) is the
+  rest. Replay would still make each decision, so it could save at most
+  part of the tactic share. The decision cost (above) looks like the
+  larger lever.
+- **Saturation estimate memory** (*optimization*, found 2026-10-11, the
+  cause of the §2 glued `Size3` OOM). `Model.SaturationEstimate` keeps a
+  dense bitset over all K silent SCCs for every SCC: K² bits for `reach`,
+  plus K² per label for `weak_of`. `Run Bisim` and `Sim Begin` compute it
+  after extraction, and `Run FSM` never does, which is why only `Run
+  Bisim` ran out. Glued CADP has one SCC per state (`Size2`: 772 of 772),
+  so `Size3` needs ~4GB for the estimate on top of the ~4.7GB FSM.
+  Measured in pure OCaml on a silent DAG: estimate heap +27, +101, +402MB
+  at K = 10k, 20k, 40k (×4 per doubling).
+  - The estimate needs only counts, and the guard only "above the bound
+    or not", so it could run in O(K) memory, for example stopping once the
+    bound is passed.
+  - The on-demand partition (`scc_moves`, `refine_blocks`) uses the same
+    `weak_of` and `reach`. Fixing the estimate alone may move the OOM
+    there. Sparse sets would help when the weak moves are few. When they
+    are many, that is the saturation's own size, which no representation
+    avoids.
 - **`Auto` mis-estimate** (*optimization*, small). On `LawProofs.tau1`,
   `Auto` picks nested (42 steps) where mutual takes 29. A data point for
   `Product.estimate`, if it is revisited.
