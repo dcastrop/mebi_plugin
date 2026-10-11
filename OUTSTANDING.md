@@ -101,10 +101,22 @@ and 2,228 steps, over the normalised semantics, transferred by
 follows under a fair scheduler, which is stated, not proved.
 
 **Still open:**
-- **The layered semantics.** The same label in `step`, then glued ≈
-  layered as a *proof* (at `Size2`: 772, or 48 normalised, against 12,027
-  states; decided only, ~35s), then the transfer corollaries. Without it
-  the FIFO result is about the glued model.
+- **The layered semantics** (the paper's central CADP claim). Glued ≈
+  layered is *proved* only at `Size1`. At `Size2` it is decided (~35s,
+  bisimilar) but not proved (772, or 48 normalised, against 12,027
+  states). No file yet states a transfer corollary ("the layered system
+  satisfies X"). So FIFO and `Size2` mutual exclusion are, today, results
+  about the glued model. To do: the same observing label in `step`, the
+  `Size2` proof (an out-of-memory failure is a reportable limit, not a
+  reason to reformulate the model), then the corollaries.
+- **Restructure `examples/CADP`** (*decision*; discussed 2026-10-11, not
+  decided). The tree is a size × semantics × property matrix, about 16
+  directories of mostly one file each. One option is to organise it
+  around the narrative: the model, its semantics and the specs in
+  `examples/CADP/`; one file per claim (mutual exclusion, FIFO) with a
+  section per size; separate files only for proofs too heavy to build
+  by default. Constraints: heavy proofs need their own process and
+  memory cap, and `_CoqProject` toggles builds per file.
 - **`Size3` proofs.** Both `weak_bisimilar … spec_fifo` and mutual
   exclusion over `bigstep_norm` (644 states) run out of memory; see
   below.
@@ -242,6 +254,32 @@ and 12)
 - **`Auto` mis-estimate** (*optimization*, small). On `LawProofs.tau1`,
   `Auto` picks nested (42 steps) where mutual takes 29. A data point for
   `Product.estimate`, if it is revisited.
+
+**Reusable theory** (agreed 2026-10-11: machinery a user could reuse
+goes into `theories/` once two examples use it, which keeps `examples/`
+minimal)
+- **The normalised-semantics transfer** (*refactor*, medium). An
+  equivalence that steps preserve, a normalising function and an
+  invariant together give `lts ≈ normalised lts`, with `weak_sim` and
+  `weak_bisimilar` transfer theorems. `examples/ProcCongruence.v`,
+  `CADP_Norm.v` and `CADP_Obs.v` each prove an instance of it by hand,
+  and `CADP_Norm.link`/`CADP_Obs.link_obs` duplicate each other. After
+  the lift, each keeps only its model-specific obligations.
+- **Hiding (relabelling)** (*capability* of `theories/`, not of the
+  plugin; small). A relabelling operator and the lemma that it preserves
+  weak bisimilarity. For CADP it turns "plain `bigstep` is `bigstep_obs`
+  with joining the queue hidden" into a theorem, which also gives
+  `Size3` mutual exclusion for `bigstep`. CCS's ABP (hiding channels)
+  could be a second user later.
+- **Preservation of trace properties** (*capability* of `theories/`;
+  small to medium). Weak bisimilarity preserves weak traces and what can
+  happen next ignoring silent steps, but no lemma in `theories/` says so.
+  These would state what "carries over" from glued to layered. Divergence
+  ("eventually"), internal states and step counts do not carry over.
+
+  Constraint on all three: the plugin cannot explore an LTS with
+  parameters (§3), so `theories/` can hold the generic *theorems*, but
+  each example still states its concrete relation (a couple of lines).
 
 **Examples**
 - `examples/Bisimilarity/_nat_streams.v`: unfinished, kept as real work,

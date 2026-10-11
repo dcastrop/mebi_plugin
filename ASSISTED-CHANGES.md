@@ -7549,6 +7549,40 @@ feature 1 · Docs 7.
 
 ---
 
+## 2026-10-11 — CADP's role and the reusable theory, into `OUTSTANDING.md`
+
+On branch `docs/outstanding-notes16`, a later session the same day. It
+records the end-of-session discussion with Jonah (his local notes,
+note 16), which had deliberately been kept out of `OUTSTANDING.md` until
+agreed.
+
+**Docs.**
+- `OUTSTANDING.md` §2: the "layered semantics" item now says plainly that
+  glued ≈ layered, the paper's central CADP claim, is proved only at
+  `Size1`, and that no transfer corollary is stated, so FIFO and `Size2`
+  mutual exclusion are today results about the glued model. A new
+  *decision* item covers restructuring `examples/CADP` around the
+  narrative (discussed, not decided).
+- `OUTSTANDING.md` §4, new "Reusable theory" group, with Jonah's rule
+  (reusable machinery goes into `theories/` once two examples use it):
+  the normalised-semantics transfer (`ProcCongruence.v`, `CADP_Norm.v`,
+  `CADP_Obs.v`), hiding, and trace-property preservation. None adds a
+  plugin capability; hiding and trace preservation are new `theories/`
+  content.
+- `examples/README.md`, CADP: the decided framing. The plugin is the
+  contribution, CADP the running example, and the model is not
+  reformulated to reach more processes.
+
+**Tooling (local).** 83 local branches already merged into `main` were
+deleted (`git branch -d`). Jonah's five unmerged pre-2026-08 branches
+were kept, as were all branches on `fork`: each of the 67 is the second
+parent of a PR merge commit in `fork/main`, so deleting them later would
+lose no history, but they stay until Jonah has spoken with @dcastrop.
+
+**Session tally (2026-10-11, later session):** Docs 3.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
