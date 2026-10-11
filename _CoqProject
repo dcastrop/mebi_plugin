@@ -96,11 +96,11 @@ examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 
 # TODO:
 examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/CADP/Size2/TermTests.v ### KNOWN LIMIT (size): re-measured 2026-10-01 -- still incomplete at 5000 states, which now extract in 11s / 0.49GB (the 3.5GB first measured was mostly this file's Result/DecodeResults/DumpResults output, ~0.65MB per state); full size unknown. Run only under a memory cap (systemd-run -p MemoryMax=...)
+# examples/Bisimilarity/CADP/Size2/TermTests.v ### Success (layered: 12027 states, ~32s; then Run Bisim against glued, bisimilar, decided on demand ~35s, ~1GB. Measured 2026-10-11; run under a memory cap)
 
 # examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
-# examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### FAIL: ^
-# examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### !!! WIP -- not bisim
+# examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### not attempted: glued vs layered (772 vs 12027 states) is decided bisimilar in Size2/TermTests.v, but these proofs' Solve 1000 bounds are placeholders and the proof cost is unmeasured
+# examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### Success (mutually similar to spec_lts, not bisimilar: see the file; ~10 min, ~4.4GB: run under a memory cap)
 
 
 # TODO:
