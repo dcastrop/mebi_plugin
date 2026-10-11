@@ -43,8 +43,10 @@ Require Import Logic.
    decided indirectly: [Norm/TermTests.v] finds the system bisimilar to
    the FIFO server [spec_fifo] (with the queue label visible), which only
    lets the head of its queue enter. Hiding that label to get back to
-   [bigstep] is the informal step. It is proved for one and two
-   processes.
+   [bigstep] is a theorem ([Properties/Hidden.v], [wbis_hidden]); what is
+   missing at three processes is a proof of the FIFO bisimilarity itself,
+   which is only decided. For one and two processes both are proved, and
+   [Size*/Norm/Fifo/PluginProofs.v] derive mutual exclusion that way.
 
    Measured 2026-10-11 (Auto, mutual cofix): [wsim_norm_r] 326 steps.
    The bound is the measured count minus one. *)

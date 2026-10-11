@@ -257,22 +257,16 @@ and 12)
 **Reusable theory** (agreed 2026-10-11: machinery a user could reuse
 goes into `theories/` once two examples use it, which keeps `examples/`
 minimal)
-- **Hiding (relabelling)** (*capability* of `theories/`, not of the
-  plugin; small). A relabelling operator and the lemma that it preserves
-  weak bisimilarity. For CADP it turns "plain `bigstep` is `bigstep_obs`
-  with joining the queue hidden" into a theorem, which also gives
-  `Size3` mutual exclusion for `bigstep`. CCS's ABP (hiding channels)
-  could be a second user later.
 - **Preservation of trace properties** (*capability* of `theories/`;
   small to medium). Weak bisimilarity preserves weak traces and what can
   happen next ignoring silent steps, but no lemma in `theories/` says so.
   These would state what "carries over" from glued to layered. Divergence
   ("eventually"), internal states and step counts do not carry over.
 
-  Constraint on both: the plugin cannot explore an LTS with parameters
-  (§3), so `theories/` can hold the generic *theorems*, but each example
-  still states its concrete relation, linked by a characterisation lemma
-  (as `theories/Transfer.v` does for normalised semantics).
+  Constraint: the plugin cannot explore an LTS with parameters (§3), so
+  `theories/` can hold the generic *theorems*, but each example still
+  states its concrete relation, linked by a characterisation lemma (as
+  `theories/Transfer.v` and `theories/Hiding.v` do).
 
 **Examples**
 - `examples/Bisimilarity/_nat_streams.v`: unfinished, kept as real work,

@@ -128,6 +128,11 @@ yet.
   `Held i`, for pids `n .. 0` (`make_spec n`).
 - **`Fifo.v`**: `spec_fifo`, a FIFO lock server (see "No starvation"
   below).
+- **`Hidden.v`**: joining the queue hidden again, with
+  `theories/Hiding.v`. `bigstep` *is* `bigstep_obs` with that label hidden
+  (`bigstep_hides`), and `spec_fifo_hidden` is `spec_fifo` with it hidden.
+  So FIFO order for `bigstep_obs` gives `weak_bisimilar bigstep
+  spec_fifo_hidden` (`wbis_hidden`).
 
 **One process.** `spec_lts` is weakly *bisimilar* to the system, in both
 semantics: layered (`Size1/MutualExclusion/PluginProofs.v`) and glued
@@ -137,7 +142,10 @@ semantics: layered (`Size1/MutualExclusion/PluginProofs.v`) and glued
 bisimilar. `Size2/Glued/MutualExclusion/PluginProofs.v` proves both
 simulations directly (11,128 and 405 steps, ~10 min, ~4.4GB);
 `Size2/Norm/MutualExclusion/PluginProofs.v` proves them over `bigstep_norm`
-and transfers them (1,038 and 153 steps, ~15s).
+and transfers them (1,038 and 153 steps, ~15s). A third route goes
+through FIFO order: `Size2/Norm/Fifo/PluginProofs.v` derives system ≤
+spec from `wbis_hidden` and a 98-step proof that `spec_fifo_hidden` ≤
+`spec_lts` (23 steps for one process).
 - **System ≤ spec** is mutual exclusion proper: every `ENTER`/`LEAVE` trace
   of the system is allowed by the server.
 - **Spec ≤ system** holds because the simulating side picks its own silent
@@ -159,8 +167,9 @@ has 128,044). As before, the system and `spec_lts` are not bisimilar
 exclusion proper, system ≤ spec, is not proved: its proof was OOM-killed
 at 9GB after ~13 min. It is decided only indirectly: the system is
 bisimilar to the FIFO server (below), which lets only the head of its queue
-enter; going from there to `bigstep`, by hiding the queue label, is an
-informal step.
+enter. Going from there to `bigstep`, by hiding the queue label, is a
+theorem (`Hidden.v`); what is missing is a *proof* of the FIFO
+bisimilarity at three processes, which is only decided.
 
 ### No starvation: FIFO order (`Properties/Fifo.v`)
 
@@ -175,7 +184,8 @@ How it is stated:
 - **Joining the queue is made visible.** `bigstep_obs` (`CADP_Obs.v`) is
   `bigstep` with its one atomic tail swap, `DO_ACQUIRE`, labelled
   `(FETCH_AND_STORE, pid)` instead of silent. `bigstep` and its proofs are
-  unchanged; hiding that label gives `bigstep` back.
+  unchanged; hiding that label gives `bigstep` back, as a theorem
+  (`Properties/Hidden.v`).
 - **`spec_fifo`** (`Properties/Fifo.v`) is a lock server with idle pids and
   a queue. `REQ i` (the same label) moves an idle `i` to the back of the
   queue; `ENTER` is allowed only for the head; `LEAVE` makes the head idle
