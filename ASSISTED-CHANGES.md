@@ -7741,6 +7741,59 @@ fix 1 · Docs 5.
 
 ---
 
+## 2026-10-11 — `theories/Hiding.v`, and CADP's hidden queue label as a theorem
+
+On branch `feat/theories-hiding`. Closes the `OUTSTANDING.md` §4 item
+"Hiding (relabelling)" (agreed with Jonah, notes/16). No plugin change.
+
+**New feature, of `theories/` only** (no plugin capability).
+`theories/Hiding.v`: `relabelled h lts lts'` (the steps of `lts'` are
+those of `lts`, each label `b` replaced by `h b`), and, when `h None =
+None`, `relabel_weak` (weak steps are preserved), `relabel_sim` and
+`relabel_bisimilar` (relabelling both sides preserves `weak_sim` and
+`weak_bisimilar`). As in `Transfer.v`, nothing defines a relabelled LTS,
+because the plugin cannot explore one with parameters.
+
+**Example.** New `examples/Bisimilarity/CADP/Properties/Hidden.v`:
+- `hide_join` silences `(FETCH_AND_STORE, _)`;
+- `bigstep_hides`: `bigstep` *is* `bigstep_obs` with joining hidden, by
+  induction. This was the informal step in the FIFO argument;
+- `spec_fifo_hidden`, the FIFO server with joining hidden, as a concrete
+  inductive the plugin can explore, and `spec_fifo_hides`;
+- `wbis_hidden`: `weak_bisimilar bigstep_obs spec_fifo c f` gives
+  `weak_bisimilar bigstep spec_fifo_hidden c f`.
+
+`Size1/Norm/Fifo` and `Size2/Norm/Fifo/PluginProofs.v` then derive
+mutual exclusion for plain `bigstep` by a route independent of the
+existing ones: `wbis_hidden`, plus a plugin proof that `spec_fifo_hidden
+≤ spec_lts` (23 and 98 steps under `Auto` and forced `True`; 23 and 321
+under forced `False`, measured alone, since those files stop at
+`wbis_norm` under `False`). The bounds are the `Auto` counts minus one.
+
+**A correction to notes/16.** It said hiding would "also give `Size3`
+mutual exclusion for `bigstep`". It does not. At three processes the FIFO
+bisimilarity is only decided, not proved (its proof ran out of memory),
+so there is nothing to hide from. Hiding makes the *step* from FIFO to
+`bigstep` a theorem at every size. The `Size3` file's comment and
+`examples/README.md` now say so.
+
+As in `Transfer.v`, `symmetry` on a hypothesis about a section-less
+`option A` raised `bad-template-constraint` under `make`'s `-w all`. One
+`match` on the equality replaces it. `Transfer.v` and `Hidden.v` were
+rechecked with `-w all`: no warnings.
+
+Verified: `dune build`; `make` of the plugin, `Hiding.v`, `Test.v` and
+`Hidden.v`; `Size1/Norm/Fifo` (119, 23), `Size2/Norm/Fifo` (2,228, 98)
+and `Size3/Norm/MutualExclusion` (326, comment only), each under a 6GB
+cap. Existing counts are unchanged.
+
+Revert: `git revert -m 1 <merge commit>`. Additive in `theories/`.
+
+**Session tally (2026-10-11, later session), cont.:** New feature 1
+(`theories/` only) · Refactor 1 · Bug fix 1 · Docs 5.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
