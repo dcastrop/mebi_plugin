@@ -1,0 +1,1 @@
+{"name":"ccs-laws: (sum pnil P) ~ P","source":"/tmp/mebi-fx.wwwZVf/examples/Bisimilarity/CCS/LawProofs.v","command":"MeBi Run Bisim (sum pnil P) With step And P With step Using step.","bisimilar":true,"silent":[],"labels":{"3":"(Some (Out a))","7":"(Some (In b))"},"a":{"init":2,"states":[2,4,8],"edges":[[2,3,4],[4,7,8]]},"b":{"init":9,"states":[4,8,9],"edges":[[4,7,8],[9,3,4]]}}

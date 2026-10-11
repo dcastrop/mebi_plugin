@@ -4,13 +4,13 @@
 
 - [ ] **Benchmarking Tools** -- using the ocaml `benchmark` package. 
   - [x] LTS Graph extraction
-  - [ ] Algorithms
-    - [ ] Saturation
-    - [ ] Minimization
-    - [ ] Bisimilarity
-  - [ ] Proof Solving algorithm
+  - [x] Algorithms -- **done 2026-10-10**: `bench/ocaml/mebi_bench.exe`, pure OCaml (no Rocq), on fixtures extracted from the examples and on generated families (`bench/ocaml/README.md`).
+    - [x] Saturation
+    - [x] Minimization
+    - [x] Bisimilarity
+  - [ ] Proof Solving algorithm -- *partly, 2026-10-10*: `bench/proofs.sh` records each proof's `Begin`, `Solve` and `Qed` seconds (`rocq compile -time`), with `eval`/`eval-large` suites for the evaluation levers. Not yet split: the solver's own overhead from its tactics' time (needed for the derivation-tree idea below).
 - [x] ~~Implement Similarity algorithm (`lib/model/algorithms/similarity`)~~ -- **done 2026-10-04** as `Product.simulation` (the greatest weak simulation among the pairs reachable from two start states) and `MeBi Run Sim x With a And y With b [As <name>]`.
-- [ ] OCaml examples -- possibly aligned with json-dumped rocq-examples
+- [x] OCaml examples -- **done 2026-10-10**: `bench/ocaml/fixtures/`, 47 FSM pairs dumped from the Rocq examples by `bench/ocaml/make-fixtures.sh`; the generated width and depth families match the dumped ones state for state. CI checks every verdict (`mebi_bench.exe --check`).
 - [x] Plugin help commands -- **done 2026-10-01**: `MeBi Help` and `MeBi Help <topic>` (`src/help.ml`).
 - [x] Constructor premises beyond LTS steps -- **done 2026-10-01/02**: equations, inductive propositions (bounded proof search), negations, a user tactic (`MeBi Config Premise Tactic`), premises that compute the target or an LTS premise's source, and several LTS premises per constructor. See README "Which constructor shapes are supported".
   - [ ] An LTS premise whose source nothing determines still finds only some of its steps (warned; known-wrong test `OutputPremises.open_c` in `theories/Test.v`).
@@ -104,6 +104,11 @@ comment) so lifting it turns the pin into a positive test.
   the same: only the solver's per-step overhead would be saved, and every
   checked-in bound would change. Scale `Layers.v` up and split solver
   overhead from tactic time before building anything.
+  *Measured 2026-10-10* (`LayersLarge.v`, `bench/proofs.sh -s eval-large`):
+  at 16, 32 and 64 layers the whole `Solve` takes 0.7, 1.7 and 7.0s, but
+  `Qed` takes 0.7, 5.5 and 71s, growing ~13 times per doubling. Deep
+  derivations are dominated by the kernel checking the proof term, which
+  batching solver steps would not change; the term's size is the lever.
 
 ## To discuss with @dcastrop
 

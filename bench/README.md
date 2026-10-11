@@ -18,6 +18,7 @@ reserve its heaps.)
 | `compare.sh` | diffs two `proofs.sh` runs: changed or missing Solves, plus time and memory side by side |
 | `testv-counts.sh` | lists `theories/Test.v`'s solver counts, for diffing two trees |
 | `lib.sh` | shared helpers, sourced by the others |
+| `ocaml/` | pure-OCaml benchmarks of the model's algorithms, on FSMs extracted from the examples and on generated families: see [`ocaml/README.md`](ocaml/README.md) |
 
 ## Running the proof suites
 
@@ -26,6 +27,8 @@ bench/proofs.sh                         # default suite, Auto strategy
 bench/proofs.sh -m auto,True,False      # ... and with MutualCofix forced
 bench/proofs.sh -s abp                  # the two ABP proofs, one at a time
 bench/proofs.sh -s test4                # Test4 via the normalised semantics
+bench/proofs.sh -s eval                 # the evaluation levers, as built by default
+bench/proofs.sh -s eval-large -f WidthLarge.v   # one file of a suite
 ```
 
 | suite | files | cost |
@@ -33,6 +36,8 @@ bench/proofs.sh -s test4                # Test4 via the normalised semantics
 | `default` | the six `PluginProofs.v` marked `### Success` in `_CoqProject`, plus `CCS/PluginProofs.v` and `CCS/LawProofs.v` | ~3 min a mode, run 8 at a time (`-j`) |
 | `abp` | `CCS/ABPProofs.v`, `CCS/ABPBisimProofs.v` | ~4 min and ~4.3GB each |
 | `test4` | `Proc/Test4/NormProofs.v`, `NormBisimProofs.v` | ~7 + ~4 min, ~3.8GB peak |
+| `eval` | `examples/Evaluation/{Width,Layers,Depth}.v` | ~40s |
+| `eval-large` | `examples/Evaluation/{Width,Layers,Depth}Large.v`, the same levers scaled up | ~7 + ~2 + ~10 min, ~3.9GB peak |
 
 `-m` takes a comma-separated list of the following:
 - `auto` runs each file as written.
@@ -48,7 +53,10 @@ if that variable is unset. The script prints the directory's path. It
 holds:
 
 - `solves.tsv`: one row per Solve, in file order (suite, mode, file, index,
-  `Solved`/`Unsolved`, iterations);
+  `Solved`/`Unsolved`, iterations), then the proof's name and the seconds
+  its `MeBi Sim Begin`, `MeBi Sim Solve` and `Qed` took, from `rocq compile
+  -time` (`?` where one did not finish). An evaluation file holds one size
+  per proof, so these columns give a series' times;
 - `runs.tsv`: one row per file (suite, mode, file, exit status, seconds,
   peak MB, error count);
 - `logs/`: each file's full output.
@@ -78,6 +86,6 @@ diff <(bench/testv-counts.sh ../mebi-main) <(bench/testv-counts.sh)
 
 - Timing LTS extraction is a plugin command:
   `MeBi Benchmark LTS <min> <max> <term> Using <lts>`.
-- Per-phase profiling: `perf` is not available everywhere. The
-  measurements so far timed phases in a pure-OCaml replica of the model,
-  which is not part of this folder.
+- Per-phase profiling inside the plugin: `perf` is not available
+  everywhere. `ocaml/` times the model's algorithms without Rocq; the
+  proof solver's own overhead is not split from its tactics' time.

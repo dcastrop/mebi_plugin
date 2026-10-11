@@ -92,6 +92,17 @@ jobs:
               | diff test/satdiff.expected -
           '
 
+      # The OCaml benchmark's inputs, checked once each and not timed: the
+      # model must still give the plugin's verdict on every FSM extracted from
+      # the Rocq examples (bench/ocaml/fixtures), and on the generated
+      # families. See bench/ocaml/README.md.
+      - name: dune exec bench/ocaml/mebi_bench.exe -- --check
+        run: |
+          nix develop --command bash -euc '
+            eval "$(opam env --switch=$(pwd) --set-switch)"
+            dune exec bench/ocaml/mebi_bench.exe -- --check
+          '
+
       # Also exercise the make path and the examples/ subset _CoqProject
       # enables by default (the expensive PluginProofs.v proof-search suite
       # stays commented out -- see CLAUDE.md for running that by hand).

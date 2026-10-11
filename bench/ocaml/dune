@@ -1,0 +1,7 @@
+; Pure-OCaml benchmarks of the model's algorithms (see README.md here).
+; Links rocq-mebi.model only -- no plugin, no rocq-runtime -- as test/tests.exe
+; does. No (public_name): a benchmark binary is not installed.
+(executable
+ (name mebi_bench)
+ (modules input fixture families mebi_bench)
+ (libraries rocq-mebi.model benchmark yojson unix))

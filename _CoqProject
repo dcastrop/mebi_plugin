@@ -43,6 +43,11 @@ examples/Evaluation/Base.v ### REQUIRED FOR BELOW
 examples/Evaluation/Width.v ### Success (6, 18, 54 states; ~22s)
 examples/Evaluation/Layers.v ### Success (6 states, 0-8 layers; ~2s)
 examples/Evaluation/Depth.v ### Success (K = 1-8; ~16s)
+### Scaled up, for benchmarking (bench/proofs.sh -s eval-large): too slow to
+### build by default.
+# examples/Evaluation/WidthLarge.v ### Success (n = 3, 162 states; ~7 min, ~3.9GB)
+# examples/Evaluation/LayersLarge.v ### Success (16, 32, 64 layers; ~2 min, Qed dominates)
+# examples/Evaluation/DepthLarge.v ### Success (K = 12, 16; ~10 min, ~3.1GB)
 
 ###############################################################################
 ### Proc
