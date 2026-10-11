@@ -121,9 +121,13 @@ and why mutual similarity is not enough, is in
   ~10 min, ~4.4GB).
 - `Size3` (three processes, where FIFO becomes interesting): glued
   128,044 states, 384,132 transitions; extraction ~19 min, ~4.7GB. `Run
-  Bisim` against `spec_lts` then ran out of memory at 9GB while
-  saturating. Feasible to extract, not yet to decide or prove. Layered
-  not tried.
+  Bisim` against `spec_lts` was OOM-killed at 9GB twice, with `Info` on
+  and with it off. The first run died just after extracting both FSMs,
+  before the saturation estimate. The second died at ~18 min, sooner than
+  `Run FSM` alone needs (~19 min, 4.7GB). So on-demand saturation was
+  never reached, and why `Run Bisim` needs so much more memory than
+  `Run FSM` for the same extraction is unexplained (*bug?*, unprobed).
+  Feasible to extract, not yet to decide or prove. Layered not tried.
 - **Shrinking `Size3`** (*optimization* of the example, small). Most
   glued states differ only in dead data. The resource's `mem_next`/
   `mem_locked` are written by reads and never read. In `bigstep`, every
@@ -133,6 +137,13 @@ and why mutual similarity is not enough, is in
   distinct states (~6.7×). It changes the glued model: glued ≈ layered
   must be re-proved and `Size1`'s glued counts re-measured, unless it is
   done in the observing variant.
+  Done as `ProcCongruence.v` does it, the reset would be a normalised
+  semantics (`bigstep_norm`), with a hand proof that "equal up to dead
+  data" is a weak bisimulation, for all sizes. Plugin proofs over
+  `bigstep_norm` would then transfer back. CADP has no congruence rules
+  (its `PAR` tree is fixed), so structural congruence itself does not
+  apply. Process symmetry does not apply either, because labels carry
+  pids.
 
 ## 3. Limitations of the tool
 

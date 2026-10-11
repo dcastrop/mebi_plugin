@@ -7371,6 +7371,33 @@ against `spec_lts` for one process: both `weak_sim`s, `mutual_sim` and
 
 ---
 
+## 2026-10-11 — CADP `Size3`: a correction, and normalisation
+
+On branch `fix/cadp-size2-mutex`. Jonah asked whether on-demand
+saturation had been tried at `Size3`, and whether the
+structural-congruence recipe would help.
+
+**A correction.** The first entry today says the `Size3` `Run Bisim` was
+OOM-killed "while saturating". That was wrong. Its log stops right after
+both FSMs were extracted, before the saturation estimate, so on-demand
+saturation was never reached. A rerun with `Info` off (no FSM printout)
+was OOM-killed at 9GB as well, after ~18 min. That is sooner than
+`Run FSM` alone needs on the same LTS (~19 min, 4.7GB peak). Without
+`Info` there are no phase markers, so where the memory goes is unknown.
+Recorded in `OUTSTANDING.md` §2 as a *bug?*: `Run Bisim` needs far more
+memory than `Run FSM` for the same extraction.
+
+**Docs.** `OUTSTANDING.md` §2: shrinking `Size3` by erasing dead data
+fits the `ProcCongruence.v` recipe as a normalised `bigstep_norm`,
+proved weakly bisimilar to `bigstep` by hand, once for all sizes.
+Structural congruence itself does not apply (CADP's `PAR` tree is fixed),
+nor does process symmetry (labels carry pids). `examples/README.md`'s
+size table is corrected.
+
+**Session tally (2026-10-11), cont.:** Bug fix 2 · Docs 4.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

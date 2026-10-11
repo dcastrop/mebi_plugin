@@ -95,7 +95,7 @@ extract beyond one process.
 |---|---|---|---|---|
 | `Size1` | 1 | small | small | proved (`Size1/Glued/PluginProofs.v`) |
 | `Size2` | 2 | 12027 states (~32s) | 772 states | decided, bisimilar (`Size2/TermTests.v`, ~35s); not yet proved |
-| `Size3` | 3 | not tried | 128044 states (~19 min, ~4.7GB) | not tried; saturating the glued side alone ran out of memory at 9GB |
+| `Size3` | 3 | not tried | 128044 states (~19 min, ~4.7GB) | not tried; `Run Bisim` against `spec_lts` ran out of memory at 9GB before saturating |
 
 Measured 2026-10-11. No transfer corollary (layered ≈ property) is stated
 yet.
