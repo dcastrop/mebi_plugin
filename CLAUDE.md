@@ -22,6 +22,16 @@ owns the upstream repo) as a transparency record of what Claude contributed
 and of what kind — be honest about mistakes and reversals there; that
 candour is the point of the log.
 
+## Keep `OUTSTANDING.md` current
+
+`OUTSTANDING.md` (repo root) is the one list of what is still open:
+decisions for @dcastrop, the tool's limitations, possible work and what
+was set aside. It should only shrink. When an item is resolved, delete it
+there and record the resolution in `ASSISTED-CHANGES.md`. When something
+new is found, add it with its kind and a pointer to the detail. Don't
+grow open-item lists elsewhere (`notes/` is local). `TODO.md` was folded
+into it and deleted on 2026-10-10 (old list: `git show a1b1470:TODO.md`).
+
 ## Verifying changes to `lib/model` or the proof solver
 
 `theories/Test.v` and `DevTest.v` alone are **not** sufficient coverage for
@@ -139,6 +149,66 @@ For pure-OCaml model changes with no Rocq/proof-solver involvement,
 does not substitute for the proof-suite run above when the change touches
 anything the proof solver reads.
 
+## Working conventions and gotchas
+
+Moved here from the local planning notes on 2026-10-10, so that a fresh
+session has them.
+
+**Conventions**
+- Commit per completed step. Run `dune fmt` before committing.
+- Gate a commit on the build. A `git commit` chained after a build in one
+  command commits a broken tree.
+- Push branches to `fork` (`thecathe/mebi_plugin`) and open PRs there.
+  Never push to `origin` (`dcastrop`): it gets a single PR, when Jonah
+  says.
+- A new capability is flagged and agreed before code (see the top of this
+  file).
+
+**Rocq and the proof solver**
+- **Rocq reuses freed hypothesis names** (after `inversion_clear` or
+  `clear`). Never identify a "new" hypothesis by name; use context order,
+  or name *and* type.
+- **Solver steps run focused on the first goal** (`Declare.Proof.by`). A
+  step cannot see or reorder sibling goals; reorder inside the tactic
+  that creates them, as `move_premises_last` does.
+- **Constructor binders are walked last to first** in extraction
+  (`check_updated_ctx`); `cross_product`'s prepending turns the tree's
+  children back into premise order.
+- **Encodings are renumbered by every command.** Never key anything that
+  outlives a command by an encoding; compare labels across dumps by term.
+- **`Reset Bounds` also resets** `Saturation OnDemand` and `Premise
+  Depth`, so set them after it.
+- **In `Proc`, a send and a receive on one channel carry the same label**
+  (`Some B`). Adding a component often leaves systems bisimilar, so check
+  the verdict before calling a pair "non-bisimilar".
+
+**Builds**
+- **`make`'s packed build differs from dune's.** `Option` resolves to
+  Rocq's module (write `Stdlib.Option`). Warning 50 also fires on an
+  ambiguous doc comment, one directly after a `val` with no blank line,
+  and does *not* catch a doc comment left before a `module`. After
+  inserting code, check where each `(** ... *)` sits.
+- **A rebuild invalidates compiled example copies** ("inconsistent
+  assumptions over library MEBI.loader"), and copied `examples/` trees
+  carry stale `.vo` files. `bench/` scripts copy and clean for you; by
+  hand, delete `*.vo*` and `*.glob` in the copy and recompile its
+  dependencies.
+
+**Measuring**
+- **The last line printed does not say where the time went.** A message
+  prints *before* its phase, and the next can come much later from another
+  phase. Put timestamped markers on stderr (`Printf.eprintf ... %!`)
+  before blaming a phase. Per-command times: `rocq compile -time`, as
+  `bench/proofs.sh` does.
+- `perf` is blocked on Jonah's machine (`perf_event_paranoid` = 4): see
+  `OUTSTANDING.md` §4.
+
+**Shell**
+- zsh does not word-split a command held in a variable (`$RC file` fails
+  as "no such file"); put such loops in a bash script.
+- `pkill -f <pattern>` can kill the calling shell when the pattern is in
+  its own command line; kill by PID from `ps`.
+
 ## Other repo-specific notes
 
 - **Result dumps are off by default** (since 2026-10-04; they were on during
@@ -151,9 +221,6 @@ anything the proof solver reads.
 - `notes/` holds local planning notes and is excluded via
   `.git/info/exclude` (not `.gitignore`) — it will not appear in a fresh
   clone's `git status` as untracked, but is not shared upstream either.
-- `TODO.md` tracks known structural/tooling debt (repo size dominated by
-  `paper/`, no CI, no LICENSE, overlapping module lists across `_CoqProject`/
-  `dune`/`.mlpack`, etc.) separately from plugin feature work.
 - Adding, renaming or deleting an OCaml module means updating **three**
   lists by hand: `_CoqProject`, `src/mebi_plugin.mlpack` and the relevant
   dune `(modules ...)`. `python3 scripts/check_module_lists.py` checks all

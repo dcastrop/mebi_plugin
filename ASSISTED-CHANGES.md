@@ -7175,7 +7175,90 @@ committed version):**
 
 ---
 
+## 2026-10-10 — `OUTSTANDING.md`: one list of what is open
+
+On branch `docs/outstanding`, stacked on `bench/evaluation`. Jonah asked
+for a single file of everything still open, because `ASSISTED-CHANGES.md`
+has grown too large to track remaining issues in. It is meant to only
+shrink.
+
+**Docs.** `OUTSTANDING.md` gathers the open items from `CLAUDE.md`,
+`TODO.md`, this file's "Outstanding" section and Jonah's local notes
+(notes 4, 12 and 14). Its sections:
+1. a concise outline of @dcastrop's decisions (licence, `paper/`,
+   upstreaming, the `Auto` defaults, the semantics questions, provenance);
+2. CADP "no starvation", moved from "the authors' call" to a fresh
+   session with Jonah, and outlined;
+3. the tool's current limitations, planned or not;
+4. possible work;
+5. what was set aside, and why.
+
+`TODO.md` and this file's "Outstanding" section now point to it.
+`CLAUDE.md` says to keep it current.
+
+**Findings while gathering:**
+- CADP `Size1` composes a single process (`composition_create 0`), so
+  no-starvation is vacuous there. It needs `Size2`, which is a known size
+  limit (its glued proofs fail). This had not been written down.
+- `perf` is installed but blocked for unprivileged users
+  (`perf_event_paranoid` = 4). Nix or opam cannot change that; a
+  one-time `sysctl` (until reboot) or timers inside the plugin would.
+- The switch has no frame pointers, so a `perf` profile would need
+  `--call-graph dwarf`.
+
+**Session tally (2026-10-10, third session), cont.:** Tooling 3 · Docs 2.
+
+---
+
+## 2026-10-10 — `TODO.md` folded into `OUTSTANDING.md`
+
+On branch `docs/outstanding`. Jonah asked whether anything would be left
+in `TODO.md` once trimmed. Nothing was:
+- every unchecked item was already in `OUTSTANDING.md`;
+- every checked item is history, recorded here in more detail.
+
+**Docs.**
+- `TODO.md` became a pointer to `OUTSTANDING.md`, then, at Jonah's
+  request, was deleted. The full old list is `git show a1b1470:TODO.md`.
+- `OUTSTANDING.md` now holds the detail it used to send readers to
+  `TODO.md` for: the `Auto` defaults' figures, the semantics examples, the
+  sketch for LTSs with parameters, and why the derivation-tree replay is
+  not simple batching.
+- "Both directions of a bisimilarity in one command" is removed from
+  `OUTSTANDING.md`: Jonah confirmed it is covered by `weak_bisimilar`
+  (PR #3) and `MeBi Run Bisim ... As` (PR #34).
+- References to `TODO.md` updated:
+  - `README.md`'s "Status & Remaining Work", which also still listed
+    similarity and CI as remaining (both done);
+  - a doc comment in `lib/rocq_tools/rocq_monad.mli`, whose list of
+    wrong `try` sites was all fixed on 2026-10-09;
+  - `CLAUDE.md`.
+
+**Session tally (2026-10-10, third session), cont.:** Tooling 3 · Docs 3.
+
+---
+
+## 2026-10-10 — Session close: `TODO.md` deleted, gotchas into `CLAUDE.md`
+
+On branch `docs/outstanding`, at Jonah's request.
+
+**Docs.**
+- `TODO.md` is deleted (see the entry above).
+- `CLAUDE.md` gains "Working conventions and gotchas", moved from the
+  "Practical gotchas" in Jonah's local notes. It covers the publishing
+  conventions, Rocq's reuse of hypothesis names, steps focused on the first
+  goal, encodings renumbered per command, `Reset Bounds` also resetting
+  `Saturation OnDemand` and `Premise Depth`, `make`'s packed build, stale
+  example copies, attributing time, and two shell traps. A fresh session
+  reads `CLAUDE.md` automatically, and these were only in `notes/`.
+
+**Session tally (2026-10-10, third session), final:** Tooling 3 · Docs 4.
+
+---
+
 ## Outstanding
+
+**Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
 - The term-equality problem in `ReModel` is unaddressed: goal terms are resolved to model elements by syntactic hashtable lookup, which can miss on evars, universe instances or local context. **Measured 2026-09-28 (see above) and found latent** — zero misses across all five cheap `PluginProofs.v` suites — so the unification rewrite is deliberately not done. Still unmeasured on the *failing* examples (`Proc/Test3`, `CADP/Size2/Glued`), which is where a miss would actually explain something.
