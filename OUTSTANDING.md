@@ -20,6 +20,8 @@ Started 2026-10-10. Each item names its kind:
 - *bug?*: suspected, not yet confirmed;
 - *capability*, *optimization*, *evaluation*: possible work, sized
   roughly;
+- *future work*: understood well enough to describe, accepted for now as
+  a limit, and worth pursuing later (§5);
 - *set aside*: decided against, or out of scope, with the reason.
 
 ## 1. To discuss with @dcastrop
@@ -139,7 +141,7 @@ follows under a fair scheduler, which is stated, not proved.
   as well as steps (*limit*/*optimization*, unprobed).
 - `Run Bisim` on glued `Size3` against `spec_lts` was OOM-killed at 9GB
   twice, after extraction. `bigstep_norm` sidesteps it for CADP. The
-  cause, found 2026-10-11, is in §4 ("Saturation estimate memory").
+  cause, found 2026-10-11, is in §5 ("Memory of the saturation estimate").
 - Glued ≈ normalised is proved by hand for every size
   (`CADP_Norm.link`); the observing variant should be built over
   `bigstep_norm` too.
@@ -178,6 +180,10 @@ turns the pin into a positive test.
   refused above `Bounds Saturation` (default 1M weak actions;
   `Saturation_Too_Large`). Above that, `Run Bisim` and `Sim Begin`
   saturate on demand and decide on the silent-SCC quotient.
+- **Many silent SCCs.** `Run Bisim` and `Sim Begin` need memory
+  quadratic in an FSM's silent SCCs, whatever the saturation bound
+  (~0.6GB at 50k SCCs, ~4GB at 128k; glued CADP `Size3` was OOM-killed
+  at 9GB). `Run FSM` is not affected. Accepted as a limit for now (§5).
 
 **Goals and proofs**
 - **Goal shapes** (*limit*, pinned `GoalShapes`). Only `weak_sim` and
@@ -196,7 +202,7 @@ turns the pin into a positive test.
   why `Test4` has no `PluginProofs.v`.
 - **Divergence.** `weak_sim` and `weak_bisimilar` ignore divergence, as
   their definitions do. Divergence-sensitive notions (as in `rocq-sims`)
-  are out of scope (§5) unless @dcastrop wants them.
+  are out of scope (§6) unless @dcastrop wants them.
 
 **Cost**
 - **Proofs cost far more than deciding.** At width n = 3 (162 states a
@@ -213,14 +219,6 @@ turns the pin into a positive test.
 
 **Profiling and evaluation** (*evaluation*; detail in Jonah's notes 10
 and 12)
-- **The solver's per-step decision is slow on CADP** (*optimization*,
-  unprobed). Choosing a step costs ~0.4-0.8ms on `Proc` and `CCS`, but
-  2-8ms on CADP (`Size1/Glued` 4.9ms, `Glued/MutualExclusion` 7.7ms), and
-  1.5ms on `Evaluation/Depth`. One guess is cost that grows with term
-  size (lookups or conversions on states that carry the whole program
-  text). The same guess is made for `Size3`'s proof memory in §2.
-  Measured with CPU timers around each step (2026-10-11, method in
-  `ASSISTED-CHANGES.md`).
 - **Time per state in extraction** grows with size (27ms → 60ms per state,
   ABP-with-data n = 1..4). Cause unknown: term size, label count, or
   something linear in the states seen so far (which would be a bug).
@@ -250,25 +248,8 @@ and 12)
   `Proc` and the CCS laws, 40-80% on CADP and 65% on `Depth`. Rocq
   running the chosen tactic (with `Declare.Proof.by`'s bookkeeping) is the
   rest. Replay would still make each decision, so it could save at most
-  part of the tactic share. The decision cost (above) looks like the
+  part of the tactic share. The decision cost (§5) looks like the
   larger lever.
-- **Saturation estimate memory** (*optimization*, found 2026-10-11, the
-  cause of the §2 glued `Size3` OOM). `Model.SaturationEstimate` keeps a
-  dense bitset over all K silent SCCs for every SCC: K² bits for `reach`,
-  plus K² per label for `weak_of`. `Run Bisim` and `Sim Begin` compute it
-  after extraction, and `Run FSM` never does, which is why only `Run
-  Bisim` ran out. Glued CADP has one SCC per state (`Size2`: 772 of 772),
-  so `Size3` needs ~4GB for the estimate on top of the ~4.7GB FSM.
-  Measured in pure OCaml on a silent DAG: estimate heap +27, +101, +402MB
-  at K = 10k, 20k, 40k (×4 per doubling).
-  - The estimate needs only counts, and the guard only "above the bound
-    or not", so it could run in O(K) memory, for example stopping once the
-    bound is passed.
-  - The on-demand partition (`scc_moves`, `refine_blocks`) uses the same
-    `weak_of` and `reach`. Fixing the estimate alone may move the OOM
-    there. Sparse sets would help when the weak moves are few. When they
-    are many, that is the saturation's own size, which no representation
-    avoids.
 - **`Auto` mis-estimate** (*optimization*, small). On `LawProofs.tau1`,
   `Auto` picks nested (42 steps) where mutual takes 29. A data point for
   `Product.estimate`, if it is revisited.
@@ -304,7 +285,81 @@ minimal)
   status unclear.
 - CADP `Size2`/`Size3`: see §2.
 
-## 5. Set aside (deliberately)
+## 5. Future work
+
+Optimizations Jonah chose on 2026-10-11 to accept as current limits.
+Neither is a bug. Verdicts and proofs are correct whenever they finish,
+and `Qed` checks every proof. Both are about cost. Like reformulating
+CADP to reach larger sizes, they are orthogonal to the research question
+(what the plugin can decide and prove), so a limit they cause is
+reported, not chased. Listed in priority order: the first touches every
+proof a user runs, the second only very large FSMs.
+
+### 5.1 The solver's own per-step cost
+
+**Standing.** Measured, cause unknown. CPU timers around each solver
+step (2026-10-11; patch kept locally as `notes/tools/solver-profile.diff`)
+separate the plugin *deciding* the next step (building its tactic) from
+Rocq *running* that tactic:
+
+| proofs | decision share of `Solve` | decision per step |
+|---|---|---|
+| `Proc/Test1`..`Test3`, `CCS` | 20-30% | 0.4-0.8ms |
+| `Evaluation/Width`, `Layers` | 30-40% | 0.55-0.67ms |
+| `Evaluation/Depth` | 65% | 1.5ms |
+| CADP `Size1` | 40-80% | 2-8ms |
+
+So deciding is cheap on small terms and ~10× dearer per step on CADP,
+whose states carry the whole program text.
+
+**Why it matters.** It is in every `MeBi Sim Solve`, so it would speed
+up every proof, including the checked-in ones. It may share a cause with
+`Size3`'s proof memory (§2), which is also unexplained.
+
+**Not known.** Whether the cost is a constant per term node (then it
+only scales with model size) or something that grows within a proof
+(lookups or conversions on states, say). That decides whether a fix is
+small.
+
+**Where to start.** Rerun the patch on CADP with finer timers inside
+`Proof_solver_step` (state lookup, transition lookup, the choice of
+answer) and see which one grows with term size. Then compare one
+`Size1` proof against its `Size1/Norm` counterpart, which has smaller
+states.
+
+**Relation to other items.** Replaying a derivation tree in one step
+(§4) would still make each decision, so this is the larger lever of the
+two.
+
+### 5.2 Memory of the saturation estimate
+
+**Standing.** Cause found; not fixed. `Model.SaturationEstimate` keeps,
+for each of an FSM's K silent SCCs, a dense bitset over all K
+(`tau_reach`), and another K² bits per label (`weak_of`). `Run Bisim`
+and `Sim Begin` compute it after extraction, to choose between whole
+and on-demand saturation. `Run FSM` does not. Measured in pure OCaml on
+a silent DAG: heap +27, +101 and +402MB at K = 10k, 20k and 40k (×4 per
+doubling).
+
+**Where it bites.** Glued CADP has one silent SCC per state (`Size2`:
+772 of 772), so glued `Size3` (128,044 states) needs ~4GB for the
+estimate on top of the ~4.7GB extracted FSM, and was OOM-killed at 9GB.
+CADP sidesteps it with `bigstep_norm` (644 states). Any user model with
+~100k or more silent SCCs needs gigabytes for it (§3, "Many silent SCCs").
+
+**What a fix involves.**
+- The estimate only needs counts, and the guard only "above the bound
+  or not", so it can run in memory linear in K, for example by stopping
+  once the bound is passed. That part is small.
+- The on-demand bisimilarity check (`scc_moves`, `refine_blocks`) reads
+  the same `reach` and `weak_of` sets. A fix to the estimate alone may
+  move the OOM there. Sparse sets help when the weak moves are few. When
+  they are many, they *are* the saturation's size, which no
+  representation avoids.
+- It touches the model, so it needs the full proof-suite runs and the
+  saturation golden test (`satdiff`).
+
+## 6. Set aside (deliberately)
 
 Kept so they are not rediscovered as new. Each could be reopened, with the
 reason in mind.

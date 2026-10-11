@@ -7665,6 +7665,28 @@ locally (`notes/tools/solver-profile.diff`).
 
 ---
 
+## 2026-10-11 — `OUTSTANDING.md`: a Future work section
+
+On branch `docs/future-work`, at Jonah's request.
+
+**Docs.** Jonah decided the two cost findings of the previous entry are
+current limits, not work for now: neither affects correctness, and like
+reformulating CADP for size, both are orthogonal to the research
+question. `OUTSTANDING.md` gains §5 "Future work" for such items, and
+"Set aside" becomes §6. In priority order:
+- §5.1, the solver's per-step decision cost (it touches every proof):
+  standing, why it matters, what is not known, where to start;
+- §5.2, the saturation estimate's memory: standing, where it bites, and
+  what a fix involves (the on-demand check reads the same sets).
+
+Both leave §4. §3 gains "Many silent SCCs" as a limit of the tool.
+`CLAUDE.md`'s `perf` note pointed at a §4 item that the previous PR
+deleted; it now points at the timer patch and §5.1.
+
+**Session tally (2026-10-11, later session), cont.:** Bug fix 1 · Docs 5.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

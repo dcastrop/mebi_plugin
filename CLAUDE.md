@@ -203,8 +203,10 @@ session has them.
   phase. Put timestamped markers on stderr (`Printf.eprintf ... %!`)
   before blaming a phase. Per-command times: `rocq compile -time`, as
   `bench/proofs.sh` does.
-- `perf` is blocked on Jonah's machine (`perf_event_paranoid` = 4): see
-  `OUTSTANDING.md` §4.
+- `perf` is blocked on Jonah's machine (`perf_event_paranoid` = 4).
+  Time the solver from inside the plugin instead: CPU timers around each
+  step, kept locally as `notes/tools/solver-profile.diff` (results in
+  `OUTSTANDING.md` §5.1).
 
 **Shell**
 - zsh does not word-split a command held in a variable (`$RC file` fails
