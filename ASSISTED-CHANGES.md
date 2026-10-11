@@ -7256,6 +7256,299 @@ On branch `docs/outstanding`, at Jonah's request.
 
 ---
 
+## 2026-10-11 — CADP: no-starvation design, `Size2` mutual exclusion, sizes
+
+On branch `fix/cadp-size2-mutex`, from `docs/outstanding`. A design
+session with Jonah on `OUTSTANDING.md` §2 (CADP "no starvation"), then
+the first step of the plan it produced.
+
+**Docs (design).** Decided with Jonah, and written up in the new
+`examples/README.md` (linked from `README.md`) and `OUTSTANDING.md` §2:
+- The property LTS is `spec_fifo`, a lock server with a queue (`REQ`/
+  `ENTER`/`LEAVE`). A `weak_bisimilar` proof against it would give mutual
+  exclusion, FIFO order and no deadlock short of divergence. No starvation
+  follows only under a fair scheduler, which is stated, not proved:
+  simulation cannot express liveness, weak bisimilarity ignores
+  divergence, and MCS waits by spinning.
+- Joining the queue (the tail swap) becomes visible as `REQ i` in an
+  observing variant of both semantics. The current semantics and their
+  counts stay as they are.
+- The transfer (layered ≈ property, via `weak_bisimilar_trans`) is to be
+  stated explicitly. No file states it yet.
+- The draft monitor `_no_starvation.v` is superseded. Read for this, it
+  has bugs: `do_action` never updates the history, and it checks
+  starvation on the pre-step state.
+
+**Docs (`examples/README.md`).** New. It describes every example file and
+directory, the CADP model, layered against glued, and the properties.
+
+**Bug fix (example).** `Size2/Glued/MutualExclusion/PluginProofs.v` was
+marked "WIP -- not bisim". It held two `weak_sim` proofs with placeholder
+`Solve 1000` bounds and debug dumps on. Both directions hold. Each was
+measured, and its bound set to the count minus one: `weak_sim bigstep
+spec_lts` 11,128 steps (~10 min, ~4.4GB) and `weak_sim spec_lts bigstep`
+405. A `mutual_sim` corollary is added, and the dumps are off. The pair
+is mutually similar but not bisimilar (`Run Bisim`: `Not_Bisimilar`).
+MCS fixes the order of entry silently, and `spec_lts`'s `Free` lets
+either pid in next. The file's comment and `examples/README.md` explain
+why. Strategies: `Auto` takes the mutual cofix, and forced `True` gives
+the same counts. Forced `False` takes 1,141 steps on the reverse, and the
+forward proof was OOM-killed at 6GB.
+
+**A mistake on the way.** I first predicted the *reverse* direction
+(spec ≤ system) was false. Working through `bigstep`'s rules by hand
+while the proof ran showed that it holds, because the simulating side
+chooses its own silent steps. The proof agreed. The failure is
+bisimilarity, not either simulation.
+
+**Docs (`Size2/TermTests.v`).** It was marked "KNOWN LIMIT (size)":
+incomplete at 5000 states on 2026-10-01. Layered `Size2` now extracts
+completely: **12,027 states**, ~32s, 0.65GB. The file now uses bound
+15000, has its result dumps off, and also decides glued ≈ layered with
+`Run Bisim`: **bisimilar**, decided on demand (~1.09M weak actions over
+10,083 silent SCCs), ~35s, ~1GB. Not proved. `_CoqProject`'s comments
+for the three `Size2` files are updated.
+
+**Measurements, not checked in** (scratch probes, each memory-capped):
+- Glued `Size2`: 772 states.
+- Glued `Size3` (three processes): **128,044 states**, 384,132
+  transitions, ~19 min, ~4.7GB. It is finite: the extracted terms do not
+  grow and carry no errors. `Run Bisim` against `spec_lts` was OOM-killed
+  at 9GB while saturating, with `Info` output (an FSM printout) adding to
+  the load.
+- Why `Size3` is large: on a 3,001-state sample, erasing the locals and
+  the resource's write-only `mem_next`/`mem_locked` leaves 446 distinct
+  states. In `bigstep` every local is dead between steps, so resetting
+  them is behaviour-preserving. Added to `OUTSTANDING.md` §2 as a possible
+  optimization of the example.
+
+**Finding.** `Size1/MutualExclusion/PluginProofs.v` proves glued against
+layered, duplicating `Size1/Glued/PluginProofs.v`, not anything against
+`spec_lts`. Recorded in `OUTSTANDING.md` §4. Its counts are part of
+`CLAUDE.md`'s baseline, so it was not touched here (restored in the
+next entry).
+
+**Verification.** `dune build` clean. `Size2/TermTests.v` compiles
+(82s, 1.1GB). `Size2/Glued/MutualExclusion/PluginProofs.v` compiles as
+checked in, under a 6GB cap. No OCaml and no `Size1` file changed, so the
+default suite's counts are unaffected.
+
+**Session tally (2026-10-11):** Bug fix 1 · Docs 3.
+
+---
+
+## 2026-10-11 — CADP `Size1/MutualExclusion`: restore what it proves
+
+On branch `fix/cadp-size2-mutex`, at Jonah's request.
+
+**Bug fix (example).** `Size1/MutualExclusion/PluginProofs.v` was a copy
+of `Size1/Glued/PluginProofs.v` (glued against layered), found earlier
+today. Its history explains it:
+- at `3cc6f10` (2026-03-13) it proved the layered `lts` against the
+  mutual-exclusion property, as its name says;
+- `37d997a` (2026-03-16, a restructure while debugging `Size2`) replaced
+  its contents with the glued file's, divider and all.
+
+Jonah chose to restore its intent over deleting it. It now proves `lts`
+against `spec_lts` for one process: both `weak_sim`s, `mutual_sim` and
+`weak_bisimilar`, mirroring `Glued/MutualExclusion`.
+- Counts: 259, 212, then `weak_bisimilar` 1442.
+- `Auto` takes the nested path for the two `weak_sim`s and the mutual
+  path for `weak_bisimilar`.
+- Forced `True` gives the same counts. Forced `False` gives the same
+  `weak_sim`s and leaves `weak_bisimilar` unsolved after 50,001 steps,
+  like every other file.
+- Compiles in ~16s.
+
+**Docs.**
+- `CLAUDE.md`'s baseline: `CADP/Size1` is now `259, 212, 268, 355, 81, 63`
+  and `1442, 2760, 185`. The duplicated 268, 355 and 2760 are gone; the
+  total is still 27 + 14. A dated note says why.
+- `examples/README.md` updated.
+- The `OUTSTANDING.md` §4 item is removed.
+
+**Session tally (2026-10-11), cont.:** Bug fix 2 · Docs 3.
+
+---
+
+## 2026-10-11 — CADP `Size3`: a correction, and normalisation
+
+On branch `fix/cadp-size2-mutex`. Jonah asked whether on-demand
+saturation had been tried at `Size3`, and whether the
+structural-congruence recipe would help.
+
+**A correction.** The first entry today says the `Size3` `Run Bisim` was
+OOM-killed "while saturating". That was wrong. Its log stops right after
+both FSMs were extracted, before the saturation estimate, so on-demand
+saturation was never reached. A rerun with `Info` off (no FSM printout)
+was OOM-killed at 9GB as well, after ~18 min. That is sooner than
+`Run FSM` alone needs on the same LTS (~19 min, 4.7GB peak). Without
+`Info` there are no phase markers, so where the memory goes is unknown.
+Recorded in `OUTSTANDING.md` §2 as a *bug?*: `Run Bisim` needs far more
+memory than `Run FSM` for the same extraction.
+
+**Docs.** `OUTSTANDING.md` §2: shrinking `Size3` by erasing dead data
+fits the `ProcCongruence.v` recipe as a normalised `bigstep_norm`,
+proved weakly bisimilar to `bigstep` by hand, once for all sizes.
+Structural congruence itself does not apply (CADP's `PAR` tree is fixed),
+nor does process symmetry (labels carry pids). `examples/README.md`'s
+size table is corrected.
+
+**Session tally (2026-10-11), cont.:** Bug fix 2 · Docs 4.
+
+---
+
+## 2026-10-11 — CADP: a normalised glued semantics (`CADP_Norm.v`)
+
+On branch `fix/cadp-size2-mutex`. Jonah chose to explore shrinking the
+glued state space with the recipe of `ProcCongruence.v`. This is example
+code: the plugin is unchanged.
+
+**Optimization (of the example's state space).** `examples/CADP_Norm.v`,
+built by default (~35s, no plugin calls):
+- `tidy` resets every process's local variables and the resource's
+  `mem_next`/`mem_locked`;
+- `bigstep_norm c a (tidy c')` whenever `bigstep c a c'`;
+- `link` proves `bigstep` and `bigstep_norm` weakly bisimilar on
+  well-formed states equal up to `tidy`, for every number of processes;
+- `wsim_transfer`, `wsim_transfer_r` and `wbis_transfer` carry plugin
+  proofs over `bigstep_norm` back to `bigstep`;
+- `composition_create_wf` discharges their premise for every initial
+  state.
+
+`Print Assumptions` on all four theorems: closed under the global
+context.
+
+| processes | `bigstep` | `bigstep_norm` |
+|---|---|---|
+| 1 | — | 5 |
+| 2 | 772 | 48 |
+| 3 | 128,044 | 644 |
+
+Earlier today, a 3,001-state sample suggested about 6.7×. The real
+reduction is 16× at two processes and about 200× at three.
+
+**New example files.**
+- `Size2/Norm/MutualExclusion/PluginProofs.v`: both simulations over
+  `bigstep_norm` (1,038 and 153 steps, ~15s, ~0.7GB, against 11,128 and
+  405 steps, ~10 min, ~4.4GB directly), transferred to `bigstep`. Forced
+  `True` gives the same counts; forced `False` was OOM-killed at 6GB on
+  the forward proof.
+- `Size3/Terms.v`, `Size3/Norm/TermTests.v` (644 states; `Fail Run Bisim`
+  against `spec_lts`, checked to fail with `Not_Bisimilar`).
+- `Size3/Norm/MutualExclusion/PluginProofs.v`: spec ≤ system only (326
+  steps, ~7s), transferred. System ≤ spec was OOM-killed at 8GB (~11 min)
+  and, with `Answers Minimal`, at 9GB (~13 min). It is recorded in
+  `OUTSTANDING.md` §2 as open.
+
+**Mistakes on the way, all caught before committing.**
+- I first claimed every local is dead between glued steps, for all
+  states. The first proof attempt showed that this is false. When a pid
+  indexes no qnode, `read_locked` fails, and `do_acquire_inner` then
+  branches on its *stale* `locked`. The lemmas therefore assume a
+  well-formedness invariant `wf` (every pid, the lock and every `next`
+  index a qnode), with `step_wf` and `composition_create_wf` proving that
+  it holds for every reachable state.
+- I told Jonah that `Size3` mutual exclusion was "decided but not proved".
+  That was wrong: `Run Bisim` decides bisimilarity (false here), not the
+  one simulation, and no MeBi command decides a simulation. It is neither
+  proved nor decided.
+- The tactic took several rounds. `cbn` refolded definitions, so the two
+  sides' scrutinees differed. Unfolding `eval` with `cbn` made one compile
+  run loop for 10 minutes; it was killed by PID. The version that works is
+  `cbv` with an explicit unfold list, re-normalising after each `destruct`.
+
+**Docs.**
+- `doc/structural-congruence.md` gains "A second instance: dead data in
+  CADP". The doc had invited a report if the recipe were applied a second
+  time. The boilerplate did recur (unfold, case-split, transfer), but the
+  per-block lemmas are model-specific, so no plugin hook is proposed.
+- `examples/README.md` covers the three semantics and the sizes.
+- `OUTSTANDING.md` §2: the "Shrinking `Size3`" item is resolved and
+  replaced by what remains: the `Size3` forward proof, and why it needs so
+  much memory.
+
+**Verification.**
+- `CADP_Norm.v` compiles under `make` (`make -j$(nproc)
+  src/mebi_plugin.cmxs theories/Test.vo examples/CADP_Norm.vo ...`, then
+  `make dune`), and `dune build` is clean.
+- The three new proof and test files compile as committed, under
+  memory-capped `rocq compile`.
+
+**Session tally (2026-10-11), cont.:** Bug fix 2 · Optimization 1 · Docs 5.
+
+---
+
+## 2026-10-11 — CADP: FIFO order (no starvation, as far as it can be stated)
+
+On branch `fix/cadp-size2-mutex`, following the `spec_fifo` design agreed
+this morning. Example code only: the plugin is unchanged.
+
+**New feature (example, not plugin).**
+- `examples/CADP_Obs.v` (built by default):
+  - `bigstep_obs` is `bigstep` rule for rule, except that `DO_ACQUIRE`,
+    the atomic tail swap, is labelled `(FETCH_AND_STORE, pid)`;
+  - `bigstep_obs_norm` is its normalised form;
+  - `step_wf_obs`, `step_tidy_obs`, `link_obs` and `wbis_transfer_obs`
+    reuse `CADP_Norm.v`'s per-block lemmas, and only the acquire case
+    needed handling by hand. No axioms.
+
+  A functor was not needed: the variant is nine constructors.
+- `examples/Bisimilarity/CADP/Properties/Fifo.v` (built by default):
+  `spec_fifo`, with idle pids, a queue, and whether the head is in its
+  critical section. `REQ` picks its pid by recursing on its own premise,
+  as `spec_lts` does.
+- Results:
+  - `Size1/Norm/Fifo/PluginProofs.v`: `weak_bisimilar` with `spec_fifo`,
+    119 steps, transferred to `bigstep_obs`;
+  - `Size2/Norm/Fifo/PluginProofs.v`: 2,228 steps, ~24s;
+  - `Size3/Norm/TermTests.v`: decided bisimilar, ~4s. The proof was
+    OOM-killed at 9GB after ~15 min (644 pairs, 3,714 moves).
+
+  Forced `MutualCofix True` gives the same counts. Forced `False` leaves
+  them unsolved, as for every `weak_bisimilar`.
+- A sanity check, not committed: a LIFO variant of the spec is
+  `Not_Bisimilar` at three processes, so the verdict discriminates.
+
+**Docs.**
+- `examples/README.md`'s no-starvation section now gives the results.
+- `OUTSTANDING.md` §2 now lists what remains: the layered semantics (the
+  label in `step`, and a proof of glued ≈ layered), the `Size3` proofs,
+  and whether to delete `_no_starvation.v`. `_CoqProject` calls that file
+  superseded.
+- A correction to the previous entry: `Size3` mutual exclusion is now
+  decided indirectly, through bisimilarity with `spec_fifo`, which lets
+  only the head enter. Hiding the queue label to reach `bigstep` is an
+  informal step. The file comment says so.
+
+**Verification.**
+- `make` builds `CADP_Obs.vo` and `Fifo.vo`; `make dune` and `dune build`
+  are clean.
+- Every new file compiles as committed, under memory-capped `rocq
+  compile`.
+
+**Session tally (2026-10-11), cont.:** Bug fix 2 · Optimization 1 · New
+feature 1 · Docs 6.
+
+---
+
+## 2026-10-11 — `_no_starvation.v` deleted
+
+On branch `fix/cadp-size2-mutex`, at Jonah's request.
+
+**Docs/Tooling.** `examples/Bisimilarity/CADP/Properties/_no_starvation.v`
+is deleted. It was a draft monitor for no starvation: never built, and
+imported by nothing. It had the bugs noted in the first entry today, and
+`Properties/Fifo.v` supersedes it. It is recoverable with `git show
+e043b0e:examples/Bisimilarity/CADP/Properties/_no_starvation.v`. Its
+`_CoqProject` line, its `examples/README.md` mention and the
+`OUTSTANDING.md` decision item are removed.
+
+**Session tally (2026-10-11), cont.:** Bug fix 2 · Optimization 1 · New
+feature 1 · Docs 7.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
