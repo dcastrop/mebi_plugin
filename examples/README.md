@@ -22,6 +22,7 @@ needs a memory cap. To build one, uncomment it and run `make`; or use
 | `CCS.v` | Value-free CCS (Milner 1989) as one inductive LTS: vending machines, buffers, and the Alternating Bit Protocol. |
 | `CADP.v` | The MCS queue lock from CADP's demo, in its layered semantics: see [CADP](#cadp) below. |
 | `CADP_Glued.v` | The same lock in a glued big-step semantics, with a much smaller state space. |
+| `CADP_Norm.v` | The glued semantics with its dead data erased (`bigstep_norm`), proved weakly bisimilar to it by hand, so proofs over it transfer to `bigstep`. |
 | `CADP_simple.v` | An early, simpler counter-based lock. Not built and not used elsewhere. |
 | `Bisimilarity/` | The proofs, one directory per calculus: see below. |
 | `Evaluation/` | Benchmark series for width, semantic layers and nesting depth. `*Large.v` are scaled up for `bench/proofs.sh -s eval-large`. |
@@ -74,28 +75,40 @@ Only `ENTER i` and `LEAVE i` are visible (`get_action`); all memory traffic
 is silent. `composition_create n` builds `n + 1` processes, with pids
 `n .. 0`.
 
-### Layered and glued
+### Layered, glued and normalised
 
-There are two semantics for the same processes:
+There are three semantics for the same processes:
 - **Layered**, `lts` over `step` (`CADP.v`): every action, branch and
   recursion unfolding is a step. This is the faithful model.
 - **Glued**, `bigstep` (`CADP_Glued.v`): each acquire or release block runs
   as one silent step, so the state space is far smaller.
+- **Normalised**, `bigstep_norm` (`CADP_Norm.v`): `bigstep` with dead data
+  erased after every step. Each glued block writes the local variables it
+  reads, so between steps they are dead, and the resource keeps two copies
+  of the last value read that nothing reads. `CADP_Norm.v` proves
+  `bigstep_norm` weakly bisimilar to `bigstep` by hand, for every number of
+  processes, following the recipe in `doc/structural-congruence.md`. The
+  proof needs every state to be well formed (all indices in range), which
+  every `composition_create` is.
 
 The intended argument:
 - prove glued ≈ layered;
-- prove a property LTS ≈ glued;
+- prove a property LTS ≈ glued, possibly over `bigstep_norm` and carried
+  back by `CADP_Norm`'s transfer theorems;
 - conclude, by `weak_bisimilar_trans` (`theories/Bisimilarity.v`), that the
   layered system has the property.
 
 The glued version exists because the layered one used to be too large to
 extract beyond one process.
 
-| size | processes | layered | glued | glued ≈ layered |
-|---|---|---|---|---|
-| `Size1` | 1 | small | small | proved (`Size1/Glued/PluginProofs.v`) |
-| `Size2` | 2 | 12027 states (~32s) | 772 states | decided, bisimilar (`Size2/TermTests.v`, ~35s); not yet proved |
-| `Size3` | 3 | not tried | 128044 states (~19 min, ~4.7GB) | not tried; `Run Bisim` against `spec_lts` ran out of memory at 9GB before saturating |
+| size | processes | layered | glued | normalised | glued ≈ layered |
+|---|---|---|---|---|---|
+| `Size1` | 1 | small | small | 5 states | proved (`Size1/Glued/PluginProofs.v`) |
+| `Size2` | 2 | 12027 states (~32s) | 772 states | 48 states | decided, bisimilar (`Size2/TermTests.v`, ~35s); not yet proved |
+| `Size3` | 3 | not tried | 128044 states (~19 min, ~4.7GB) | 644 states (~3s) | not tried |
+
+Glued ≈ normalised needs no plugin run: it is `CADP_Norm.link`, for every
+size.
 
 Measured 2026-10-11. No transfer corollary (layered ≈ property) is stated
 yet.
@@ -112,7 +125,10 @@ semantics: layered (`Size1/MutualExclusion/PluginProofs.v`) and glued
 (`Size1/Glued/MutualExclusion/PluginProofs.v`).
 
 **Two processes.** The system and `spec_lts` are mutually similar but *not*
-bisimilar (`Size2/Glued/MutualExclusion/PluginProofs.v`):
+bisimilar. `Size2/Glued/MutualExclusion/PluginProofs.v` proves both
+simulations directly (11,128 and 405 steps, ~10 min, ~4.4GB);
+`Size2/Norm/MutualExclusion/PluginProofs.v` proves them over `bigstep_norm`
+and transfers them (1,038 and 153 steps, ~15s).
 - **System ≤ spec** is mutual exclusion proper: every `ENTER`/`LEAVE` trace
   of the system is allowed by the server.
 - **Spec ≤ system** holds because the simulating side picks its own silent
@@ -126,6 +142,14 @@ bisimilar (`Size2/Glued/MutualExclusion/PluginProofs.v`):
 So mutual exclusion holds, but `spec_lts` cannot be *the* property LTS
 bisimilar to the system once there is more than one process. The order is
 part of the system's behaviour, and the spec does not see it.
+
+**Three processes.** Only through `bigstep_norm` (644 states; `bigstep`
+has 128,044). As before, the system and `spec_lts` are not bisimilar
+(`Size3/Norm/TermTests.v`). Spec ≤ system is proved
+(`Size3/Norm/MutualExclusion/PluginProofs.v`, 326 steps, ~7s). Mutual
+exclusion proper, system ≤ spec, is neither proved nor decided: its proof
+was OOM-killed at 9GB after ~13 min, and no MeBi command decides a single
+simulation.
 
 ### No starvation: the `spec_fifo` design (agreed 2026-10-11, not yet written)
 
@@ -142,6 +166,9 @@ The plan:
   an observing variant of both semantics, so the existing proofs and their
   step counts stay as they are. It must be the same in both, so that
   glued ≈ layered still means something.
+- **Build it over `bigstep_norm`.** `REQ` changes nothing `CADP_Norm.v`
+  erases, so the same `tidy` and proof should carry over to the observing
+  variant, and keep it small enough to prove.
 - **`spec_fifo`.** A lock server with a queue. `REQ i` appends `i`,
   `ENTER i` is allowed only for the head of the queue, and `LEAVE i` pops
   it. It is mutually exclusive and FIFO by construction.

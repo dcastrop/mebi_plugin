@@ -166,6 +166,40 @@ Neither proof is built by default; run them under a memory cap
 The hand proof, `ProcCongruence.v` in full, is about 300 lines and is
 written once for the calculus, not per example.
 
+## A second instance: dead data in CADP
+
+`examples/CADP_Norm.v` applies the same recipe to a different kind of
+redundancy. The glued CADP semantics (`CADP_Glued.bigstep`) has no
+congruence rules, but most of its states differ only in data no step will
+read again:
+- each process's local variables, which every glued block writes before it
+  reads them;
+- two copies the resource keeps of the last value read, which nothing reads.
+
+`tidy` erases that data, `bigstep_norm` takes `tidy` of every target, and
+`link` proves the two weakly bisimilar on states equal up to `tidy`. There
+is no sorting, because the arrangement is fixed: the canonical
+representative is just the state with its dead data reset.
+
+One difference from `ProcCongruence.v`: the claim holds only for
+**well-formed** states (`wf`: every pid, the lock and every queue link
+index an existing queue node). Outside them a memory access fails, and the
+error path goes on to read a stale local. So `link` assumes `wf`,
+`step_wf` shows that `bigstep` preserves it, and `composition_create_wf`
+shows that every initial state has it. The transfer theorems take `wf` as
+a premise, and every example discharges it with `composition_create_wf`.
+Expect the same in any model with error paths: check what an error branch
+reads before calling data dead.
+
+| processes | `bigstep` | `bigstep_norm` | `weak_sim` system ≤ `spec_lts` |
+|---|---|---|---|
+| 2 | 772 states | 48 states | 11,128 steps, ~10 min, ~4.4GB → 1,038 steps, ~15s, ~0.7GB |
+| 3 | 128,044 states | 644 states | out of reach both ways: OOM-killed at 9GB after ~13 min (spec ≤ system: 326 steps, ~7s) |
+
+The hand proof is about 500 lines, mostly per-block lemmas closed by one
+tactic that unfolds a block and case-splits on what it reads. It compiles
+in ~35s.
+
 ## Applying it to your own calculus
 
 1. Separate the congruence rules from the rest (`core`).

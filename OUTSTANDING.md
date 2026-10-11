@@ -120,30 +120,23 @@ and why mutual similarity is not enough, is in
   bisimilar, and is now proved both ways (11,128 and 405 steps; the first
   ~10 min, ~4.4GB).
 - `Size3` (three processes, where FIFO becomes interesting): glued
-  128,044 states, 384,132 transitions; extraction ~19 min, ~4.7GB. `Run
-  Bisim` against `spec_lts` was OOM-killed at 9GB twice, with `Info` on
-  and with it off. The first run died just after extracting both FSMs,
-  before the saturation estimate. The second died at ~18 min, sooner than
-  `Run FSM` alone needs (~19 min, 4.7GB). So on-demand saturation was
-  never reached, and why `Run Bisim` needs so much more memory than
-  `Run FSM` for the same extraction is unexplained (*bug?*, unprobed).
-  Feasible to extract, not yet to decide or prove. Layered not tried.
-- **Shrinking `Size3`** (*optimization* of the example, small). Most
-  glued states differ only in dead data. The resource's `mem_next`/
-  `mem_locked` are written by reads and never read. In `bigstep`, every
-  local variable is read only within the atomic step that wrote it. So
-  resetting the locals after each glued step changes no visible
-  behaviour. On a 3,001-state `Size3` sample, erasing them leaves 446
-  distinct states (~6.7×). It changes the glued model: glued ≈ layered
-  must be re-proved and `Size1`'s glued counts re-measured, unless it is
-  done in the observing variant.
-  Done as `ProcCongruence.v` does it, the reset would be a normalised
-  semantics (`bigstep_norm`), with a hand proof that "equal up to dead
-  data" is a weak bisimulation, for all sizes. Plugin proofs over
-  `bigstep_norm` would then transfer back. CADP has no congruence rules
-  (its `PAR` tree is fixed), so structural congruence itself does not
-  apply. Process symmetry does not apply either, because labels carry
-  pids.
+  128,044 states (extraction ~19 min, ~4.7GB), normalised
+  (`CADP_Norm.bigstep_norm`) **644**. Through `bigstep_norm`, spec ≤
+  system is proved (326 steps, ~7s). Mutual exclusion proper (system ≤
+  spec) is neither proved nor decided: its proof was OOM-killed at 8GB
+  (~11 min) and, with `Answers Minimal`, at 9GB (~13 min). Why a proof
+  over 644 states needs so much more memory than `Size2`'s over 772
+  (`bigstep`, 4.4GB) is unmeasured; one hypothesis is that each state
+  carries the whole program text, so the proof term grows with term size
+  as well as steps (*limit*/*optimization*, unprobed).
+- `Run Bisim` on glued `Size3` against `spec_lts` was OOM-killed at 9GB
+  twice, the second time before `Run FSM`'s extraction time had even
+  passed. So `Run Bisim` seems to need far more memory than `Run FSM` for
+  the same extraction (*bug?*, unprobed). `bigstep_norm` sidesteps it for
+  CADP.
+- Glued ≈ normalised is proved by hand for every size
+  (`CADP_Norm.link`); the observing variant should be built over
+  `bigstep_norm` too.
 
 ## 3. Limitations of the tool
 

@@ -7398,6 +7398,87 @@ size table is corrected.
 
 ---
 
+## 2026-10-11 — CADP: a normalised glued semantics (`CADP_Norm.v`)
+
+On branch `fix/cadp-size2-mutex`. Jonah chose to explore shrinking the
+glued state space with the recipe of `ProcCongruence.v`. This is example
+code: the plugin is unchanged.
+
+**Optimization (of the example's state space).** `examples/CADP_Norm.v`,
+built by default (~35s, no plugin calls):
+- `tidy` resets every process's local variables and the resource's
+  `mem_next`/`mem_locked`;
+- `bigstep_norm c a (tidy c')` whenever `bigstep c a c'`;
+- `link` proves `bigstep` and `bigstep_norm` weakly bisimilar on
+  well-formed states equal up to `tidy`, for every number of processes;
+- `wsim_transfer`, `wsim_transfer_r` and `wbis_transfer` carry plugin
+  proofs over `bigstep_norm` back to `bigstep`;
+- `composition_create_wf` discharges their premise for every initial
+  state.
+
+`Print Assumptions` on all four theorems: closed under the global
+context.
+
+| processes | `bigstep` | `bigstep_norm` |
+|---|---|---|
+| 1 | — | 5 |
+| 2 | 772 | 48 |
+| 3 | 128,044 | 644 |
+
+Earlier today, a 3,001-state sample suggested about 6.7×. The real
+reduction is 16× at two processes and about 200× at three.
+
+**New example files.**
+- `Size2/Norm/MutualExclusion/PluginProofs.v`: both simulations over
+  `bigstep_norm` (1,038 and 153 steps, ~15s, ~0.7GB, against 11,128 and
+  405 steps, ~10 min, ~4.4GB directly), transferred to `bigstep`. Forced
+  `True` gives the same counts; forced `False` was OOM-killed at 6GB on
+  the forward proof.
+- `Size3/Terms.v`, `Size3/Norm/TermTests.v` (644 states; `Fail Run Bisim`
+  against `spec_lts`, checked to fail with `Not_Bisimilar`).
+- `Size3/Norm/MutualExclusion/PluginProofs.v`: spec ≤ system only (326
+  steps, ~7s), transferred. System ≤ spec was OOM-killed at 8GB (~11 min)
+  and, with `Answers Minimal`, at 9GB (~13 min). It is recorded in
+  `OUTSTANDING.md` §2 as open.
+
+**Mistakes on the way, all caught before committing.**
+- I first claimed every local is dead between glued steps, for all
+  states. The first proof attempt showed that this is false. When a pid
+  indexes no qnode, `read_locked` fails, and `do_acquire_inner` then
+  branches on its *stale* `locked`. The lemmas therefore assume a
+  well-formedness invariant `wf` (every pid, the lock and every `next`
+  index a qnode), with `step_wf` and `composition_create_wf` proving that
+  it holds for every reachable state.
+- I told Jonah that `Size3` mutual exclusion was "decided but not proved".
+  That was wrong: `Run Bisim` decides bisimilarity (false here), not the
+  one simulation, and no MeBi command decides a simulation. It is neither
+  proved nor decided.
+- The tactic took several rounds. `cbn` refolded definitions, so the two
+  sides' scrutinees differed. Unfolding `eval` with `cbn` made one compile
+  run loop for 10 minutes; it was killed by PID. The version that works is
+  `cbv` with an explicit unfold list, re-normalising after each `destruct`.
+
+**Docs.**
+- `doc/structural-congruence.md` gains "A second instance: dead data in
+  CADP". The doc had invited a report if the recipe were applied a second
+  time. The boilerplate did recur (unfold, case-split, transfer), but the
+  per-block lemmas are model-specific, so no plugin hook is proposed.
+- `examples/README.md` covers the three semantics and the sizes.
+- `OUTSTANDING.md` §2: the "Shrinking `Size3`" item is resolved and
+  replaced by what remains: the `Size3` forward proof, and why it needs so
+  much memory.
+
+**Verification.**
+- `CADP_Norm.v` compiles under `make` (`make -j$(nproc)
+  src/mebi_plugin.cmxs theories/Test.vo examples/CADP_Norm.vo ...`, then
+  `make dune`), and `dune build` is clean.
+- The three new proof and test files compile as committed, under
+  memory-capped `rocq compile`.
+
+**Session tally (2026-10-11), cont.:** Bug fix 2 · Optimization 1 · Docs 5.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
