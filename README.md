@@ -119,6 +119,8 @@ If VSCode is launched outside the direnv environment it won't have `_opam/bin` o
 
 Every command below starts with `MeBi` and needs `Require Import MEBI.loader.` first. This is the current command surface — see `src/g_mebi.mlg` for the exact grammar, and `theories/Test.v`/`theories/DevTest.v` for more worked examples.
 
+The worked examples (process calculi, CCS and the Alternating Bit Protocol, the CADP MCS lock and its properties) are described in [`examples/README.md`](examples/README.md).
+
 ### Building an LTS or FSM
 
 ```
