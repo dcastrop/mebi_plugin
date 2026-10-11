@@ -302,19 +302,25 @@ let refuse_goal () : 'a =
         a definition of your own, unfold it first.")
 ;;
 
-(** [check_goal_states pstate x y] checks [x] and [y], the terms given to
-    [MeBi Sim Begin], are the two states of the goal in focus (its last two
-    arguments), up to conversion: the proof search looks the goal's states
-    up in the LTSs built from [x] and [y]. Before 2026-10-10 a mismatch
-    stopped [Solve] on an internal error ([CouldNotFind_State],
-    [CannotGetTransition]). Assumes the goal is [weak_sim] or
-    [weak_bisimilar].
+(** [check_goal_arguments pstate (x, lts_x) (y, lts_y)] checks the LTSs
+    and terms given to [MeBi Sim Begin] are the goal's, up to conversion:
+    [lts_x] and [lts_y] its two LTSs, [x] and [y] its two states (the
+    goal's last four arguments, in that order). The proof search looks the
+    goal's states up in the LTSs built from [x] and [y], and applies the
+    constructors of [lts_x] and [lts_y] to the goal's transitions.
+
+    Before 2026-10-10 a mismatched term stopped [Solve] on an internal
+    error ([CouldNotFind_State], [CannotGetTransition]). Before 2026-10-11
+    the LTSs were not checked: a sub-LTS gave the same internal error, a
+    super-LTS a wrong "not weakly simulated" refusal of a true goal, and
+    swapped LTSs Rocq's "Not enough constructors". Assumes the goal is
+    [weak_sim] or [weak_bisimilar].
 
     @raise CErrors.UserError if they are not (raised here). *)
-let check_goal_states
+let check_goal_arguments
       (pstate : Declare.Proof.t)
-      (x : Constrexpr.constr_expr)
-      (y : Constrexpr.constr_expr)
+      ((x, lts_x) : Constrexpr.constr_expr * Libnames.qualid)
+      ((y, lts_y) : Constrexpr.constr_expr * Libnames.qualid)
   : unit
   =
   let { Proof.goals; sigma; _ } = Proof.data (Declare.Proof.get pstate) in
@@ -325,39 +331,45 @@ let check_goal_states
     let concl = Evd.evar_concl (Evd.find_undefined sigma g) in
     let _, args = EConstr.decompose_app sigma concl in
     let n = Array.length args in
-    if n >= 2
+    if n >= 4
     then (
-      let sigma, x' = Constrintern.interp_constr_evars env sigma x in
-      let sigma, y' = Constrintern.interp_constr_evars env sigma y in
-      let s = args.(n - 2)
-      and t = args.(n - 1) in
+      let interp sigma e = Constrintern.interp_constr_evars env sigma e in
+      let sigma, lts_x' = interp sigma (Constrexpr_ops.mkRefC lts_x) in
+      let sigma, lts_y' = interp sigma (Constrexpr_ops.mkRefC lts_y) in
+      let sigma, x' = interp sigma x in
+      let sigma, y' = interp sigma y in
       let pr = Printer.pr_econstr_env env sigma in
-      let mismatch (which : string) (given : EConstr.t) (goal : EConstr.t) =
-        Pp.(
-          str (Printf.sprintf "the %s term given, " which)
-          ++ pr given
-          ++ str ", is not the goal's "
-          ++ str which
-          ++ str " state, "
-          ++ pr goal
-          ++ str ".")
+      (* [check which given_what goal_what given goal] is [[]] if [given]
+         converts to [goal], else the one message saying it does not. *)
+      let check which given_what goal_what given goal =
+        if Reductionops.is_conv env sigma given goal
+        then []
+        else
+          [ Pp.(
+              str (Printf.sprintf "the %s %s given, " which given_what)
+              ++ pr given
+              ++ str
+                   (Printf.sprintf
+                      ", is not the goal's %s %s, "
+                      which
+                      goal_what)
+              ++ pr goal
+              ++ str ".")
+          ]
       in
       let errs =
-        (if Reductionops.is_conv env sigma x' s
-         then []
-         else [ mismatch "first" x' s ])
-        @
-        if Reductionops.is_conv env sigma y' t
-        then []
-        else [ mismatch "second" y' t ]
+        check "first" "LTS" "LTS" lts_x' args.(n - 4)
+        @ check "second" "LTS" "LTS" lts_y' args.(n - 3)
+        @ check "first" "term" "state" x' args.(n - 2)
+        @ check "second" "term" "state" y' args.(n - 1)
       in
       if errs <> []
       then
         CErrors.user_err
           Pp.(
             str
-              "MeBi: [MeBi Sim Begin <lts> <x> And <lts> <y>] needs [x] and \
-               [y] to be the goal's two states, in order: "
+              "MeBi: [MeBi Sim Begin <lts> <x> And <lts> <y>] needs the goal's \
+               two LTSs and two states, in order: "
             ++ prlist_with_sep spc (fun e -> e) errs))
 ;;
 
@@ -710,7 +722,7 @@ let init
   let goal_is_bisimilar : bool = goal_head_is pstate "weak_bisimilar" in
   let goal_is_sim : bool = goal_head_is pstate "weak_sim" in
   if Bool.not (goal_is_bisimilar || goal_is_sim) then refuse_goal ();
-  check_goal_states pstate (fst a) (fst b);
+  check_goal_arguments pstate a b;
   Solver.W.check_bisimilarity ~fail_if_not_bisim:(Bool.not goal_is_sim) refs a b;
   Solver.W.swapped := false;
   Solver.W.simulators := None;

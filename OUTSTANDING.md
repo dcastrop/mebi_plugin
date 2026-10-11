@@ -188,10 +188,6 @@ turns the pin into a positive test.
   - **An `exists` goal** needs its witness given by hand (`exists t.`).
 
   Witness search and open terms would be new *capabilities*.
-- **`Begin` does not check its LTSs against the goal's** (*bug?*;
-  `Begin`'s terms are checked since PR #57). To probe: a goal over one LTS
-  with `Begin` given another. If that ends in an internal error, it is a
-  bug fix like #57's.
 - **One state per silent SCC cannot be proved inside a coinduction**
   (*limit*; counterexample pinned as `CircularTransfer`). Very large
   systems (`Proc/Test4`, 9720 states) are therefore *decided* on demand
