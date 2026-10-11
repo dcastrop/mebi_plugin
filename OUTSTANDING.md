@@ -89,53 +89,50 @@ means, so deciding one way means re-measuring every bound)
 
 ### CADP "no starvation"
 
-**Kind:** example/property; possibly *limit*. Moved here from "the
-authors' call" (2026-10-10) to be designed with Jonah.
+**Kind:** example/property. Designed with Jonah on 2026-10-11; the design,
+and why mutual similarity is not enough, is in
+[`examples/README.md`](examples/README.md#cadp) ("CADP").
 
-**The property.** No process waiting to enter the critical section is
-overtaken forever. `examples/Bisimilarity/CADP/Properties/
-_no_starvation.v` quotes CADP's MCL formula (`[ true* ] forall i ... ]
--|`) and sketches a Rocq monitor (`NoStarvation.lts`). The monitor tracks,
-per process, which others have acted since it last did. It allows a step
-only while no process has been overtaken more than allowed, and only for
-`ENTER`/`LEAVE` steps in the right order. The draft paper holds the
-intended formulation.
+**Decided (2026-10-11):**
+- **Property LTS:** `spec_fifo`, a lock server with a queue. `REQ i`
+  appends, `ENTER i` only for the head, `LEAVE i` pops. A
+  `weak_bisimilar` proof against it gives mutual exclusion, FIFO order and
+  no deadlock short of divergence. No starvation then follows under a fair
+  scheduler, which is stated, not proved. The draft monitor
+  `Properties/_no_starvation.v` is superseded.
+- **Labels:** an observing variant of `lts`/`step` and `bigstep` that also
+  shows `REQ i` on the tail swap, built beside the current semantics so
+  existing proofs and counts stay put. Try a module or functor first,
+  since MeBi refuses LTSs with parameters.
+- **Transfer:** state `layered ≈ property` with `weak_bisimilar_trans`/
+  `weak_sim_trans`. No file states it yet, not even at `Size1`.
 
-**What the checked-in pieces can and cannot say:**
-- `weak_sim` and `weak_bisimilar` are divergence-insensitive, and
-  simulation preserves (weak) traces, not liveness. A true "eventually
-  enters" cannot be stated as a simulation into a spec LTS without
-  fairness.
-- What a simulation *can* state is a **safety approximation**: bounded
-  overtaking ("no process is bypassed more than k times while waiting").
-  Under fair scheduling, that implies freedom from starvation. The draft
-  monitor is shaped like this.
-- So the likely form is `weak_sim system monitor`: every behaviour of the
-  system is allowed by the monitor. Mutual exclusion is proved the same
-  way, against `spec_lts`.
+**Still to do:**
+- write `spec_fifo` and the observing variant;
+- decide variant ≈ `spec_fifo` with `Run Bisim` at `Size1`/`Size2`, then
+  prove it where that is affordable;
+- prove glued ≈ layered at `Size2` (decided bisimilar, ~35s; proof cost
+  unmeasured: 772 against 12,027 states), then the transfer corollaries.
 
-**Obstacles to settle first:**
-- **Size.** CADP `Size1` composes **one** process (`composition_create
-  0`), for which no-starvation is vacuous. It needs at least two, i.e.
-  `Size2`, which is a known size limit: the plain LTS is still incomplete
-  at 5000 states. The glued semantics extracts at `Size2`, but its
-  `PluginProofs.v` fails and its `MutualExclusion` is marked "WIP, not
-  bisim" in `_CoqProject`. Getting `Size2` (glued) to prove mutual
-  exclusion first is probably the real first step.
-- **Labels.** The monitor must see the system's labels (`act * pid`) and
-  treat the rest as silent. Its premise `do_action a t1 = Some t2` is an
-  equation computing the target, which MeBi supports.
-- **Monitor state.** The history is lists of pids, so it is finite for a
-  fixed N, but its size grows with N and k.
-- **Waiting.** Which events mean "waiting" in this protocol: requesting
-  the lock (`WRITE_NEXT`/`READ_LOCKED`), or only `ENTER`/`LEAVE`? This
-  decides which labels stay visible.
-
-**Inputs for the session:**
-- the draft paper's formulation;
-- `_no_starvation.v`;
-- `Properties/MutualExclusion.v` (`spec_lts`) as the template;
-- the `Size2` files.
+**Size (measured 2026-10-11):**
+- `Size2` (two processes): layered 12,027 states (~32s), glued 772.
+  `Size2/Glued/MutualExclusion` is mutually similar to `spec_lts`, not
+  bisimilar, and is now proved both ways (11,128 and 405 steps; the first
+  ~10 min, ~4.4GB).
+- `Size3` (three processes, where FIFO becomes interesting): glued
+  128,044 states, 384,132 transitions; extraction ~19 min, ~4.7GB. `Run
+  Bisim` against `spec_lts` then ran out of memory at 9GB while
+  saturating. Feasible to extract, not yet to decide or prove. Layered
+  not tried.
+- **Shrinking `Size3`** (*optimization* of the example, small). Most
+  glued states differ only in dead data. The resource's `mem_next`/
+  `mem_locked` are written by reads and never read. In `bigstep`, every
+  local variable is read only within the atomic step that wrote it. So
+  resetting the locals after each glued step changes no visible
+  behaviour. On a 3,001-state `Size3` sample, erasing them leaves 446
+  distinct states (~6.7×). It changes the glued model: glued ≈ layered
+  must be re-proved and `Size1`'s glued counts re-measured, unless it is
+  done in the observing variant.
 
 ## 3. Limitations of the tool
 
@@ -249,7 +246,12 @@ and 12)
 **Examples**
 - `examples/Bisimilarity/_nat_streams.v`: unfinished, kept as real work,
   status unclear.
-- CADP `Size2`: see §2.
+- CADP `Size2`/`Size3`: see §2.
+- CADP `Size1/MutualExclusion/PluginProofs.v` is misnamed: it proves
+  glued against layered, duplicating `Size1/Glued/PluginProofs.v`, not
+  anything against `spec_lts` (found 2026-10-11). Delete or rename it;
+  its counts are part of `CLAUDE.md`'s baseline, so that changes the
+  baseline listing too.
 
 ## 5. Set aside (deliberately)
 

@@ -7256,6 +7256,86 @@ On branch `docs/outstanding`, at Jonah's request.
 
 ---
 
+## 2026-10-11 — CADP: no-starvation design, `Size2` mutual exclusion, sizes
+
+On branch `fix/cadp-size2-mutex`, from `docs/outstanding`. A design
+session with Jonah on `OUTSTANDING.md` §2 (CADP "no starvation"), then
+the first step of the plan it produced.
+
+**Docs (design).** Decided with Jonah, and written up in the new
+`examples/README.md` (linked from `README.md`) and `OUTSTANDING.md` §2:
+- The property LTS is `spec_fifo`, a lock server with a queue (`REQ`/
+  `ENTER`/`LEAVE`). A `weak_bisimilar` proof against it would give mutual
+  exclusion, FIFO order and no deadlock short of divergence. No starvation
+  follows only under a fair scheduler, which is stated, not proved:
+  simulation cannot express liveness, weak bisimilarity ignores
+  divergence, and MCS waits by spinning.
+- Joining the queue (the tail swap) becomes visible as `REQ i` in an
+  observing variant of both semantics. The current semantics and their
+  counts stay as they are.
+- The transfer (layered ≈ property, via `weak_bisimilar_trans`) is to be
+  stated explicitly. No file states it yet.
+- The draft monitor `_no_starvation.v` is superseded. Read for this, it
+  has bugs: `do_action` never updates the history, and it checks
+  starvation on the pre-step state.
+
+**Docs (`examples/README.md`).** New. It describes every example file and
+directory, the CADP model, layered against glued, and the properties.
+
+**Bug fix (example).** `Size2/Glued/MutualExclusion/PluginProofs.v` was
+marked "WIP -- not bisim". It held two `weak_sim` proofs with placeholder
+`Solve 1000` bounds and debug dumps on. Both directions hold. Each was
+measured, and its bound set to the count minus one: `weak_sim bigstep
+spec_lts` 11,128 steps (~10 min, ~4.4GB) and `weak_sim spec_lts bigstep`
+405. A `mutual_sim` corollary is added, and the dumps are off. The pair
+is mutually similar but not bisimilar (`Run Bisim`: `Not_Bisimilar`).
+MCS fixes the order of entry silently, and `spec_lts`'s `Free` lets
+either pid in next. The file's comment and `examples/README.md` explain
+why. Strategies: `Auto` takes the mutual cofix, and forced `True` gives
+the same counts. Forced `False` takes 1,141 steps on the reverse, and the
+forward proof was OOM-killed at 6GB.
+
+**A mistake on the way.** I first predicted the *reverse* direction
+(spec ≤ system) was false. Working through `bigstep`'s rules by hand
+while the proof ran showed that it holds, because the simulating side
+chooses its own silent steps. The proof agreed. The failure is
+bisimilarity, not either simulation.
+
+**Docs (`Size2/TermTests.v`).** It was marked "KNOWN LIMIT (size)":
+incomplete at 5000 states on 2026-10-01. Layered `Size2` now extracts
+completely: **12,027 states**, ~32s, 0.65GB. The file now uses bound
+15000, has its result dumps off, and also decides glued ≈ layered with
+`Run Bisim`: **bisimilar**, decided on demand (~1.09M weak actions over
+10,083 silent SCCs), ~35s, ~1GB. Not proved. `_CoqProject`'s comments
+for the three `Size2` files are updated.
+
+**Measurements, not checked in** (scratch probes, each memory-capped):
+- Glued `Size2`: 772 states.
+- Glued `Size3` (three processes): **128,044 states**, 384,132
+  transitions, ~19 min, ~4.7GB. It is finite: the extracted terms do not
+  grow and carry no errors. `Run Bisim` against `spec_lts` was OOM-killed
+  at 9GB while saturating, with `Info` output (an FSM printout) adding to
+  the load.
+- Why `Size3` is large: on a 3,001-state sample, erasing the locals and
+  the resource's write-only `mem_next`/`mem_locked` leaves 446 distinct
+  states. In `bigstep` every local is dead between steps, so resetting
+  them is behaviour-preserving. Added to `OUTSTANDING.md` §2 as a possible
+  optimization of the example.
+
+**Finding.** `Size1/MutualExclusion/PluginProofs.v` proves glued against
+layered, duplicating `Size1/Glued/PluginProofs.v`, not anything against
+`spec_lts`. Recorded in `OUTSTANDING.md` §4. Its counts are part of
+`CLAUDE.md`'s baseline, so it was not touched.
+
+**Verification.** `dune build` clean. `Size2/TermTests.v` compiles
+(82s, 1.1GB). `Size2/Glued/MutualExclusion/PluginProofs.v` compiles as
+checked in, under a 6GB cap. No OCaml and no `Size1` file changed, so the
+default suite's counts are unaffected.
+
+**Session tally (2026-10-11):** Bug fix 1 · Docs 3.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
