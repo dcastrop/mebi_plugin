@@ -1525,6 +1525,20 @@ Module GoalShapes.
   Proof. Fail MeBi Sim Begin termLTS p And termLTS p Using termLTS.
     Fail MeBi Sim Begin termLTS q And termLTS p Using termLTS. Abort.
 
+  (* So must [Begin]'s LTSs be the goal's (2026-10-11). Before, a sub-LTS
+     stopped [Solve] on an internal error, a super-LTS was refused as "not
+     weakly simulated", and swapped LTSs failed in Rocq. *)
+  Inductive seqLTS : term -> option action -> term -> Prop :=
+  | s_act : forall a t, seqLTS (tact a t) (Some a) t
+  | s_fix : forall t, seqLTS (tfix t) None (subst (tfix t) t).
+  Example lts_mismatch : weak_sim termLTS termLTS p q.
+  Proof. Fail MeBi Sim Begin seqLTS p And termLTS q Using termLTS seqLTS.
+    Fail MeBi Sim Begin seqLTS p And seqLTS q Using seqLTS. Abort.
+  Example lts_swapped : weak_sim termLTS seqLTS q q.
+  Proof. Fail MeBi Sim Begin seqLTS q And termLTS q Using termLTS seqLTS.
+    MeBi Sim Begin termLTS q And seqLTS q Using termLTS seqLTS.
+    MeBi Sim Solve 1000. Qed.
+
   (* An existential goal: give the witness first. *)
   Example exists_hand : exists r, weak_sim termLTS termLTS p r.
   Proof. exists q. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
