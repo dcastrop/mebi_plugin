@@ -8,11 +8,13 @@
    is in the queue. [bigstep] and every proof over it are unchanged.
 
    [bigstep_obs_norm] is [bigstep_obs] with dead data erased, as in
-   [CADP_Norm.v], whose per-block lemmas it reuses. *)
+   [CADP_Norm.v], whose per-block lemmas it reuses. The link between the
+   two is [MEBI.Transfer.normalised_bisimilar]'s, as in [CADP_Norm.v]. *)
 
 From Stdlib Require Import List Lia.
 Import ListNotations.
 Require Import MEBI.Bisimilarity.
+Require Import MEBI.Transfer.
 Require Import MEBI.Examples.CADP.
 Require Import MEBI.Examples.CADP_Glued.
 Require Import MEBI.Examples.CADP_Norm.
@@ -128,22 +130,18 @@ Proof.
     injection E' as E1 E2; rewrite E1, E2, El; reflexivity.
 Qed.
 
+Lemma norm_spec_obs : forall c a d,
+  bigstep_obs_norm c a d <-> exists c', bigstep_obs c a c' /\ d = tidy c'.
+Proof.
+  split; [intros T; inversion T; subst; eauto | intros [c' [T ->]]; constructor; exact T].
+Qed.
+
 Lemma link_obs : forall c d, wf c -> tidy c = tidy d ->
   weak_bisimilar bigstep_obs bigstep_obs_norm c d.
 Proof.
-  cofix CH; intros c d W E; constructor; constructor.
-  - intros c' a T.
-    destruct (step_tidy_obs _ _ _ T W d (eq_sym E)) as [d' [T' E']].
-    exists (tidy d'); split.
-    + apply inject_weak; constructor; exact T'.
-    + apply CH; [exact (proj1 (step_wf_obs _ _ _ T W))|].
-      rewrite tidy_idem; exact (eq_sym E').
-  - intros e a T; inversion T as [d0 a0 d' T']; subst.
-    destruct (step_tidy_obs _ _ _ T' (wf_tidy _ _ E W) c E) as [c' [Tc Ec]].
-    exists c'; split.
-    + apply inject_weak; exact Tc.
-    + apply CH; [exact (proj1 (step_wf_obs _ _ _ Tc W))|].
-      rewrite tidy_idem; exact Ec.
+  exact (normalised_bisimilar bigstep_obs bigstep_obs_norm tidy wf norm_spec_obs
+           tidy_idem wf_tidy (fun c a c' T W => proj1 (step_wf_obs c a c' T W))
+           step_tidy_obs).
 Qed.
 
 (* What the plugin proves over [bigstep_obs_norm] holds over [bigstep_obs],
@@ -153,7 +151,7 @@ Theorem wbis_transfer_obs {N : Type} (ltsN : LTS N label) : forall c n,
   wf c -> weak_bisimilar bigstep_obs_norm ltsN c n ->
   weak_bisimilar bigstep_obs ltsN c n.
 Proof.
-  intros c n W H.
-  apply (weak_bisimilar_trans bigstep_obs bigstep_obs_norm ltsN c c n); [|exact H].
-  apply link_obs; [exact W | reflexivity].
+  intros c n W.
+  apply (transfer_wbis_l bigstep_obs bigstep_obs_norm ltsN c n), link_obs;
+    [exact W | reflexivity].
 Qed.

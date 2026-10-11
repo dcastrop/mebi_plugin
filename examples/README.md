@@ -18,11 +18,11 @@ needs a memory cap. To build one, uncomment it and run `make`; or use
 | path | what it holds |
 |---|---|
 | `Proc.v` | A small process calculus with sends and receives on labels `A`/`B`/`C`, in two styles. `Flat` has one relation; `Layered` has terms and a composition of processes (`comp`), each with its own relation. |
-| `ProcCongruence.v` | A normalised semantics for `Proc.Layered`, with structural congruence made explicit, proved weakly bisimilar to it by hand. It carries proofs about `Test4` over to the original semantics (`wsim_transfer`, `wbis_transfer`). |
+| `ProcCongruence.v` | A normalised semantics for `Proc.Layered`, with structural congruence made explicit, proved weakly bisimilar to it (by `theories/Transfer.v`'s `stutter_bisimilar`). It carries proofs about `Test4` over to the original semantics (`wsim_transfer`, `wbis_transfer`). |
 | `CCS.v` | Value-free CCS (Milner 1989) as one inductive LTS: vending machines, buffers, and the Alternating Bit Protocol. |
 | `CADP.v` | The MCS queue lock from CADP's demo, in its layered semantics: see [CADP](#cadp) below. |
 | `CADP_Glued.v` | The same lock in a glued big-step semantics, with a much smaller state space. |
-| `CADP_Norm.v` | The glued semantics with its dead data erased (`bigstep_norm`), proved weakly bisimilar to it by hand, so proofs over it transfer to `bigstep`. |
+| `CADP_Norm.v` | The glued semantics with its dead data erased (`bigstep_norm`), proved weakly bisimilar to it (by `theories/Transfer.v`'s `normalised_bisimilar`), so proofs over it transfer to `bigstep`. |
 | `CADP_Obs.v` | The glued semantics with joining the queue visible (`bigstep_obs`), and its normalised form, with the same hand proof. Used to state FIFO order. |
 | `CADP_simple.v` | An early, simpler counter-based lock. Not built and not used elsewhere. |
 | `Bisimilarity/` | The proofs, one directory per calculus: see below. |
@@ -95,7 +95,7 @@ There are three semantics for the same processes:
   erased after every step. Each glued block writes the local variables it
   reads, so between steps they are dead, and the resource keeps two copies
   of the last value read that nothing reads. `CADP_Norm.v` proves
-  `bigstep_norm` weakly bisimilar to `bigstep` by hand, for every number of
+  `bigstep_norm` weakly bisimilar to `bigstep` (with `theories/Transfer.v`), for every number of
   processes, following the recipe in `doc/structural-congruence.md`. The
   proof needs every state to be well formed (all indices in range), which
   every `composition_create` is.
