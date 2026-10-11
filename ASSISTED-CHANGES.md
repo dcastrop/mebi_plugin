@@ -7583,6 +7583,42 @@ lose no history, but they stay until Jonah has spoken with @dcastrop.
 
 ---
 
+## 2026-10-11 — `MeBi Sim Begin` checks its LTSs against the goal's
+
+On branch `fix/begin-checks-lts`. Closes the `OUTSTANDING.md` §3 *bug?*
+"`Begin` does not check its LTSs against the goal's".
+
+**Bug fix.** `Begin` checked its two terms against the goal's states
+(PR #57), but not its two LTSs against the goal's. Probed with a goal
+over `termLTS` and `Begin` given another relation over the same terms:
+- a sub-LTS stopped `Solve` on an internal error
+  (`CannotGetTransition`);
+- a super-LTS made `Begin` refuse a true goal as "not weakly simulated",
+  a wrong verdict about the wrong relation;
+- swapped LTSs (`weak_sim termLTS seqLTS`) failed in Rocq with "Not
+  enough constructors";
+- with the same state on both sides, the proof went through regardless,
+  because `weak_sim_refl` ignores the LTSs.
+
+`Proof_solver.check_goal_states` becomes `check_goal_arguments`, which
+also compares `Begin`'s LTSs with the goal's (its fourth- and third-last
+arguments), up to conversion, and names each mismatch. All four cases
+are now refused with that message, the last included. A heterogeneous
+goal given its LTSs in order still proves (23 steps). `theories/Test.v`
+`GoalShapes` gains `lts_mismatch` and `lts_swapped`.
+
+Verified: `dune build` (`Test.v` included), `tests.exe` 110/110, `make`
+of the plugin and `Test.v`, and `bench/proofs.sh` (default suite, `Auto`)
+against `main`: every Solve identical, and matching `CLAUDE.md`'s
+baseline. The check only adds a refusal before the solver starts, so the
+forced strategies were not run.
+
+Revert: `git revert -m 1 <merge commit>`.
+
+**Session tally (2026-10-11, later session), cont.:** Bug fix 1 · Docs 3.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
