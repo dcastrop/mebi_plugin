@@ -93,26 +93,23 @@ means, so deciding one way means re-measuring every bound)
 and why mutual similarity is not enough, is in
 [`examples/README.md`](examples/README.md#cadp) ("CADP").
 
-**Decided (2026-10-11):**
-- **Property LTS:** `spec_fifo`, a lock server with a queue. `REQ i`
-  appends, `ENTER i` only for the head, `LEAVE i` pops. A
-  `weak_bisimilar` proof against it gives mutual exclusion, FIFO order and
-  no deadlock short of divergence. No starvation then follows under a fair
-  scheduler, which is stated, not proved. The draft monitor
-  `Properties/_no_starvation.v` is superseded.
-- **Labels:** an observing variant of `lts`/`step` and `bigstep` that also
-  shows `REQ i` on the tail swap, built beside the current semantics so
-  existing proofs and counts stay put. Try a module or functor first,
-  since MeBi refuses LTSs with parameters.
-- **Transfer:** state `layered ≈ property` with `weak_bisimilar_trans`/
-  `weak_sim_trans`. No file states it yet, not even at `Size1`.
+**Done (2026-10-11):** FIFO order is stated as weak bisimilarity with
+`Properties/Fifo.v`'s `spec_fifo`, with joining the queue visible
+(`CADP_Obs.bigstep_obs`). It is proved for one and two processes (119
+and 2,228 steps, over the normalised semantics, transferred by
+`wbis_transfer_obs`) and decided for three (~4s). No starvation then
+follows under a fair scheduler, which is stated, not proved.
 
-**Still to do:**
-- write `spec_fifo` and the observing variant;
-- decide variant ≈ `spec_fifo` with `Run Bisim` at `Size1`/`Size2`, then
-  prove it where that is affordable;
-- prove glued ≈ layered at `Size2` (decided bisimilar, ~35s; proof cost
-  unmeasured: 772 against 12,027 states), then the transfer corollaries.
+**Still open:**
+- **The layered semantics.** The same label in `step`, then glued ≈
+  layered as a *proof* (at `Size2`: 772, or 48 normalised, against 12,027
+  states; decided only, ~35s), then the transfer corollaries. Without it
+  the FIFO result is about the glued model.
+- **`Size3` proofs.** Both `weak_bisimilar … spec_fifo` and mutual
+  exclusion over `bigstep_norm` (644 states) run out of memory; see
+  below.
+- **`Properties/_no_starvation.v`** is superseded by `Fifo.v`. Delete it,
+  or keep it as history (*decision*, Jonah).
 
 **Size (measured 2026-10-11):**
 - `Size2` (two processes): layered 12,027 states (~32s), glued 772.
@@ -123,8 +120,9 @@ and why mutual similarity is not enough, is in
   128,044 states (extraction ~19 min, ~4.7GB), normalised
   (`CADP_Norm.bigstep_norm`) **644**. Through `bigstep_norm`, spec ≤
   system is proved (326 steps, ~7s). Mutual exclusion proper (system ≤
-  spec) is neither proved nor decided: its proof was OOM-killed at 8GB
-  (~11 min) and, with `Answers Minimal`, at 9GB (~13 min). Why a proof
+  spec) is not proved: its proof was OOM-killed at 8GB (~11 min) and,
+  with `Answers Minimal`, at 9GB (~13 min). It is decided indirectly,
+  through the FIFO bisimilarity above. Why a proof
   over 644 states needs so much more memory than `Size2`'s over 772
   (`bigstep`, 4.4GB) is unmeasured; one hypothesis is that each state
   carries the whole program text, so the proof term grows with term size

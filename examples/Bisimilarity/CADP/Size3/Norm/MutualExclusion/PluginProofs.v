@@ -39,10 +39,12 @@ Require Import Logic.
    [weak_sim bigstep_norm spec_lts c3 (make_spec 2)], was OOM-killed on
    2026-10-11: at 8GB after ~11 min under Auto (mutual cofix over 644
    pairs, 1932 moves), and at 9GB after ~13 min with [Solver Answers
-   Minimal]. Nor is it decided: [Run Bisim] ([Norm/TermTests.v]) finds the
-   two not bisimilar, as at [Size2], which says nothing about this one
-   simulation, and no MeBi command decides a single simulation. It holds
-   for one and two processes.
+   Minimal]. No MeBi command decides a single simulation, but it is
+   decided indirectly: [Norm/TermTests.v] finds the system bisimilar to
+   the FIFO server [spec_fifo] (with the queue label visible), which only
+   lets the head of its queue enter. Hiding that label to get back to
+   [bigstep] is the informal step. It is proved for one and two
+   processes.
 
    Measured 2026-10-11 (Auto, mutual cofix): [wsim_norm_r] 326 steps.
    The bound is the measured count minus one. *)

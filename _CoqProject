@@ -85,7 +85,9 @@ examples/Bisimilarity/Proc/Test4/NormTermTests.v ### Success (Test4 under the no
 examples/CADP.v ### REQUIRED FOR BELOW
 examples/CADP_Glued.v ### REQUIRED FOR BELOW
 examples/CADP_Norm.v ### REQUIRED FOR BELOW; the glued semantics with dead data erased, proved weakly bisimilar to it by hand (~35s, no plugin calls)
+examples/CADP_Obs.v ### REQUIRED FOR BELOW; the glued semantics with joining the queue visible, and its normalised form (hand proof, fast)
 examples/Bisimilarity/CADP/Properties/MutualExclusion.v ### REQUIRED FOR BELOW
+examples/Bisimilarity/CADP/Properties/Fifo.v ### REQUIRED FOR BELOW; the FIFO lock server, for no starvation
 
 examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
@@ -94,6 +96,7 @@ examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
 # examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v ### Success
+# examples/Bisimilarity/CADP/Size1/Norm/Fifo/PluginProofs.v ### Success (weak_bisimilar to spec_fifo, 119 steps; ~1s)
 
 # TODO:
 examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
@@ -103,16 +106,17 @@ examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### not attempted: glued vs layered (772 vs 12027 states) is decided bisimilar in Size2/TermTests.v, but these proofs' Solve 1000 bounds are placeholders and the proof cost is unmeasured
 # examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### Success (mutually similar to spec_lts, not bisimilar: see the file; ~10 min, ~4.4GB: run under a memory cap)
 # examples/Bisimilarity/CADP/Size2/Norm/MutualExclusion/PluginProofs.v ### Success (the same over CADP_Norm.bigstep_norm, 48 states, transferred to bigstep; ~15s)
+# examples/Bisimilarity/CADP/Size2/Norm/Fifo/PluginProofs.v ### Success (weak_bisimilar to spec_fifo, 2228 steps; ~24s)
 
 ### CADP.Size3 (three processes; tractable only through CADP_Norm)
 examples/Bisimilarity/CADP/Size3/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/CADP/Size3/Norm/TermTests.v ### Success (bigstep_norm: 644 states, against bigstep's 128044; not bisimilar to spec_lts; ~7s)
+# examples/Bisimilarity/CADP/Size3/Norm/TermTests.v ### Success (bigstep_norm: 644 states, against bigstep's 128044; not bisimilar to spec_lts, bisimilar to spec_fifo; ~11s)
 # examples/Bisimilarity/CADP/Size3/Norm/MutualExclusion/PluginProofs.v ### Success (spec <= system only, ~7s; system <= spec was OOM-killed at 9GB: see the file)
 
 
 # TODO:
 ### CADP properties
-# examples/Bisimilarity/CADP/Properties/_no_starvation.v ### unfinished draft, no starvation still unimplemented
+# examples/Bisimilarity/CADP/Properties/_no_starvation.v ### superseded draft (by Properties/Fifo.v), kept for the record
 
 ### CADP Simple
 # examples/CADP_simple.v

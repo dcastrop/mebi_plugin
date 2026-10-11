@@ -38,3 +38,14 @@ MeBi Run FSM c3 Using bigstep_norm bigstep.
    MCS queue fixes the order of entry silently. Decided in ~4s. *)
 Fail MeBi Run Bisim c3 With bigstep_norm And (make_spec 2) With spec_lts
   Using bigstep.
+
+Require Import MEBI.Examples.CADP_Obs.
+Require Import MEBI.Examples.Bisimilarity.CADP.Properties.Fifo.
+
+MeBi Divider "Examples.Bisimilarity.CADP.Size3.Norm.TermTests.fifo".
+(* With joining the queue visible ([bigstep_obs]), the system is weakly
+   bisimilar to the FIFO lock server ([Properties/Fifo.v]). Decided in ~4s;
+   for one and two processes it is also proved ([Size1/Norm/Fifo],
+   [Size2/Norm/Fifo]). *)
+MeBi Run Bisim c3 With bigstep_obs_norm And (make_fifo 2) With spec_fifo
+  Using bigstep_obs.

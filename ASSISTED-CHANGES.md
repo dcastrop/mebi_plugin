@@ -7479,6 +7479,59 @@ reduction is 16× at two processes and about 200× at three.
 
 ---
 
+## 2026-10-11 — CADP: FIFO order (no starvation, as far as it can be stated)
+
+On branch `fix/cadp-size2-mutex`, following the `spec_fifo` design agreed
+this morning. Example code only: the plugin is unchanged.
+
+**New feature (example, not plugin).**
+- `examples/CADP_Obs.v` (built by default):
+  - `bigstep_obs` is `bigstep` rule for rule, except that `DO_ACQUIRE`,
+    the atomic tail swap, is labelled `(FETCH_AND_STORE, pid)`;
+  - `bigstep_obs_norm` is its normalised form;
+  - `step_wf_obs`, `step_tidy_obs`, `link_obs` and `wbis_transfer_obs`
+    reuse `CADP_Norm.v`'s per-block lemmas, and only the acquire case
+    needed handling by hand. No axioms.
+
+  A functor was not needed: the variant is nine constructors.
+- `examples/Bisimilarity/CADP/Properties/Fifo.v` (built by default):
+  `spec_fifo`, with idle pids, a queue, and whether the head is in its
+  critical section. `REQ` picks its pid by recursing on its own premise,
+  as `spec_lts` does.
+- Results:
+  - `Size1/Norm/Fifo/PluginProofs.v`: `weak_bisimilar` with `spec_fifo`,
+    119 steps, transferred to `bigstep_obs`;
+  - `Size2/Norm/Fifo/PluginProofs.v`: 2,228 steps, ~24s;
+  - `Size3/Norm/TermTests.v`: decided bisimilar, ~4s. The proof was
+    OOM-killed at 9GB after ~15 min (644 pairs, 3,714 moves).
+
+  Forced `MutualCofix True` gives the same counts. Forced `False` leaves
+  them unsolved, as for every `weak_bisimilar`.
+- A sanity check, not committed: a LIFO variant of the spec is
+  `Not_Bisimilar` at three processes, so the verdict discriminates.
+
+**Docs.**
+- `examples/README.md`'s no-starvation section now gives the results.
+- `OUTSTANDING.md` §2 now lists what remains: the layered semantics (the
+  label in `step`, and a proof of glued ≈ layered), the `Size3` proofs,
+  and whether to delete `_no_starvation.v`. `_CoqProject` calls that file
+  superseded.
+- A correction to the previous entry: `Size3` mutual exclusion is now
+  decided indirectly, through bisimilarity with `spec_fifo`, which lets
+  only the head enter. Hiding the queue label to reach `bigstep` is an
+  informal step. The file comment says so.
+
+**Verification.**
+- `make` builds `CADP_Obs.vo` and `Fifo.vo`; `make dune` and `dune build`
+  are clean.
+- Every new file compiles as committed, under memory-capped `rocq
+  compile`.
+
+**Session tally (2026-10-11), cont.:** Bug fix 2 · Optimization 1 · New
+feature 1 · Docs 6.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

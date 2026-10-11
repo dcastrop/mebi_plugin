@@ -23,6 +23,7 @@ needs a memory cap. To build one, uncomment it and run `make`; or use
 | `CADP.v` | The MCS queue lock from CADP's demo, in its layered semantics: see [CADP](#cadp) below. |
 | `CADP_Glued.v` | The same lock in a glued big-step semantics, with a much smaller state space. |
 | `CADP_Norm.v` | The glued semantics with its dead data erased (`bigstep_norm`), proved weakly bisimilar to it by hand, so proofs over it transfer to `bigstep`. |
+| `CADP_Obs.v` | The glued semantics with joining the queue visible (`bigstep_obs`), and its normalised form, with the same hand proof. Used to state FIFO order. |
 | `CADP_simple.v` | An early, simpler counter-based lock. Not built and not used elsewhere. |
 | `Bisimilarity/` | The proofs, one directory per calculus: see below. |
 | `Evaluation/` | Benchmark series for width, semantic layers and nesting depth. `*Large.v` are scaled up for `bench/proofs.sh -s eval-large`. |
@@ -147,11 +148,13 @@ part of the system's behaviour, and the spec does not see it.
 has 128,044). As before, the system and `spec_lts` are not bisimilar
 (`Size3/Norm/TermTests.v`). Spec ≤ system is proved
 (`Size3/Norm/MutualExclusion/PluginProofs.v`, 326 steps, ~7s). Mutual
-exclusion proper, system ≤ spec, is neither proved nor decided: its proof
-was OOM-killed at 9GB after ~13 min, and no MeBi command decides a single
-simulation.
+exclusion proper, system ≤ spec, is not proved: its proof was OOM-killed
+at 9GB after ~13 min. It is decided only indirectly: the system is
+bisimilar to the FIFO server (below), which lets only the head of its queue
+enter; going from there to `bigstep`, by hiding the queue label, is an
+informal step.
 
-### No starvation: the `spec_fifo` design (agreed 2026-10-11, not yet written)
+### No starvation: FIFO order (`Properties/Fifo.v`)
 
 "Every waiting process eventually enters" is a liveness property.
 Simulation and bisimulation cannot state it. Weak bisimilarity also ignores
@@ -160,27 +163,38 @@ What can be stated, and is MCS's actual guarantee, is **FIFO order**: once
 a process has joined the queue, no process that joins later enters before
 it.
 
-The plan:
-- **Make joining the queue visible.** Add a label `REQ i` on the tail swap:
-  `FETCH_AND_STORE` in `step`, inside `DO_ACQUIRE` in `bigstep`. Do it in
-  an observing variant of both semantics, so the existing proofs and their
-  step counts stay as they are. It must be the same in both, so that
-  glued ≈ layered still means something.
-- **Build it over `bigstep_norm`.** `REQ` changes nothing `CADP_Norm.v`
-  erases, so the same `tidy` and proof should carry over to the observing
-  variant, and keep it small enough to prove.
-- **`spec_fifo`.** A lock server with a queue. `REQ i` appends `i`,
-  `ENTER i` is allowed only for the head of the queue, and `LEAVE i` pops
-  it. It is mutually exclusive and FIFO by construction.
-- **Prove `weak_bisimilar` between the system and `spec_fifo`,** then carry
-  it to the layered system. One theorem then gives:
-  - mutual exclusion;
-  - FIFO order;
-  - no deadlock short of divergence: the system can always do what the
-    queue allows next.
+How it is stated:
+- **Joining the queue is made visible.** `bigstep_obs` (`CADP_Obs.v`) is
+  `bigstep` with its one atomic tail swap, `DO_ACQUIRE`, labelled
+  `(FETCH_AND_STORE, pid)` instead of silent. `bigstep` and its proofs are
+  unchanged; hiding that label gives `bigstep` back.
+- **`spec_fifo`** (`Properties/Fifo.v`) is a lock server with idle pids and
+  a queue. `REQ i` (the same label) moves an idle `i` to the back of the
+  queue; `ENTER` is allowed only for the head; `LEAVE` makes the head idle
+  again. It is mutually exclusive and FIFO by construction.
+- **The system is weakly bisimilar to `spec_fifo`.** The plugin proves it
+  over the normalised `bigstep_obs_norm`, and `wbis_transfer_obs` carries
+  it to `bigstep_obs`:
 
-  No starvation follows *under a fair scheduler*. Fairness is an assumption
-  stated alongside, not proved, as it is in CADP's own check, which is also
-  a safety property over traces.
+  | processes | states | result |
+  |---|---|---|
+  | 1 | 5 | proved, 119 steps (`Size1/Norm/Fifo/PluginProofs.v`) |
+  | 2 | 48 | proved, 2,228 steps, ~24s (`Size2/Norm/Fifo/PluginProofs.v`) |
+  | 3 | 644 | decided, ~4s (`Size3/Norm/TermTests.v`); proof OOM-killed at 9GB after ~15 min |
 
-`OUTSTANDING.md` §2 tracks what is still open.
+  As a check that the verdict discriminates, a LIFO variant of the spec is
+  found not bisimilar for three processes.
+
+One theorem then gives:
+- mutual exclusion;
+- FIFO order;
+- no deadlock short of divergence: the system can always do what the queue
+  allows next.
+
+No starvation follows *under a fair scheduler*. Fairness is an assumption
+stated alongside, not proved, as it is in CADP's own check, which is also
+a safety property over traces.
+
+Not done yet: carrying this to the layered semantics. That needs the same
+label in `step` and a proof of glued ≈ layered, which so far is only
+decided at two processes. `OUTSTANDING.md` §2 tracks it.
