@@ -118,8 +118,8 @@ yet.
 
 - **`MutualExclusion.v`**: `spec_lts`, a lock server that is `Free` or
   `Held i`, for pids `n .. 0` (`make_spec n`).
-- **`_no_starvation.v`**: a draft monitor, not built. It is superseded by
-  the `spec_fifo` design below.
+- **`Fifo.v`**: `spec_fifo`, a FIFO lock server (see "No starvation"
+  below).
 
 **One process.** `spec_lts` is weakly *bisimilar* to the system, in both
 semantics: layered (`Size1/MutualExclusion/PluginProofs.v`) and glued

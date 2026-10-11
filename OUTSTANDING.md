@@ -108,8 +108,6 @@ follows under a fair scheduler, which is stated, not proved.
 - **`Size3` proofs.** Both `weak_bisimilar … spec_fifo` and mutual
   exclusion over `bigstep_norm` (644 states) run out of memory; see
   below.
-- **`Properties/_no_starvation.v`** is superseded by `Fifo.v`. Delete it,
-  or keep it as history (*decision*, Jonah).
 
 **Size (measured 2026-10-11):**
 - `Size2` (two processes): layered 12,027 states (~32s), glued 772.

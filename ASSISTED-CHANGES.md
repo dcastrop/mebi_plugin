@@ -7532,6 +7532,23 @@ feature 1 · Docs 6.
 
 ---
 
+## 2026-10-11 — `_no_starvation.v` deleted
+
+On branch `fix/cadp-size2-mutex`, at Jonah's request.
+
+**Docs/Tooling.** `examples/Bisimilarity/CADP/Properties/_no_starvation.v`
+is deleted. It was a draft monitor for no starvation: never built, and
+imported by nothing. It had the bugs noted in the first entry today, and
+`Properties/Fifo.v` supersedes it. It is recoverable with `git show
+e043b0e:examples/Bisimilarity/CADP/Properties/_no_starvation.v`. Its
+`_CoqProject` line, its `examples/README.md` mention and the
+`OUTSTANDING.md` decision item are removed.
+
+**Session tally (2026-10-11), cont.:** Bug fix 2 · Optimization 1 · New
+feature 1 · Docs 7.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

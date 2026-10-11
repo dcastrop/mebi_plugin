@@ -114,10 +114,6 @@ examples/Bisimilarity/CADP/Size3/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size3/Norm/MutualExclusion/PluginProofs.v ### Success (spec <= system only, ~7s; system <= spec was OOM-killed at 9GB: see the file)
 
 
-# TODO:
-### CADP properties
-# examples/Bisimilarity/CADP/Properties/_no_starvation.v ### superseded draft (by Properties/Fifo.v), kept for the record
-
 ### CADP Simple
 # examples/CADP_simple.v
 
