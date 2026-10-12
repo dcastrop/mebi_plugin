@@ -106,11 +106,16 @@ follows under a fair scheduler, which is stated, not proved.
 - **The layered semantics** (the paper's central CADP claim). Glued ≈
   layered is *proved* only at `Size1`. At `Size2` it is decided (~35s,
   bisimilar) but not proved (772, or 48 normalised, against 12,027
-  states). No file yet states a transfer corollary ("the layered system
+  states). The proof was attempted on 2026-10-12 and is a *limit*. Both
+  `weak_sim`s and the `weak_bisimilar` ran out of memory in `Solve`, at
+  7GB and at 10GB, after 25-52 min on the nested path. On the mutual path (514,020 pairs,
+  2.06M moves), `Solve` did not finish its first 2,000 steps in 2.5 hours,
+  with memory flat at ~2.2GB. Where that time goes is unmeasured.
+  The measurements are in `Size2/Glued/PluginProofs.v`, and a way round
+  is §5.3. No file yet states a transfer corollary ("the layered system
   satisfies X"). So FIFO and `Size2` mutual exclusion are, today, results
-  about the glued model. To do: the same observing label in `step`, the
-  `Size2` proof (an out-of-memory failure is a reportable limit, not a
-  reason to reformulate the model), then the corollaries.
+  about the glued model. To do: the `Size1` corollaries, and the same
+  observing label in `step` (a model change, so ask first).
 - **Restructure `examples/CADP`** (*decision*; discussed 2026-10-11, not
   decided). The tree is a size × semantics × property matrix, about 16
   directories of mostly one file each. One option is to organise it
@@ -207,7 +212,16 @@ turns the pin into a positive test.
 **Cost**
 - **Proofs cost far more than deciding.** At width n = 3 (162 states a
   side), `Bisimilarity.fsm` takes 19ms and the proof 7 minutes (56k
-  steps, 3.9GB).
+  steps, 3.9GB). CADP `Size2` glued ≈ layered is decided in ~35s and
+  ~1GB, but its proof runs out of memory at 10GB (§2).
+- **`Auto` goes nested on an FSM saturated on demand** unless `MeBi
+  Config Bounds Game` is set, because estimating would walk the whole
+  game. It says so in a notice. For a `weak_bisimilar` goal the nested
+  path is the one that does not finish on the checked-in proofs. At CADP
+  `Size2` the estimate (~1 min) put nested at over 10.3M goals, against
+  514,020 pairs and 2.06M moves mutual. Setting the bound by hand avoids
+  it. Whether `Auto` should estimate by default there is an open
+  *optimization* question.
 - **Heavy proofs need a memory cap**, one per process. The ABP and
   `Test4` proofs peak at ~3.8-4.3GB; two such proofs in one file were
   OOM-killed at 6GB.

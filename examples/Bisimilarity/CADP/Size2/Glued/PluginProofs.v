@@ -6,7 +6,7 @@ MeBi Config Output "Notice" True.
 MeBi Config Output "Warning" True.
 MeBi Config Output "Error" True.
 MeBi Config Output "Trace" False.
-MeBi Config Output "Result" True.
+MeBi Config Output "Result" False.
 MeBi Config Output "Show" False.
 MeBi Config Output "DecodeResults" False.
 MeBi Config Output "DumpResults" False.
@@ -26,19 +26,55 @@ Require Import MEBI.Examples.Bisimilarity.CADP.Size2.Terms.
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.Glued.PluginProofs".
 
 MeBi Config Weak As Option label.
+MeBi Config Bounds As Num States 15000.
 
 Require Import Logic.
 
 
+(* NOT PROVED: every proof below runs out of memory in [Solve]. Glued and
+   layered are *decided* bisimilar at Size2 ([Run Bisim] in
+   [Size2/TermTests.v], ~35s, ~1GB); proving it is out of reach today.
+
+   Measured 2026-10-12 against the dune build, one proof per process under
+   [systemd-run --user --scope -p MemoryMax=<cap> -p MemorySwapMax=0], with
+   [Solve 1000000]. In each, [Begin] takes ~33s, saturating layered on
+   demand (1,091,776 weak actions over 10,083 silent SCCs, above the 1M
+   bound), and [Auto] then takes the nested cofix without estimating:
+
+     proof              7GB cap           10GB cap
+     wsim_bigstep_lts   OOM, 16m53s       OOM, 25m25s
+     wsim_lts_bigstep   OOM, 35m24s       OOM, 52m01s
+     wbis_bigstep_lts   -                 OOM, 28m28s
+
+   Memory grew to each cap (0.3-0.47GB a minute for [wbis_bigstep_lts],
+   falling slowly; the rate per step is unmeasured). With
+   [MeBi Config Bounds Game 100000000], [Auto] estimates instead (Begin
+   ~90s) and picks the mutual cofix: 514,020 pairs and 2,056,080 moves,
+   against over 10,280,400 goals nested. That run ([wbis_bigstep_lts],
+   10GB cap, [Solve] in 2000-step chunks) did not finish its first chunk
+   in 2h28m of [Solve] at full CPU, with memory flat at ~2.2GB; it was
+   stopped then. Where that time goes (setting up the mutual cofix over
+   514,020 pairs is the likely place) is unmeasured.
+
+   See OUTSTANDING.md 2 (CADP) and 5.3 (proofs split into lemmas). *)
+
+(*
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.Glued.PluginProofs.bigstep".
 Example wsim_bigstep_lts : weak_sim bigstep lts c2 c2. 
 Proof. MeBi Sim Begin bigstep c2 And lts c2 Using step.
   (* Iteration History: _ <- _ <- _ <- _ *) 
-  MeBi Sim Solve 1000. Qed.
+  MeBi Sim Solve 1000000. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.Glued.PluginProofs.lts".
 Example wsim_lts_bigstep : weak_sim lts bigstep c2 c2. 
 Proof. MeBi Sim Begin lts c2 And bigstep c2 Using step. 
   (* Iteration History: _ <- _ <- _ <- _  *) 
-  MeBi Sim Solve 1000. Qed.
+  MeBi Sim Solve 1000000. Qed.
+
+
+MeBi Divider "Examples.Bisimilarity.CADP.Size2.Glued.PluginProofs.ProofTest.bigstep.bisimilar".
+Example wbis_bigstep_lts : weak_bisimilar bigstep lts c2 c2.
+Proof. MeBi Sim Begin bigstep c2 And lts c2 Using step.
+  MeBi Sim Solve 1000000. Qed.
+*)
