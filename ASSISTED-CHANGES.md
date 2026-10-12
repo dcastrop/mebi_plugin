@@ -7794,6 +7794,74 @@ Revert: `git revert -m 1 <merge commit>`. Additive in `theories/`.
 
 ---
 
+## 2026-10-12 — CADP `Size2` glued ≈ layered: attempted, out of memory
+
+On branch `feat/cadp-size2-glued-layered`, from the handoff in notes/17.
+Addresses the `OUTSTANDING.md` §2 item "The layered semantics". It does
+not close it. No plugin change.
+
+**Docs (measurement).** `Size2/Glued/PluginProofs.v` had never been
+run. It had no state bound (the default of 100 would have stopped
+`Begin` on a partial LTS), `"Result"` was on (~0.65MB a state), and its
+bounds were placeholders. I fixed those, added `wbis_bigstep_lts`
+(`weak_bisimilar bigstep lts c2 c2`, as `Size1` has), and ran each proof
+in its own process under a memory cap, with `Solve 1000000`:
+
+| proof | 7GB cap | 10GB cap |
+|---|---|---|
+| `wsim_bigstep_lts` | OOM, 16m53s | OOM, 25m25s |
+| `wsim_lts_bigstep` | OOM, 35m24s | OOM, 52m01s |
+| `wbis_bigstep_lts` | not run | OOM, 28m28s |
+
+In each run, `Begin` (~33s) saturates layered on demand (1,091,776 weak
+actions, 10,083 silent SCCs). `Auto` then takes the nested cofix without
+estimating, and memory grows until the cap. With `MeBi Config Bounds Game
+100000000`, `Auto` estimates instead (`Begin` ~90s) and picks the mutual
+cofix: 514,020 pairs and 2,056,080 moves, against over 10.28M nested
+goals. That run (`Solve` in 2,000-step chunks, with memory sampled
+every 15s) did not finish its first chunk in 2h28m of `Solve` at full
+CPU, with memory flat at ~2.2GB. I stopped it at the time agreed with
+Jonah. Where the time goes is unmeasured; setting up the mutual cofix
+over 514,020 pairs is the likely place. So the mutual path fails on
+time, not memory. The per-step memory rate that was to support an
+estimate of the RAM needed could not be measured either.
+
+So the result stays *decided* at `Size2` and is not proved. The proofs
+are left commented in the file with the measurements, and the
+`_CoqProject` and `examples/README.md` notes say so. `OUTSTANDING.md`
+§2 records it as a limit, and §3 gains two items. One is the `Size2`
+cost. The other is that `Auto` goes nested on an on-demand FSM unless
+`Bounds Game` is set, which for a `weak_bisimilar` goal is the path that
+does not finish.
+
+**Docs.** `OUTSTANDING.md` §5.3, *capability*, not started: proofs split
+into separately checked lemmas. A single `cofix` cannot be split, because
+lemmas over a cyclic product would depend on each other. Proving that an
+explicit relation is a bisimulation turns the per-pair obligations into
+independent lemmas, which can be `Qed`'d in blocks across files. It needs
+one generic lemma in `theories/`, which does not exist yet.
+
+**Mistakes along the way, for the record.**
+- The first run used a 4GB cap, because the machine then had only ~4GB
+  free. It was OOM-killed, and that number says nothing about the tool.
+- The second (7GB) was started as a background task of the Claude Code
+  session. It died with the session, 8s in. Later runs ran as a
+  transient `systemd-run --user` service, which survives a session
+  restart.
+- Asked for the growth rate, I extrapolated from a one-minute sample
+  (0.38GB/min) and predicted the 10GB kill ~5 min too early. The rate
+  fell over the run (0.47, then 0.38, then 0.30GB/min). Jonah spotted
+  this. A falling rate per *minute* does not show that memory levels off,
+  since each step may also be getting slower. The per-step rate was not
+  measured.
+
+Revert: `git revert -m 1 <merge commit>`. Comments and docs only.
+
+**Session tally (2026-10-12):** Docs 2 · Refactor 0 · Bug fix 0 ·
+Optimization 0 · **New feature 0**.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

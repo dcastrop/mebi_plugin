@@ -113,7 +113,7 @@ extract beyond one process.
 | size | processes | layered | glued | normalised | glued ≈ layered |
 |---|---|---|---|---|---|
 | `Size1` | 1 | small | small | 5 states | proved (`Size1/Glued/PluginProofs.v`) |
-| `Size2` | 2 | 12027 states (~32s) | 772 states | 48 states | decided, bisimilar (`Size2/TermTests.v`, ~35s); not yet proved |
+| `Size2` | 2 | 12027 states (~32s) | 772 states | 48 states | decided, bisimilar (`Size2/TermTests.v`, ~35s); not proved: out of memory at 10GB (nested cofix), unfinished after 2.5h (mutual) (`Size2/Glued/PluginProofs.v`) |
 | `Size3` | 3 | not tried | 128044 states (~19 min, ~4.7GB) | 644 states (~3s) | not tried |
 
 Glued ≈ normalised needs no plugin run: it is `CADP_Norm.link`, for every

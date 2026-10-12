@@ -106,7 +106,7 @@ examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size2/TermTests.v ### Success (layered: 12027 states, ~32s; then Run Bisim against glued, bisimilar, decided on demand ~35s, ~1GB. Measured 2026-10-11; run under a memory cap)
 
 # examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
-# examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### not attempted: glued vs layered (772 vs 12027 states) is decided bisimilar in Size2/TermTests.v, but these proofs' Solve 1000 bounds are placeholders and the proof cost is unmeasured
+# examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### Not proved: glued vs layered (772 vs 12027 states) is decided bisimilar in Size2/TermTests.v, but every proof ran out of memory in Solve at 10GB on the nested cofix (25-52 min), and the mutual one had not done 2000 steps after 2.5h (measured 2026-10-12, see the file). The proofs are commented out
 # examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### Success (mutually similar to spec_lts, not bisimilar: see the file; ~10 min, ~4.4GB: run under a memory cap)
 # examples/Bisimilarity/CADP/Size2/Norm/MutualExclusion/PluginProofs.v ### Success (the same over CADP_Norm.bigstep_norm, 48 states, transferred to bigstep; ~15s)
 # examples/Bisimilarity/CADP/Size2/Norm/Fifo/PluginProofs.v ### Success (weak_bisimilar to spec_fifo, 2228 steps; hidden, mutual exclusion 98; ~24s)

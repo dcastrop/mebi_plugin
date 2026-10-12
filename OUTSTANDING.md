@@ -106,11 +106,16 @@ follows under a fair scheduler, which is stated, not proved.
 - **The layered semantics** (the paper's central CADP claim). Glued ≈
   layered is *proved* only at `Size1`. At `Size2` it is decided (~35s,
   bisimilar) but not proved (772, or 48 normalised, against 12,027
-  states). No file yet states a transfer corollary ("the layered system
+  states). The proof was attempted on 2026-10-12 and is a *limit*. Both
+  `weak_sim`s and the `weak_bisimilar` ran out of memory in `Solve`, at
+  7GB and at 10GB, after 25-52 min on the nested path. On the mutual path (514,020 pairs,
+  2.06M moves), `Solve` did not finish its first 2,000 steps in 2.5 hours,
+  with memory flat at ~2.2GB. Where that time goes is unmeasured.
+  The measurements are in `Size2/Glued/PluginProofs.v`, and a way round
+  is §5.3. No file yet states a transfer corollary ("the layered system
   satisfies X"). So FIFO and `Size2` mutual exclusion are, today, results
-  about the glued model. To do: the same observing label in `step`, the
-  `Size2` proof (an out-of-memory failure is a reportable limit, not a
-  reason to reformulate the model), then the corollaries.
+  about the glued model. To do: the `Size1` corollaries, and the same
+  observing label in `step` (a model change, so ask first).
 - **Restructure `examples/CADP`** (*decision*; discussed 2026-10-11, not
   decided). The tree is a size × semantics × property matrix, about 16
   directories of mostly one file each. One option is to organise it
@@ -207,7 +212,16 @@ turns the pin into a positive test.
 **Cost**
 - **Proofs cost far more than deciding.** At width n = 3 (162 states a
   side), `Bisimilarity.fsm` takes 19ms and the proof 7 minutes (56k
-  steps, 3.9GB).
+  steps, 3.9GB). CADP `Size2` glued ≈ layered is decided in ~35s and
+  ~1GB, but its proof runs out of memory at 10GB (§2).
+- **`Auto` goes nested on an FSM saturated on demand** unless `MeBi
+  Config Bounds Game` is set, because estimating would walk the whole
+  game. It says so in a notice. For a `weak_bisimilar` goal the nested
+  path is the one that does not finish on the checked-in proofs. At CADP
+  `Size2` the estimate (~1 min) put nested at over 10.3M goals, against
+  514,020 pairs and 2.06M moves mutual. Setting the bound by hand avoids
+  it. Whether `Auto` should estimate by default there is an open
+  *optimization* question.
 - **Heavy proofs need a memory cap**, one per process. The ABP and
   `Test4` proofs peak at ~3.8-4.3GB; two such proofs in one file were
   OOM-killed at 6GB.
@@ -275,13 +289,15 @@ minimal)
 
 ## 5. Future work
 
-Optimizations Jonah chose on 2026-10-11 to accept as current limits.
-Neither is a bug. Verdicts and proofs are correct whenever they finish,
-and `Qed` checks every proof. Both are about cost. Like reformulating
-CADP to reach larger sizes, they are orthogonal to the research question
-(what the plugin can decide and prove), so a limit they cause is
-reported, not chased. Listed in priority order: the first touches every
-proof a user runs, the second only very large FSMs.
+Optimizations Jonah chose on 2026-10-11 to accept as current limits, and
+one capability (§5.3, added 2026-10-12). None is a bug. Verdicts and
+proofs are correct whenever they finish, and `Qed` checks every proof.
+All are about cost. Like reformulating CADP to reach larger sizes, they
+are orthogonal to the research question (what the plugin can decide and
+prove), so a limit they cause is reported, not chased. §5.1 and §5.2 are
+in priority order: the first touches every proof a user runs, the second
+only very large FSMs. §5.3 is the one that would reach proofs the plugin
+cannot produce today.
 
 ### 5.1 The solver's own per-step cost
 
@@ -346,6 +362,51 @@ CADP sidesteps it with `bigstep_norm` (644 states). Any user model with
   representation avoids.
 - It touches the model, so it needs the full proof-suite runs and the
   saturation golden test (`satdiff`).
+
+### 5.3 Proofs split into separately checked lemmas
+
+**Kind:** *capability* (large). A new proof back end, not a heuristic.
+
+**Standing.** Not started; discussed 2026-10-12. Motivated by CADP
+`Size2` glued ≈ layered (§2). It is decided in ~35s, but every proof
+attempt ran out of memory *during `Solve`*, before `Qed` was reached.
+Both `weak_sim`s and the `weak_bisimilar`, on the nested path, were
+OOM-killed at 7GB and at 10GB, and memory grew steadily to the cap. The
+mutual path's game has 514,020 pairs and 2,056,080 moves.
+
+**Why one proof cannot simply be cut up.** Today a proof is one `cofix`.
+A pair that reaches a pair already under proof closes the cycle with the
+coinduction hypothesis, which exists only inside that term. The product
+has cycles, so lemmas per state would have to use each other, and Rocq
+has no mutual dependency between separately proved lemmas.
+
+**The way round.** Prove bisimilarity through an explicit relation:
+- Define R, the product's pairs, as a finite relation. Name each state
+  once (`s1 := ...`), so that R is written over names. CADP states carry
+  the whole program text.
+- In `theories/`, prove once that a weak bisimulation (or simulation)
+  containing `(p, q)` gives `weak_bisimilar p q` (or `weak_sim`). It is
+  a small fixed `cofix`. `theories/Bisimilarity.v` has no such lemma
+  today.
+- Show R is a bisimulation, one obligation per pair: each move has an
+  answer that lands back in R. Landing in R is a membership check, not
+  the coinduction hypothesis, so the obligations are independent. Group
+  them into lemmas by block (for example, per glued state) and blocks
+  into files.
+
+A `Qed`'d lemma is opaque. Later proofs use only its statement, and
+`Require` does not load its body. So peak memory is about one block, and
+files compile in parallel. The plugin already computes what this needs:
+the partition, and the pairs and answers that the mutual path uses.
+
+**What it does not fix.** The total work is still one derivation per
+move (about 2M at `Size2`), so time stays large, although it is spread
+over files. The statement of R and the per-block lemmas add to the
+environment.
+
+**Relation to other items.** It is complementary to §5.1, which makes
+each step cheaper. It is independent of the "one state per silent SCC"
+item set aside in §6: R relates states, not SCCs.
 
 ## 6. Set aside (deliberately)
 
