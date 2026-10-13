@@ -1,4 +1,5 @@
 Require Import MEBI.Bisimilarity.
+Require Import MEBI.Traces.
 Require Import MEBI.Examples.CADP.Model.
 Require Import MEBI.Examples.CADP.Glued.
 
@@ -40,4 +41,21 @@ Proof.
   apply (weak_sim_trans lts spec_fifo_hidden spec_lts c1 (make_fifo 0) (make_spec 0)).
   - apply weak_bisimilar_sim, wbis_lts_fifo_hidden_1.
   - exact Fifo.wsim_hidden_spec_1.
+Qed.
+
+(* The same results as properties of behaviour ([MEBI.Traces],
+   2026-10-13). The layered system has exactly the weak traces of the FIFO
+   server with joining hidden, and after any trace it can do next what
+   that server can ([weak_bisimilar_ready]). Every one of its traces
+   alternates [ENTER i] and [LEAVE i]: mutual exclusion as a safety
+   property, through [SpecMutex.spec_lts_mutex]. *)
+
+Example traces_lts_fifo_hidden_1 :
+  forall t, weak_trace lts c1 t <-> weak_trace spec_fifo_hidden (make_fifo 0) t.
+Proof. exact (weak_bisimilar_traces _ _ wbis_lts_fifo_hidden_1). Qed.
+
+Example traces_lts_mutex_1 : forall t, weak_trace lts c1 t -> mutex_trace Free t.
+Proof.
+  exact (weak_sim_safe (mutex_trace Free) c1 (make_spec 0) wsim_lts_mutex_1
+           (make_spec_mutex 0)).
 Qed.
