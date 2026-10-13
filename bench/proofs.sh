@@ -2,8 +2,9 @@
 # bench/proofs.sh -- run the plugin's proof suites and tabulate the results.
 #
 # usage: bench/proofs.sh [-s SUITE] [-f FILES] [-m MODES] [-j JOBS] [-t TAG]
-#   -s SUITE  default (the six PluginProofs.v marked ### Success, CCS's
-#             PluginProofs.v and LawProofs.v; ~3 min a mode), abp (the
+#   -s SUITE  default (Proc's three PluginProofs.v, CADP's
+#             MutualExclusion.v and GluedLayered.v, CCS's PluginProofs.v
+#             and LawProofs.v; ~3 min a mode), abp (the
 #             Alternating Bit Protocol proofs, ~4 min and ~4.3GB each),
 #             test4 (Test4 through the normalised semantics, ~11 min,
 #             ~3.8GB peak), eval (the evaluation levers in
@@ -50,16 +51,17 @@ done
 
 # Per suite: the examples to compile first (in order), the directory under
 # examples/ holding its proof files, the proof files (relative to it), the
-# memory cap, the parallelism.
+# memory cap, the parallelism. The default suite's CADP files are outside
+# Bisimilarity/ (examples/CADP/), hence their "../": the others keep the
+# names earlier runs were tabulated under.
 dir=Bisimilarity
 case $suite in
   default)
     deps="CCS.v Proc.v Bisimilarity/Proc/Test1/Terms.v Bisimilarity/Proc/Test2/Terms.v
-          Bisimilarity/Proc/Test3/Terms.v CADP.v CADP_Glued.v
-          Bisimilarity/CADP/Properties/MutualExclusion.v Bisimilarity/CADP/Size1/Terms.v"
+          Bisimilarity/Proc/Test3/Terms.v CADP/Model.v CADP/Glued.v CADP/SpecMutex.v
+          CADP/Terms.v"
     files="Proc/Test1/PluginProofs.v Proc/Test2/PluginProofs.v Proc/Test3/PluginProofs.v
-           CADP/Size1/MutualExclusion/PluginProofs.v CADP/Size1/Glued/PluginProofs.v
-           CADP/Size1/Glued/MutualExclusion/PluginProofs.v
+           ../CADP/MutualExclusion.v ../CADP/GluedLayered.v
            CCS/PluginProofs.v CCS/LawProofs.v"
     mem=5G ;;
   abp)
@@ -104,7 +106,7 @@ printf 'suite\tmode\tfile\texit\tseconds\tpeak_mb\terrors\n' > "$run/runs.tsv"
 # (forcing the strategy edits the file), memory-capped, logging to logs/.
 run_one() {
   local mode=$1 file=$2
-  local name=${file//\//_}
+  local name=${file#../}; name=${name//\//_}
   local src="$run/examples/$dir/$file"
   local copy="${src%.v}_bench_$mode.v"
   # the copy must keep a valid module name: no dots or dashes
@@ -122,7 +124,7 @@ for mode in ${modes//,/ }; do
   # shellcheck disable=SC2086
   printf '%s\n' $files | xargs -P "$jobs" -I{} bash -c 'run_one "$0" "$1"' "$mode" {}
   for file in $files; do
-    name=${file//\//_}
+    name=${file#../}; name=${name//\//_}
     bench_rows "$suite" "$mode" "${file%.v}" "$run/logs/$mode.${name%.v}.log" \
       "$run/solves.tsv" "$run/runs.tsv"
   done

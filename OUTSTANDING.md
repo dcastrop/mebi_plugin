@@ -96,8 +96,8 @@ and why mutual similarity is not enough, is in
 [`examples/README.md`](examples/README.md#cadp) ("CADP").
 
 **Done (2026-10-11):** FIFO order is stated as weak bisimilarity with
-`Properties/Fifo.v`'s `spec_fifo`, with joining the queue visible
-(`CADP_Obs.bigstep_obs`). It is proved for one and two processes (119
+`examples/CADP/SpecFifo.v`'s `spec_fifo`, with joining the queue visible
+(`Obs.bigstep_obs`). It is proved for one and two processes (119
 and 2,228 steps, over the normalised semantics, transferred by
 `wbis_transfer_obs`) and decided for three (~4s). No starvation then
 follows under a fair scheduler, which is stated, not proved.
@@ -111,31 +111,25 @@ follows under a fair scheduler, which is stated, not proved.
   7GB and at 10GB, after 25-52 min on the nested path. On the mutual path (514,020 pairs,
   2.06M moves), `Solve` did not finish its first 2,000 steps in 2.5 hours,
   with memory flat at ~2.2GB. Where that time goes is unmeasured.
-  The measurements are in `Size2/Glued/PluginProofs.v`, and a way round
-  is §5.3. No file yet states a transfer corollary ("the layered system
-  satisfies X"). So FIFO and `Size2` mutual exclusion are, today, results
-  about the glued model. To do: the `Size1` corollaries, and the same
-  observing label in `step` (a model change, so ask first).
-- **Restructure `examples/CADP`** (*decision*; discussed 2026-10-11, not
-  decided). The tree is a size × semantics × property matrix, about 16
-  directories of mostly one file each. One option is to organise it
-  around the narrative: the model, its semantics and the specs in
-  `examples/CADP/`; one file per claim (mutual exclusion, FIFO) with a
-  section per size; separate files only for proofs too heavy to build
-  by default. Constraints: heavy proofs need their own process and
-  memory cap, and `_CoqProject` toggles builds per file.
+  The measurements are in `examples/CADP/GluedLayered.v`, and a way
+  round is §5.3. The transfer corollary is stated at `Size1` only
+  (`LayeredTransfer.v`: layered ≈ FIFO with joining hidden, and layered
+  mutual exclusion from it). So FIFO and `Size2` mutual exclusion are,
+  today, results about the glued model. To do: the same observing label
+  in `step` (a model change, so ask first), for FIFO order proper on
+  layered.
 - **`Size3` proofs.** Both `weak_bisimilar … spec_fifo` and mutual
   exclusion over `bigstep_norm` (644 states) run out of memory; see
   below.
 
 **Size (measured 2026-10-11):**
 - `Size2` (two processes): layered 12,027 states (~32s), glued 772.
-  `Size2/Glued/MutualExclusion` is mutually similar to `spec_lts`, not
+  Glued `Size2` (`MutualExclusionLarge.v`) is mutually similar to `spec_lts`, not
   bisimilar, and is now proved both ways (11,128 and 405 steps; the first
   ~10 min, ~4.4GB).
 - `Size3` (three processes, where FIFO becomes interesting): glued
   128,044 states (extraction ~19 min, ~4.7GB), normalised
-  (`CADP_Norm.bigstep_norm`) **644**. Through `bigstep_norm`, spec ≤
+  (`Norm.bigstep_norm`) **644**. Through `bigstep_norm`, spec ≤
   system is proved (326 steps, ~7s). Mutual exclusion proper (system ≤
   spec) is not proved: its proof was OOM-killed at 8GB (~11 min) and,
   with `Answers Minimal`, at 9GB (~13 min). It is decided indirectly,
@@ -148,7 +142,7 @@ follows under a fair scheduler, which is stated, not proved.
   twice, after extraction. `bigstep_norm` sidesteps it for CADP. The
   cause, found 2026-10-11, is in §5 ("Memory of the saturation estimate").
 - Glued ≈ normalised is proved by hand for every size
-  (`CADP_Norm.link`); the observing variant should be built over
+  (`Norm.link`); the observing variant should be built over
   `bigstep_norm` too.
 
 ## 3. Limitations of the tool
@@ -328,8 +322,8 @@ small.
 **Where to start.** Rerun the patch on CADP with finer timers inside
 `Proof_solver_step` (state lookup, transition lookup, the choice of
 answer) and see which one grows with term size. Then compare one
-`Size1` proof against its `Size1/Norm` counterpart, which has smaller
-states.
+glued `Size1` proof against its normalised counterpart, which has
+smaller states.
 
 **Relation to other items.** Replaying a derivation tree in one step
 (§4) would still make each decision, so this is the larger lever of the

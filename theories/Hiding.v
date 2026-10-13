@@ -7,11 +7,11 @@
    ([relabel_sim], [relabel_bisimilar]). Hiding is the case where [h] maps
    some visible labels to [None].
 
-   The use it was written for: [examples/CADP_Obs.v] makes joining the
+   The use it was written for: [examples/CADP/Obs.v] makes joining the
    lock's queue visible, to state FIFO order. Plain [bigstep] is that
    semantics with joining hidden, so a result about the observing
    semantics gives one about [bigstep]
-   ([examples/Bisimilarity/CADP/Properties/Hidden.v]).
+   ([examples/CADP/Hidden.v]).
 
    As in [MEBI.Transfer], the plugin cannot explore a relation with
    parameters, so nothing here defines a relabelled LTS. An example states

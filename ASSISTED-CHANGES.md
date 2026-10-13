@@ -7862,6 +7862,103 @@ Optimization 0 · **New feature 0**.
 
 ---
 
+## 2026-10-13 — `examples/CADP` restructured around its claims; the Size1 transfer corollary
+
+On branch `refactor/cadp-layout`, from notes/18 (items 3 and 1). Jonah
+chose the narrative layout from `OUTSTANDING.md` §2.
+
+**Refactor.** CADP was spread over five files at the top of `examples/`
+(`CADP.v`, `CADP_Glued.v`, `CADP_Norm.v`, `CADP_Obs.v`, `CADP_simple.v`)
+and twenty in `examples/Bisimilarity/CADP/`. Those twenty formed a size ×
+semantics × property matrix of about 16 directories, most holding one
+file. All of it is now in `examples/CADP/`, flat:
+- the model and its semantics: `Model.v`, `Glued.v`, `Norm.v`, `Obs.v`,
+  and `Simple.v`, still not built;
+- the specs: `SpecMutex.v`, `SpecFifo.v`, `Hidden.v` (formerly
+  `Properties/`);
+- `Terms.v`: the three sizes' `Terms.v` merged;
+- `Explore.v` and `ExploreLarge.v`: the `TermTests.v` files, merged;
+- one file per claim: `GluedLayered.v`, `MutualExclusion.v`,
+  `MutualExclusionLarge.v` and `Fifo.v`.
+
+Each claim file has a section per size. A `*Large.v` file holds what
+cannot run in `bench/proofs.sh`'s default suite, following
+`Evaluation/*Large.v`. Under forced `MutualCofix False`, two-process
+mutual exclusion over `bigstep_norm` was OOM-killed at 6GB, so it could
+not share a file with the Size1 regression proofs.
+
+`Module` per size was the obvious structure, but I did not use it.
+Rocq cannot reopen a module, and each file must keep its
+`weak_bisimilar` proofs after all its `weak_sim`s, so that a forced run
+still reaches every `weak_sim` count. Running `MeBi Sim Begin` inside a
+`Module` is also untested. Proof names instead end in the number of
+processes (`wsim_bigstep_2`). Within Size1, glued's `wsim_spec_lts`
+became `wsim_spec_bigstep_1`, so as not to clash with layered's. Proof
+bodies, `Solve` bounds and measurement comments are unchanged, apart from
+paths.
+
+Other changes:
+- `Explore.v` leaves `DumpResults` off, which is the default since
+  2026-10-04. Two old `TermTests.v` files had turned it on.
+- `ExploreLarge.v`'s comment no longer says a proof of Size2 glued ≈
+  layered "has not been attempted": it was, on 2026-10-12.
+- `git mv` keeps the history of the eight files that moved whole.
+- `bench/proofs.sh`'s default suite now runs `../CADP/MutualExclusion.v`
+  and `../CADP/GluedLayered.v`. The `../` keeps `dir=Bisimilarity`, so
+  the Proc and CCS rows keep the names earlier runs were tabulated under.
+  The CADP rows are renamed, so `bench/compare.sh` cannot pair them
+  across this change.
+- `bench/ocaml/make-fixtures.sh` points at the new files. Its
+  `cadp-glued-mutex` source is dropped, since that pair now lives in
+  `MutualExclusion.v`. The checked-in fixtures were **not** regenerated.
+  They still name their old source paths, and a regeneration would rename
+  the CADP ones.
+- Paths are updated in `_CoqProject`, `examples/README.md` (which gains a
+  file table), `CLAUDE.md` (the default suite and the baseline, which
+  CADP now attributes per new file), `OUTSTANDING.md`,
+  `doc/structural-congruence.md`, and the comments in `theories/Hiding.v`
+  and `theories/Transfer.v`.
+
+**Docs (example, no plugin change).** `LayeredTransfer.v` carries the
+paper's argument through end to end for one process, with no plugin
+call. Two existing proofs combine by `weak_bisimilar_sym`/`_trans`:
+`GluedLayered.wbis_bigstep_1` (glued ≈ layered) and
+`Fifo.wbis_bigstep_hidden_1` (glued ≈ FIFO with joining hidden). They
+give `wbis_lts_fifo_hidden_1 : weak_bisimilar lts spec_fifo_hidden c1
+(make_fifo 0)`. With `Fifo.wsim_hidden_spec_1`, that gives
+`wsim_lts_mutex_1`: layered mutual exclusion, independent of its direct
+proof. Checking it takes under a second. I named the file
+`LayeredTransfer.v`, not `Transfer.v`, so that it is not confused with
+`MEBI.Transfer`.
+
+**Verification.** Every new file was compiled from a copy against the
+dune build, under a memory cap. All counts equal the checked-in
+measurements:
+- `MutualExclusion.v`: 259, 212, 81, 63, 1442, 185;
+- `GluedLayered.v`: 268, 355, 2760;
+- `Fifo.v`: 119, 23, 2228, 98;
+- `Explore.v` passes, and its `Fail` fails with `Not_Bisimilar`, checked
+  by running the command without it;
+- `LayeredTransfer.v` checks.
+
+- `MutualExclusionLarge.v` (6GB cap): 1038, 153, 326, 11128, 405, in
+  10.4 min at 4.4GB peak;
+- `ExploreLarge.v`: decided bisimilar, 64s, 1.06GB.
+
+`bench/proofs.sh -m auto,True,False` (default suite) reproduces
+`CLAUDE.md`'s baseline in every mode, for Proc and CCS as well as CADP.
+Forced `False` stops each file at its first `weak_bisimilar`, after every
+`weak_sim`, as before. `make` (the packed build) builds the eight CADP
+files built by default, and `check_module_lists.py` agrees.
+
+Revert: `git revert -m 1 <merge commit>`. Proofs moved and one example
+added; no plugin change.
+
+**Session tally (2026-10-13):** Refactor 1 · Docs 1 · Bug fix 0 ·
+Optimization 0 · **New feature 0**.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

@@ -1,4 +1,4 @@
-Require Import MEBI.Examples.CADP.
+Require Import MEBI.Examples.CADP.Model.
 
 From Corelib Require Import Relations.Relation_Definitions.
 From Stdlib Require Import Relations.Relation_Operators.

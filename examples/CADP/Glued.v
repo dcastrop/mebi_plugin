@@ -1,4 +1,4 @@
-Require Import MEBI.Examples.CADP.
+Require Import MEBI.Examples.CADP.Model.
 
 Import Protocol.
 
