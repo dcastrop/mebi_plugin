@@ -8069,6 +8069,76 @@ Docs 0 · Bug fix 0 · Optimization 0 · **New feature 0**.
 
 ---
 
+## 2026-10-13 — `theories/Traces.v`: what a proved relation says about behaviour
+
+On branch `feat/theories-traces`, notes/18 item 2 (`OUTSTANDING.md` §4,
+"Preservation of trace properties"). Jonah chose it from the options.
+
+**New feature (`theories/`, not the plugin).** `theories/Traces.v`
+defines three notions:
+- `weak_path lts x t y`: the visible actions `t`, with silent steps
+  anywhere, from `x` to `y`;
+- `weak_trace`;
+- `weak_can`: "can do `a` next, after silent steps".
+
+It then states what each relation preserves:
+- `weak_sim`: trace inclusion (`weak_sim_traces`), so any safety
+  property over traces (`weak_sim_safe`);
+- `mutual_sim`: trace equivalence;
+- `weak_bisimilar`: trace equivalence, and also, after any trace, a
+  matching state with the same next actions (`weak_bisimilar_ready`), so
+  the same deadlocks (`weak_bisimilar_deadlock`).
+
+The header says what does *not* carry over: divergence, hidden labels and
+internal states, and step counts. All proofs are short inductions over
+the closure lemmas already in `Bisimilarity.v`. Nothing in `Bisimilarity.v`
+changed.
+
+**Tests.** In `Test.v` (`WeakBisimilarVsMutualSim`), `a.b + a` and `a.b`
+have the same traces (`same_traces`; it used `mutually_similar'`, which
+the `weak_bisim` removal above folded into `mutually_similar`, so the
+merge renames it), but only the first can deadlock
+after `a` (`p_deadlocks`, `q_no_deadlock`). So `weak_bisimilar_ready` is
+genuinely stronger than what mutual similarity gives.
+
+**Example.** `SpecMutex.v` gains `mutex_trace` (from `Free`, visible
+actions alternate `ENTER i`/`LEAVE i`) and the characterisation lemma
+`spec_lts_mutex`: every trace of the lock server satisfies it, for any
+number of processes. `LayeredTransfer.v` gains:
+- `traces_lts_fifo_hidden_1`: layered has exactly the traces of
+  `spec_fifo_hidden`;
+- `traces_lts_mutex_1`: every trace of layered `c1` is mutually
+  exclusive.
+
+None of these is a plugin call.
+
+Note on the 2026-10-11 rule (reusable machinery goes into `theories/`
+"once two examples use it"): today the only users are CADP and `Test.v`.
+I went ahead because Jonah asked for it as a `theories/` item.
+
+**Verification.** `dune build` (with `Test.v`) passes. The CADP files
+that load `SpecMutex.v` compile against the new build with unchanged
+counts:
+- `MutualExclusion.v`: 259, 212, 81, 63, 1442, 185;
+- `GluedLayered.v`: 268, 355, 2760;
+- `Fifo.v`: 119, 23, 2228, 98;
+- `Explore.v` and `LayeredTransfer.v` also compile.
+
+`make` (the packed build) passes. `MutualExclusionLarge.v` also loads
+`SpecMutex.v`; it was not rerun (10 min), since the change only adds
+definitions after the existing ones.
+
+Two slips on the way, both caught by compiling: a `destruct` pattern
+with one name too many, and an `injection ... as <-` that rewrote the
+wrong way.
+
+Revert: `git revert -m 1 <merge commit>`. No plugin change.
+
+**Session tally (2026-10-13), cont.:** Refactor 1 · Docs 1 · Bug fix 0 ·
+Optimization 0 · **New feature 1** (`theories/` only).
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

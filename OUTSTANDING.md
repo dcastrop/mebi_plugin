@@ -264,17 +264,8 @@ and 12)
 
 **Reusable theory** (agreed 2026-10-11: machinery a user could reuse
 goes into `theories/` once two examples use it, which keeps `examples/`
-minimal)
-- **Preservation of trace properties** (*capability* of `theories/`;
-  small to medium). Weak bisimilarity preserves weak traces and what can
-  happen next ignoring silent steps, but no lemma in `theories/` says so.
-  These would state what "carries over" from glued to layered. Divergence
-  ("eventually"), internal states and step counts do not carry over.
-
-  Constraint: the plugin cannot explore an LTS with parameters (§3), so
-  `theories/` can hold the generic *theorems*, but each example still
-  states its concrete relation, linked by a characterisation lemma (as
-  `theories/Transfer.v` and `theories/Hiding.v` do).
+minimal): nothing open. The last item, trace preservation, became
+`theories/Traces.v` on 2026-10-13.
 
 **Examples**
 - `examples/Bisimilarity/_nat_streams.v`: unfinished, kept as real work,
