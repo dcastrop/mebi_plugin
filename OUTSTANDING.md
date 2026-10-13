@@ -112,10 +112,12 @@ follows under a fair scheduler, which is stated, not proved.
   2.06M moves), `Solve` did not finish its first 2,000 steps in 2.5 hours,
   with memory flat at ~2.2GB. Where that time goes is unmeasured.
   The measurements are in `examples/CADP/GluedLayered.v`, and a way
-  round is §5.3. No file yet states a transfer corollary ("the layered
-  system satisfies X"). So FIFO and `Size2` mutual exclusion are, today,
-  results about the glued model. To do: the `Size1` corollaries, and the
-  same observing label in `step` (a model change, so ask first).
+  round is §5.3. The transfer corollary is stated at `Size1` only
+  (`LayeredTransfer.v`: layered ≈ FIFO with joining hidden, and layered
+  mutual exclusion from it). So FIFO and `Size2` mutual exclusion are,
+  today, results about the glued model. To do: the same observing label
+  in `step` (a model change, so ask first), for FIFO order proper on
+  layered.
 - **`Size3` proofs.** Both `weak_bisimilar … spec_fifo` and mutual
   exclusion over `bigstep_norm` (644 states) run out of memory; see
   below.

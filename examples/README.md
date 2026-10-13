@@ -114,7 +114,15 @@ extract beyond one process.
 Glued ≈ normalised needs no plugin run: it is `Norm.link`, for every
 size.
 
-Measured 2026-10-11. No transfer corollary (layered ≈ property) is stated yet.
+Measured 2026-10-11.
+
+The argument is carried through for one process in `LayeredTransfer.v`,
+with no plugin call: glued ≈ layered (`GluedLayered.v`) and glued ≈ the
+FIFO server with joining hidden (`Fifo.v`, below) give
+`weak_bisimilar lts spec_fifo_hidden c1 (make_fifo 0)`, and from it mutual
+exclusion for the layered system, independently of its direct proof in
+`MutualExclusion.v`. For two or more processes it stops at glued ≈
+layered.
 
 ### Files
 
@@ -132,6 +140,7 @@ memory cap.
 | `GluedLayered.v` | glued ≈ layered |
 | `MutualExclusion.v`, `MutualExclusionLarge.v` | mutual exclusion: one process, then two and three |
 | `Fifo.v` | FIFO order, one and two processes |
+| `LayeredTransfer.v` | the transfer to layered, one process |
 | `Simple.v` | an early, simpler counter-based lock; not built and not used elsewhere |
 
 A proof's name ends in the number of processes (`wsim_bigstep_2`). Until
@@ -228,6 +237,9 @@ No starvation follows *under a fair scheduler*. Fairness is an assumption
 stated alongside, not proved, as it is in CADP's own check, which is also
 a safety property over traces.
 
-Not done yet: carrying this to the layered semantics. That needs the same
-label in `step` and a proof of glued ≈ layered, which so far is only
-decided at two processes. `OUTSTANDING.md` §2 tracks it.
+For one process, the layered system is weakly bisimilar to
+`spec_fifo_hidden` (`LayeredTransfer.v`): FIFO order with joining hidden,
+which still gives mutual exclusion. FIFO order proper, with joining
+visible, would need the same label in `step`, and more than one process
+would need a proof of glued ≈ layered, which so far is only decided at two
+processes. `OUTSTANDING.md` §2 tracks both.

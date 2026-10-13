@@ -98,6 +98,7 @@ examples/CADP/Terms.v ### REQUIRED FOR BELOW; c1, c2, c3: one, two and three pro
 # examples/CADP/MutualExclusion.v ### Success (one process, layered and glued; ~18s)
 # examples/CADP/MutualExclusionLarge.v ### Success (two processes: normalised ~15s, direct ~10 min and ~4.4GB; three: spec <= system only, ~7s. Run under a memory cap)
 # examples/CADP/Fifo.v ### Success (weak_bisimilar to spec_fifo, 119 and 2228 steps; hidden, mutual exclusion 23 and 98; ~25s)
+# examples/CADP/LayeredTransfer.v ### Success (one process: layered ≈ FIFO hidden and layered mutual exclusion, from GluedLayered.v and Fifo.v; no plugin calls, <1s)
 # examples/CADP/Simple.v ### an early, simpler counter-based lock; not built and not used elsewhere
 
 ### Other (nat streams)

@@ -25,8 +25,8 @@ Require Import MEBI.Examples.CADP.Terms.
 
 (* The glued semantics ([bigstep], [Glued.v]) against the layered one
    ([lts] over [step], [Model.v]): the first link in carrying a property
-   proved for glued over to layered. Proved for one process; for two it is
-   only decided (see the end of this file). *)
+   proved for glued over to layered ([LayeredTransfer.v]). Proved for one
+   process; for two it is only decided (see the end of this file). *)
 
 MeBi Divider "Examples.CADP.GluedLayered".
 
