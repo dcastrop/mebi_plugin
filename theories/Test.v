@@ -1586,7 +1586,7 @@ MeBi Help Config FailIf.
 MeBi Help Config Solver.
 MeBi Help Config Output.
 
-(* [weak_bisimilar] is strictly finer than [weak_bisim] (mutual similarity),
+(* [weak_bisimilar] is strictly finer than [mutual_sim] (mutual similarity),
    proved by hand on the textbook pair [a.b + a] and [a.b]: each simulates
    the other, but after [P -a-> Z] (the stuck branch) [Q] can only reach
    [Q1], which can still do [b]. No plugin command involved. *)
@@ -1619,16 +1619,13 @@ Module WeakBisimilarVsMutualSim.
     exists Z; split; [exact (inject_weak _ _ _ p1_b) | apply z_sim].
   Qed.
 
-  Example mutually_similar : weak_bisim step step P Q.
+  Example mutually_similar : mutual_sim step step P Q.
   Proof.
     split; constructor; constructor; intros m2 a' T; inversion T; subst.
     - exists Q1; split; [exact (inject_weak _ _ _ q_a) | exact p1_q1].
     - exists Q1; split; [exact (inject_weak _ _ _ q_a) | apply z_sim].
     - exists P1; split; [exact (inject_weak _ _ _ p_a1) | exact q1_p1].
   Qed.
-
-  Example mutually_similar' : mutual_sim step step P Q.
-  Proof. exact mutually_similar. Qed.
 
   Example not_bisimilar : ~ weak_bisimilar step step P Q.
   Proof.

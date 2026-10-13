@@ -162,32 +162,16 @@ Proof.
   exists n2; split; [exact (weak_silent_prefix n n' n2 a S W) | exact B].
 Qed.
 
-Section WeakBisim.
-  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
+(* Mutual similarity: a weak simulation each way, two possibly different
+   relations. Strictly coarser than bisimilarity (see [weak_bisimilar]
+   below, and [Test.v]'s [WeakBisimilarVsMutualSim]), so say [mutual_sim]
+   or [weak_bisimilar], whichever is meant.
 
-  Definition weak_bisim (s : M) (t : N) : Prop
-    := weak_sim ltsM ltsN s t /\ weak_sim ltsN ltsM t s.
-End WeakBisim.
-Hint Unfold weak_bisim : rel_db.
-
-Lemma wk_bisim_refl {M A} (lts : LTS M A) : forall x, weak_bisim lts lts x x.
-Proof. eauto with rel_db. Qed.
-
-Lemma wk_bisim_trans {M A} (lts : LTS M A) : forall x y z,
-    weak_bisim lts lts x y -> weak_bisim lts lts y z -> weak_bisim lts lts x z.
-Proof. intros ??? [] []; eauto with rel_db. Qed.
-
-Lemma wk_bisim_sym {M A} (lts : LTS M A) : forall x y,
-    weak_bisim lts lts x y -> weak_bisim lts lts y x.
-Proof. intros ?? []; eauto with rel_db. Qed.
-
-(* Mutual similarity, under its honest name: a weak simulation each way,
-   two possibly different relations. It is exactly [weak_bisim] above, whose
-   name suggests bisimilarity but which is strictly coarser (see
-   [weak_bisimilar] below, and [Test.v]'s [WeakBisimilarVsMutualSim]).
-   [weak_bisim] is kept, unchanged, for existing proofs; new statements
-   should say [mutual_sim] or [weak_bisimilar], whichever they mean. Added
-   2026-10-02, alongside the existing definitions. *)
+   This is the old [weak_bisim], whose name suggested bisimilarity.
+   [mutual_sim] was added beside it on 2026-10-02, and [weak_bisim], with
+   [wk_bisim_refl], [wk_bisim_trans] and [wk_bisim_sym] (now
+   [mutual_sim_refl], [mutual_sim_trans] and [mutual_sim_sym]), removed on
+   2026-10-13. *)
 Section MutualSim.
   Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
 
@@ -195,10 +179,6 @@ Section MutualSim.
     := weak_sim ltsM ltsN s t /\ weak_sim ltsN ltsM t s.
 End MutualSim.
 Hint Unfold mutual_sim : rel_db.
-
-Lemma mutual_sim_weak_bisim {M N A} (ltsM : LTS M A) (ltsN : LTS N A) :
-  forall s t, mutual_sim ltsM ltsN s t <-> weak_bisim ltsM ltsN s t.
-Proof. split; intros H; exact H. Qed.
 
 Lemma mutual_sim_refl {M A} (lts : LTS M A) : forall x, mutual_sim lts lts x x.
 Proof. eauto with rel_db. Qed.
@@ -217,16 +197,15 @@ Proof. intros ??? [] []; split; eauto with rel_db. Qed.
    directions at once (Milner's observation equivalence; Sangiorgi,
    "Introduction to Bisimulation and Coinduction", ch. 4).
 
-   [weak_bisim] above is two separate [weak_sim]s, i.e. mutual similarity,
-   which is strictly coarser: each direction may pick a different relation.
-   [a.b + a] and [a.b] are mutually similar but not bisimilar (after [a], the
-   left can be stuck while the right can always still do [b]); so are
-   [tau.a + b] and [a + b]. [weak_bisimilar] implies [weak_bisim]
-   ([weak_bisimilar_weak_bisim]), not conversely.
+   [mutual_sim] above is two separate [weak_sim]s, which is strictly
+   coarser: each direction may pick a different relation. [a.b + a] and
+   [a.b] are mutually similar but not bisimilar (after [a], the left can be
+   stuck while the right can always still do [b]); so are [tau.a + b] and
+   [a + b]. [weak_bisimilar] implies [mutual_sim]
+   ([weak_bisimilar_mutual_sim]), not conversely.
 
-   Added 2026-10-02, alongside the existing definitions rather than in place
-   of them: nothing above is changed, and the plugin does not yet refer to
-   anything below. *)
+   Added 2026-10-02. It is what [MeBi Sim] and [MeBi Run Bisim ... As]
+   prove. *)
 Section WeakBisimilar.
   Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
 
@@ -267,14 +246,6 @@ Qed.
 
 Lemma weak_bisimilar_mutual_sim {M N A} {ltsM : LTS M A} {ltsN : LTS N A} :
   forall s t, weak_bisimilar ltsM ltsN s t -> mutual_sim ltsM ltsN s t.
-Proof.
-  intros s t H; split.
-  - exact (weak_bisimilar_sim _ _ H).
-  - exact (weak_bisimilar_sim _ _ (weak_bisimilar_sym _ _ H)).
-Qed.
-
-Lemma weak_bisimilar_weak_bisim {M N A} {ltsM : LTS M A} {ltsN : LTS N A} :
-  forall s t, weak_bisimilar ltsM ltsN s t -> weak_bisim ltsM ltsN s t.
 Proof.
   intros s t H; split.
   - exact (weak_bisimilar_sim _ _ H).

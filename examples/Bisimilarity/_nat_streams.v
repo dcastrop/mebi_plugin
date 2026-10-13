@@ -577,7 +577,7 @@ Qed.
 
 Example bisim_plus_two_or_twice : forall x xs y ys,
   eq_parity (get_parity x) (get_parity y) -> 
-  weak_bisim plus_2 plus_1_twice 
+  mutual_sim plus_2 plus_1_twice 
     (In_stream (consF x xs)) (In_stream (consF y ys)).
 Proof. split. 
   - apply plus_two_sim_twice, H. 
@@ -647,7 +647,7 @@ Qed.
 
 Example bisim_odd_one_or_three : forall x xs y ys,
   eq_parity (get_parity x) (get_parity y) -> 
-  weak_bisim plus_1 plus_3
+  mutual_sim plus_1 plus_3
     (In_stream (consF x xs)) (In_stream (consF y ys)).
 Proof. split. 
   - apply parity_one_sim_three, H. 
@@ -779,14 +779,14 @@ Tactic Notation "solve_bisim_nats" constr(xin) constr(yin) := bisim_nats_parity 
 
 Example ltac_bisim_odd_one_or_three : forall x xs y ys,
   eq_parity (get_parity x) (get_parity y) -> 
-  weak_bisim plus_1 plus_3
+  mutual_sim plus_1 plus_3
     (In_stream (consF x xs)) (In_stream (consF y ys)).
 Proof. solve_bisim_nats 1 3. Qed.
 
 (******************************************************************************)
 Example ltac_bisim_parity_incr_two : forall x xs y ys,
   eq_parity (get_parity x) (get_parity y) -> 
-  weak_bisim plus_2 plus_1_twice
+  mutual_sim plus_2 plus_1_twice
     (In_stream (consF x xs)) (In_stream (consF y ys)).
 Proof. 
   (* NOTE: "No applicable tactic." *)
@@ -796,7 +796,7 @@ Admitted.
 
 Example ltac_bisim_parity_incr_three : forall x xs y ys,
   eq_parity (get_parity x) (get_parity y) -> 
-  weak_bisim plus_3 plus_1_thrice
+  mutual_sim plus_3 plus_1_thrice
     (In_stream (consF x xs)) (In_stream (consF y ys)).
 Proof. 
   (* NOTE: doesn't handle the multiple layers of [plus_1_thrice] *)
