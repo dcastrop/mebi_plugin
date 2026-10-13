@@ -8139,6 +8139,38 @@ Optimization 0 · **New feature 1** (`theories/` only).
 
 ---
 
+## 2026-10-13 — `doc/decide-vs-prove.md`: what a proof costs over its verdict
+
+On branch `docs/decide-vs-prove`, item A3 of the options listed for
+Jonah. Docs only, no code.
+
+**Docs (evaluation).** A table of deciding (`Run Bisim`) against proving
+(`Sim Begin`/`Solve`/`Qed`) for every CADP pair, `Test4` and the ABP.
+Every decision was run again today (`7b71aad`), each alone under a 6GB
+cap. CADP proof times are per command, from today's compiles of the
+checked-in files. ABP and `Test4` proofs, and the failed CADP proofs, are
+quoted from their files and marked as such.
+
+The findings:
+- a proof costs 40-500× its verdict;
+- where proofs stop (two-process glued ≈ layered, three-process FIFO),
+  the verdict still takes 5-45s;
+- proof cost follows the pairs and moves visited, not the state count;
+- normalising a model speeds proofs up far more than decisions: ~40×
+  against 8× for CADP mutual exclusion, and out of reach to ~4 min for
+  `Test4`.
+
+**Correction before commit.** I first wrote the ABP's state count from
+memory (33). The decision log says 108, and the table now does. Every
+other state count was then checked against the logs.
+
+Revert: `git revert -m 1 <merge commit>`.
+
+**Session tally (2026-10-13), cont.:** Refactor 1 · Docs 2 · Bug fix 0 ·
+Optimization 0 · **New feature 1** (`theories/` only).
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
