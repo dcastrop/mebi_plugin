@@ -186,8 +186,10 @@ session has them.
   children back into premise order.
 - **Encodings are renumbered by every command.** Never key anything that
   outlives a command by an encoding; compare labels across dumps by term.
-- **`Reset Bounds` also resets** `Saturation OnDemand` and `Premise
-  Depth`, so set them after it.
+- **`Reset Bounds` resets more than the state and transition bounds**:
+  also `Bounds Saturation`, `Bounds Game`, `Saturation OnDemand`, `Premise
+  Depth` and `Premise Range` (not the premise tactic: that is `Reset
+  Premise`). Set them after it.
 - **In `Proc`, a send and a receive on one channel carry the same label**
   (`Some B`). Adding a component often leaves systems bisimilar, so check
   the verdict before calling a pair "non-bisimilar".

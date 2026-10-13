@@ -7959,6 +7959,37 @@ Optimization 0 · **New feature 0**.
 
 ---
 
+## 2026-10-13 (second session) — Docs: what `Reset` resets, and what an undecidable premise does
+
+**Docs.** Found while checking a catch-up quiz's answer key against the
+code (a read-only session, no behaviour touched). Three statements
+described less than the code does:
+- `README.md`, "Anything else": said an undecidable premise is applied as
+  if it held, with a warning. Under the default `FailIf Incomplete True`
+  the LTS is marked incomplete and extraction is an *error*
+  (`Wrapper.check_if_lts_fail`; `MeBi Help Premises` already said so). The
+  apply-as-if-it-held behaviour needs `FailIf Incomplete False`. The
+  quiz's answer key took the README's reading at first; the code was
+  right, the README was not.
+- `CLAUDE.md`, gotchas: named two things `Reset Bounds` also resets
+  (`Saturation OnDemand`, `Premise Depth`). `Api.reset_bounds_args`
+  resets five: also the saturation bound, the game bound and the premise
+  range. Now lists all of them, and says the premise tactic is *not*
+  among them.
+- `README.md`, tactic bullet: `Reset Premise` was said to clear the tactic
+  and the depth; it clears the range too (`Api.reset_premise`).
+
+Not changed: the "Premises that compute something" bullet only says the
+plugin *warns*, which is true but leaves out that the same warnings make
+the LTS incomplete.
+
+Revert: `git revert <commit>`. No code or proof changed.
+
+**Session tally (2026-10-13, second session):** Docs 1 · Refactor 0 ·
+Bug fix 0 · Optimization 0 · **New feature 0**.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
