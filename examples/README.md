@@ -124,6 +124,13 @@ exclusion for the layered system, independently of its direct proof in
 `MutualExclusion.v`. For two or more processes it stops at glued ≈
 layered.
 
+`theories/Traces.v` turns these results into statements about behaviour.
+The layered system has exactly the weak traces of `spec_fifo_hidden`
+(`traces_lts_fifo_hidden_1`), and every one of its traces alternates
+`ENTER i` and `LEAVE i` (`traces_lts_mutex_1`, through `SpecMutex.v`'s
+characterisation lemma `spec_lts_mutex`). Divergence, internal states and
+step counts do not carry over.
+
 ### Files
 
 All in `examples/CADP/`. The files a claim's proofs need are built by
@@ -227,11 +234,11 @@ How it is stated:
   As a check that the verdict discriminates, a LIFO variant of the spec is
   found not bisimilar for three processes.
 
-One theorem then gives:
-- mutual exclusion;
-- FIFO order;
-- no deadlock short of divergence: the system can always do what the queue
-  allows next.
+One theorem then gives, by `theories/Traces.v`:
+- mutual exclusion and FIFO order, as properties of every weak trace
+  (`weak_bisimilar_traces`);
+- no deadlock short of divergence: after any trace, the system can do next
+  what the queue allows (`weak_bisimilar_ready`, `weak_bisimilar_deadlock`).
 
 No starvation follows *under a fair scheduler*. Fairness is an assumption
 stated alongside, not proved, as it is in CADP's own check, which is also
