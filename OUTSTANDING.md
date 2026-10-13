@@ -73,12 +73,12 @@ means, so deciding one way means re-measuring every bound)
   notion. A τ-loop and a stuck state are therefore equivalent (see §3).
   The checker decides it properly since PR #1 (rooted verdict, `=ε⇒`
   split). Before, `Run Bisim` could call `a.b.x` and `b.a.y` bisimilar.
-- `weak_bisim` in `theories/Bisimilarity.v` is mutual similarity, which is
-  strictly weaker than bisimilarity: `a.b + a` and `a.b` satisfy it but
-  are not bisimilar (proved in `Test.v`). `mutual_sim` (its honest name) and
-  `weak_bisimilar` (a real bisimulation) were added beside it. *Decision:*
-  deprecate or rename `weak_bisim`, and whether the `ManualProofs.v`/
-  `LtacProofs.v` theorems should be restated.
+- `mutual_sim` in `theories/Bisimilarity.v` (two `weak_sim`s, one each
+  way) is strictly weaker than bisimilarity: `a.b + a` and `a.b` satisfy
+  it but are not bisimilar (proved in `Test.v`). `weak_bisimilar` (a real
+  bisimulation) is what `MeBi Sim` proves. Its old name, `weak_bisim`, was
+  removed on 2026-10-13 and the `ManualProofs.v`/`LtacProofs.v` theorems
+  restated as `mutual_sim` (`ASSISTED-CHANGES.md`, same date).
 - `MeBi Sim Begin` accepts `weak_sim` goals between similar but not
   bisimilar states, and proves `weak_bisimilar` goals.
 

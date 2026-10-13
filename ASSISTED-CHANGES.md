@@ -8010,6 +8010,65 @@ Bug fix 0 · Optimization 0 · **New feature 0**.
 
 ---
 
+## 2026-10-13 (second session) — `weak_bisim` removed; `mutual_sim` is the one name
+
+On branch `refactor/theories-drop-weak-bisim`, stacked on the docs branch
+above. Jonah's call, and the reason he gave: `weak_bisim` had already been
+renamed `mutual_sim` (2026-10-02, `6b7faa2`, which added the new name
+beside the old one "for existing proofs"), so this is removal of dead
+code. The one reason it had been parked, `OUTSTANDING.md` §1 listing it as a
+decision for @dcastrop, is recorded there and revertable below.
+
+**Refactor.** `weak_bisim` was definitionally identical to `mutual_sim`.
+Removed:
+- `theories/Bisimilarity.v`: the definition and its `Hint Unfold`;
+  `wk_bisim_refl`/`_trans`/`_sym` (their `mutual_sim_*` twins stay);
+  `mutual_sim_weak_bisim`, an iff between the two names, now trivial;
+  `weak_bisimilar_weak_bisim`, a copy of `weak_bisimilar_mutual_sim`.
+  Two comments rewritten, including the stale "the plugin does not yet
+  refer to anything below".
+- `lib/rocq_tools/mebi_theories.ml`: the registry entries `"weak_bisim"`
+  and `"wk_bisim_refl"`. **These had to go with it:** `get_constants`
+  resolves every entry on first use and raises `ErrorWithGlobalOfPath` for
+  a missing one, so deleting the theory alone would have broken every
+  command that looks a theory term up. Nothing read either name (the solver
+  reads only `weak_sim` and `weak_bisimilar`).
+- `theories/Test.v`: `mutually_similar` now states `mutual_sim`; its twin
+  `mutually_similar'` is gone, as it said the same thing.
+- `examples/Bisimilarity/Proc/{Test1/ManualProofs,Test1/LtacProofs,
+  Test2/LtacProofs}.v`: nine `wbisim_*` theorems restated as `mutual_sim`
+  (`unfold mutual_sim`). `examples/Bisimilarity/_nat_streams.v`: five
+  statements renamed; that draft is not built and was not compiled.
+- `README.md`, `OUTSTANDING.md` §1: the mention, and the decision, which
+  this resolves.
+
+**Verified** (fresh worktree, so no stale artifacts):
+- `dune build`: clean, as at baseline; `dune build @fmt` shows no drift in
+  the touched OCaml; `dune exec test/tests.exe`: 110/110.
+- The three example files that `_CoqProject` leaves out and that used
+  the old name (`Test1/ManualProofs`, `Test1/LtacProofs`,
+  `Test2/LtacProofs`), and `Test2/ManualProofs` beside them, were compiled
+  against the dune build **before** the change (all four pass) and after
+  (all four pass). The default `make` and `dune build` would not have
+  noticed a break.
+- `bench/proofs.sh -m auto` (default suite, 7 files): every `Solve` count
+  equals `CLAUDE.md`'s baseline, 27 `weak_sim` and 14 `weak_bisimilar`,
+  and `CCS/LawProofs.v`'s 14. No iteration count changed, as expected:
+  nothing the solver reads was touched.
+
+**Not run:** forced `MutualCofix True`/`False`, `-s abp`, `-s test4`, and
+the packed `make` build. The change removes names and two lookup-table
+entries, so it cannot move a step count; the single `Auto` run is there to
+show the registry still resolves and the solver still proves.
+
+**Revert:** `git revert -m 1 <merge commit>` restores the definition, the
+lemmas and the registry entries together.
+
+**Session tally (2026-10-13, second session), cont.:** Refactor 1 ·
+Docs 0 · Bug fix 0 · Optimization 0 · **New feature 0**.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
