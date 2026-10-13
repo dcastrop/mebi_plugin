@@ -86,8 +86,8 @@ spec are smaller.
      of memory at 9GB.
 
    So for these sizes, the plugin's result is a decision, not a proof.
-   `OUTSTANDING.md` §2 and §5.3 record this as a limit, with a possible
-   way round.
+   `OUTSTANDING.md` records this as a limit, and `future-work.md`
+   ("Proofs split into separately checked lemmas") a possible way round.
 
 3. **A proof's cost follows the game, not the state count.**
    - Two-process glued vs `spec_lts` (772 states) is proved in 10 min.
@@ -125,7 +125,8 @@ state's transitions by trying every constructor and every branch of the
 source term by unification: 1,753 attempts a state at n = 1, about 600
 more for each extra datum, for ~2.7 transitions found. The slope is the
 number of alternatives in the term (`sums n`), not a cost that compounds.
-Cutting the attempts is future work (`OUTSTANDING.md` §5.4).
+Cutting the attempts is future work (`future-work.md`, "Extraction's
+derivation search is unindexed").
 
 ## Not measured
 
@@ -138,6 +139,7 @@ Cutting the attempts is future work (`OUTSTANDING.md` §5.4).
 - **Variation:** each figure is a single run. Timings of a second or
   less vary by tens of percent between runs, so the small ratios are only
   orders of magnitude.
-- **Cost per pair or per step:** not separated here. `OUTSTANDING.md` §5.1
-  has the split of solver time between deciding the next step and running
+- **Cost per pair or per step:** not separated here. `future-work.md`
+  ("The solver's own per-step cost") has the split of solver time
+  between deciding the next step and running
   its tactic.

@@ -98,7 +98,8 @@ Proof. MeBi Sim Begin bigstep c1 And lts c1 Using step.
    stopped then. Where that time goes (setting up the mutual cofix over
    514,020 pairs is the likely place) is unmeasured.
 
-   See OUTSTANDING.md 2 (CADP) and 5.3 (proofs split into lemmas). *)
+   See OUTSTANDING.md (CADP) and doc/future-work.md ("Proofs split into
+   separately checked lemmas"). *)
 
 (*
 MeBi Config Bounds As Num States 15000.

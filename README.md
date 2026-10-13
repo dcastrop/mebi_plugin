@@ -274,7 +274,7 @@ MeBi Help <topic>.
 
 ## Status & Remaining Work
 
-The core functionality described under [Usage](#usage) — reading a `Step : Term -> Label -> Term -> Prop`-shaped relation, building an LTS/FSM from a term, deciding (weak) bisimilarity, and turning the result into a Rocq proof via `MeBi Sim` — is implemented and working. Remaining work, the tool's known limitations and the decisions still open are tracked in [`OUTSTANDING.md`](OUTSTANDING.md).
+The core functionality described under [Usage](#usage) — reading a `Step : Term -> Label -> Term -> Prop`-shaped relation, building an LTS/FSM from a term, deciding (weak) bisimilarity, and turning the result into a Rocq proof via `MeBi Sim` — is implemented and working. What is still open is indexed in [`OUTSTANDING.md`](OUTSTANDING.md), with the detail in [`doc/limitations.md`](doc/limitations.md) (what the tool cannot do today), [`doc/future-work.md`](doc/future-work.md) and [`doc/decisions.md`](doc/decisions.md) (decisions for the repository's owner).
 
 
 

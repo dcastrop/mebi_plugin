@@ -24,13 +24,21 @@ candour is the point of the log.
 
 ## Keep `OUTSTANDING.md` current
 
-`OUTSTANDING.md` (repo root) is the one list of what is still open:
-decisions for @dcastrop, the tool's limitations, possible work and what
-was set aside. It should only shrink. When an item is resolved, delete it
-there and record the resolution in `ASSISTED-CHANGES.md`. When something
-new is found, add it with its kind and a pointer to the detail. Don't
-grow open-item lists elsewhere (`notes/` is local). `TODO.md` was folded
-into it and deleted on 2026-10-10 (old list: `git show a1b1470:TODO.md`).
+`OUTSTANDING.md` (repo root) is the one *index* of what is still open:
+one line per item, saying who it waits on and where its detail is. Keep
+it short. Detail goes in a scoped `doc/` file, never in the index:
+- `doc/decisions.md`: briefs for @dcastrop. Write them for a reader who
+  has not seen the code in months: concrete file names, concise.
+- `doc/limitations.md`: what the tool cannot do today.
+- `doc/future-work.md`: possible work, and what was set aside.
+
+The index should only shrink. When an item is resolved, delete its line
+(and its detail), and record the resolution in `ASSISTED-CHANGES.md`.
+When something new is found, add one line to the index and the detail to
+the right `doc/` file. Don't grow open-item lists elsewhere (`notes/` is
+local). `TODO.md` was folded into it on 2026-10-10 (`git show
+a1b1470:TODO.md`); the index replaced a 438-line version on 2026-10-13
+(`git show 3cc717e:OUTSTANDING.md`).
 
 ## Verifying changes to `lib/model` or the proof solver
 
@@ -215,7 +223,7 @@ session has them.
 - `perf` is blocked on Jonah's machine (`perf_event_paranoid` = 4).
   Time the solver from inside the plugin instead: CPU timers around each
   step, kept locally as `notes/tools/solver-profile.diff` (results in
-  `OUTSTANDING.md` §5.1).
+  `doc/future-work.md`, "The solver's own per-step cost").
 
 **Shell**
 - zsh does not word-split a command held in a variable (`$RC file` fails
