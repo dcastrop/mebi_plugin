@@ -1,23 +1,23 @@
 (* The glued CADP semantics with joining the queue made visible
-   (2026-10-11), for stating FIFO order against [Properties/Fifo.v].
+   (2026-10-11), for stating FIFO order against [SpecFifo.v].
 
-   [bigstep_obs] is [CADP_Glued.bigstep] rule for rule, except that
+   [bigstep_obs] is [Glued.bigstep] rule for rule, except that
    [DO_ACQUIRE] -- one atomic step that swaps the process into the lock's
    tail and links it behind its predecessor -- is labelled
    [(FETCH_AND_STORE, pid)] rather than silent. From that point the process
    is in the queue. [bigstep] and every proof over it are unchanged.
 
    [bigstep_obs_norm] is [bigstep_obs] with dead data erased, as in
-   [CADP_Norm.v], whose per-block lemmas it reuses. The link between the
-   two is [MEBI.Transfer.normalised_bisimilar]'s, as in [CADP_Norm.v]. *)
+   [Norm.v], whose per-block lemmas it reuses. The link between the
+   two is [MEBI.Transfer.normalised_bisimilar]'s, as in [Norm.v]. *)
 
 From Stdlib Require Import List Lia.
 Import ListNotations.
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Transfer.
-Require Import MEBI.Examples.CADP.
-Require Import MEBI.Examples.CADP_Glued.
-Require Import MEBI.Examples.CADP_Norm.
+Require Import MEBI.Examples.CADP.Model.
+Require Import MEBI.Examples.CADP.Glued.
+Require Import MEBI.Examples.CADP.Norm.
 
 Import Protocol.
 
@@ -48,7 +48,7 @@ Inductive bigstep_obs_norm : composition -> option label -> composition -> Prop 
 | obs_norm_step : forall c a c', bigstep_obs c a c' -> bigstep_obs_norm c a (tidy c').
 
 (******************************************************************************)
-(** The [CADP_Norm] argument again, for [bigstep_obs]: it differs from
+(** The [Norm] argument again, for [bigstep_obs]: it differs from
     [bigstep] only in [OBS_ACQUIRE]'s label, so the per-block lemmas carry
     over as they are. *)
 

@@ -170,8 +170,8 @@ written once for the calculus, not per example.
 
 ## A second instance: dead data in CADP
 
-`examples/CADP_Norm.v` applies the same recipe to a different kind of
-redundancy. The glued CADP semantics (`CADP_Glued.bigstep`) has no
+`examples/CADP/Norm.v` applies the same recipe to a different kind of
+redundancy. The glued CADP semantics (`Glued.bigstep`) has no
 congruence rules, but most of its states differ only in data no step will
 read again:
 - each process's local variables, which every glued block writes before it
@@ -185,7 +185,7 @@ covers this shape (a semantics against itself with normalised targets).
 The example supplies `tidy`, the invariant, a two-line lemma saying
 `bigstep_norm` is "a `bigstep` step, then `tidy`" (`norm_spec`), and the
 one model-specific obligation: states equal up to `tidy` step alike
-(`step_tidy`). `CADP_Obs.v` reuses all of it for its observing variant. There
+(`step_tidy`). `Obs.v` reuses all of it for its observing variant. There
 is no sorting, because the arrangement is fixed: the canonical
 representative is just the state with its dead data reset.
 

@@ -83,42 +83,22 @@ examples/Bisimilarity/Proc/Test4/NormTermTests.v ### Success (Test4 under the no
 # examples/Bisimilarity/Proc/Test4/PluginProofs.v ### not written: a direct proof under compLTS needs ~525k solver steps (notes/13); Test4 is proved instead via the normalised semantics, NormProofs.v above
 
 ###############################################################################
-### CADP
-examples/CADP.v ### REQUIRED FOR BELOW
-examples/CADP_Glued.v ### REQUIRED FOR BELOW
-examples/CADP_Norm.v ### REQUIRED FOR BELOW; the glued semantics with dead data erased, proved weakly bisimilar to it by hand (~35s, no plugin calls)
-examples/CADP_Obs.v ### REQUIRED FOR BELOW; the glued semantics with joining the queue visible, and its normalised form (hand proof, fast)
-examples/Bisimilarity/CADP/Properties/MutualExclusion.v ### REQUIRED FOR BELOW
-examples/Bisimilarity/CADP/Properties/Fifo.v ### REQUIRED FOR BELOW; the FIFO lock server, for no starvation
-examples/Bisimilarity/CADP/Properties/Hidden.v ### REQUIRED FOR BELOW; joining the queue hidden again (hand proof, fast)
-
-examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
-# examples/Bisimilarity/CADP/Size1/MutualExclusion/PluginProofs.v ### Success
-
-# examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
-# examples/Bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
-# examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v ### Success
-# examples/Bisimilarity/CADP/Size1/Norm/Fifo/PluginProofs.v ### Success (weak_bisimilar to spec_fifo, 119 steps; hidden, mutual exclusion 23; ~1s)
-
-# TODO:
-examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/CADP/Size2/TermTests.v ### Success (layered: 12027 states, ~32s; then Run Bisim against glued, bisimilar, decided on demand ~35s, ~1GB. Measured 2026-10-11; run under a memory cap)
-
-# examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
-# examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### Not proved: glued vs layered (772 vs 12027 states) is decided bisimilar in Size2/TermTests.v, but every proof ran out of memory in Solve at 10GB on the nested cofix (25-52 min), and the mutual one had not done 2000 steps after 2.5h (measured 2026-10-12, see the file). The proofs are commented out
-# examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### Success (mutually similar to spec_lts, not bisimilar: see the file; ~10 min, ~4.4GB: run under a memory cap)
-# examples/Bisimilarity/CADP/Size2/Norm/MutualExclusion/PluginProofs.v ### Success (the same over CADP_Norm.bigstep_norm, 48 states, transferred to bigstep; ~15s)
-# examples/Bisimilarity/CADP/Size2/Norm/Fifo/PluginProofs.v ### Success (weak_bisimilar to spec_fifo, 2228 steps; hidden, mutual exclusion 98; ~24s)
-
-### CADP.Size3 (three processes; tractable only through CADP_Norm)
-examples/Bisimilarity/CADP/Size3/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/CADP/Size3/Norm/TermTests.v ### Success (bigstep_norm: 644 states, against bigstep's 128044; not bisimilar to spec_lts, bisimilar to spec_fifo; ~11s)
-# examples/Bisimilarity/CADP/Size3/Norm/MutualExclusion/PluginProofs.v ### Success (spec <= system only, ~7s; system <= spec was OOM-killed at 9GB: see the file)
-
-
-### CADP Simple
-# examples/CADP_simple.v
+### CADP (examples/README.md, "CADP"). Every proof file's measurements are in its header
+examples/CADP/Model.v ### REQUIRED FOR BELOW; the layered model
+examples/CADP/Glued.v ### REQUIRED FOR BELOW; the glued big-step semantics
+examples/CADP/Norm.v ### REQUIRED FOR BELOW; the glued semantics with dead data erased, proved weakly bisimilar to it by hand (~35s, no plugin calls)
+examples/CADP/Obs.v ### REQUIRED FOR BELOW; the glued semantics with joining the queue visible, and its normalised form (hand proof, fast)
+examples/CADP/SpecMutex.v ### REQUIRED FOR BELOW; the lock server, for mutual exclusion
+examples/CADP/SpecFifo.v ### REQUIRED FOR BELOW; the FIFO lock server, for no starvation
+examples/CADP/Hidden.v ### REQUIRED FOR BELOW; joining the queue hidden again (hand proof, fast)
+examples/CADP/Terms.v ### REQUIRED FOR BELOW; c1, c2, c3: one, two and three processes
+# examples/CADP/Explore.v ### Success (FSMs, saturation, minimisation and Run Bisim for each size; ~13s)
+# examples/CADP/ExploreLarge.v ### Success (layered c2: 12027 states, ~32s; then Run Bisim against glued, bisimilar, decided on demand ~35s, ~1GB. Measured 2026-10-11; run under a memory cap)
+# examples/CADP/GluedLayered.v ### Success (one process, ~52s; two processes not proved: out of memory at 10GB nested, unfinished after 2.5h mutual, measured 2026-10-12, see the file)
+# examples/CADP/MutualExclusion.v ### Success (one process, layered and glued; ~18s)
+# examples/CADP/MutualExclusionLarge.v ### Success (two processes: normalised ~15s, direct ~10 min and ~4.4GB; three: spec <= system only, ~7s. Run under a memory cap)
+# examples/CADP/Fifo.v ### Success (weak_bisimilar to spec_fifo, 119 and 2228 steps; hidden, mutual exclusion 23 and 98; ~25s)
+# examples/CADP/Simple.v ### an early, simpler counter-based lock; not built and not used elsewhere
 
 ### Other (nat streams)
 # examples/Bisimilarity/_nat_streams.v ### unfinished draft, sidelined during a reorg, not superseded

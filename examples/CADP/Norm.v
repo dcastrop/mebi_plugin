@@ -1,4 +1,4 @@
-(* The glued CADP semantics ([CADP_Glued.bigstep]) with its dead data erased,
+(* The glued CADP semantics ([Glued.bigstep]) with its dead data erased,
    made explicit as a normalised semantics, after the recipe of
    [ProcCongruence.v] and [doc/structural-congruence.md] (2026-10-11).
 
@@ -33,8 +33,8 @@ From Stdlib Require Import List Lia.
 Import ListNotations.
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Transfer.
-Require Import MEBI.Examples.CADP.
-Require Import MEBI.Examples.CADP_Glued.
+Require Import MEBI.Examples.CADP.Model.
+Require Import MEBI.Examples.CADP.Glued.
 
 Import Protocol.
 

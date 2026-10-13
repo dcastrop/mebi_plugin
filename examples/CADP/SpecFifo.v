@@ -14,7 +14,7 @@
 
 From Stdlib Require Import List.
 Import ListNotations.
-Require Import MEBI.Examples.CADP.
+Require Import MEBI.Examples.CADP.Model.
 
 (* [ins i l] inserts [i] into the sorted list [l]. *)
 Fixpoint ins (i : pid) (l : list pid) : list pid :=

@@ -1,15 +1,15 @@
 (* Hiding joining the queue (2026-10-11), with [MEBI.Hiding].
 
-   [CADP_Obs.bigstep_obs] is [CADP_Glued.bigstep] with one silent step made
+   [Obs.bigstep_obs] is [Glued.bigstep] with one silent step made
    visible: [DO_ACQUIRE], the tail swap, labelled [(FETCH_AND_STORE, pid)].
    [bigstep_hides] proves the converse: [bigstep] is [bigstep_obs] with that
    label hidden ([hide_join]). Likewise [spec_fifo_hidden] is the FIFO lock
-   server ([Fifo.spec_fifo]) with joining hidden ([spec_fifo_hides]).
+   server ([SpecFifo.spec_fifo]) with joining hidden ([spec_fifo_hides]).
 
    Hiding preserves weak bisimilarity ([MEBI.Hiding.relabel_bisimilar]), so
    FIFO order proved for the observing semantics gives, for plain
    [bigstep], [weak_bisimilar bigstep spec_fifo_hidden] ([wbis_hidden]).
-   [Size*/Norm/Fifo/PluginProofs.v] go on to mutual exclusion from there:
+   [Fifo.v] goes on to mutual exclusion from there:
    [spec_fifo_hidden] only ever lets one process in, which the plugin proves
    against [spec_lts]. *)
 
@@ -17,10 +17,10 @@ From Stdlib Require Import List.
 Import ListNotations.
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Hiding.
-Require Import MEBI.Examples.CADP.
-Require Import MEBI.Examples.CADP_Glued.
-Require Import MEBI.Examples.CADP_Obs.
-Require Import MEBI.Examples.Bisimilarity.CADP.Properties.Fifo.
+Require Import MEBI.Examples.CADP.Model.
+Require Import MEBI.Examples.CADP.Glued.
+Require Import MEBI.Examples.CADP.Obs.
+Require Import MEBI.Examples.CADP.SpecFifo.
 
 Import Protocol.
 

@@ -25,17 +25,16 @@ here=$BENCH_ROOT/bench/ocaml
 sources="Bisimilarity/Proc/Test1/PluginProofs.v proc-test1
 Bisimilarity/Proc/Test2/PluginProofs.v proc-test2
 Bisimilarity/Proc/Test3/PluginProofs.v proc-test3
-Bisimilarity/CADP/Size1/MutualExclusion/PluginProofs.v cadp-mutex
-Bisimilarity/CADP/Size1/Glued/PluginProofs.v cadp-glued
-Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v cadp-glued-mutex
+CADP/MutualExclusion.v cadp-mutex
+CADP/GluedLayered.v cadp-glued
 Bisimilarity/CCS/PluginProofs.v ccs
 Bisimilarity/CCS/LawProofs.v ccs-laws
 Evaluation/Width.v eval-width
 Evaluation/Layers.v eval-layers
 Evaluation/Depth.v eval-depth"
 deps="CCS.v Proc.v Bisimilarity/Proc/Test1/Terms.v Bisimilarity/Proc/Test2/Terms.v
-      Bisimilarity/Proc/Test3/Terms.v CADP.v CADP_Glued.v
-      Bisimilarity/CADP/Properties/MutualExclusion.v Bisimilarity/CADP/Size1/Terms.v
+      Bisimilarity/Proc/Test3/Terms.v CADP/Model.v CADP/Glued.v CADP/SpecMutex.v
+      CADP/Terms.v
       Evaluation/Base.v"
 
 bench_check_build

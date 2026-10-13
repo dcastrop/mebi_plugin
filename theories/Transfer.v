@@ -3,8 +3,8 @@
 
    A model often has a faithful semantics, and a smaller one on which the
    plugin can decide and prove things: congruent states identified
-   ([examples/ProcCongruence.v]), or dead data erased ([examples/CADP_Norm.v],
-   [examples/CADP_Obs.v]). Each example used to prove by hand, with its own
+   ([examples/ProcCongruence.v]), or dead data erased ([examples/CADP/Norm.v],
+   [examples/CADP/Obs.v]). Each example used to prove by hand, with its own
    coinduction, that the two are weakly bisimilar, and then derive transfer
    theorems from it. This file holds the generic parts, so an example only
    discharges its model-specific obligations:
