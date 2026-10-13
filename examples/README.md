@@ -249,4 +249,4 @@ For one process, the layered system is weakly bisimilar to
 which still gives mutual exclusion. FIFO order proper, with joining
 visible, would need the same label in `step`, and more than one process
 would need a proof of glued ≈ layered, which so far is only decided at two
-processes. `OUTSTANDING.md` §2 tracks both.
+processes. `OUTSTANDING.md` tracks both.

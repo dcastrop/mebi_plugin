@@ -8204,6 +8204,49 @@ Optimization 0 · **New feature 1** (`theories/` only).
 
 ---
 
+## 2026-10-13 — `OUTSTANDING.md` becomes an index; detail moves to `doc/`
+
+On branch `docs/outstanding-index`, at Jonah's request: the file had
+grown to 438 lines, and much of it was detail rather than open items.
+
+**Docs.** `OUTSTANDING.md` (98 lines) is now an index, one line per open
+item, saying who it waits on and where its detail is. The detail moved
+to three scoped files:
+- **`doc/decisions.md`:** §1, rewritten as briefs for @dcastrop (question,
+  options, consequences, a marked recommendation). It opens with an
+  orientation for someone who last saw the code at `d204afb`, 2026-01-12:
+  what each top-level directory holds now. The settled "Semantics" and
+  "Provenance" items became one "for review" brief.
+- **`doc/limitations.md`:** §3, nearly verbatim.
+- **`doc/future-work.md`:** §5 (sections now named, not numbered), §4's
+  possible work, and §6.
+
+§2 (CADP) shrank to two index lines: its measurements were already in
+`examples/README.md` and the CADP file headers.
+
+`CLAUDE.md`'s rule for the file now says that detail goes in `doc/`. The
+section-number pointers (`OUTSTANDING.md` §2, §5.x) in `CLAUDE.md`,
+`doc/decide-vs-prove.md`, `examples/README.md` and `GluedLayered.v` now
+point to the new places.
+
+**Checked for loss.** Each old paragraph's numbers and code names were
+looked up in the new files and the example docs. The only misses were
+renumbered sections, numbers now written with thousands separators, and
+two deliberate changes:
+- `paper/`'s size, measured again: 74 files, ~55MB, 96% of the tracked
+  bytes. The old text said 73 PDFs, ~36MB.
+- A stale CADP to-do was dropped: "build the observing variant over
+  `bigstep_norm`". `Obs.v` already defines `bigstep_obs_norm`.
+
+The old file is at `git show 3cc717e:OUTSTANDING.md`.
+
+Revert: `git revert -m 1 <merge commit>`.
+
+**Session tally (2026-10-13), cont.:** Refactor 1 · Docs 4 · Bug fix 0 ·
+Optimization 0 · **New feature 1** (`theories/` only).
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
