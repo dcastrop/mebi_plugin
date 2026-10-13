@@ -692,6 +692,7 @@ End Collapsing.
    fails at that branch. *)
 MeBi Divider "Theories.Test.MultipleDerivations".
 Require Import MEBI.Bisimilarity.
+Require Import MEBI.Traces.
 Module MultipleDerivations.
   Inductive action : Set := | A | B.
 
@@ -1641,6 +1642,34 @@ Module WeakBisimilarVsMutualSim.
     inversion W' as [a'' z' t' S1' T' _|]; subst.
     apply no_silent in S1'; subst.
     inversion T'.
+  Qed.
+
+  (* What the difference means for behaviour ([MEBI.Traces], 2026-10-13).
+     Being mutually similar, [P] and [Q] have the same weak traces. But
+     [P] can reach the deadlock [Z] after [a], and nothing [Q] reaches
+     after [a] matches it: [weak_bisimilar_deadlock] needs bisimilarity. *)
+  Example same_traces : forall t, weak_trace step P t <-> weak_trace step Q t.
+  Proof. exact (mutual_sim_traces P Q mutually_similar'). Qed.
+
+  Example p_deadlocks :
+    weak_path step P (a :: nil) Z /\ forall x, ~ weak_can step Z x.
+  Proof.
+    split.
+    - exact (wp_cons (inject_weak _ _ _ p_a2) (wp_nil (Relation_Operators.rt1n_refl _ _ Z))).
+    - intros x [y W]; inversion W as [x' z t S1 T _|]; subst.
+      apply no_silent in S1; subst; inversion T.
+  Qed.
+
+  Example q_no_deadlock :
+    ~ exists n', weak_path step Q (a :: nil) n' /\ forall x, ~ weak_can step n' x.
+  Proof.
+    intros [n' [Pq D]].
+    inversion Pq as [| x y z a' t W Pn]; subst.
+    inversion Pn as [x' y' S |]; subst; apply no_silent in S; subst.
+    inversion W as [a'' z t S1 T S2|]; subst.
+    apply no_silent in S1; apply no_silent in S2; subst.
+    inversion T; subst.
+    apply (D b); exists Z; exact (inject_weak _ _ _ q1_b).
   Qed.
 End WeakBisimilarVsMutualSim.
 

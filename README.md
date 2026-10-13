@@ -176,6 +176,8 @@ Inside a proof whose goal is bisimilarity-shaped, `MeBi Sim` drives a tactic-bas
 - `weak_sim r1 r2 t1 t2`: weak *simulation*, one direction.
 - `weak_bisimilar r1 r2 t1 t2`: weak *bisimilarity* (one relation that is a simulation both ways), proved in one go. `weak_bisim` (two separate `weak_sim`s, i.e. mutual similarity) is weaker; see the comment in `theories/Bisimilarity.v`. A `weak_bisimilar` proof needs the mutual cofix, which the default `Auto` strategy chooses for it; the `examples/Bisimilarity/**/BisimProofs.v` files are worked examples.
 
+What a proved relation says about behaviour is in `theories/Traces.v`. A `weak_sim` gives trace inclusion, and with it any safety property over traces. Mutual similarity gives trace equivalence. `weak_bisimilar` also matches, after any trace, what each system can do next, including deadlock. Divergence is not preserved.
+
 
 ```coq
 Example wsim_pq : weak_sim termLTS termLTS p q.
