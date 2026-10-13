@@ -1,6 +1,6 @@
 # MEBI: Mechanised Bisimilarities
 
-This repository contains a Coq plugin for automating bisimilarity proofs (which are currently taken from the methods detailed in "Advanced Topics in Bisimulation and Coinduction", Section 3.2.2).
+This repository contains a Rocq (formerly Coq) plugin for automating bisimilarity proofs (which are currently taken from the methods detailed in "Advanced Topics in Bisimulation and Coinduction", Section 3.2.2).
 
 
 **Work in progress**
@@ -85,7 +85,9 @@ A full `dune build` takes ~1m40s, almost all of it the `MeBi Benchmark` vernacul
 ### Running tests
 `dune exec test/tests.exe` runs a small pure-OCaml test suite (no Rocq runtime) exercising `lib/model` directly — FSM construction, saturation, minimization, bisimilarity, JSON round-tripping. It's a fast first signal for changes to `lib/model`/`lib/terms`/`lib/utils`, but it doesn't exercise the proof solver (`src/proof_solver*`) or anything Rocq-facing.
 
-The only end-to-end coverage of the proof solver is the `examples/Bisimilarity/**/PluginProofs.v` files, which are commented out of `_CoqProject` by default (full proof search is slow — some examples need tens of thousands of tactic iterations). Uncomment the ones you need and run `make -j$(nproc)` to exercise them; see the comment next to each line in `_CoqProject` for which are cheap vs. expensive.
+`theories/Test.v` runs the solver on small cases; the end-to-end coverage is the proof files under `examples/`: the `PluginProofs.v` files in `examples/Bisimilarity/**`, and the CADP proofs in `examples/CADP/` (`MutualExclusion.v`, `GluedLayered.v`, `Fifo.v`, ...). Most are commented out of `_CoqProject` by default (full proof search is slow — some examples need tens of thousands of tactic iterations); `CCS/PluginProofs.v`, `CCS/LawProofs.v` and `examples/Evaluation/{Width,Layers,Depth}.v` are built by default. Uncomment the ones you need and run `make -j$(nproc)` to exercise them; see the comment next to each line in `_CoqProject` for which are cheap vs. expensive.
+
+`bench/proofs.sh` is the quicker way: it compiles each proof file in its own memory-capped process and tabulates the solver's step counts, which `CLAUDE.md` lists as the known-good baseline (see [`bench/README.md`](bench/README.md)).
 
 
 
@@ -155,7 +157,7 @@ An LTS is an inductive relation `term -> label -> term -> Prop`. For each constr
 
 - **Premises over an LTS listed in `Using`** (the LTS itself, or another one: layered LTSs) are explored, and a constructor may have several. The proof search replays every premise's derivation.
 - **Any other premise** is decided once it is closed, either immediately or after the LTS premises have fixed what it mentions (a label, say). An equation `l = r` holds when its sides are convertible and fails when they differ in a constructor. Any other inductive proposition (`<=`, `<`, `In`, `Forall`, `/\`, `\/`, your own) is decided by a bounded proof search over its constructors, after unfolding definitions and fixpoints. The bound is `MeBi Config Premise Depth <n>` (default 16). A false premise means that transition is not in the LTS. In a proof, a true premise is closed with the proof the search found, and a false one in a hypothesis is refuted. "False" is only concluded when the search was complete: nothing opaque, no depth cut.
-- **Premises that compute something** (the target in `succ_rel n m -> lts n a m`, or a value an LTS premise needs, as in `In q l -> lts q a q'`) are enumerated: each solution is a transition of its own. The plugin warns if the solutions found may be incomplete (depth bound, solution cap, something opaque), and if an LTS premise has to be explored from a source nothing determines. The latter gives only some of its steps, so put whatever fixes the source among the premises.
+- **Premises that compute something** (the target in `succ_rel n m -> lts n a m`, or a value an LTS premise needs, as in `In q l -> lts q a q'`) are enumerated: each solution is a transition of its own. The plugin warns if the solutions found may be incomplete (depth bound, solution cap, something opaque), and if an LTS premise has to be explored from a source nothing determines; such an LTS is marked incomplete, which is an error unless `MeBi Config FailIf Incomplete False`. The latter gives only some of its steps, so put whatever fixes the source among the premises.
 - **Negations** `~ P` hold exactly when `P` is refuted by a complete search; in a proof they are proved by refuting `P`.
 - **Bounded universals** over `nat`, `forall k, k < n -> P k` or `forall k, k <= n -> P k` (also `n > k`), where `n` is a number once the premise is closed: they hold exactly when every `P i` does, each decided as above. Only up to `MeBi Config Premise Range <n>` values of `k` (default 256): each value costs a search and the proof grows with the square of the range, so a wider premise is left undecided, with a warning saying why. In a proof they are assembled from the instances' proofs with the lemmas in `MEBI.Premises` (exported by `MEBI.loader`), and a false one in a hypothesis is refuted at a false instance.
 - **A tactic of your own** for what the search cannot decide: `MeBi Config Premise Tactic <tactic>` (e.g. `(rewrite f_def; lia)`). It is tried on the premise and on its negation, both at extraction and in the proof. `MeBi Config Reset Premise` clears it, the depth and the range.
@@ -174,7 +176,7 @@ Times repeated LTS construction over a range of sizes using the `benchmark` pack
 Inside a proof whose goal is bisimilarity-shaped, `MeBi Sim` drives a tactic-based proof-search state machine instead of writing the proof by hand. Two goal shapes are supported:
 
 - `weak_sim r1 r2 t1 t2`: weak *simulation*, one direction.
-- `weak_bisimilar r1 r2 t1 t2`: weak *bisimilarity* (one relation that is a simulation both ways), proved in one go. `weak_bisim` (two separate `weak_sim`s, i.e. mutual similarity) is weaker; see the comment in `theories/Bisimilarity.v`. A `weak_bisimilar` proof needs the mutual cofix, which the default `Auto` strategy chooses for it; the `examples/Bisimilarity/**/BisimProofs.v` files are worked examples.
+- `weak_bisimilar r1 r2 t1 t2`: weak *bisimilarity* (one relation that is a simulation both ways), proved in one go. `weak_bisim` (two separate `weak_sim`s, i.e. mutual similarity) is weaker; see the comment in `theories/Bisimilarity.v`. A `weak_bisimilar` proof needs the mutual cofix, which the default `Auto` strategy chooses for it. (On an FSM saturated on demand, `Auto` estimates only within `MeBi Config Bounds Game <n>`, and without it takes the nested cofix, which does not finish for `weak_bisimilar` on the checked-in proofs; it says so in a notice. Set the bound.) The `weak_bisimilar` goals in the `PluginProofs.v` files of `examples/Bisimilarity/Proc`, in `examples/Bisimilarity/CCS/ABPBisimProofs.v` and in `examples/CADP/Fifo.v` are worked examples.
 
 
 ```coq
@@ -185,7 +187,7 @@ Proof.
 Qed.
 ```
 
-`Sim Begin <relation> <term> And <relation> <term> [Using <relation>...]` starts the search for the current goal. `Sim Step.` runs a single step. `Sim Solve <bound>.` runs up to `<bound>` steps, stopping as soon as the goal is proved — the bound just needs to be an upper limit, not an exact count (see the worked examples under `examples/Bisimilarity/**/PluginProofs.v` for real bound values, which vary widely by example size).
+`Sim Begin <relation> <term> And <relation> <term> [Using <relation>...]` starts the search for the current goal. `Sim Step.` runs a single step. `Sim Solve <bound>.` runs up to `<bound> + 1` steps, stopping as soon as the goal is proved — the bound just needs to be an upper limit, not an exact count (see the worked examples under `examples/` for real bound values, which vary widely by example size).
 
 To check bisimilarity and prove it in one go, give `Run Bisim` a name: it states the goal as an `Example`, opens its proof and runs `Sim Begin` on it, so the check is done once.
 
@@ -203,10 +205,13 @@ It states `weak_bisimilar`; if the two are not bisimilar, nothing is opened. `As
 ### Configuration
 
 ```
+MeBi Config Reset.                                 (* everything below *)
 MeBi Config Reset [Bounds|Weak|FailIf|Output].
 MeBi Config Bounds As Num States <n>.
 MeBi Config Bounds As Num Transitions <n>.
 MeBi Config Bounds Saturation <n>.
+MeBi Config Bounds Game <n>.                       (* most game states a walk may visit on an FSM saturated on demand *)
+MeBi Config Saturation OnDemand True|False|Auto.   (* default Auto *)
 MeBi Config Premise Depth <n>.
 MeBi Config Premise Range <n>.                     (* values of k a bounded universal premise may range over *)
 MeBi Config Premise Tactic <tactic>.
@@ -222,7 +227,7 @@ MeBi Config Solver Answers Default|Greedy|Minimal|Auto.
 ```
 
 - `Bounds` caps how large an explored graph may get before mebi gives up. Extraction has measured 0.01–0.07MB of memory per state on top of a fixed ~0.1–0.3GB, so setting a state bound whose upper estimate passes 1GB (about 14,000 states) prints a notice. Logging the result with `Output "Result"`/`"DecodeResults"`/`"DumpResults"` costs far more, about 0.65MB per state, because every term is pretty-printed.
-- `Bounds Saturation <n>` caps how many weak actions saturation (used by `Saturate`, `Minimize`, `Bisim` and `Sim Begin` whenever a `Weak` label is set) may produce. Saturation can be orders of magnitude larger than the LTS: `examples/Bisimilarity/Proc/Test4` has 9720 states and would saturate to 74.6M weak actions. Before saturating, mebi computes that number exactly (cheaply, without saturating) and refuses above the bound with `Saturation_Too_Large`, naming the figure. The default is 1,000,000. Measured memory is 450–900 bytes per weak action, the upper end for larger LTSs (each action keeps its shortest witness path). Pick a bound your machine can hold. As a guide:
+- `Bounds Saturation <n>` caps how many weak actions saturation (used by `Saturate`, `Minimize`, `Bisim` and `Sim Begin` whenever a `Weak` label is set) may produce. Saturation can be orders of magnitude larger than the LTS: `examples/Bisimilarity/Proc/Test4` has 9720 states and would saturate to 74.6M weak actions. Before saturating, mebi computes that number exactly (cheaply, without saturating). Above the bound, `Run Bisim` and `Sim Begin` saturate on demand instead (see `Saturation OnDemand` below), with a warning; `Run Saturate` and `Run Minimize` refuse with `Saturation_Too_Large`, naming the figure. The default is 1,000,000. Measured memory is 450–900 bytes per weak action, the upper end for larger LTSs (each action keeps its shortest witness path). Pick a bound your machine can hold. As a guide:
 
   | `<n>` (weak actions) | approx. memory |
   | -------------------- | -------------- |
@@ -232,8 +237,10 @@ MeBi Config Solver Answers Default|Greedy|Minimal|Auto.
   | 20,000,000           | 9–18 GB        |
 
   Time grows faster than linearly in the count (a partial `Test4` LTS with 400k weak actions takes ~13s), so a large bound can also mean a long wait. The proof examples (`PluginProofs.v`) saturate to at most a few hundred weak actions. Run `MeBi Config Output "Info" True.` to see each estimate.
+- `Saturation OnDemand` (default `Auto`) is how `Run Bisim` and `Sim Begin` saturate each FSM. Whole, every weak action is built up front. On demand, each state is saturated when the check or the proof first needs it, holding at most `Bounds Saturation` weak actions at a time (the oldest dropped and recomputed if asked about again), and bisimilarity is decided on the quotient by silent strongly connected components (states in one silent SCC have the same weak moves; `Test4`'s 9720 states make 81), with the same verdict. `Auto` goes on demand exactly for the FSMs whose saturation would exceed `Bounds Saturation`, and warns; `True` does it for every FSM; `False` refuses those FSMs (`Saturation_Too_Large`, or with `FailIf Oversaturated False` saturates them whole anyway). `Run Saturate` and `Run Minimize` always saturate whole.
+- `Bounds Game <n>` (unset by default) caps how many pairs of states a walk of the whole proof may visit on an FSM saturated on demand. Without it, `Solver MutualCofix True` and any `Solver Answers` other than `Default` are refused on such an FSM, `Auto` takes the nested cofix without estimating, and `Run Sim` is refused; with it they run within `<n>` pairs and are refused past it.
 - `Weak` (and the asymmetric `Weak1`/`Weak2`) mark a label constructor as the silent/tau action, enabling weak bisimilarity/saturation. `Reset Weak` clears it back to strong bisimilarity.
-- `FailIf` controls whether an empty LTS, an incomplete (unboundedly large) exploration, a negative bisimilarity result, or a saturation above `Bounds Saturation` raises a hard error instead of a warning. `Oversaturated` defaults to `True`, because past the bound the likely alternative is running out of memory. `False` warns and saturates anyway.
+- `FailIf` controls whether an empty LTS (default `False`), an incomplete one (default `True`: exploration cut short by a bound, or a premise the search could not decide), a negative bisimilarity result (default `True`), or a saturation above `Bounds Saturation` (`Oversaturated`, default `True`) raises a hard error instead of a warning. `Oversaturated` defaults to `True` because past the bound the likely alternative is running out of memory; `False` warns and saturates anyway.
 - `Solver MutualCofix` picks how `MeBi Sim` introduces coinduction hypotheses (one nested cofix per new pair, or one mutual cofix over the whole relation; `Auto`, the default, measures both). `Solver Answers` picks how it chooses each answer to the other system's move: `Default` (the default) move by move; `Greedy`/`Minimal` from a plan built at `Sim Begin`; `Auto` the plan with the lowest predicted cost. On the checked-in examples `Auto` was never slower than `Default`, and cut the `weak_bisimilar` proofs by 60% (`ASSISTED-CHANGES.md`, 2026-10-02).
 - `Output "<Kind>" <bool>` toggles one log channel. `<Kind>` is one of `Debug`, `Info`, `Notice`, `Warning`, `Error`, `Trace`, `Result`, `Show`, `DecodeResults`, `DumpResults`. `DumpResults` is off by default: when on, every command writes its FSMs and results as JSON files into `./_dumps/` in the working directory, which is useful for debugging but costly on large systems (on `Proc/Test4`, about 20s, hundreds of MB on disk and 1GB of extra memory per command).
 
@@ -255,7 +262,7 @@ MeBi Help.
 MeBi Help <topic>.
 ```
 
-`MeBi Help` lists the topics: `Run`, `Sim`, `Benchmark`, `Premises`, `Config`, and `Config Bounds`, `Config Bounds Saturation`, `Config Weak`, `Config FailIf`, `Config Solver`, `Config Output`. `MeBi Help Config Bounds Saturation` gives the memory guidance above, computed from the same measured figures the plugin's errors and notices use.
+`MeBi Help` lists the topics: `Run`, `Sim`, `Benchmark`, `Premises`, `Config`, and `Config Bounds`, `Config Bounds Saturation`, `Config Saturation`, `Config Weak`, `Config FailIf`, `Config Solver`, `Config Output`. `MeBi Help Config Bounds Saturation` gives the memory guidance above, computed from the same measured figures the plugin's errors and notices use.
 
 
 

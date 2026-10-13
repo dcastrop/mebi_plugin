@@ -7979,13 +7979,33 @@ described less than the code does:
 - `README.md`, tactic bullet: `Reset Premise` was said to clear the tactic
   and the depth; it clears the range too (`Api.reset_premise`).
 
-Not changed: the "Premises that compute something" bullet only says the
-plugin *warns*, which is true but leaves out that the same warnings make
-the LTS incomplete.
+**A README audit** followed, at Jonah's request ("make any fixes you find"),
+each statement checked against the code or `MeBi Help`:
+- "Premises that compute something": now says the same warnings make the
+  LTS incomplete, an error by default.
+- `Bounds Saturation`: said saturation above the bound is refused with
+  `Saturation_Too_Large`. Since 2026-10-03 only `Run Saturate` and `Run
+  Minimize` refuse; `Run Bisim` and `Sim Begin` saturate on demand.
+- `Configuration`: `Saturation OnDemand`, `Bounds Game` and a bare `Config
+  Reset` were in the grammar (and `MeBi Help`) but not in the README. Added,
+  with a bullet each, and `Config Saturation` in the help-topic list.
+- `FailIf`: "incomplete (unboundedly large)" now covers undecided premises
+  too, and the four defaults are stated.
+- `Sim Solve <bound>`: runs up to `<bound> + 1` steps (`CLAUDE.md` had it
+  right, the README did not).
+- Test and example paths: "the only end-to-end coverage is
+  `examples/Bisimilarity/**/PluginProofs.v`" predated the CADP restructure
+  (PR #70) and the by-default CCS and Evaluation proofs, and did not
+  mention `bench/proofs.sh`. The `BisimProofs.v` files it pointed at were
+  deleted on 2026-10-02 (`6552acd`), their `weak_bisimilar` proofs moved
+  into the `PluginProofs.v` files; the README now names those.
+- `weak_bisimilar` and `Auto`: added that on an FSM saturated on demand
+  `Auto` goes nested unless `Bounds Game` is set (OUTSTANDING §3).
+- "Coq plugin" → "Rocq (formerly Coq) plugin".
 
 Revert: `git revert <commit>`. No code or proof changed.
 
-**Session tally (2026-10-13, second session):** Docs 1 · Refactor 0 ·
+**Session tally (2026-10-13, second session):** Docs 2 · Refactor 0 ·
 Bug fix 0 · Optimization 0 · **New feature 0**.
 
 ---
