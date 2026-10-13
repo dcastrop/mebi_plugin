@@ -112,6 +112,21 @@ spec are smaller.
    This is the method `doc/structural-congruence.md` describes, and the
    reason the CADP example has three semantics.
 
+## Inside deciding: extraction
+
+Most of a decision's time is extraction. Its cost per state is not
+constant. On the ABP with a data domain of n values (a local series; n = 1
+is `CCS.v`'s ABP, 108 states), states grow linearly (108, 220, 344, 480,
+628 for n = 1..5), and so does the time per state: 26, 37, 49, 62, 77ms.
+Total time is therefore roughly quadratic in n.
+
+It does not grow with the states already seen. Extraction finds each
+state's transitions by trying every constructor and every branch of the
+source term by unification: 1,753 attempts a state at n = 1, about 600
+more for each extra datum, for ~2.7 transitions found. The slope is the
+number of alternatives in the term (`sums n`), not a cost that compounds.
+Cutting the attempts is future work (`OUTSTANDING.md` §5.4).
+
 ## Not measured
 
 - **ABP and `Test4` proofs:** not rerun on this build. The step counts

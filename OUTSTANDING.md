@@ -227,9 +227,6 @@ turns the pin into a positive test.
 
 **Profiling and evaluation** (*evaluation*; detail in Jonah's notes 10
 and 12)
-- **Time per state in extraction** grows with size (27ms → 60ms per state,
-  ABP-with-data n = 1..4). Cause unknown: term size, label count, or
-  something linear in the states seen so far (which would be a bug).
 - **Compare with CADP and mCRL2**: verdicts and cost on the same models.
   Neither tool is installed; CADP needs a licence.
 - **Scale the evaluation levers further** (`bench/proofs.sh -s
@@ -282,7 +279,8 @@ are orthogonal to the research question (what the plugin can decide and
 prove), so a limit they cause is reported, not chased. §5.1 and §5.2 are
 in priority order: the first touches every proof a user runs, the second
 only very large FSMs. §5.3 is the one that would reach proofs the plugin
-cannot produce today.
+cannot produce today. §5.4 (added 2026-10-13) is extraction's cost per
+state.
 
 ### 5.1 The solver's own per-step cost
 
@@ -392,6 +390,32 @@ environment.
 **Relation to other items.** It is complementary to §5.1, which makes
 each step cheaper. It is independent of the "one state per silent SCC"
 item set aside in §6: R relates states, not SCCs.
+
+### 5.4 Extraction's derivation search is unindexed
+
+**Standing.** Cause found 2026-10-13; not fixed. On the ABP with a data
+domain of n values, extraction's time per state grows with n: 26, 37, 49,
+62 and 77ms for n = 1..5. Within one run it does *not* grow with the
+states already seen (at n = 5 it falls from 101ms a state in the first
+fifth to 59ms in the last), and no state is visited twice. So it is not
+the bug the earlier question feared.
+
+**Cause.** All the time is in finding a state's transitions
+(`collect_valid_constructors`). For each state it tries every
+constructor and every branch of the source term by unification: 1,753
+`w_unify` attempts a state at n = 1, about 600 more for each extra datum,
+to find ~2.7 transitions. Roughly half fail outright, and most successes
+belong to derivations that fail further down. Each attempt costs about the
+same (6-9µs in `w_unify`, ~45% of the time; the rest scales with the
+attempts too). `sums n` gives the sender, receiver and media n
+alternatives each, hence the slope.
+
+**What a fix involves.** Fewer attempts: skip a constructor whose
+conclusion's head cannot match the source term's, before unifying (an
+index on head symbols), and prune a premise's branches the same way. It
+touches the proof solver's view of derivations, so it needs the full
+proof-suite runs. How much it would save is unmeasured. The measurement
+patch is kept locally (`notes/tools/extraction-profile.diff`).
 
 ## 6. Set aside (deliberately)
 

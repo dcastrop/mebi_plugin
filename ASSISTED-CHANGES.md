@@ -8171,6 +8171,39 @@ Optimization 0 · **New feature 1** (`theories/` only).
 
 ---
 
+## 2026-10-13 — Extraction's time per state: not a bug, an unindexed search
+
+On the same branch, item A2 (`OUTSTANDING.md` §4, "Time per state in
+extraction"). Docs only: the measurement patch was not merged, and is
+kept locally as `notes/tools/extraction-profile.diff`.
+
+**Docs (evaluation).** On the ABP with a data domain of n values, the
+time per state grows with n: 26 to 77ms for n = 1..5. The open question
+was whether it grows with the states already seen, which would be a bug.
+A patch timed each visited state's search and counted `w_unify` calls,
+and the series ran for n = 1..5:
+- no state is visited twice;
+- within one run, the time per state *falls* (at n = 5, from 101ms to
+  59ms between the first and last fifth), so nothing compounds with
+  states seen;
+- all the time is in finding a state's transitions;
+- unification attempts per state grow linearly in n (1,753 at n = 1,
+  about +600 per datum), for a flat ~2.7 transitions found, at a near
+  constant 6-9µs per attempt.
+
+So the slope comes from the alternatives in the source term (`sums n`),
+which extraction tries one by one. The §4 question is removed.
+`OUTSTANDING.md` §5.4 records the unindexed search as future work: cost
+only, not chased, per the 2026-10-11 policy. `doc/decide-vs-prove.md`
+gains a short section.
+
+Revert: as for the entry above.
+
+**Session tally (2026-10-13), cont.:** Refactor 1 · Docs 3 · Bug fix 0 ·
+Optimization 0 · **New feature 1** (`theories/` only).
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
