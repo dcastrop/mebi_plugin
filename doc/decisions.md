@@ -8,8 +8,13 @@ can be backed out: `ASSISTED-CHANGES.md` gives each one's revert command.
 ## Since you last looked
 
 Your last commit is `d204afb` (2026-01-12, the port to Rocq 9.0.1). Since
-then, 630 commits have landed on Jonah's fork, `thecathe/mebi_plugin`, as
-PRs #1–#72. None of it is upstream yet. The core still does what it did:
+then, 632 commits have been made, and 231 of them are already on your
+`main`: 181 reached it before 2026-08-17 (the Rocq 9.2 port among them),
+and 50 (2026-08-17 to 2026-09-29) were pushed to it by mistake on
+2026-09-29, because an earlier session had set git up so that a push went
+to your repository instead of the fork. Jonah moved on rather than undo
+it. The other 401 landed on Jonah's fork, `thecathe/mebi_plugin`, as PRs
+#1–#73, and are not upstream yet. The core still does what it did:
 - it reads an inductive `step : term -> label -> term -> Prop`;
 - it builds the LTS and decides (weak) bisimilarity;
 - it proves the result with `MeBi Sim Begin`/`Solve`.
@@ -34,7 +39,8 @@ The decisions below are ordered by what blocks the upstream PR first.
 
 ## 1. How should the work reach your repository?
 
-**Question.** All 72 PRs are merged on the fork. The plan is one PR to
+**Question.** All 73 PRs are merged on the fork: 401 commits, 251 files,
++29,310/−3,725 against your `main` (2026-10-15). The plan is one PR to
 `dcastrop/mebi_plugin` after you decide 2 and 3, because each of those
 changes what every checked-in proof bound means.
 
