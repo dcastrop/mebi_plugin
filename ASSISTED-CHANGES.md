@@ -8560,7 +8560,26 @@ and the grant.** Read, not legal advice:
   grant sits (a record of its own, not found); if Royal Holloway, its IP
   policy governs that work and it, too, must agree to the licence and be
   named in the notice. The README acknowledges both grants; INDIMO's PI
-  should confirm the wording.
+  should confirm the wording. (Settled by the author: Kent employs them, and
+  INDIMO's secondary PI is at Kent, so one institution, and the secondary PI
+  can say which reference Kent's share is under.)
+
+**What Kent's own guidance says** (read 2026-10-15; the 2013 policy is still
+the one hosted):
+- "Copyright for researchers": "the University of Kent will own the
+  copyright in the outputs of your research, for example if you create
+  software"; funders may own IP only where "stated in your funding
+  agreement". The contact for IP and commercialisation is Research and
+  Innovation Services (commercialisation@kent.ac.uk): KIE, named in the
+  2013 policy, is that office's predecessor.
+- "Choose a licence for your research works": no licence is required. For
+  software it lists GNU GPL 3.0 ("to make sure all versions remain free"),
+  GNU LGPL 3.0 and the Artistic Licence 2.0, and does not mention MIT or
+  Apache. Help with licences: researchsupport@kent.ac.uk.
+- So the split is within what Kent describes. Read with the policy's "no
+  commercial rights" line, a copyleft licence leaves the owner (the
+  University) free to license the code commercially itself, which a
+  permissive licence does not.
 - The notice therefore names the University first. The wording of the
   notice, and whether "no commercial rights" is compatible with GPL and
   LGPL (both allow commercial use), are questions for KIE.
