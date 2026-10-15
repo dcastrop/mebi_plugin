@@ -55,9 +55,10 @@ opam pin add rocq-mebi "git+https://github.com/dcastrop/mebi_plugin#main"
 
 Until the fork's work is merged upstream, use
 `git+https://github.com/thecathe/mebi_plugin#main`. A branch pin follows the
-branch: `opam update` brings in whatever is on `main` then. To stay on one
-version, pin a commit (`#<hash>`). It builds the plugin from source, which
-takes a few minutes, and builds Rocq and OCaml too if the switch is new.
+branch: `opam update` fetches whatever is on `main` then, and `opam upgrade
+rocq-mebi` (or `opam update --upgrade`) rebuilds it. To stay on one version,
+pin a commit (`#<hash>`). It builds the plugin from source, which takes a few
+minutes, and builds Rocq and OCaml too if the switch is new.
 
 Then, in a `.v` file, a tiny system and a proof the plugin finds:
 
