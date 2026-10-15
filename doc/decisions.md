@@ -114,27 +114,7 @@ one.
 plugins. LGPL-2.1 matches Rocq itself. Adding it means one file and
 uncommenting one line.
 
-## 5. What should happen to `paper/`?
-
-**Question.** `paper/` holds 74 tracked files, mostly third-party PDFs:
-~55MB, or 96% of the repository's tracked bytes. It was last changed in
-February 2025.
-
-**Options.**
-1. **Delete it from `HEAD` (recommended),** and keep the references as a
-   bibliography. New clones still download the history, so the
-   repository only shrinks with option 3.
-2. **Keep it.** Redistributing third-party papers from a public
-   repository raises a copyright question.
-3. **Rewrite history** (`git filter-repo`) to remove it everywhere. The
-   repository then shrinks for real, but every clone must be re-cloned
-   after a coordinated force-push.
-
-Small, whichever you choose: `paper/references/to check/Affeldt.pdf` has
-a ligature (U+FB00) in its name and a space in its directory, both
-portability hazards.
-
-## 6. Do you want proofs split into separately checked lemmas?
+## 5. Do you want proofs split into separately checked lemmas?
 
 **Question.** Some systems are decided but cannot be proved. CADP's
 two-process glued ≈ layered is decided in 45s, but every proof ran out of
@@ -150,7 +130,7 @@ block. It is a new capability, and large. The design is in
 2. **Build it.** It reaches proofs the plugin cannot produce today. It
    is the largest item on the list.
 
-## 7. For review: choices made while you were away
+## 6. For review: choices made while you were away
 
 These were Jonah's calls, made as the work went. Each can be reversed.
 

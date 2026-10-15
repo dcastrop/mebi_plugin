@@ -8272,12 +8272,68 @@ and `dcastrop/mebi_plugin`'s `main` (`f0ae289`) already holds 231 of them:
 read `git remote -v` and `git branch -vv` and to name the remote.
 
 Found by comparing `origin/main` with `main` for the question of how
-`paper/` could be removed from history; that work (a rewrite, which
-changes the hash of every commit since 2024-05-10) is not in this entry.
+`paper/` could be removed from history; that work is the next entry.
 
 Revert: `git revert -m 1 <merge commit>`.
 
 **Session tally (2026-10-15):** Docs 1 · Refactor 0 · Bug fix 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
+## 2026-10-15 (cont.) — `paper/` purged from history
+
+On branch `docs/remap-shas-after-paper-purge`, on top of a history
+rewrite. Decision 5 of `doc/decisions.md` (what happens to `paper/`) was
+settled by Jonah, to whom David has given control of the repository, as
+option 3 (rewrite history). He keeps a copy of the directory elsewhere and
+asked for all of it to go, `BIB.md` included.
+
+**Docs, and a history rewrite.** `git filter-repo --invert-paths --path
+paper` (v2.47.0), run **once**, on a fresh clone. Both repositories are
+given those same commits. It is not run on each side: filter-repo's manual
+warns that identical commands can produce different hashes in another
+clone, which would leave the fork and upstream with unrelated histories.
+- **Content.** The tree of every surviving commit is the old tree without
+  `paper/`. Checked on `main`: 266 paths, same modes and blob hashes,
+  nothing else differs.
+- **Size.** `.git` goes from 41M to 4.1M after `git gc --aggressive`.
+  `git log --all -- paper` is empty.
+- **Commits.** 1,583 become 1,569. The 14 dropped touched only `paper/`:
+  12 of Jonah's and `cathe`'s, and two of David's (`Papers`, 2024-05-10, and
+  `Paper with examples`, 2025-02-11). Their authors' other commits are
+  untouched. Of the survivors, 1,560 have a new hash (everything after
+  2024-05-10) and 9 do not.
+- **Cited hashes.** 110 distinct commit hashes in nine files were
+  rewritten from filter-repo's `commit-map`, as their own commit: the
+  revert commands in this log, `OUTSTANDING.md`, `CLAUDE.md`,
+  `doc/decide-vs-prove.md`, `doc/decisions.md`, and comments in
+  `src/api.ml`, `src/proof_solver_step.ml`, `theories/Test.v` and
+  `examples/CADP/MutualExclusion.v` (comments only). Four hashes this log
+  cited (`ac65dbb`, `c85bc64`, `a506314`, `1064d83`) were pre-rebase
+  originals that no branch had ever contained, so they were already
+  unreachable; each now cites the same-subject commit that is on `main`.
+  Older versions of these files, in history, still hold the old hashes.
+- **Docs.** `doc/decisions.md` §5 and `OUTSTANDING.md`'s item 5 are
+  deleted, per that file's rule; the later decisions are renumbered 5-6
+  and every pointer to them follows.
+
+**What this does not do.** GitHub keeps the old commits reachable through
+`refs/pull/*` (read-only, on both repositories) and the fork network, and
+its Support declines to purge non-sensitive data. The rewrite shrinks every
+new clone and removes the PDFs from the default view. It does not remove
+them from GitHub.
+
+**What a clone has to do.** Re-clone. A `git pull` into an old clone
+merges the old history back in, and a `git push --all` or `--mirror` from
+one puts the PDFs back.
+
+Revert: not by `git revert`. The old history is in mirror clones of both
+repositories taken before the push; restoring it means force-pushing them.
+Old and new hashes are paired in `.git/filter-repo/commit-map` of the
+rewrite, kept with the mirrors.
+
+**Session tally (2026-10-15), cont.:** Docs 3 · Refactor 0 · Bug fix 0 ·
 Optimization 0 · **New feature 0.**
 
 ---

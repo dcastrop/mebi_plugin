@@ -14,7 +14,7 @@ Work that is understood well enough to describe, but not under way.
   first touches every proof a user runs, the second only very large
   FSMs.
 - **"Proofs split into separately checked lemmas"** is a capability
-  (@dcastrop's decision 6, `decisions.md`), the one that would reach
+  (@dcastrop's decision 5, `decisions.md`), the one that would reach
   proofs the plugin cannot produce today.
 - **The rest** lists smaller possible work, and what was set aside on
   purpose.
