@@ -573,7 +573,7 @@ module Init (Solver : S) = struct
           (match answer_policy_setting () with
            | Some setting -> refuse_exceeded setting n
            | None ->
-             Logger.notice
+             Logger.info
                (Printf.sprintf
                   "(Answers: the whole game is past [Bounds Game] (%i pairs); \
                    answering move by move.)"
@@ -593,7 +593,9 @@ module Init (Solver : S) = struct
                 p.measure.unanswered)
          else (
            if p.policy <> Product.Policy.Default then W.plan := Some p;
-           Logger.notice
+           (* [Info], not [Notice]: every [Sim Begin] says it, and a user who
+              turns [Info] off should not see it. *)
+           Logger.info
              (Printf.sprintf
                 "(Answers: %s -- %i pairs, %i moves, witness %i; predicted \
                  %.0f iterations.)"
@@ -776,27 +778,20 @@ let init
      | _ -> ());
     if Stdlib.Option.is_none bound
     then (
-      match
-        ( !Api.the_solver_strategy = Api.Auto
-        , !Api.the_answer_policy = Api.Answers_auto )
-      with
-      | true, true ->
-        Logger.notice
-          "(Saturated on demand: Auto takes the nested cofix and answers move \
-           by move, without estimating or planning, as that would walk the \
-           whole game up front. [MeBi Config Bounds Game <n>] lets it do both \
-           within <n> pairs.)"
-      | true, false ->
+      if !Api.the_solver_strategy = Api.Auto
+      then
         Logger.notice
           "(Saturated on demand: Auto takes the nested cofix without \
            estimating, as estimating would walk the whole game up front. [MeBi \
-           Config Bounds Game <n>] lets it estimate within <n> pairs.)"
-      | false, true ->
-        Logger.notice
+           Config Bounds Game <n>] lets it estimate within <n> pairs.)";
+      (* The answer policy's feedback is [Info], so that
+         [MeBi Config Output "Info" False] silences it. *)
+      if !Api.the_answer_policy = Api.Answers_auto
+      then
+        Logger.info
           "(Saturated on demand: Answers Auto answers move by move without \
            planning, as planning would walk the whole game up front. [MeBi \
-           Config Bounds Game <n>] lets it plan within <n> pairs.)"
-      | false, false -> ()));
+           Config Bounds Game <n>] lets it plan within <n> pairs.)"));
   (* The goal is not built yet, so compare the LTS names rather than the
      terms [Concl.is_weak_refl] will see. Two names for one LTS only lose
      the refl short-cut, which over-predicts -- cost, never a missing
