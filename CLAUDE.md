@@ -153,11 +153,13 @@ per-Solve tables that `bench/compare.sh` diffs between two builds; see
    **On the answer policy.** `MeBi Config Solver Answers` is `Auto` by
    default (since 2026-10-15): at `Sim Begin` the plugin plans every answer
    under `Default`, `Greedy` and `Minimal` and keeps the cheapest. It prints
-   a `Notice` ("Answers: ...") for each plan. Forcing `Default` reproduces
+   an `Info` message ("Answers: ...") for each plan, so
+   `MeBi Config Output "Info" False` hides it. Forcing `Default` reproduces
    the solver's earlier counts exactly. Measured on the default suite, all
    161 Solves under `Auto`, forced `True` and forced `False`: none takes
-   more steps, none changes status, 61 take fewer. On an FSM saturated on
-   demand, `Auto` answers move by move unless `Bounds Game` is set.
+   more steps, none changes status, 61 take fewer
+   (`doc/measurements/answers-auto.md`). On an FSM saturated on demand,
+   `Auto` answers move by move unless `Bounds Game` is set.
 
    **On bounds.** `MeBi Sim Solve N` permits up to `N + 1` solver steps
    before giving up (`solve`'s loop guard in `src/proof_solver.ml` is

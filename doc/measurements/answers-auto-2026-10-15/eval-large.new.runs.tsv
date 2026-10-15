@@ -1,0 +1,4 @@
+suite	mode	file	exit	seconds	peak_mb	errors
+eval-large	auto	WidthLarge	0	413.50	3958	0
+eval-large	auto	LayersLarge	0	86.70	2574	0
+eval-large	auto	DepthLarge	0	60.57	727	0

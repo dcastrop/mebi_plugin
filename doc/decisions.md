@@ -142,5 +142,6 @@ These were Jonah's calls, made as the work went. Each can be reversed.
   by 55-74%). `Auto` is the tool's own choice, like `MutualCofix Auto`, so
   on an FSM saturated on demand it answers move by move unless
   `Bounds Game` is set, instead of being refused as `Greedy` and `Minimal`
-  still are. Back out with `MeBi Config Solver Answers Default`, or
-  `git revert -m 1` the merge.
+  still are. The figures are in `doc/measurements/answers-auto.md`. Back
+  out with `MeBi Config Solver Answers Default`, or `git revert -m 1` the
+  merge.

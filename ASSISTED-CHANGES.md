@@ -8361,10 +8361,14 @@ already was:
 
 Tests pin all three, and the default itself (`theories/Test.v`,
 `SaturationGuard`, `AnswerPolicies`; four `Solve`s added). One visible
-change: every `Sim Begin` now prints an `(Answers: ...)` notice, as it
-already did for a non-`Default` policy.
+change: every `Sim Begin` now prints an `(Answers: ...)` line, as it
+already did for a non-`Default` policy. It is `Info`, not `Notice`, so
+`MeBi Config Output "Info" False` hides it (checked); the on-demand
+cofix notice is unchanged.
 
-**Measured** (`bench/proofs.sh`, 4 files at a time; times depend on load):
+**Measured** (`bench/proofs.sh`, 4 files at a time; times depend on load;
+recorded in full, with the raw data and the method, in
+[`doc/measurements/answers-auto.md`](doc/measurements/answers-auto.md)):
 - *Default suite, seven files, `Auto`, forced `True`, forced `False`: 161
   Solves.* None takes more steps, none changes status, 61 take fewer. The
   `Auto` total falls from 58,899 to 30,049 (-49%); `True` the same; `False`
@@ -8413,7 +8417,7 @@ may well be better.
 Revert: `MeBi Config Solver Answers Default` for one file, or
 `git revert -m 1 <merge commit>` (the bounds go back with it).
 
-**Session tally (2026-10-15), cont.:** Docs 4 · Optimization 1 · Refactor 0
+**Session tally (2026-10-15), cont.:** Docs 5 · Optimization 1 · Refactor 0
 · Bug fix 0 · **New feature 0.**
 
 ---
