@@ -8651,10 +8651,12 @@ directory to one logical path, so: a second theory in `theories/` shadows
 `modules`; and two stanzas of one name, picked by `enabled_if` on the
 profile, are rejected as a duplicate. A directory of its own was left.
 
-**Why `test/rocq/`, not `tests/`.** The `Makefile` has a dead `tests:`
-target for a `tests/` directory that does not exist, and `test/` holds the
-OCaml tests; `test/rocq/` is next to them and already under the GPL row of
-`LICENSE`, which drops two lines.
+**Why `test/rocq/`, not `tests/`.** The `Makefile` had a dead `tests:`
+target for a `tests/` directory that does not exist (a leftover of the Rocq
+plugin tutorial the repository began as; nothing used it), and `test/`
+holds the OCaml tests; `test/rocq/` is next to them and already under the
+GPL row of `LICENSE`, which drops two lines. The target is removed in a
+follow-up.
 
 **Paths.** `theories/Test.v` and `DevTest.v` become `test/rocq/Test.v` and
 `DevTest.v`: `_CoqProject`, `bench/testv-counts.sh`, `CLAUDE.md`, `README.md`,
