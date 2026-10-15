@@ -19,14 +19,14 @@ One brief each, in [`doc/decisions.md`](doc/decisions.md), in this
 order:
 1. How the fork's work reaches his repository: one PR or a series.
 2. Whether `MeBi Config Solver MutualCofix Auto` stays the default.
-3. Whether `MeBi Config Solver Answers Auto` becomes the default.
-4. Which licence (there is none).
-5. Whether to build proofs split into separately checked lemmas.
-6. For review: choices made while he was away (the target notion,
-   `weak_bisim` removed, `Sim Begin` on similar states, provenance).
+3. Which licence (there is none).
+4. Whether to build proofs split into separately checked lemmas.
+5. For review: choices made while he was away (the target notion,
+   `weak_bisim` removed, `Sim Begin` on similar states, provenance,
+   `Answers Auto` as the default).
 
-Decisions 2 and 3 change every checked-in proof bound, so they come
-before the upstream PR.
+Decision 2 would change every checked-in proof bound if it went against
+`Auto`, so it comes before the upstream PR.
 
 ## Waiting on Jonah
 
@@ -45,7 +45,7 @@ before the upstream PR.
 
 - **Two processes, glued ≈ layered:** decided, not proved (*limit*). The
   measurements are in `examples/CADP/GluedLayered.v`. A way round is
-  decision 5.
+  decision 4.
 - **Three processes:** FIFO order, and mutual exclusion (system ≤ spec),
   are decided but not proved: out of memory at 8-9GB (*limit*;
   `examples/CADP/MutualExclusionLarge.v`, `examples/README.md`). Why they
@@ -86,7 +86,7 @@ way.
   - memory of the saturation estimate;
   - extraction's unindexed derivation search.
 - **Capability:** proofs split into separately checked lemmas
-  (decision 5).
+  (decision 4).
 - **Smaller:**
   - replay a derivation tree in one solver step;
   - `Auto`'s mis-estimate on `LawProofs.tau1`;

@@ -233,11 +233,12 @@ let text : string list -> string option = function
        Oversaturated False saturates them whole anyway. Run Saturate and \
        Minimize always saturate whole.\n\n\
        On demand, planning the whole proof up front walks every pair the proof \
-       can reach, saturating as it goes. So Solver MutualCofix True and any \
-       Solver Answers but Default are refused unless MeBi Config Bounds Game \
+       can reach, saturating as it goes. So Solver MutualCofix True, Answers \
+       Greedy and Answers Minimal are refused unless MeBi Config Bounds Game \
        <n> is set (unset by default); with it, the walk runs within <n> pairs \
-       and past it they are refused. Auto estimates within the bound, and \
-       otherwise (or past it) takes the nested cofix."
+       and past it they are refused. The two Autos estimate or plan within the \
+       bound, and otherwise (or past it) take the nested cofix and answer move \
+       by move."
   | [ "Config"; "Weak" ] ->
     Some
       "MeBi Config Weak As Option <type>.\n\
@@ -273,27 +274,28 @@ let text : string list -> string option = function
        other answer it with a weak move to some y' such that (x', y') can be \
        proved related in turn. Usually several answers would do; which one is \
        taken decides the proof's next goals, and so its length.\n\n\
-       Default -- the policy the solver has always used, and the default \
-       setting -- chooses each answer on its own, with no look-ahead: stand \
-       still if the move was silent and the answering state is already \
-       bisimilar to x'; otherwise take the weak transition with the shortest \
-       witness (fewest steps to justify) into the bisimilarity class of x', \
-       ending at its lowest-numbered state (the one extraction discovered \
-       first). For a weak_sim goal between states that are similar but not \
-       bisimilar, the same two tries against the states that simulate x'. \
-       Because no choice takes the others into account, a proof can visit many \
-       more pairs than it needs -- weak_bisimilar proofs especially, whose two \
-       directions each pick answers the other never uses.\n\n\
+       Default -- the policy the solver used until 2026-10-15 -- chooses each \
+       answer on its own, with no look-ahead: stand still if the move was \
+       silent and the answering state is already bisimilar to x'; otherwise \
+       take the weak transition with the shortest witness (fewest steps to \
+       justify) into the bisimilarity class of x', ending at its \
+       lowest-numbered state (the one extraction discovered first). For a \
+       weak_sim goal between states that are similar but not bisimilar, the \
+       same two tries against the states that simulate x'. Because no choice \
+       takes the others into account, a proof can visit many more pairs than \
+       it needs -- weak_bisimilar proofs especially, whose two directions each \
+       pick answers the other never uses.\n\n\
        Greedy, Minimal and Auto plan every answer at Begin, before the first \
        step, and Begin announces the plan and its predicted cost. Greedy \
        prefers an answer whose pair has already been reached. Minimal answers \
        within a relation that no pair can be removed from. Auto plans all \
-       three and keeps the cheapest predicted. Measured on the checked-in \
-       examples (2026-10-02), Auto was never slower than Default and cut \
-       weak_sim proofs by 17% and weak_bisimilar proofs by 60%; Minimal alone \
-       was slower on many weak_sim proofs. Every answer is still checked by \
-       Qed, so a policy can only change how long a proof is, never whether it \
-       is correct."
+       three and keeps the cheapest predicted. Auto is the default; on an FSM \
+       saturated on demand it answers move by move, as Default does, unless \
+       Bounds Game is set. Measured on the checked-in examples (2026-10-02), \
+       Auto was never slower than Default and cut weak_sim proofs by 17% and \
+       weak_bisimilar proofs by 60%; Minimal alone was slower on many weak_sim \
+       proofs. Every answer is still checked by Qed, so a policy can only \
+       change how long a proof is, never whether it is correct."
   | [ "Config"; "Output" ] ->
     Some
       "MeBi Config Output \"<Kind>\" True | False.\n\

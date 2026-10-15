@@ -2,10 +2,11 @@
    [weak_sim] over the normalised semantics [nLTS] (82 states), and
    [ProcCongruence.Normalised.wsim_transfer] -- one hand proof, for all
    terms -- carries it to [compLTS], whose 9720-state LTS no proof could
-   cover. Not built by default: ~7 minutes and ~3.8GB peak, so run it under
-   a memory cap (systemd-run --user --scope -p MemoryMax=6G
-   -p MemorySwapMax=0 ...). The bound is the least that closes the proof:
-   [MeBi Sim Solve N] permits N + 1 steps, and it reports 48821.
+   cover. Not built by default: ~30 seconds and ~0.7GB peak. (Until
+   2026-10-15 the default answers were [Answers Default], and this proof took
+   48,821 steps, ~7 minutes and ~3.8GB, so it had to run under a memory cap.)
+   The bound is the least that closes the proof: [MeBi Sim Solve N] permits
+   N + 1 steps, and it reports 6115.
 
    [weak_bisimilar] is in NormBisimProofs.v (with [Answers Minimal]). *)
 
@@ -34,7 +35,7 @@ MeBi Config Weak As Option label.
 MeBi Config Bounds As Num States 200.
 
 Example wsim_pq_norm : weak_sim nLTS nLTS p q.
-Proof. MeBi Sim Begin nLTS p And nLTS q Using nLTS core termLTS. MeBi Sim Solve 48820. Qed.
+Proof. MeBi Sim Begin nLTS p And nLTS q Using nLTS core termLTS. MeBi Sim Solve 6114. Qed.
 
 (* Test4's simulation, in the semantics it was written in *)
 Example wsim_pq : weak_sim compLTS compLTS p q.

@@ -68,7 +68,8 @@ per-Solve tables that `bench/compare.sh` diffs between two builds; see
    state per silent SCC is unsound inside a coinduction: notes/13, `Test.v`
    `CircularTransfer`), but `Test4` **is** proved via a normalised semantics
    with structural congruence made explicit (`examples/ProcCongruence.v`,
-   `Test4/NormProofs.v`: 48,821 steps, ~7 min, ~3.8GB; `weak_bisimilar` in
+   `Test4/NormProofs.v`: 6,115 steps, ~30s, ~0.7GB (48,821, ~7 min, ~3.8GB
+   under `Answers Default`, until 2026-10-15); `weak_bisimilar` in
    `Test4/NormBisimProofs.v` with `Answers Minimal`: 61,161 steps, ~4 min,
    ~2.8GB; neither built by default). Run
    anything on `Test4` under a memory cap,
@@ -87,15 +88,20 @@ per-Solve tables that `bench/compare.sh` diffs between two builds; see
 3. `make -j$(nproc)`.
 4. Compare the `(Stopped) Solved after N iterations.` lines against the
    known-good baseline, one entry per `MeBi Sim Solve`, **27 total**. Under
-   the default `Auto` solver strategy:
+   the default `Auto` solver strategy and `Auto` answer policy:
    ```
-   Proc/Test1   114, 105, 106, 109, 22, 21        (nested)
+   Proc/Test1   88, 82, 88, 88, 22, 10            (nested)
    Proc/Test2   112, 112, 112, 84, 112, 84        (mutual)
-   Proc/Test3   995, 355, 483, 483, 555, 195, 307, 555, 307    (mutual)
-   CADP/MutualExclusion   259, 212, 81, 63        (nested)
-   CADP/GluedLayered      268, 355                (nested)
+   Proc/Test3   408, 355, 483, 483, 555, 195, 307, 291, 307    (mutual)
+   CADP/MutualExclusion   259, 202, 81, 55        (nested)
+   CADP/GluedLayered      246, 277                (nested)
    ```
-   (Since 2026-10-02's hypothesis-order fix. Before it: Test3 1073, 387,
+   (Since 2026-10-15, when `Answers Auto` became the default. Under
+   `Answers Default`, until then: Test1 114, 105, 106, 109, 22, 21; Test3
+   995 ... 555 (its 1st and 8th); MutualExclusion 212 and 63; Glued 268,
+   355. The rest do not change: `Auto` keeps `Default` where it plans
+   cheapest.
+   Since 2026-10-02's hypothesis-order fix. Before it: Test3 1073, 387,
    519, 519, 603, 211, 331, 603, 331 and CADP 268, 396, 268, 396, 81, 63.
    Since 2026-10-11, `CADP/Size1/MutualExclusion` proves the layered `lts`
    against `spec_lts`, as its name says; until then it was a copy of
@@ -108,20 +114,24 @@ per-Solve tables that `bench/compare.sh` diffs between two builds; see
    pair, proved from its two `weak_sim`s, with no `Solve`). Under `Auto` and
    forced `MutualCofix True`, in file order:
    ```
-   Proc/Test1   709, 709, 51
-   Proc/Test2   702, 852, 852
-   Proc/Test3   13203, 6211, 9379, 4083, 6179
+   Proc/Test1   305, 318, 51
+   Proc/Test2   425, 375, 409
+   Proc/Test3   3439, 2801, 4132, 1742, 2649
    CADP/MutualExclusion   1442, 185
-   CADP/GluedLayered      2760
+   CADP/GluedLayered      1658
    ```
+   (Under `Answers Default`, until 2026-10-15: Test1 709, 709, 51; Test2
+   702, 852, 852; Test3 13203, 6211, 9379, 4083, 6179; Glued 2760.)
    Forced `False` stops at the first of them in every file (with a loose
    bound, glued mutual exclusion's, `wbis_bigstep_1` in
-   `MutualExclusion.v`, alone would finish, at 3859). They come last in each file so
+   `MutualExclusion.v`, alone would finish, at 3859 under `Answers Default`;
+   not re-measured). They come last in each file so
    that a forced run still reaches all 27 `weak_sim` counts first.
    `CCS/LawProofs.v` (built by default) adds 14 more, `weak_bisimilar`
    instances of CTrees' CCS laws, with least bounds, so any increase fails
-   the build: under `Auto`, `36, 58, 19, 19, 56, 42, 53, 28, 15, 98, 278,
-   357, 325, 3192`. Forced `True` differs only at `tau1` (29); forced
+   the build: under `Auto`, `36, 58, 19, 19, 56, 42, 27, 28, 15, 98, 278,
+   357, 325, 2836` (until 2026-10-15, under `Answers Default`: 53 for the
+   7th and 3192 for the last). Forced `True` differs only at `tau1` (29); forced
    `False` stops at `expansion` (bound 97, the nested path needs 155;
    past it, `paraC`..`parap0` take 2218, 3127, 2853 and `paraA` was
    OOM-killed at 5GB).
@@ -139,6 +149,17 @@ per-Solve tables that `bench/compare.sh` diffs between two builds; see
    nested-strategy figures for the first five files, should you need them,
    are `21, 22, 63, 81, 105, 106, 109, 114, 182, 194, 268, 268, 278, 299,
    396, 396, 446, 446` — that was the baseline before 2026-09-29.
+
+   **On the answer policy.** `MeBi Config Solver Answers` is `Auto` by
+   default (since 2026-10-15): at `Sim Begin` the plugin plans every answer
+   under `Default`, `Greedy` and `Minimal` and keeps the cheapest. It prints
+   an `Info` message ("Answers: ...") for each plan, so
+   `MeBi Config Output "Info" False` hides it. Forcing `Default` reproduces
+   the solver's earlier counts exactly. Measured on the default suite, all
+   161 Solves under `Auto`, forced `True` and forced `False`: none takes
+   more steps, none changes status, 61 take fewer
+   (`doc/measurements/answers-auto.md`). On an FSM saturated on demand,
+   `Auto` answers move by move unless `Bounds Game` is set.
 
    **On bounds.** `MeBi Sim Solve N` permits up to `N + 1` solver steps
    before giving up (`solve`'s loop guard in `src/proof_solver.ml` is

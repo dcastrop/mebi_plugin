@@ -8338,6 +8338,90 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-10-15 (cont.) — `Answers Auto` is the default
+
+On branch `perf/answers-auto-default`, at Jonah's request: decision 3 of
+`doc/decisions.md`, settled by him, with `Auto` chosen.
+
+**Optimization** (the default of an existing setting; no new capability).
+`MeBi Config Solver Answers` is `Auto`, not `Default`: at `Sim Begin` every
+answer is planned under `Default`, `Greedy` and `Minimal`, and the cheapest
+kept. `Default` is one setting away.
+
+**A behaviour change the brief did not cover.** The old code treated any
+policy but `Default` as an explicit whole-game setting, so on an FSM
+saturated on demand it was refused unless `Bounds Game` was set. With
+`Auto` the default, every default-settings proof of such an FSM would have
+been refused. `Auto` is now the tool's own choice, as `MutualCofix Auto`
+already was:
+- without `Bounds Game`, it answers move by move, as `Default` does, with a
+  notice;
+- within it, it plans; past it, it answers move by move;
+- `Greedy` and `Minimal` are refused as before.
+
+Tests pin all three, and the default itself (`theories/Test.v`,
+`SaturationGuard`, `AnswerPolicies`; four `Solve`s added). One visible
+change: every `Sim Begin` now prints an `(Answers: ...)` line, as it
+already did for a non-`Default` policy. It is `Info`, not `Notice`, so
+`MeBi Config Output "Info" False` hides it (checked); the on-demand
+cofix notice is unchanged.
+
+**Measured** (`bench/proofs.sh`, 4 files at a time; times depend on load;
+recorded in full, with the raw data and the method, in
+[`doc/measurements/answers-auto.md`](doc/measurements/answers-auto.md)):
+- *Default suite, seven files, `Auto`, forced `True`, forced `False`: 161
+  Solves.* None takes more steps, none changes status, 61 take fewer. The
+  `Auto` total falls from 58,899 to 30,049 (-49%); `True` the same; `False`
+  from 11,538 to 11,281 (-2%). Forced `False` stops where it did.
+- `Proc/Test3`'s `weak_bisimilar`: 13,203 / 6,211 / 9,379 / 4,083 / 6,179
+  become 3,439 / 2,801 / 4,132 / 1,742 / 2,649; the file went from 226s,
+  2.1GB to 51s, 0.66GB. `Proc/Test2`'s: 702, 852, 852 become 425, 375, 409.
+  `Proc/Test1`'s `weak_sim`: 114, 105, 106, 109, 21 become 88, 82, 88, 88,
+  10. Glued ≈ layered: 2,760 becomes 1,658 (64s to 16s). `LawProofs`: 53 to
+  27 and 3,192 to 2,836.
+- *Evaluation series:* `Width` 1,163 / 8,256 to 974 / 7,664; `Depth` 108 /
+  672 / 4,704 to 93 / 407 / 2,171; `Layers` unchanged. `DepthLarge`
+  15,168 / 35,136 to 6,303 / 13,827 (~10 min, 3.1GB to ~1 min, 0.7GB);
+  `WidthLarge` 55,963 to 54,894; `LayersLarge` unchanged.
+- *`Test4`'s `weak_sim` over the normalised semantics:* 48,821 steps, 403s,
+  3.75GB (re-run on `main`, to be sure) to 6,115 steps, 32s, 0.72GB.
+- *Unchanged:* ABP (6,494 and 9,914 steps, the same time and memory),
+  `Fifo.v` (119, 23, 2,228, 98), and the `Auto` cofix choice in every file.
+  Where `Auto` plans, it keeps `Default` when that is cheapest.
+
+**Bounds.** Those that were least (or one above) are lowered to the new
+count minus one: `Proc/Test1` (7), `Proc/Test2` (3), `CCS/LawProofs` (2),
+`CADP/GluedLayered` (1), `CADP/MutualExclusion` (1), `Evaluation/Width`
+(2), `Depth` (3), `WidthLarge` (1), `DepthLarge` (2), `Test4/NormProofs`
+(48820 to 6114). Left alone: `Proc/Test2`'s first six (the nested-path
+figures), `Proc/Test3`'s (checked in loose, 16 to 11,000 over), `CCS/
+PluginProofs`' round numbers, `GluedLayered`'s second and third.
+`MutualExclusion`'s third and fourth (82 and 64, for 81 and 55) were
+already slightly loose.
+
+**Docs.** `README.md`, `MeBi Help Config Solver`, and `Model.Product.Policy`
+say `Auto` is the default. `CLAUDE.md`'s baseline has the new counts, the old
+ones beside them, and a paragraph on the policy. `doc/decisions.md` §3 is
+gone (the later ones renumbered, and its pointers) and a bullet under "for
+review" says what was chosen and how to undo it. The step counts in
+`doc/decide-vs-prove.md`, `doc/structural-congruence.md`, `_CoqProject` and
+the headers of `Test4/NormProofs.v` and `NormTermTests.v` are the new ones.
+
+**Not re-measured.** `NormBisimProofs.v` (it sets `Answers Minimal`
+itself), `MutualExclusionLarge.v` and the two- and three-process CADP
+figures (heavy, and out of memory before), the 3,859 for `wbis_bigstep_1`
+under forced `False`, and `Test4`'s direct proofs. Their figures say they
+were measured under `Answers Default`. Nothing tells us they got worse; they
+may well be better.
+
+Revert: `MeBi Config Solver Answers Default` for one file, or
+`git revert -m 1 <merge commit>` (the bounds go back with it).
+
+**Session tally (2026-10-15), cont.:** Docs 5 · Optimization 1 · Refactor 0
+· Bug fix 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

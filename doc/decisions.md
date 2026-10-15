@@ -41,8 +41,9 @@ The decisions below are ordered by what blocks the upstream PR first.
 
 **Question.** All 73 PRs are merged on the fork: 401 commits, 251 files,
 +29,310/−3,725 against your `main` (2026-10-15). The plan is one PR to
-`dcastrop/mebi_plugin` after you decide 2 and 3, because each of those
-changes what every checked-in proof bound means.
+`dcastrop/mebi_plugin` after you decide 2, because going against `Auto`
+changes what every checked-in proof bound means. (Jonah settled the
+answer policy, which used to be decision 3, on 2026-10-15: see 5.)
 
 **Options.**
 1. **One PR of the whole fork (recommended).** You review the result
@@ -63,9 +64,10 @@ cheaper (`Model.Product.estimate`). `Auto` is the default today.
 **Options.**
 1. **Keep `Auto` (recommended).** On the 18 cheap proofs it takes 2,565
    steps in total, against 3,794 always-nested and 2,654 always-mutual,
-   and it is worse than nested on none of them. Some `weak_bisimilar`
+   and it is worse than nested on none of them (measured under
+   `Answers Default`). Some `weak_bisimilar`
    proofs finish only mutually: `examples/Bisimilarity/CCS/LawProofs.v`'s
-   `paraA` takes 3,192 steps, and nested is killed at 5GB. The cost is
+   `paraA` takes 2,836 steps (3,192 under `Answers Default`), and nested is killed at 5GB. The cost is
    that the choice is automatic, and it prints a notice when it goes
    mutual.
 2. **Default to nested,** your original behaviour, with the others
@@ -75,35 +77,16 @@ cheaper (`Model.Product.estimate`). `Auto` is the default today.
    estimate to compute.
 
 **What it commits us to.** Every checked-in `MeBi Sim Solve N` bound was
-measured under `Auto`. Option 2 or 3 means re-measuring them all, which
-is best done before the upstream PR. If you keep `Auto`, two small
-follow-ups remain:
+measured under `Auto` (and since 2026-10-15 under `Answers Auto`, see 5).
+Option 2 or 3 means re-measuring them all, which is best done before the
+upstream PR. If you keep `Auto`, two small follow-ups remain:
 - `Proc/Test2`'s bounds are deliberately loose, so that the file still
   compiles nested; they can be tightened.
 - `Proc/Test3`'s explicit `MutualCofix True` can be dropped.
 
 Detail: `ASSISTED-CHANGES.md`, 2026-09-29.
 
-## 3. Should `MeBi Config Solver Answers Auto` become the default?
-
-**Question.** The solver must choose an answer to each of the other
-side's moves. `Default`, the default today, chooses move by move. `Auto`
-plans every answer at `Sim Begin` and keeps the cheapest of three
-policies (`Default`, `Greedy`, `Minimal`).
-
-**Options.**
-1. **Switch to `Auto` (recommended).** On all 41 checked-in proofs it was
-   never slower than `Default`. It cut `weak_sim` proofs by 17% and
-   `weak_bisimilar` proofs by 60% (`Proc/Test3`'s `wbis_p3`: 14,427 to
-   3,579 steps).
-2. **Keep `Default`.** Nothing changes. `Auto` stays one setting away.
-
-**What it commits us to.** Switching changes every bound, as in 2. It
-was not measured with `MutualCofix` forced either way, so if you choose
-nested in 2, it needs measuring again. Detail: `ASSISTED-CHANGES.md`,
-2026-10-02 (PR #9).
-
-## 4. Which licence?
+## 3. Which licence?
 
 **Question.** There is no `LICENSE` file, and `dune-project`'s
 `(license ...)` line is commented out, so the opam package has no
@@ -114,7 +97,7 @@ one.
 plugins. LGPL-2.1 matches Rocq itself. Adding it means one file and
 uncommenting one line.
 
-## 5. Do you want proofs split into separately checked lemmas?
+## 4. Do you want proofs split into separately checked lemmas?
 
 **Question.** Some systems are decided but cannot be proved. CADP's
 two-process glued ≈ layered is decided in 45s, but every proof ran out of
@@ -130,7 +113,7 @@ block. It is a new capability, and large. The design is in
 2. **Build it.** It reaches proofs the plugin cannot produce today. It
    is the largest item on the list.
 
-## 6. For review: choices made while you were away
+## 5. For review: choices made while you were away
 
 These were Jonah's calls, made as the work went. Each can be reversed.
 
@@ -150,3 +133,15 @@ These were Jonah's calls, made as the work went. Each can be reversed.
 - **Provenance.** `rocq-sims` (N. Chappe, POPL'26) overlaps in subject,
   not in method. An audit of the assisted commits found no copying. The
   13 earliest assisted commits have no session transcript.
+- **`MeBi Config Solver Answers Auto` is the default** (2026-10-15; it was
+  `Default`, and your brief for it was decision 3). Each answer is planned
+  at `Sim Begin`, and the cheapest of the three policies kept. Measured on
+  the default suite, all 161 Solves under `Auto`, forced `True` and forced
+  `False`: none takes more steps, none changes status, and 61 take fewer
+  (the `Auto` total falls by 49%; `Proc/Test3`'s `weak_bisimilar` proofs
+  by 55-74%). `Auto` is the tool's own choice, like `MutualCofix Auto`, so
+  on an FSM saturated on demand it answers move by move unless
+  `Bounds Game` is set, instead of being refused as `Greedy` and `Minimal`
+  still are. The figures are in `doc/measurements/answers-auto.md`. Back
+  out with `MeBi Config Solver Answers Default`, or `git revert -m 1` the
+  merge.

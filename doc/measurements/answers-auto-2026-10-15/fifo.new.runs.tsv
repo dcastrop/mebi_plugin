@@ -1,0 +1,2 @@
+suite	mode	file	exit	seconds	peak_mb	errors
+fifo	auto	../CADP/Fifo	0	25.18	774	0

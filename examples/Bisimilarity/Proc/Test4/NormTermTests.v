@@ -3,7 +3,7 @@
    representatives, rather than as silent steps. The same p, q and r, from
    9720 states under [compLTS] to 82 here (81 normal forms and p itself);
    bisimilarity decided in seconds. Fast, so built by default. The proof is
-   in [NormProofs.v] (not built by default: ~7 min, ~3.8GB). See notes/13
+   in [NormProofs.v] (not built by default: ~30s, ~0.7GB). See notes/13
    and ASSISTED-CHANGES.md, 2026-10-03. *)
 
 Require Import MEBI.loader.

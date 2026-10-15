@@ -145,7 +145,7 @@ MeBi Config Bounds As Num States 200.
 
 Example wsim_pq_norm : weak_sim nLTS nLTS p q.
 Proof. MeBi Sim Begin nLTS p And nLTS q Using nLTS core termLTS.
-       MeBi Sim Solve 48820. Qed.
+       MeBi Sim Solve 6114. Qed.
 
 Example wsim_pq : weak_sim compLTS compLTS p q.
 Proof. exact (wsim_transfer p q wsim_pq_norm). Qed.
@@ -160,10 +160,12 @@ and is evaluated, not explored.
 | | states | solver steps | time | peak memory |
 |---|---|---|---|---|
 | `compLTS` directly | 9720 | out of reach | — | — |
-| `weak_sim` over `nLTS` | 82 | 48,821 | ~7 min | ~3.8GB |
+| `weak_sim` over `nLTS` | 82 | 6,115 | ~30s | ~0.7GB |
 | `weak_bisimilar` over `nLTS` (`Answers Minimal`) | 82 | 61,161 | ~4 min | ~2.8GB |
 
-Neither proof is built by default; run them under a memory cap
+(Until 2026-10-15 the `weak_sim` row was 48,821 steps, ~7 min and ~3.8GB,
+under `Answers Default`. `Answers Auto` is the default now.)
+Neither proof is built by default; run the second under a memory cap
 (`systemd-run --user --scope -p MemoryMax=6G -p MemorySwapMax=0 ...`).
 The hand proof, `ProcCongruence.v` in full, is about 300 lines and is
 written once for the calculus, not per example.

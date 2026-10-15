@@ -70,8 +70,8 @@ turns the pin into a positive test.
 
 **Cost**
 - **Proofs cost far more than deciding.** At width n = 3 (162 states a
-  side), `Bisimilarity.fsm` takes 19ms and the proof 7 minutes (56k
-  steps, 3.9GB). CADP `Size2` glued ≈ layered is decided in ~45s and
+  side), `Bisimilarity.fsm` takes 19ms and the proof 7 minutes (55k
+  steps, 4.0GB). CADP `Size2` glued ≈ layered is decided in ~45s and
   ~1.5GB, but its proof runs out of memory at 10GB. `decide-vs-prove.md`
   has the full comparison.
 - **`Auto` goes nested on an FSM saturated on demand** unless `MeBi

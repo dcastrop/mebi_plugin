@@ -20,7 +20,7 @@ Fail MeBi Run LTS (tfix X) Using G12.termLTS.
 MeBi Config Reset Bounds.
 Example wbis_k12 : weak_bisimilar G12.termLTS G12.termLTS (tfix X) (tfix (tfix X)).
 Proof. MeBi Sim Begin G12.termLTS (tfix X) And G12.termLTS (tfix (tfix X)) Using G12.termLTS.
-  MeBi Sim Solve 15167. Qed.
+  MeBi Sim Solve 6302. Qed.
 
 (* [fix_depth t < 16] is an [lt] the premise search proves to the depth of
    about 16, the default ([MeBi Config Premise Depth]): left undecided, the
@@ -36,7 +36,7 @@ MeBi Config Reset Bounds.
 MeBi Config Premise Depth 32.
 Example wbis_k16 : weak_bisimilar G16.termLTS G16.termLTS (tfix X) (tfix (tfix X)).
 Proof. MeBi Sim Begin G16.termLTS (tfix X) And G16.termLTS (tfix (tfix X)) Using G16.termLTS.
-  MeBi Sim Solve 35135. Qed.
+  MeBi Sim Solve 13826. Qed.
 MeBi Config Reset Bounds.
 
 MeBi Config Reset Weak.

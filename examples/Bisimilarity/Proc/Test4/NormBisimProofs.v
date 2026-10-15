@@ -3,9 +3,9 @@
    and [ProcCongruence.Normalised.wbis_transfer] carries it to [compLTS].
    Its own file, as heavy proofs add up in one process (see NormProofs.v).
 
-   With the default answers the proof would visit 6592 pairs (every state
-   is bisimilar to every other, so answers scatter over nearly all 82 x 82
-   pairs) and 52,088 moves. [Answers Minimal] plans within a minimal
+   With [Answers Default] (the policy until 2026-10-15) the proof would visit
+   6592 pairs (every state is bisimilar to every other, so answers scatter
+   over nearly all 82 x 82 pairs) and 52,088 moves. [Answers Minimal] plans within a minimal
    relation instead: 245 pairs, 1912 moves. Its planning took 19.5 minutes
    until 2026-10-03 ([Product.Policy.minimal_relation]), now 5.6s.
 
@@ -46,6 +46,6 @@ Proof. MeBi Sim Begin nLTS p And nLTS q Using nLTS core termLTS. MeBi Sim Solve 
 Example wbis_pq : weak_bisimilar compLTS compLTS p q.
 Proof. exact (wbis_transfer p q wbis_pq_norm). Qed.
 
-MeBi Config Solver Answers Default.
+MeBi Config Solver Answers Auto.
 MeBi Config Reset Bounds.
 MeBi Config Reset Weak.

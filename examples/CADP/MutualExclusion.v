@@ -62,7 +62,7 @@ Proof. MeBi Sim Begin lts c1 And spec_lts (make_spec 0) Using step.
 MeBi Divider "Examples.CADP.MutualExclusion.Size1.lts.spec_lts".
 Example wsim_spec_lts_1 : weak_sim spec_lts lts (make_spec 0) c1.
 Proof. MeBi Sim Begin spec_lts (make_spec 0) And lts c1 Using step.
-  MeBi Sim Solve 211. Qed.
+  MeBi Sim Solve 201. Qed.
 
 MeBi Divider "Examples.CADP.MutualExclusion.Size1.lts.mutual".
 (* Mutual similarity: the two [weak_sim]s above, one each way. *)

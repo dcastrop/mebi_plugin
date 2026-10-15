@@ -267,19 +267,22 @@ let goal_head_is (pstate : Declare.Proof.t) (name : string) : bool =
 ;;
 
 (** [answer_policy_setting ()] is the command that set the answer policy,
-    if it is not [Default]. Raises nothing. *)
+    if it is [Greedy] or [Minimal]: a choice the user made, which plans the
+    whole game. [None] for [Default] and [Auto], which are the tool's own
+    (and [Auto] is the default since 2026-10-15, as [MutualCofix Auto] is).
+    Raises nothing. *)
 let answer_policy_setting () : string option =
   match !Api.the_answer_policy with
-  | Api.Answers_default -> None
+  | Api.Answers_default | Api.Answers_auto -> None
   | Api.Answers_greedy -> Some "MeBi Config Solver Answers Greedy"
   | Api.Answers_minimal -> Some "MeBi Config Solver Answers Minimal"
-  | Api.Answers_auto -> Some "MeBi Config Solver Answers Auto"
 ;;
 
 (** [explicit_whole_game_settings ()] is the settings made explicitly that
     walk the whole game up front -- [MutualCofix True], and an answer
-    policy other than [Default] -- as the commands that set them. Raises
-    nothing. *)
+    policy of [Greedy] or [Minimal] -- as the commands that set them. [Auto]
+    of either is not one: it is the tool's own choice, and takes the cheap
+    way when the walk is not affordable. Raises nothing. *)
 let explicit_whole_game_settings () : string list =
   (if !Api.the_solver_strategy = Api.Mutual
    then [ "MeBi Config Solver MutualCofix True" ]
@@ -551,7 +554,7 @@ module Init (Solver : S) = struct
             (W.get_fsm_b ~saturated:true ())
             pi
       in
-      let p : Product.Policy.plan =
+      let planned : Product.Policy.plan option =
         match
           capped bound (fun () ->
             match !Api.the_answer_policy with
@@ -562,29 +565,45 @@ module Init (Solver : S) = struct
             | Api.Answers_auto | Api.Answers_default ->
               Product.Policy.best game (ra, rb))
         with
-        | Ok p -> p
+        | Ok p -> Some p
         | Error n ->
-          refuse_exceeded (Stdlib.Option.get (answer_policy_setting ())) n
+          (* A policy the user chose is refused past the bound, naming it;
+             [Auto] is the tool's choice, so it gives up planning and the
+             solver answers move by move. *)
+          (match answer_policy_setting () with
+           | Some setting -> refuse_exceeded setting n
+           | None ->
+             Logger.info
+               (Printf.sprintf
+                  "(Answers: the whole game is past [Bounds Game] (%i pairs); \
+                   answering move by move.)"
+                  n);
+             None)
       in
-      if p.measure.unanswered > 0
-      then
-        Logger.warning
-          (Printf.sprintf
-             "(Answers: the %s plan leaves %i moves unanswered; answering move \
-              by move instead.)"
-             (Product.Policy.name p.policy)
-             p.measure.unanswered)
-      else (
-        if p.policy <> Product.Policy.Default then W.plan := Some p;
-        Logger.notice
-          (Printf.sprintf
-             "(Answers: %s -- %i pairs, %i moves, witness %i; predicted %.0f \
-              iterations.)"
-             (Product.Policy.name p.policy)
-             p.measure.pairs
-             p.measure.moves
-             p.measure.witness
-             (Product.Policy.predicted p.measure)))
+      (match planned with
+       | None -> ()
+       | Some p ->
+         if p.measure.unanswered > 0
+         then
+           Logger.warning
+             (Printf.sprintf
+                "(Answers: the %s plan leaves %i moves unanswered; answering \
+                 move by move instead.)"
+                (Product.Policy.name p.policy)
+                p.measure.unanswered)
+         else (
+           if p.policy <> Product.Policy.Default then W.plan := Some p;
+           (* [Info], not [Notice]: every [Sim Begin] says it, and a user who
+              turns [Info] off should not see it. *)
+           Logger.info
+             (Printf.sprintf
+                "(Answers: %s -- %i pairs, %i moves, witness %i; predicted \
+                 %.0f iterations.)"
+                (Product.Policy.name p.policy)
+                p.measure.pairs
+                p.measure.moves
+                p.measure.witness
+                (Product.Policy.predicted p.measure))))
     | _ -> ()
   ;;
 
@@ -740,12 +759,15 @@ let init
      whole game of up front: planning answers, the mutual cofix's pair set,
      or [Auto]'s estimate, saturate state after state as they walk
      ([Proc/Test4]: still running after 29 minutes). A setting the user made
-     explicitly -- [MutualCofix True], an answer policy other than
-     [Default] -- needs [MeBi Config Bounds Game <n>] on demand, and is
+     explicitly -- [MutualCofix True], an answer policy of [Greedy] or
+     [Minimal] -- needs [MeBi Config Bounds Game <n>] on demand, and is
      refused, naming the bound, if the walk goes past it. [Auto] is the
      tool's own choice: without the bound it takes the nested cofix without
      estimating; with it, it estimates within the bound, and past it takes
-     the nested cofix. (2026-10-03; before, the explicit settings were
+     the nested cofix. [Answers Auto] is the same: without the bound it
+     answers move by move, within it it plans, and past it answers move by
+     move (2026-10-15, when it became the default; before, any policy
+     but [Default] was refused here). (2026-10-03; before, the explicit settings were
      refused outright, and before that silently downgraded or stalled.) *)
   let on_demand : bool = I.on_demand () in
   let bound : int option = if on_demand then !Api.the_game_bound else None in
@@ -754,12 +776,22 @@ let init
     (match explicit_whole_game_settings (), bound with
      | setting :: _, None -> refuse_unbounded setting
      | _ -> ());
-    if !Api.the_solver_strategy = Api.Auto && Stdlib.Option.is_none bound
-    then
-      Logger.notice
-        "(Saturated on demand: Auto takes the nested cofix without estimating, \
-         as estimating would walk the whole game up front. [MeBi Config Bounds \
-         Game <n>] lets it estimate within <n> pairs.)");
+    if Stdlib.Option.is_none bound
+    then (
+      if !Api.the_solver_strategy = Api.Auto
+      then
+        Logger.notice
+          "(Saturated on demand: Auto takes the nested cofix without \
+           estimating, as estimating would walk the whole game up front. [MeBi \
+           Config Bounds Game <n>] lets it estimate within <n> pairs.)";
+      (* The answer policy's feedback is [Info], so that
+         [MeBi Config Output "Info" False] silences it. *)
+      if !Api.the_answer_policy = Api.Answers_auto
+      then
+        Logger.info
+          "(Saturated on demand: Answers Auto answers move by move without \
+           planning, as planning would walk the whole game up front. [MeBi \
+           Config Bounds Game <n>] lets it plan within <n> pairs.)"));
   (* The goal is not built yet, so compare the LTS names rather than the
      terms [Concl.is_weak_refl] will see. Two names for one LTS only lose
      the refl short-cut, which over-predicts -- cost, never a missing

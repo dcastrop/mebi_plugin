@@ -2,10 +2,40 @@
 
 This repository contains a Rocq (formerly Coq) plugin for automating bisimilarity proofs (which are currently taken from the methods detailed in "Advanced Topics in Bisimulation and Coinduction", Section 3.2.2).
 
-
 **Work in progress**
 
 ---
+
+
+- [MEBI: Mechanised Bisimilarities](#mebi-mechanised-bisimilarities)
+  - [Building the Project](#building-the-project)
+    - [Toolchain](#toolchain)
+    - [First-time setup on a new machine](#first-time-setup-on-a-new-machine)
+    - [Everyday environment](#everyday-environment)
+    - [Changing dependencies](#changing-dependencies)
+    - [Documentation](#documentation)
+    - [Two build paths](#two-build-paths)
+    - [Switching back to dune after running make](#switching-back-to-dune-after-running-make)
+    - [Faster inner loops](#faster-inner-loops)
+    - [Running tests](#running-tests)
+    - [Using VSCode](#using-vscode)
+      - [Issues with `vsrocqtop`](#issues-with-vsrocqtop)
+  - [Usage](#usage)
+    - [Building an LTS or FSM](#building-an-lts-or-fsm)
+    - [Bisimilarity, merging, minimizing, saturating](#bisimilarity-merging-minimizing-saturating)
+    - [Which constructor shapes are supported](#which-constructor-shapes-are-supported)
+    - [Benchmarking](#benchmarking)
+    - [Interactive proof search (`MeBi Sim`)](#interactive-proof-search-mebi-sim)
+    - [Configuration](#configuration)
+    - [Diagnostics](#diagnostics)
+    - [Help](#help)
+  - [Status \& Remaining Work](#status--remaining-work)
+  - [Other Resources](#other-resources)
+    - [Templates](#templates)
+    - [Tutorials](#tutorials)
+    - [Other](#other)
+    - [Papers](#papers)
+    - [Books](#books)
 
 
 
@@ -73,12 +103,12 @@ make dune
 ### Faster inner loops
 A full `dune build` takes ~1m40s, almost all of it the `MeBi Benchmark` vernaculars in `theories/DevTest.v`. When you don't need them:
 
-| Changing | Command |
-| --- | --- |
-| OCaml plugin code | `dune build @check` — type-checks everything in `lib/` and `src/`, builds no `.vo` (~2s) |
-| OCaml, and you want the loadable plugin | `dune build src/` |
-| A single theory file | `dune build theories/Test.vo` |
-| Everything, before committing | `dune build` |
+| Changing                                | Command                                                                                  |
+| --------------------------------------- | ---------------------------------------------------------------------------------------- |
+| OCaml plugin code                       | `dune build @check` — type-checks everything in `lib/` and `src/`, builds no `.vo` (~2s) |
+| OCaml, and you want the loadable plugin | `dune build src/`                                                                        |
+| A single theory file                    | `dune build theories/Test.vo`                                                            |
+| Everything, before committing           | `dune build`                                                                             |
 
 `dune build @check` also produces the `.cmi`/`.cmt` files merlin needs, so it doubles as the "make my editor happy" command.
 
@@ -242,10 +272,10 @@ MeBi Config Solver Answers Default|Greedy|Minimal|Auto.
 
   Time grows faster than linearly in the count (a partial `Test4` LTS with 400k weak actions takes ~13s), so a large bound can also mean a long wait. The proof examples (`PluginProofs.v`) saturate to at most a few hundred weak actions. Run `MeBi Config Output "Info" True.` to see each estimate.
 - `Saturation OnDemand` (default `Auto`) is how `Run Bisim` and `Sim Begin` saturate each FSM. Whole, every weak action is built up front. On demand, each state is saturated when the check or the proof first needs it, holding at most `Bounds Saturation` weak actions at a time (the oldest dropped and recomputed if asked about again), and bisimilarity is decided on the quotient by silent strongly connected components (states in one silent SCC have the same weak moves; `Test4`'s 9720 states make 81), with the same verdict. `Auto` goes on demand exactly for the FSMs whose saturation would exceed `Bounds Saturation`, and warns; `True` does it for every FSM; `False` refuses those FSMs (`Saturation_Too_Large`, or with `FailIf Oversaturated False` saturates them whole anyway). `Run Saturate` and `Run Minimize` always saturate whole.
-- `Bounds Game <n>` (unset by default) caps how many pairs of states a walk of the whole proof may visit on an FSM saturated on demand. Without it, `Solver MutualCofix True` and any `Solver Answers` other than `Default` are refused on such an FSM, `Auto` takes the nested cofix without estimating, and `Run Sim` is refused; with it they run within `<n>` pairs and are refused past it.
+- `Bounds Game <n>` (unset by default) caps how many pairs of states a walk of the whole proof may visit on an FSM saturated on demand. Without it, `Solver MutualCofix True` and `Solver Answers Greedy` or `Minimal` are refused on such an FSM, `Auto` (of either) takes the nested cofix and answers move by move without estimating or planning, and `Run Sim` is refused; with it they run within `<n>` pairs and are refused past it.
 - `Weak` (and the asymmetric `Weak1`/`Weak2`) mark a label constructor as the silent/tau action, enabling weak bisimilarity/saturation. `Reset Weak` clears it back to strong bisimilarity.
 - `FailIf` controls whether an empty LTS (default `False`), an incomplete one (default `True`: exploration cut short by a bound, or a premise the search could not decide), a negative bisimilarity result (default `True`), or a saturation above `Bounds Saturation` (`Oversaturated`, default `True`) raises a hard error instead of a warning. `Oversaturated` defaults to `True` because past the bound the likely alternative is running out of memory; `False` warns and saturates anyway.
-- `Solver MutualCofix` picks how `MeBi Sim` introduces coinduction hypotheses (one nested cofix per new pair, or one mutual cofix over the whole relation; `Auto`, the default, measures both). `Solver Answers` picks how it chooses each answer to the other system's move: `Default` (the default) move by move; `Greedy`/`Minimal` from a plan built at `Sim Begin`; `Auto` the plan with the lowest predicted cost. On the checked-in examples `Auto` was never slower than `Default`, and cut the `weak_bisimilar` proofs by 60% (`ASSISTED-CHANGES.md`, 2026-10-02).
+- `Solver MutualCofix` picks how `MeBi Sim` introduces coinduction hypotheses (one nested cofix per new pair, or one mutual cofix over the whole relation; `Auto`, the default, measures both). `Solver Answers` picks how it chooses each answer to the other system's move: `Auto` (the default, since 2026-10-15) the plan with the lowest predicted cost, among `Default`, `Greedy` and `Minimal`; `Default` move by move, as the solver did before; `Greedy`/`Minimal` from one of those plans. On the checked-in examples `Auto` was never slower than `Default`, and cut the `weak_bisimilar` proofs by 60% (`ASSISTED-CHANGES.md`, 2026-10-02). On an FSM saturated on demand, `Auto` answers move by move unless `Bounds Game` is set.
 - `Output "<Kind>" <bool>` toggles one log channel. `<Kind>` is one of `Debug`, `Info`, `Notice`, `Warning`, `Error`, `Trace`, `Result`, `Show`, `DecodeResults`, `DumpResults`. `DumpResults` is off by default: when on, every command writes its FSMs and results as JSON files into `./_dumps/` in the working directory, which is useful for debugging but costly on large systems (on `Proc/Test4`, about 20s, hundreds of MB on disk and 1GB of extra memory per command).
 
 ### Diagnostics

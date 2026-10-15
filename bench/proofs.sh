@@ -6,8 +6,8 @@
 #             MutualExclusion.v and GluedLayered.v, CCS's PluginProofs.v
 #             and LawProofs.v; ~3 min a mode), abp (the
 #             Alternating Bit Protocol proofs, ~4 min and ~4.3GB each),
-#             test4 (Test4 through the normalised semantics, ~11 min,
-#             ~3.8GB peak), eval (the evaluation levers in
+#             test4 (Test4 through the normalised semantics, ~5 min,
+#             ~2.8GB peak), eval (the evaluation levers in
 #             examples/Evaluation as built by default, ~40s) or eval-large
 #             (the same levers scaled up). Default: default.
 #   -f FILES  comma-separated subset of the suite's proof files to run,

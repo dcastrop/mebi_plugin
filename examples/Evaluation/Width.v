@@ -33,7 +33,7 @@ Fail MeBi Run LTS (wl 1) Using procLTS.
 MeBi Config Reset Bounds.
 Example wbis_w1 : weak_bisimilar procLTS procLTS (wl 1) (wr 1).
 Proof. MeBi Sim Begin procLTS (wl 1) And procLTS (wr 1) Using procLTS.
-  MeBi Sim Solve 1162. Qed.
+  MeBi Sim Solve 973. Qed.
 
 (* n = 2: 54 states. *)
 MeBi Config Bounds As Num States 54.
@@ -43,6 +43,6 @@ Fail MeBi Run LTS (wl 2) Using procLTS.
 MeBi Config Reset Bounds.
 Example wbis_w2 : weak_bisimilar procLTS procLTS (wl 2) (wr 2).
 Proof. MeBi Sim Begin procLTS (wl 2) And procLTS (wr 2) Using procLTS.
-  MeBi Sim Solve 8255. Qed.
+  MeBi Sim Solve 7663. Qed.
 
 MeBi Config Reset Weak.
