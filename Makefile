@@ -17,8 +17,4 @@ Makefile.rocq: _CoqProject
 dune: clean
 	dune build
 
-tests: all
-	@$(MAKE) -C tests -s clean
-	@$(MAKE) -C tests -s all
-
 -include Makefile.rocq
