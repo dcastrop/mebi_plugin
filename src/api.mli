@@ -94,7 +94,10 @@ val reset_mutual_cofix : unit -> unit
 (** How the proof solver chooses each answer (see
     [Model.Product.Policy]): [Default] as it always has; [Greedy] and
     [Minimal] from a plan built at [MeBi Sim Begin]; [Auto] the plan with
-    the lowest predicted cost. [Default] by default. *)
+    the lowest predicted cost. [Auto] by default (until 2026-10-15 it was
+    [Default]). Like [MutualCofix Auto] it is the tool's own choice, so an
+    FSM saturated on demand does not refuse it: without a [Bounds Game] it
+    answers move by move, as [Default] does. *)
 type answer_policy =
   | Answers_default
   | Answers_greedy

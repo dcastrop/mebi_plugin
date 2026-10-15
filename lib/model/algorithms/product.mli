@@ -218,8 +218,8 @@ module type S = sig
   val reachable_bisim : refl:bool -> game -> partition -> Pair.t -> Pair.Set.t
 
   (** Policies for choosing answers. [Default] is {!val:answer}'s choice,
-      the solver's behaviour unless [MeBi Config Solver Answers] says
-      otherwise. Any other policy is turned, at [MeBi Sim Begin], into a
+      the solver's behaviour until 2026-10-15; [MeBi Config Solver Answers Auto], the default since, keeps whichever policy plans cheapest,
+      [Default] among them. Any other policy is turned, at [MeBi Sim Begin], into a
       {!type:Policy.plan}: the answer for every move the game can reach, and
       the pairs that makes. The solver then answers from the plan, and the
       mutual block and the cofix-strategy estimate read its pairs, so the
