@@ -140,3 +140,4 @@ pin-depends: [
   "https://github.com/rocq-prover/rocq/releases/download/V9.2.0/rocq-9.2.0.tar.gz"
 ]
 x-maintenance-intent: ["(latest)"]
+license: "GPL-3.0-or-later AND LGPL-2.1-or-later"

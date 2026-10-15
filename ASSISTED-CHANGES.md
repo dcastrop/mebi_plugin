@@ -8476,6 +8476,141 @@ Refactor 0 · Bug fix 0 · **New feature 0.**
 
 ---
 
+## 2026-10-15 (cont.) — a licence split (GPL plugin, LGPL library), drafted
+
+On branch `docs/licence-split`. At Jonah's request, after David said he did
+not mind and tended to use GPL "since it keeps it free".
+
+**A reversal, and why.** This was drafted to wait for the University of
+Kent's confirmation, and the first commit says "do not merge" until then.
+Jonah then decided to apply it first, and David, the PI, to obtain Kent's
+confirmation afterwards. The reason is that the repository is already public:
+an unlicensed copy gives anyone who has one no rights, and a licence in
+place helps them. The licence was applied on 2026-10-15, before Kent has
+confirmed. What that leaves open is in the section below; the first commit's
+message, which says otherwise, is left as it was.
+
+**Docs.** The repository had no licence. This adds two, by directory
+(`LICENSE`, the texts in `LICENSES/`, copied verbatim from the system's
+`/usr/share/common-licenses`, and checked by hash):
+- **GPL-3.0-or-later**: the plugin (`src/`, `lib/`, `test/`, `bench/`,
+  `scripts/`), the files that load and test it (`theories/loader.v`,
+  `Test.v`, `DevTest.v`), and what is not listed (build files, docs).
+- **LGPL-2.1-or-later**: the Rocq library (`theories/Bisimilarity.v`,
+  `Premises.v`, `Transfer.v`, `Hiding.v`, `Traces.v`) and `examples/`.
+
+**Why the line is there.** The plugin's lookups of library constants name
+only `MEBI.Bisimilarity` (19 names) and `MEBI.Premises`, so a proof the
+plugin generates depends on those two files and the standard library, not
+on anything GPL. `Premises.v` (the lemmas for bounded universals) is
+therefore on the LGPL side, though `loader.v` imports it. `Hiding`,
+`Transfer` and `Traces` import only `Bisimilarity`. Compatibility: Rocq is
+LGPL-2.1 (a GPL-3-or-later work may link it, through the "or later" of
+LGPL-2.1 section 3); `yojson` is BSD-3; `benchmark` is LGPL-3.0 with the
+OCaml linking exception, which is why it is GPL-3 and not GPL-2.
+
+**The packaging.** `dune-project` gets `(license "GPL-3.0-or-later AND
+LGPL-2.1-or-later")`, `rocq-mebi.opam` and `rocq-mebi.opam.locked`
+regenerated (`scripts/relock.sh`; one line each). `README.md` has a
+Licence section. Decision 3 (licence) is removed from `doc/decisions.md`
+and `OUTSTANDING.md` and the later ones renumbered 3-4, with a bullet
+under "for review". No file headers were added; the table in `LICENSE`
+carries it.
+
+**What is not yet settled with Kent: its Intellectual Property Policy (March
+2013), and the grant.** Read, not legal advice:
+- §3.1: the University owns the IP created by staff "in the course of
+  normal duties"; §3.3: it requires registered students to assign all IP
+  developed whilst at the University. So the copyright is probably the
+  University's, for both authors, and David's agreement is not the
+  University's. The commits carry kent.ac.uk addresses.
+- Appendix A, "Open source publication": new material "may be published
+  under an open source license with no commercial rights", and "the release
+  of commercial rights should only be done in consultation with KIE"; the
+  University must be asked (Head of School) before University-owned
+  material is made open-access. Software is "Computing works" there, and
+  KIE "can provide advice on the licencing of software ... 'open licencing'
+  may be the most appropriate route".
+- §5: a funder's contract may specify who owns the IP: the funding
+  conditions needed checking, and were (next).
+- **The grant** is EPSRC EP/Y00339X/1, "MEBI: Mechanised Bisimilarities
+  and Behavioural-typed Processes" (University of Kent, PI David Castro
+  Perez, January 2024 to April 2026, project partners ITU Copenhagen and
+  DTU; Gateway to Research). The repository is its funded output. UKRI's
+  standard terms (RGC 12.1, version 16 of 2026-10-01) leave "all
+  intellectual property" with "the party that generates" it, so with the
+  University, not the funder; RGC 12.3 reserves a right to retain it "in
+  individual cases", which is for KIE to confirm it has not been used. They
+  do not mention software or open source. UKRI asks for the grant to be
+  acknowledged in publications (RGC 12.4) and, where possible, on public
+  websites (RGC 12.6): `README.md` now does. EPSRC's data policy covers
+  software only where it is needed to validate findings, and recommends an
+  open licence as good practice; it does not require one. So the funder
+  supports the release but does not demand it and does not own the code.
+- **Where it is not clean: the history against the grant dates.** Of 1,583
+  commits, 1,108 are from the grant period (January 2024 to April 2026) and
+  475 are after it (August to October 2026), 384 of those Claude-assisted:
+  the Rocq 9.2 port, the answer policies, the measurements, PRs #1-#74. The
+  grant record says "Closed". Whether that work was within a contract of
+  employment, and on what funding, is the author's to say and KIE's to
+  confirm; the author addresses do not tell (personal addresses are used
+  throughout, Kent's on 48 commits). If any of it was outside employment,
+  it is not within §3.1, and the licence for it is its author's to give.
+- **Partners:** RGC 12.1 expects a formal collaboration agreement where
+  partners are involved; whether one exists for the ITU and DTU case
+  studies, and says anything about this code, is worth asking the PI.
+- **The work since April 2026** was on EPSRC UKRI1247, "INDIMO: Invariant
+  Discovery and Monitoring for Message-Passing Programs" (PI Julien Lange,
+  March 2026 to March 2029). Its Gateway to Research record lists **Royal
+  Holloway** as lead and Aarhus, SUTD, Uber and Meta as partners, and **no
+  University of Kent**. So which institution has employed the author since
+  April 2026 is a question to settle: if Kent, where Kent's share of the
+  grant sits (a record of its own, not found); if Royal Holloway, its IP
+  policy governs that work and it, too, must agree to the licence and be
+  named in the notice. The README acknowledges both grants; INDIMO's PI
+  should confirm the wording. (Settled by the author: Kent employs them, and
+  INDIMO's secondary PI is at Kent, so one institution, and the secondary PI
+  can say which reference Kent's share is under.)
+
+**What Kent's own guidance says** (read 2026-10-15; the 2013 policy is still
+the one hosted):
+- "Copyright for researchers": "the University of Kent will own the
+  copyright in the outputs of your research, for example if you create
+  software"; funders may own IP only where "stated in your funding
+  agreement". The contact for IP and commercialisation is Research and
+  Innovation Services (commercialisation@kent.ac.uk): KIE, named in the
+  2013 policy, is that office's predecessor.
+- "Choose a licence for your research works": no licence is required. For
+  software it lists GNU GPL 3.0 ("to make sure all versions remain free"),
+  GNU LGPL 3.0 and the Artistic Licence 2.0, and does not mention MIT or
+  Apache. Help with licences: researchsupport@kent.ac.uk.
+- So the split is within what Kent describes. Read with the policy's "no
+  commercial rights" line, a copyleft licence leaves the owner (the
+  University) free to license the code commercially itself, which a
+  permissive licence does not.
+- The notice therefore names the University first. The wording of the
+  notice, and whether "no commercial rights" is compatible with GPL and
+  LGPL (both allow commercial use), are questions for KIE.
+
+**Not checked.** That nothing in `examples/` is copied from elsewhere (the
+CCS laws are stated after CTrees', not copied; the 2026-10 provenance audit
+found none); that the policy is current (this copy is dated 2013).
+
+**What changing it later means.** The grant to a recipient is irrevocable
+for the copies they have (GPL-3.0 section 2; LGPL-2.1 section 8). A later
+change applies to later versions, and needs every copyright holder, and any
+outside contributor, to agree. So: no outside contributions until Kent has
+confirmed, and the tag, the DOI and the opam announcement wait for it.
+Until then people use `#main`, or a commit.
+
+Revert: `git revert -m 1 <merge commit>` (this takes the licence files away
+from later versions; it cannot recall copies already distributed).
+
+**Session tally (2026-10-15), cont.:** Docs 8 · Optimization 1 · Tooling 1 ·
+Refactor 0 · Bug fix 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

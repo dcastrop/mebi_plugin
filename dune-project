@@ -21,7 +21,10 @@
 
 (maintainers "David Castro-Perez")
 
-; (license LICENSE)
+; Two licences, by directory: see LICENSE. The plugin is GPL-3.0-or-later,
+; the Rocq library (theories/ but for loader.v and the tests) and examples/
+; are LGPL-2.1-or-later.
+(license "GPL-3.0-or-later AND LGPL-2.1-or-later")
 
 ; (documentation https://url/to/documentation)
 

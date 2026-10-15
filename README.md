@@ -30,6 +30,8 @@ This repository contains a Rocq (formerly Coq) plugin for automating bisimilarit
     - [Diagnostics](#diagnostics)
     - [Help](#help)
   - [Status \& Remaining Work](#status--remaining-work)
+  - [Licence](#licence)
+  - [Acknowledgements](#acknowledgements)
   - [Other Resources](#other-resources)
     - [Templates](#templates)
     - [Tutorials](#tutorials)
@@ -307,6 +309,26 @@ MeBi Help <topic>.
 The core functionality described under [Usage](#usage) — reading a `Step : Term -> Label -> Term -> Prop`-shaped relation, building an LTS/FSM from a term, deciding (weak) bisimilarity, and turning the result into a Rocq proof via `MeBi Sim` — is implemented and working. What is still open is indexed in [`OUTSTANDING.md`](OUTSTANDING.md), with the detail in [`doc/limitations.md`](doc/limitations.md) (what the tool cannot do today), [`doc/future-work.md`](doc/future-work.md) and [`doc/decisions.md`](doc/decisions.md) (decisions for the repository's owner).
 
 
+
+## Licence
+
+Two licences, by directory (`LICENSE`; the texts are in `LICENSES/`):
+- The **plugin** (`src/`, `lib/`, `test/`, `bench/`, and the files that load
+  and test it) is **GPL-3.0-or-later**, so changes to it stay free.
+- The **Rocq library** other developments import (`theories/Bisimilarity.v`,
+  `Premises.v`, `Transfer.v`, `Hiding.v`, `Traces.v`) and `examples/` are
+  **LGPL-2.1-or-later**, as Rocq itself is. The proofs the plugin generates
+  refer to nothing but `MEBI.Bisimilarity` and `MEBI.Premises`, so a
+  development that imports the library, or contains such a proof, is not
+  bound by the GPL.
+
+## Acknowledgements
+
+This work was supported by the UK Engineering and Physical Sciences
+Research Council (EPSRC) grants EP/Y00339X/1, *MEBI: Mechanised
+Bisimilarities and Behavioural-typed Processes* (University of Kent), and
+UKRI1247, *INDIMO: Invariant Discovery and Monitoring for Message-Passing
+Programs* (Royal Holloway, University of London).
 
 ## Other Resources
 
