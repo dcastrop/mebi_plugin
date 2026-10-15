@@ -72,7 +72,7 @@ Fail MeBi Run LTS (tfix X) Using G2.termLTS.
 MeBi Config Reset Bounds.
 Example wbis_k2 : weak_bisimilar G2.termLTS G2.termLTS (tfix X) (tfix (tfix X)).
 Proof. MeBi Sim Begin G2.termLTS (tfix X) And G2.termLTS (tfix (tfix X)) Using G2.termLTS.
-  MeBi Sim Solve 107. Qed.
+  MeBi Sim Solve 92. Qed.
 
 Module K4 <: BOUND. Definition K := 4. End K4.
 Module G4 := Guarded K4.
@@ -83,7 +83,7 @@ Fail MeBi Run LTS (tfix X) Using G4.termLTS.
 MeBi Config Reset Bounds.
 Example wbis_k4 : weak_bisimilar G4.termLTS G4.termLTS (tfix X) (tfix (tfix X)).
 Proof. MeBi Sim Begin G4.termLTS (tfix X) And G4.termLTS (tfix (tfix X)) Using G4.termLTS.
-  MeBi Sim Solve 671. Qed.
+  MeBi Sim Solve 406. Qed.
 
 Module K8 <: BOUND. Definition K := 8. End K8.
 Module G8 := Guarded K8.
@@ -94,6 +94,6 @@ Fail MeBi Run LTS (tfix X) Using G8.termLTS.
 MeBi Config Reset Bounds.
 Example wbis_k8 : weak_bisimilar G8.termLTS G8.termLTS (tfix X) (tfix (tfix X)).
 Proof. MeBi Sim Begin G8.termLTS (tfix X) And G8.termLTS (tfix (tfix X)) Using G8.termLTS.
-  MeBi Sim Solve 4703. Qed.
+  MeBi Sim Solve 2170. Qed.
 
 MeBi Config Reset Weak.

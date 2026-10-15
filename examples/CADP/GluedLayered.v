@@ -43,7 +43,7 @@ MeBi Divider "Examples.CADP.GluedLayered.Size1.bigstep".
 Example wsim_bigstep_1 : weak_sim bigstep lts c1 c1. 
 Proof. MeBi Sim Begin bigstep c1 And lts c1 Using step.
   (* Iteration History: 267 <- 300 <- _ <- _ *) 
-  MeBi Sim Solve 267. Qed.
+  MeBi Sim Solve 245. Qed.
 
 
 MeBi Divider "Examples.CADP.GluedLayered.Size1.lts".

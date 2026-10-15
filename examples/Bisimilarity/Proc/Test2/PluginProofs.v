@@ -95,14 +95,14 @@ Proof. split; [exact wsim_pr | exact wsim_rp]. Qed.
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pq.bisimilar".
 Example wbis_pq : weak_bisimilar termLTS termLTS p q.
 Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
-  MeBi Sim Solve 701. Qed.
+  MeBi Sim Solve 424. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.qr.bisimilar".
 Example wbis_qr : weak_bisimilar termLTS termLTS q r.
 Proof. MeBi Sim Begin termLTS q And termLTS r Using termLTS.
-  MeBi Sim Solve 851. Qed.
+  MeBi Sim Solve 374. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pr.bisimilar".
 Example wbis_pr : weak_bisimilar termLTS termLTS p r.
 Proof. MeBi Sim Begin termLTS p And termLTS r Using termLTS.
-  MeBi Sim Solve 851. Qed.
+  MeBi Sim Solve 408. Qed.

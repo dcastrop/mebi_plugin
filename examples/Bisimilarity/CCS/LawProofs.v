@@ -64,7 +64,7 @@ MeBi Divider "Examples.Bisimilarity.CCS.LawProofs.tau".
 Example tau1 : weak_bisimilar step step (? a . tau. P) (? a . P).
 Proof. MeBi Sim Begin step (? a . tau. P) And step (? a . P) Using step. MeBi Sim Solve 41. Qed.
 Example tau2 : weak_bisimilar step step (sum P (tau. P)) (tau. P).
-Proof. MeBi Sim Begin step (sum P (tau. P)) And step (tau. P) Using step. MeBi Sim Solve 52. Qed.
+Proof. MeBi Sim Begin step (sum P (tau. P)) And step (tau. P) Using step. MeBi Sim Solve 26. Qed.
 Example tau3 :
   weak_bisimilar step step (sum (? a . sum P (tau. Q)) (? a . Q)) (? a . sum P (tau. Q)).
 Proof.
@@ -117,6 +117,6 @@ Proof. MeBi Sim Begin step (par pnil (par P Q)) And step (par P Q) Using step. M
 Example parap0 : weak_bisimilar step step (par (par P Q) pnil) (par P Q).
 Proof. MeBi Sim Begin step (par (par P Q) pnil) And step (par P Q) Using step. MeBi Sim Solve 324. Qed.
 Example paraA : weak_bisimilar step step (par P (par Q R)) (par (par P Q) R).
-Proof. MeBi Sim Begin step (par P (par Q R)) And step (par (par P Q) R) Using step. MeBi Sim Solve 3191. Qed.
+Proof. MeBi Sim Begin step (par P (par Q R)) And step (par (par P Q) R) Using step. MeBi Sim Solve 2835. Qed.
 
 MeBi Config Reset Weak.
