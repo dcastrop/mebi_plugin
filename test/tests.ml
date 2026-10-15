@@ -1329,7 +1329,7 @@ let test_tree_order () : unit =
     are its constructor's premises, all required, so all of them are
     replayed, depth-first, left to right -- the order Rocq focuses premise
     goals in. It replaced [minimize], which kept only the shortest child
-    (backlog A6; [theories/Test.v]'s [TwoPremises]). *)
+    (backlog A6; [test/rocq/Test.v]'s [TwoPremises]). *)
 let test_tree_preorder () : unit =
   print_endline "terms: Tree.preorder, Tree.size and Trees.min";
   let chain = Tree.N (node 1 0, [ Tree.N (node 2 1, [ leaf 3 2 ]) ]) in

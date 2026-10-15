@@ -145,13 +145,14 @@ make dune
 `make` writes generated files into the source tree (`src/g_mebi.ml`, `*.vo`, `*.glob`, `*.cm*`). Dune also claims those paths, so a following `dune build` fails with `Multiple rules generated ...`. Dune has no way to ignore them, so the artifacts have to go: `make dune` is just `make clean && dune build`.
 
 ### Faster inner loops
-A full `dune build` takes ~1m40s, almost all of it the `MeBi Benchmark` vernaculars in `theories/DevTest.v`. When you don't need them:
+A full `dune build` takes ~1m40s, almost all of it the `MeBi Benchmark` vernaculars in `test/rocq/DevTest.v`, which is not part of the installed package, so `opam` does not run it. When you don't need them:
 
 | Changing                                | Command                                                                                  |
 | --------------------------------------- | ---------------------------------------------------------------------------------------- |
 | OCaml plugin code                       | `dune build @check` — type-checks everything in `lib/` and `src/`, builds no `.vo` (~2s) |
 | OCaml, and you want the loadable plugin | `dune build src/`                                                                        |
-| A single theory file                    | `dune build theories/Test.vo`                                                            |
+| The plugin and library, no tests        | `dune build @install` — what opam builds (~7s from clean)                                |
+| A single test file                      | `dune build test/rocq/Test.vo`                                                           |
 | Everything, before committing           | `dune build`                                                                             |
 
 `dune build @check` also produces the `.cmi`/`.cmt` files merlin needs, so it doubles as the "make my editor happy" command.
@@ -159,7 +160,7 @@ A full `dune build` takes ~1m40s, almost all of it the `MeBi Benchmark` vernacul
 ### Running tests
 `dune exec test/tests.exe` runs a small pure-OCaml test suite (no Rocq runtime) exercising `lib/model` directly — FSM construction, saturation, minimization, bisimilarity, JSON round-tripping. It's a fast first signal for changes to `lib/model`/`lib/terms`/`lib/utils`, but it doesn't exercise the proof solver (`src/proof_solver*`) or anything Rocq-facing.
 
-`theories/Test.v` runs the solver on small cases; the end-to-end coverage is the proof files under `examples/`: the `PluginProofs.v` files in `examples/Bisimilarity/**`, and the CADP proofs in `examples/CADP/` (`MutualExclusion.v`, `GluedLayered.v`, `Fifo.v`, ...). Most are commented out of `_CoqProject` by default (full proof search is slow — some examples need tens of thousands of tactic iterations); `CCS/PluginProofs.v`, `CCS/LawProofs.v` and `examples/Evaluation/{Width,Layers,Depth}.v` are built by default. Uncomment the ones you need and run `make -j$(nproc)` to exercise them; see the comment next to each line in `_CoqProject` for which are cheap vs. expensive.
+`test/rocq/Test.v` runs the solver on small cases; the end-to-end coverage is the proof files under `examples/`: the `PluginProofs.v` files in `examples/Bisimilarity/**`, and the CADP proofs in `examples/CADP/` (`MutualExclusion.v`, `GluedLayered.v`, `Fifo.v`, ...). Most are commented out of `_CoqProject` by default (full proof search is slow — some examples need tens of thousands of tactic iterations); `CCS/PluginProofs.v`, `CCS/LawProofs.v` and `examples/Evaluation/{Width,Layers,Depth}.v` are built by default. Uncomment the ones you need and run `make -j$(nproc)` to exercise them; see the comment next to each line in `_CoqProject` for which are cheap vs. expensive.
 
 `bench/proofs.sh` is the quicker way: it compiles each proof file in its own memory-capped process and tabulates the solver's step counts, which `CLAUDE.md` lists as the known-good baseline (see [`bench/README.md`](bench/README.md)).
 
@@ -193,7 +194,7 @@ If VSCode is launched outside the direnv environment it won't have `_opam/bin` o
 
 ## Usage
 
-Every command below starts with `MeBi` and needs `Require Import MEBI.loader.` first. This is the current command surface — see `src/g_mebi.mlg` for the exact grammar, and `theories/Test.v`/`theories/DevTest.v` for more worked examples.
+Every command below starts with `MeBi` and needs `Require Import MEBI.loader.` first. This is the current command surface — see `src/g_mebi.mlg` for the exact grammar, and `test/rocq/Test.v`/`test/rocq/DevTest.v` for more worked examples.
 
 The worked examples (process calculi, CCS and the Alternating Bit Protocol, the CADP MCS lock and its properties) are described in [`examples/README.md`](examples/README.md).
 

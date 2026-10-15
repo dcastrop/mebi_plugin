@@ -42,7 +42,7 @@ cbbdd39:TODO.md`); the index replaced a 438-line version on 2026-10-13
 
 ## Verifying changes to `lib/model` or the proof solver
 
-`theories/Test.v` and `DevTest.v` alone are **not** sufficient coverage for
+`test/rocq/Test.v` and `DevTest.v` alone are **not** sufficient coverage for
 changes touching the model or `src/proof_solver*`. The tests that actually
 exercise the proof solver end to end are the `examples/Bisimilarity/**/
 PluginProofs.v` files, which are commented out of `_CoqProject` by default
@@ -273,17 +273,17 @@ session has them.
   committing such a change.
 - In-tree build artifacts (`.vo`, `.glob`, `.aux` left in `theories/`,
   `examples/` or `src/` by `make` or by deleting parts of `_build` by hand)
-  can make `dune build` **silently skip** `theories/Test.v` -- no error, no
-  output (seen 2026-10-05). If `Test.v`'s messages are missing, check
-  `_build/default/theories/Test.vo` exists; `git clean -fX theories src
-  examples` and `dune clean` restore it. Verification in a fresh worktree
+  can make `dune build` **silently skip** `test/rocq/Test.v` -- no error, no
+  output (seen 2026-10-05, when it was `theories/Test.v`). If `Test.v`'s
+  messages are missing, check `_build/default/test/rocq/Test.vo` exists;
+  `git clean -fX theories test src examples` and `dune clean` restore it. Verification in a fresh worktree
   (the `bench/` scripts) is not affected.
 - `make` rejects warnings `dune build` accepts, notably **warning 50**: a
   doc comment separated from its definition, which inserting new code
   between the two causes. Run `make -j$(nproc) src/mebi_plugin.cmxs
-  theories/Test.vo` (then `make dune`) *before* starting a proof-suite run,
+  test/rocq/Test.vo` (then `make dune`) *before* starting a proof-suite run,
   or a failed build costs the whole run.
-- `theories/Test.v` contains deliberate **known-wrong** tests (a `Fail`, or
+- `test/rocq/Test.v` contains deliberate **known-wrong** tests (a `Fail`, or
   a pin that succeeds only while a limitation lasts), each with a comment
   saying so. When behaviour improves one of them starts failing, which is
   intended: turn it into a positive test. Check every `Fail` fails for the

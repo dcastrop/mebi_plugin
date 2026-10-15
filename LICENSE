@@ -10,9 +10,8 @@ MeBi (rocq-mebi) is distributed under two licences, by directory.
     lib/                      its OCaml libraries (model, terms, utils, ...)
     test/  bench/  scripts/   its tests and tooling
     theories/loader.v         the file that loads the plugin
-    theories/Test.v           the tests that drive it
-    theories/DevTest.v
     and everything else not listed below: build files, documentation.
+    (test/ includes the Rocq-level tests, test/rocq/.)
 
   THE LIBRARY: GNU Lesser General Public License, version 2.1 or (at your
   option) any later version (SPDX: LGPL-2.1-or-later;

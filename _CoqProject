@@ -1,5 +1,6 @@
 src/META.rocq-mebi
 -R theories/ MEBI
+-R test/rocq/ MEBITests
 -R examples/ MEBI.Examples
 -I lib/
 -I lib/utils/
@@ -12,8 +13,8 @@ src/META.rocq-mebi
 -arg "-w all"
 
 theories/loader.v ###
-theories/DevTest.v ###
-theories/Test.v ###
+test/rocq/DevTest.v ###
+test/rocq/Test.v ###
 
 theories/Bisimilarity.v ###
 theories/Premises.v ###

@@ -8620,6 +8620,60 @@ Refactor 0 · Bug fix 0 · **New feature 0.**
 
 ---
 
+## 2026-10-15 (cont.) — the Rocq tests leave the package: `test/rocq/`
+
+On branch `refactor/rocq-tests-out-of-package`, at Jonah's request, after he
+asked whether `opam upgrade rocq-mebi` ran anything unnecessary.
+
+**Tooling.** It did. opam builds a pinned package with `dune build -p
+rocq-mebi @install`, and `@install` built, and installed, everything in
+the `MEBI` theory, `Test.v` and `DevTest.v` among it. From dune's trace of a
+clean build (4 jobs, cache off):
+
+| | CPU | wall |
+|---|---|---|
+| before: `DevTest.v` (its `MeBi Benchmark` runs) | 53 s | |
+| before: `Test.v` | 4 s | |
+| before: everything else, the plugin and the library | ~20 s | ~60 s |
+| after | ~20 s | **7 s** |
+
+Nothing `Require`s either file. They now live in `test/rocq/`, a theory of
+their own (`MEBITests`, `(theories MEBI)`, no `(package)`), so the opam
+build neither builds nor installs them (installed: `Bisimilarity`, `Hiding`,
+`loader`, `Premises`, `Traces`, `Transfer`), and `dune build @install` is
+now the fast loop (README). Plain `dune build`, and so CI, still builds them
+(56 s). `_CoqProject` maps `-R test/rocq/ MEBITests`, so `make` is
+unchanged otherwise.
+
+**What did not work, tried first** (so it is not tried again). Dune maps a
+directory to one logical path, so: a second theory in `theories/` shadows
+`MEBI` (`Cannot find ... MEBI.loader`); `(:include ...)` is not allowed in
+`modules`; and two stanzas of one name, picked by `enabled_if` on the
+profile, are rejected as a duplicate. A directory of its own was left.
+
+**Why `test/rocq/`, not `tests/`.** The `Makefile` has a dead `tests:`
+target for a `tests/` directory that does not exist, and `test/` holds the
+OCaml tests; `test/rocq/` is next to them and already under the GPL row of
+`LICENSE`, which drops two lines.
+
+**Paths.** `theories/Test.v` and `DevTest.v` become `test/rocq/Test.v` and
+`DevTest.v`: `_CoqProject`, `bench/testv-counts.sh`, `CLAUDE.md`, `README.md`,
+`LICENSE`, and the docs and two comments that named them. Earlier entries in
+this log, and `doc/measurements/`, still say `theories/`: they describe the
+state at the time.
+
+Checked: `dune build -p rocq-mebi @install`, `dune build`, `dune build
+@fmt`, `test/tests.exe` 110/110, `scripts/check_module_lists.py`,
+`bench/testv-counts.sh`, and `make` of the plugin and `test/rocq/Test.vo`.
+
+Revert: `git revert -m 1 <merge commit>`.
+
+**Session tally (2026-10-15), cont.:** Docs 10 (counting the README's Try
+it and its two corrections) · Optimization 1 · Tooling 2 · Refactor 0 ·
+Bug fix 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
