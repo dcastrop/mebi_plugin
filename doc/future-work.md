@@ -163,6 +163,68 @@ touches the proof solver's view of derivations, so it needs the full
 proof-suite runs. How much it would save is unmeasured. The measurement
 patch is kept locally (`notes/tools/extraction-profile.diff`).
 
+## Re-running the large CADP proofs
+
+**Why.** The two- and three-process CADP figures were measured on a 14GB
+machine under `Answers Default`. Three proofs ran out of memory, at 7-10GB.
+Since 2026-10-15 `Answers Auto` is the default, and it cut `Test4`'s
+`weak_sim` from 48,821 steps and 3.75GB to 6,115 steps and 0.72GB
+(`doc/measurements/answers-auto.md`). A 90-second look at
+`MutualExclusionLarge.v` under it already showed `wsim_norm_r_2` at 75
+steps (153 before) and the three-process `wsim_norm_r_3` at 124 (326
+before). So the heavy proofs may now fit, or finish, and a 32GB machine
+says which. Nothing here is new: the same statements, the same plugin.
+This is not measured yet; the look above was a smoke run, not a result.
+
+**On the host.** Clone, `nix develop`, then `opam switch create . --locked
+--deps-only` and `dune build` (`README.md`, "Build"). `dune exec
+test/tests.exe` should say 110/110. Nothing else is needed: `bench/` copies
+the examples and compiles what each proof needs.
+
+**The runs.** One file is one process, memory-capped (`-M`), and heavy
+proofs go one at a time (`-j 1`, the suites' default):
+
+| run | how | measured before (14GB, `Answers Default`) | cap |
+|---|---|---|---|
+| `MutualExclusionLarge.v`: two processes normalised (1,037 and 152 steps) and direct (11,127 and 404), three processes spec <= system (325) | `-s cadp-large` | ~10 min, ~4.4GB; forced nested OOM-killed at 6GB | 24G |
+| three processes, system <= spec | `-s cadp-huge -f ThreeProcessesMutex.v` | OOM at 8GB after ~11 min (Auto), 9GB after ~13 min (`Answers Minimal`) | 28G |
+| three processes, FIFO bisimilarity | `-s cadp-huge -f ThreeProcessesFifo.v` | OOM at 9GB after ~15 min | 28G |
+| two processes, glued ~ layered | `-s cadp-huge -f TwoProcessesGluedLayered.v` | OOM at 7GB (17-35 min) and 10GB (25-52 min); mutual cofix, with `Bounds Game 100000000`, unfinished after 2h28m with memory flat at ~2.2GB | 28G |
+
+```sh
+export MEBI_BENCH_DIR=$HOME/mebi-bench      # where the runs go
+bench/proofs.sh -s cadp-large -M 24G -t cadp-large-auto
+bench/proofs.sh -s cadp-large -M 24G -a Default -t cadp-large-default   # the old policy, same host
+bench/proofs.sh -s cadp-huge -f ThreeProcessesMutex.v -M 28G -t huge-mutex-auto
+bench/proofs.sh -s cadp-huge -f ThreeProcessesFifo.v -M 28G -t huge-fifo-auto
+bench/proofs.sh -s cadp-huge -f TwoProcessesGluedLayered.v -M 28G -t huge-glued-auto
+```
+
+- **The `-a Default` runs are the baseline** for the same machine. They may
+  run out of memory or take hours; that is an answer too. `cadp-large`'s
+  bounds are the old counts, so it passes under both policies.
+- **The huge proofs may not finish.** Run them one at a time, overnight,
+  and stop them with a timeout rather than waiting. The log keeps the last
+  `Auto:` and `Answers:` lines, which say which cofix and policy it chose.
+  `runs.tsv` has the exit status and the peak memory.
+- **Also try the mutual cofix on glued ~ layered**: add
+  `MeBi Config Bounds Game 100000000.` before its proof, in a working copy
+  (not committed). It was the path that never finished a 2000-step chunk.
+- **Record the results** like `doc/measurements/answers-auto.md`: the
+  machine, the toolchain, the commands, the tables from `solves.tsv` and
+  `runs.tsv`, and the raw files beside them in
+  `doc/measurements/cadp-large-<date>/`.
+
+**What a result changes.** A proof that now finishes updates, with the new
+figures: `OUTSTANDING.md` ("CADP, the running example", the "not proved"
+lines), `examples/README.md` (the three-process table), `doc/decide-vs-prove.md`
+(the rows marked as not proved), the comments in `_CoqProject`, and the
+headers of `GluedLayered.v`, `MutualExclusionLarge.v` and `Fifo.v`. Decision 4
+in `doc/decisions.md`, proofs split into separately checked lemmas, rests on
+these proofs being out of reach, so it needs updating too. A proof that still
+does not finish says at what memory and how long, and whether `Bounds Game`
+changed it.
+
 ## Smaller possible work
 
 **Evaluation** (detail in Jonah's local notes 10 and 12)
