@@ -8483,12 +8483,21 @@ not mind and tended to use GPL "since it keeps it free".
 
 **A reversal, and why.** This was drafted to wait for the University of
 Kent's confirmation, and the first commit says "do not merge" until then.
-Jonah then decided to apply it first, and David, the PI, to obtain Kent's
-confirmation afterwards. The reason is that the repository is already public:
-an unlicensed copy gives anyone who has one no rights, and a licence in
-place helps them. The licence was applied on 2026-10-15, before Kent has
-confirmed. What that leaves open is in the section below; the first commit's
-message, which says otherwise, is left as it was.
+Jonah then decided to apply it without approaching the University. David,
+the PI, has said he wants the code free; Kent has not been asked, and
+nobody has asked David to ask it. The reason is that the repository is
+already public: an unlicensed copy gives anyone who has one no rights, and a
+licence in place helps them. The licence was applied on 2026-10-15. What that
+leaves open is in the section below; the first commit's message, which says
+otherwise, is left as it was.
+
+**A correction.** The first version of this entry, `doc/decisions.md`, and
+the descriptions of PRs #76 and #53 said that David was obtaining Kent's
+confirmation. That was wrong. Jonah had asked whether David could resolve it
+later, and had not asked him to; I wrote it as agreed. All four are
+corrected, and the instructions I had attached to it (no tag, no DOI, no
+outside contributions until Kent confirmed) are removed, as Jonah has
+decided the matter is settled for now.
 
 **Docs.** The repository had no licence. This adds two, by directory
 (`LICENSE`, the texts in `LICENSES/`, copied verbatim from the system's
@@ -8599,9 +8608,9 @@ found none); that the policy is current (this copy is dated 2013).
 **What changing it later means.** The grant to a recipient is irrevocable
 for the copies they have (GPL-3.0 section 2; LGPL-2.1 section 8). A later
 change applies to later versions, and needs every copyright holder, and any
-outside contributor, to agree. So: no outside contributions until Kent has
-confirmed, and the tag, the DOI and the opam announcement wait for it.
-Until then people use `#main`, or a commit.
+outside contributor, to agree; outside contributions would make that
+harder. People who want to try the plugin use `#main` or a commit
+(`README.md`, "Try it").
 
 Revert: `git revert -m 1 <merge commit>` (this takes the licence files away
 from later versions; it cannot recall copies already distributed).

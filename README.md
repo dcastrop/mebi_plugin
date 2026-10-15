@@ -8,6 +8,7 @@ This repository contains a Rocq (formerly Coq) plugin for automating bisimilarit
 
 
 - [MEBI: Mechanised Bisimilarities](#mebi-mechanised-bisimilarities)
+  - [Try it](#try-it)
   - [Building the Project](#building-the-project)
     - [Toolchain](#toolchain)
     - [First-time setup on a new machine](#first-time-setup-on-a-new-machine)
@@ -40,6 +41,46 @@ This repository contains a Rocq (formerly Coq) plugin for automating bisimilarit
     - [Books](#books)
 
 
+
+## Try it
+
+To use the plugin in your own Rocq developments, without a clone, pin it into
+an opam switch that can install Rocq 9.2 (the default opam repository is
+enough, and OCaml 4.14 or later):
+
+```sh
+opam switch create mebi ocaml-base-compiler.5.4.0   # skip if you have a suitable switch
+opam pin add rocq-mebi "git+https://github.com/dcastrop/mebi_plugin#main"
+```
+
+Until the fork's work is merged upstream, use
+`git+https://github.com/thecathe/mebi_plugin#main`. A branch pin follows the
+branch: `opam update` brings in whatever is on `main` then. To stay on one
+version, pin a commit (`#<hash>`). It builds the plugin from source, which
+takes a few minutes, and builds Rocq and OCaml too if the switch is new.
+
+Then, in a `.v` file, a tiny system and a proof the plugin finds:
+
+```coq
+Require Import MEBI.loader.
+Require Import MEBI.Bisimilarity.
+
+Inductive st : nat -> option bool -> nat -> Prop :=
+  | p0 : st 0 (Some true) 1 | p1 : st 1 (Some false) 0
+  | q0 : st 10 (Some true) 11 | q1 : st 11 (Some false) 10.
+
+MeBi Config Weak As Option bool.
+
+Example e : weak_bisimilar st st 0 10.
+Proof. MeBi Sim Begin st 0 And st 10 Using st. MeBi Sim Solve 100. Qed.
+```
+
+It prints `Solved after 29 iterations`. `MeBi Help.` lists the commands, and
+[Usage](#usage) below describes them. Larger worked examples, with the bounds
+they need, are in [`examples/README.md`](examples/README.md). It is a
+research prototype.
+
+The licences are in [Licence](#licence).
 
 ## Building the Project
 
