@@ -40,7 +40,7 @@ Require Import MEBI.Examples.CADP.SpecMutex.
    the glued ones in [Size1/Glued/MutualExclusion/PluginProofs.v] until
    2026-10-13. The former held a copy of the glued-against-layered proofs
    ([GluedLayered.v]) from 2026-03-16 to 2026-10-11; these are the goals
-   its name and its original version ([3cc6f10]) stated. *)
+   its name and its original version ([2da782e]) stated. *)
 
 MeBi Divider "Examples.CADP.MutualExclusion".
 

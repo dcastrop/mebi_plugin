@@ -10,7 +10,7 @@ type output_config =
 (** [dump_results] is off by default: dumping writes JSON files of every
     FSM and result into [./_dumps/] on each command (on [Proc/Test4]: ~20s
     and hundreds of MB a command), and disk writes are opt-in. It was on
-    during active development (from [e53a386]) and turned off 2026-10-04;
+    during active development (from [977b923]) and turned off 2026-10-04;
     [MeBi Config Output "DumpResults" True] turns it on for debugging. *)
 let output_config_default () : output_config =
   { decode_results = true; dump_results = false }

@@ -10,8 +10,8 @@ line, and record the resolution in `ASSISTED-CHANGES.md`. When something
 new is found, add one line, and put its detail in the right `doc/` file.
 
 (Until 2026-10-13 this file held the detail as well, and had grown to
-438 lines: `git show 3cc717e:OUTSTANDING.md`. It replaced `TODO.md`,
-deleted 2026-10-10: `git show a1b1470:TODO.md`.)
+438 lines: `git show 6b9b38f:OUTSTANDING.md`. It replaced `TODO.md`,
+deleted 2026-10-10: `git show cbbdd39:TODO.md`.)
 
 ## Waiting on @dcastrop
 
@@ -21,9 +21,8 @@ order:
 2. Whether `MeBi Config Solver MutualCofix Auto` stays the default.
 3. Whether `MeBi Config Solver Answers Auto` becomes the default.
 4. Which licence (there is none).
-5. What happens to `paper/` (96% of the repository's bytes).
-6. Whether to build proofs split into separately checked lemmas.
-7. For review: choices made while he was away (the target notion,
+5. Whether to build proofs split into separately checked lemmas.
+6. For review: choices made while he was away (the target notion,
    `weak_bisim` removed, `Sim Begin` on similar states, provenance).
 
 Decisions 2 and 3 change every checked-in proof bound, so they come
@@ -46,7 +45,7 @@ before the upstream PR.
 
 - **Two processes, glued ≈ layered:** decided, not proved (*limit*). The
   measurements are in `examples/CADP/GluedLayered.v`. A way round is
-  decision 6.
+  decision 5.
 - **Three processes:** FIFO order, and mutual exclusion (system ≤ spec),
   are decided but not proved: out of memory at 8-9GB (*limit*;
   `examples/CADP/MutualExclusionLarge.v`, `examples/README.md`). Why they
@@ -87,7 +86,7 @@ way.
   - memory of the saturation estimate;
   - extraction's unindexed derivation search.
 - **Capability:** proofs split into separately checked lemmas
-  (decision 6).
+  (decision 5).
 - **Smaller:**
   - replay a derivation tree in one solver step;
   - `Auto`'s mis-estimate on `LawProofs.tau1`;
