@@ -78,6 +78,22 @@ bench_compile_deps() {
 # drop the file's own MutualCofix settings and set MODE right after it
 # loads the plugin. MODE auto leaves FILE as it is. (Only a bare [MeBi
 # Config Reset] would undo this, and no proof file uses one.)
+# bench_force_answers FILE POLICY: make FILE start under the answer policy
+# POLICY (Default, Greedy, Minimal or Auto) by inserting the setting right
+# after it loads the plugin. A setting the file makes itself, later, still
+# applies. POLICY empty means as written.
+bench_force_answers() {
+  local file=$1 policy=$2
+  [ -n "$policy" ] || return 0
+  case $policy in
+    Default | Greedy | Minimal | Auto) ;;
+    *) bench_die "unknown answer policy '$policy' (expected Default, Greedy, Minimal or Auto)" ;;
+  esac
+  grep -q '^Require Import MEBI.loader.' "$file" \
+    || bench_die "$file does not load MEBI.loader, cannot force the answer policy"
+  sed -i "s/^Require Import MEBI.loader.$/&\nMeBi Config Solver Answers $policy./" "$file"
+}
+
 bench_force_strategy() {
   local file=$1 mode=$2
   case $mode in

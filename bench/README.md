@@ -29,6 +29,8 @@ bench/proofs.sh -s abp                  # the two ABP proofs, one at a time
 bench/proofs.sh -s test4                # Test4 via the normalised semantics
 bench/proofs.sh -s eval                 # the evaluation levers, as built by default
 bench/proofs.sh -s eval-large -f WidthLarge.v   # one file of a suite
+bench/proofs.sh -s cadp-large -M 24G    # MutualExclusionLarge.v, with a higher cap
+bench/proofs.sh -s cadp-large -a Default -t old   # force an answer policy, to compare
 ```
 
 | suite | files | cost |
@@ -37,7 +39,9 @@ bench/proofs.sh -s eval-large -f WidthLarge.v   # one file of a suite
 | `abp` | `CCS/ABPProofs.v`, `CCS/ABPBisimProofs.v` | ~4 min and ~4.3GB each |
 | `test4` | `Proc/Test4/NormProofs.v`, `NormBisimProofs.v` | ~0.5 + ~4 min, ~2.8GB peak |
 | `eval` | `examples/Evaluation/{Width,Layers,Depth}.v` | ~40s |
-| `eval-large` | `examples/Evaluation/{Width,Layers,Depth}Large.v`, the same levers scaled up | ~7 + ~2 + ~10 min, ~3.9GB peak |
+| `eval-large` | `examples/Evaluation/{Width,Layers,Depth}Large.v`, the same levers scaled up | ~7 + ~1.5 + ~1 min, ~4GB peak |
+| `cadp-large` | `examples/CADP/MutualExclusionLarge.v` | ~10 min, ~4.4GB (two processes direct), as measured under `Answers Default` |
+| `cadp-huge` | `examples/CADP/{ThreeProcessesMutex,ThreeProcessesFifo,TwoProcessesGluedLayered}.v`, the three proofs that ran out of memory at 7-10GB, one per file | unknown: may not finish; give `-M` and run one at a time |
 
 `-m` takes a comma-separated list of the following:
 - `auto` runs each file as written.
@@ -47,6 +51,15 @@ bench/proofs.sh -s eval-large -f WidthLarge.v   # one file of a suite
 
 Under `False` most files stop at their first `weak_bisimilar` proof; that
 is expected (see `CLAUDE.md`).
+
+Two more options, for a machine unlike the one the suites were sized for:
+- `-M <mem>` replaces each file's memory cap (`systemd-run`'s form, such as
+  `28G`). The suites' caps are 5-8GB.
+- `-a <policy>` starts every file under `MeBi Config Solver Answers
+  <policy>` (`Default`, `Greedy`, `Minimal` or `Auto`), to measure one policy
+  against another on the same machine. A file's checked-in bounds are for the
+  plugin's default, so a policy that needs more steps stops at its first
+  `Solve`; that is the answer, not a fault.
 
 Each run goes in `$MEBI_BENCH_DIR/<tag>`, or in a new temporary directory
 if that variable is unset. The script prints the directory's path. It

@@ -30,6 +30,11 @@ Decision 2 would change every checked-in proof bound if it went against
 
 ## Waiting on Jonah
 
+- **Re-run the large CADP proofs on the 32GB host** (`doc/future-work.md`,
+  "Re-running the large CADP proofs"). Three proofs ran out of memory at
+  7-10GB under `Answers Default`; `bench/proofs.sh -s cadp-large` and
+  `-s cadp-huge` (with `-M`) run them. Needs this on `origin/main`
+  (PR #53).
 - **An observing label in layered `step`** (a model change). It would
   carry FIFO order with joining *visible* to the layered CADP model. Today
   only the hidden form carries over, at one process (`examples/README.md`,

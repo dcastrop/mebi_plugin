@@ -8422,6 +8422,60 @@ Revert: `MeBi Config Solver Answers Default` for one file, or
 
 ---
 
+## 2026-10-15 (cont.) — a load notice, and what a larger machine needs
+
+On branch `feat/load-notice`, at Jonah's request: a pointer to `MeBi Help`
+when the plugin loads, and a note for re-running the large CADP proofs on
+his 32GB host once this is on `origin/main`.
+
+**A load notice.** `Require Import MEBI.loader` prints one `Notice`:
+"(MeBi loaded. [MeBi Help.] lists the commands; [MeBi Config Output "Info"
+False.] hides routine messages.)". Before, it printed a divider and nothing
+about either. It is an output line, not a capability; none of the log's tags
+fits it, so it is counted under Docs. The defaults it points to were
+already these: `Info`, `Notice`, `Warning`, `Error` and `Show` on, `Debug`,
+`Trace` and `Result` off. `MeBi Help Config Output` and `README.md` now say
+so; before, neither did. `MeBi Divider` still ignores `Output`, as it prints
+through Rocq's own feedback.
+
+**Tooling** (`bench/`): `proofs.sh -M <mem>` replaces a suite's memory cap,
+`-a <policy>` starts every file under an answer policy (so before and after
+can be run on one host), and two suites: `cadp-large`
+(`MutualExclusionLarge.v`) and `cadp-huge` (below). `-a` inserts the
+setting after the loader line, and refuses an unknown policy at once. A
+file's checked-in bounds are for the default policy, so `-a Default` on
+`Test1` stops at its first `Solve`: that is by design, and the option says so.
+
+**Examples, not built:** `ThreeProcessesMutex.v`, `ThreeProcessesFifo.v` and
+`TwoProcessesGluedLayered.v`, one proof each, so that each is its own
+process. They state proofs that ran out of memory at 7-10GB (the statements
+were in comments, or in prose). Not new capability: the same claims, and
+the file headers give the old figures. Checked to typecheck and to run
+`Sim Begin` (644 pairs, 1,932 and 3,714 moves, as documented); **not
+solved**: whether they finish is the point of the run.
+
+**Docs.** `doc/future-work.md`, "Re-running the large CADP proofs": why,
+the runs with their old figures, the commands, and what a result updates.
+`OUTSTANDING.md` has one line, under "Waiting on Jonah".
+
+**Seen, not measured.** A 90-second smoke run of `MutualExclusionLarge.v`
+under `Answers Auto`: `wsim_norm_r_2` 75 steps (153 before), the
+three-process `wsim_norm_r_3` 124 (326 before). That is a hint, on a machine
+that was busy; the figures go in a measurement record, from the other host.
+
+**A mistake, twice.** I ran `pkill -f <pattern>` and a `ps | awk | kill`
+whose pattern was in my own command line, and killed my own shell both
+times (`CLAUDE.md` warns of the first). The compile process is
+`rocqworker --kind=compile`, not `rocq compile`, which is why my first
+cleanup missed it. No files were lost; two smoke runs were repeated.
+
+Revert: `git revert -m 1 <merge commit>`.
+
+**Session tally (2026-10-15), cont.:** Docs 7 · Optimization 1 · Tooling 1 ·
+Refactor 0 · Bug fix 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

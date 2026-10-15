@@ -2,14 +2,20 @@
 # bench/proofs.sh -- run the plugin's proof suites and tabulate the results.
 #
 # usage: bench/proofs.sh [-s SUITE] [-f FILES] [-m MODES] [-j JOBS] [-t TAG]
+#                        [-M MEM] [-a POLICY]
 #   -s SUITE  default (Proc's three PluginProofs.v, CADP's
 #             MutualExclusion.v and GluedLayered.v, CCS's PluginProofs.v
 #             and LawProofs.v; ~3 min a mode), abp (the
 #             Alternating Bit Protocol proofs, ~4 min and ~4.3GB each),
 #             test4 (Test4 through the normalised semantics, ~5 min,
 #             ~2.8GB peak), eval (the evaluation levers in
-#             examples/Evaluation as built by default, ~40s) or eval-large
-#             (the same levers scaled up). Default: default.
+#             examples/Evaluation as built by default, ~40s), eval-large
+#             (the same levers scaled up), cadp-large (CADP's
+#             MutualExclusionLarge.v: ~10 min and ~4.4GB at two processes
+#             direct, as measured) or cadp-huge (the three CADP proofs
+#             that ran out of memory at 7-10GB, one per file: they may
+#             not finish; give both -M on a large machine).
+#             Default: default.
 #   -f FILES  comma-separated subset of the suite's proof files to run,
 #             as listed below (e.g. -s eval-large -f WidthLarge.v).
 #             Default: all of them.
@@ -20,6 +26,17 @@
 #             one file at a time, as two heavy proofs together can exhaust
 #             memory). Default: 8.
 #   -t TAG    name of the run's directory. Default: SUITE-YYYYmmdd-HHMMSS.
+#   -M MEM    the memory cap of each file's process, as systemd-run takes it
+#             (for example 28G), instead of the suite's. Use it on a machine
+#             with more memory than the caps below assume.
+#   -a POLICY force MeBi Config Solver Answers (Default, Greedy, Minimal or
+#             Auto) at the start of every file, to measure one policy against
+#             another on the same machine (a file that sets its own policy
+#             later keeps it). Default: the files as written, i.e. the
+#             plugin's default. Put the policy in -t, as it is not in the
+#             tables. A file's checked-in bounds are for the plugin's
+#             default, so a policy that needs more steps stops at its first
+#             Solve ("Unsolved after N"); that is the answer, not a fault.
 #
 # Each file is its own memory-capped process (5G, or 6G for abp/test4)
 # with its own log, so every "Solved after N" line is attributable. The run
@@ -37,17 +54,24 @@
 
 . "$(dirname "$0")/lib.sh"
 
-suite=default only= modes=auto jobs=8 tag=
-while getopts "s:f:m:j:t:h" opt; do
+suite=default only= modes=auto jobs=8 tag= mem_override= answers=
+while getopts "s:f:m:j:t:M:a:h" opt; do
   case $opt in
     s) suite=$OPTARG ;;
     f) only=$OPTARG ;;
     m) modes=$OPTARG ;;
     j) jobs=$OPTARG ;;
     t) tag=$OPTARG ;;
+    M) mem_override=$OPTARG ;;
+    a) answers=$OPTARG ;;
     *) sed -n '2,/^$/s/^# \{0,1\}//p' "$0"; exit 2 ;;
   esac
 done
+
+case $answers in
+  "" | Default | Greedy | Minimal | Auto) ;;
+  *) bench_die "unknown answer policy '$answers' (expected Default, Greedy, Minimal or Auto)" ;;
+esac
 
 # Per suite: the examples to compile first (in order), the directory under
 # examples/ holding its proof files, the proof files (relative to it), the
@@ -80,8 +104,18 @@ case $suite in
     deps="Evaluation/Base.v Evaluation/Layers.v Evaluation/Depth.v" dir=Evaluation
     files="WidthLarge.v LayersLarge.v DepthLarge.v"
     mem=6G jobs=1 ;;
-  *) bench_die "unknown suite '$suite' (expected default, abp, test4, eval or eval-large)" ;;
+  cadp-large)
+    deps="CADP/Model.v CADP/Glued.v CADP/Norm.v CADP/Terms.v CADP/SpecMutex.v" dir=CADP
+    files="MutualExclusionLarge.v"
+    mem=8G jobs=1 ;;
+  cadp-huge)
+    deps="CADP/Model.v CADP/Glued.v CADP/Norm.v CADP/Obs.v CADP/Terms.v CADP/SpecFifo.v
+          CADP/SpecMutex.v" dir=CADP
+    files="ThreeProcessesMutex.v ThreeProcessesFifo.v TwoProcessesGluedLayered.v"
+    mem=8G jobs=1 ;;
+  *) bench_die "unknown suite '$suite' (expected default, abp, test4, eval, eval-large, cadp-large or cadp-huge)" ;;
 esac
+[ -z "$mem_override" ] || mem=$mem_override
 
 if [ -n "$only" ]; then
   for f in ${only//,/ }; do
@@ -112,12 +146,13 @@ run_one() {
   # the copy must keep a valid module name: no dots or dashes
   cp "$src" "$copy"
   bench_force_strategy "$copy" "$mode"
+  bench_force_answers "$copy" "$answers"
   bench_rocq_argv "$run"
   bench_capped "$mem" "$run/logs/$mode.${name%.v}.log" \
     "${BENCH_RC[@]}" -time -o "${copy%.v}.vo" "$copy"
 }
-export -f run_one bench_rocq_argv bench_capped bench_force_strategy bench_die
-export run mem dir BENCH_ROOT
+export -f run_one bench_rocq_argv bench_capped bench_force_strategy bench_force_answers bench_die
+export run mem dir answers BENCH_ROOT
 
 for mode in ${modes//,/ }; do
   echo "bench: $suite, mode $mode ..." >&2

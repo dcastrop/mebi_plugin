@@ -8,6 +8,14 @@ open Stdarg
 (* lib/ emits through Logger, which prints to stdout until a sink is installed.
    Route it through Rocq's Feedback now that we are running inside Rocq. *)
 let () = Rocq_output.install ()
+
+(* Said once, when Rocq loads the plugin ([Require Import MEBI.loader]): where
+   the commands are listed, and how to hide the routine messages. A [Notice],
+   so it is shown by default. *)
+let () =
+  Logger.notice
+    "(MeBi loaded. [MeBi Help.] lists the commands; [MeBi Config Output \"Info\" \
+     False.] hides routine messages.)"
 }
 
 DECLARE PLUGIN "rocq-mebi.mebi"

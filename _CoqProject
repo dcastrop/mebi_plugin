@@ -98,6 +98,9 @@ examples/CADP/Terms.v ### REQUIRED FOR BELOW; c1, c2, c3: one, two and three pro
 # examples/CADP/GluedLayered.v ### Success (one process, ~52s; two processes not proved: out of memory at 10GB nested, unfinished after 2.5h mutual, measured 2026-10-12, see the file)
 # examples/CADP/MutualExclusion.v ### Success (one process, layered and glued; ~18s)
 # examples/CADP/MutualExclusionLarge.v ### Success (two processes: normalised ~15s, direct ~10 min and ~4.4GB; three: spec <= system only, ~7s. Run under a memory cap)
+# examples/CADP/TwoProcessesGluedLayered.v ### NOT PROVED (glued ~ layered at two processes: out of memory at 7-10GB; one proof per file, bench/proofs.sh -s cadp-huge -M <cap>)
+# examples/CADP/ThreeProcessesMutex.v ### NOT PROVED (three processes, system <= spec: out of memory at 8-9GB; bench/proofs.sh -s cadp-huge)
+# examples/CADP/ThreeProcessesFifo.v ### NOT PROVED (three processes, FIFO bisimilarity: out of memory at 9GB; bench/proofs.sh -s cadp-huge)
 # examples/CADP/Fifo.v ### Success (weak_bisimilar to spec_fifo, 119 and 2228 steps; hidden, mutual exclusion 23 and 98; ~25s)
 # examples/CADP/LayeredTransfer.v ### Success (one process: layered ≈ FIFO hidden and layered mutual exclusion, from GluedLayered.v and Fifo.v; no plugin calls, <1s)
 # examples/CADP/Simple.v ### an early, simpler counter-based lock; not built and not used elsewhere
