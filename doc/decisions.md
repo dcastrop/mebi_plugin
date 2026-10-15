@@ -152,7 +152,7 @@ These were Jonah's calls, made as the work went. Each can be reversed.
   12.1) leave IP with the research organisation; UKRI does not require open
   source, and asks for the grant to be acknowledged (`README.md` does, and
   names EPSRC UKRI1247, INDIMO, which funded the work since April 2026).
-  **Applied 2026-10-15, before Kent has confirmed**, because the repository
-  is public; David is obtaining the confirmation. Until he has it: no outside
-  contributions (relicensing would then need their consent), and no tag,
-  DOI or opam announcement.
+  **Applied 2026-10-15; Kent has not been asked.** The repository is public,
+  and you have said you want it free. If the University objects, the licence
+  can be changed for later versions, with every copyright holder's
+  agreement; outside contributions would make that harder.
