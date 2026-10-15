@@ -147,4 +147,7 @@ These were Jonah's calls, made as the work went. Each can be reversed.
   Intellectual Property Policy (March 2013) gives the University the
   copyright in staff's and registered students' work, so the notice names
   it, and releasing University-owned software as open source goes through
-  the Head of School, with advice from Kent Innovation & Enterprise.
+  the Head of School, with advice from Kent Innovation & Enterprise. The
+  work was funded by EPSRC grant EP/Y00339X/1 (MEBI), whose terms (RGC
+  12.1) leave IP with the research organisation; UKRI does not require open
+  source, and asks for the grant to be acknowledged (`README.md` does).

@@ -31,6 +31,7 @@ This repository contains a Rocq (formerly Coq) plugin for automating bisimilarit
     - [Help](#help)
   - [Status \& Remaining Work](#status--remaining-work)
   - [Licence](#licence)
+  - [Acknowledgements](#acknowledgements)
   - [Other Resources](#other-resources)
     - [Templates](#templates)
     - [Tutorials](#tutorials)
@@ -320,6 +321,13 @@ Two licences, by directory (`LICENSE`; the texts are in `LICENSES/`):
   refer to nothing but `MEBI.Bisimilarity` and `MEBI.Premises`, so a
   development that imports the library, or contains such a proof, is not
   bound by the GPL.
+
+## Acknowledgements
+
+This work was supported by the UK Engineering and Physical Sciences
+Research Council (EPSRC) grant EP/Y00339X/1, *MEBI: Mechanised
+Bisimilarities and Behavioural-typed Processes*, held at the University of
+Kent.
 
 ## Other Resources
 

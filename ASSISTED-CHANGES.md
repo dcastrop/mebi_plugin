@@ -8509,8 +8509,8 @@ and `OUTSTANDING.md` and the later ones renumbered 3-4, with a bullet
 under "for review". No file headers were added; the table in `LICENSE`
 carries it.
 
-**What stops it merging: Kent's Intellectual Property Policy (March 2013).**
-Read, not legal advice:
+**What stops it merging: Kent's Intellectual Property Policy (March 2013),
+and the grant.** Read, not legal advice:
 - §3.1: the University owns the IP created by staff "in the course of
   normal duties"; §3.3: it requires registered students to assign all IP
   developed whilst at the University. So the copyright is probably the
@@ -8524,7 +8524,33 @@ Read, not legal advice:
   KIE "can provide advice on the licencing of software ... 'open licencing'
   may be the most appropriate route".
 - §5: a funder's contract may specify who owns the IP: the funding
-  conditions need checking.
+  conditions needed checking, and were (next).
+- **The grant** is EPSRC EP/Y00339X/1, "MEBI: Mechanised Bisimilarities
+  and Behavioural-typed Processes" (University of Kent, PI David Castro
+  Perez, January 2024 to April 2026, project partners ITU Copenhagen and
+  DTU; Gateway to Research). The repository is its funded output. UKRI's
+  standard terms (RGC 12.1, version 16 of 2026-10-01) leave "all
+  intellectual property" with "the party that generates" it, so with the
+  University, not the funder; RGC 12.3 reserves a right to retain it "in
+  individual cases", which is for KIE to confirm it has not been used. They
+  do not mention software or open source. UKRI asks for the grant to be
+  acknowledged in publications (RGC 12.4) and, where possible, on public
+  websites (RGC 12.6): `README.md` now does. EPSRC's data policy covers
+  software only where it is needed to validate findings, and recommends an
+  open licence as good practice; it does not require one. So the funder
+  supports the release but does not demand it and does not own the code.
+- **Where it is not clean: the history against the grant dates.** Of 1,583
+  commits, 1,108 are from the grant period (January 2024 to April 2026) and
+  475 are after it (August to October 2026), 384 of those Claude-assisted:
+  the Rocq 9.2 port, the answer policies, the measurements, PRs #1-#74. The
+  grant record says "Closed". Whether that work was within a contract of
+  employment, and on what funding, is the author's to say and KIE's to
+  confirm; the author addresses do not tell (personal addresses are used
+  throughout, Kent's on 48 commits). If any of it was outside employment,
+  it is not within §3.1, and the licence for it is its author's to give.
+- **Partners:** RGC 12.1 expects a formal collaboration agreement where
+  partners are involved; whether one exists for the ITU and DTU case
+  studies, and says anything about this code, is worth asking the PI.
 - The notice therefore names the University first. The wording of the
   notice, and whether "no commercial rights" is compatible with GPL and
   LGPL (both allow commercial use), are questions for KIE.
