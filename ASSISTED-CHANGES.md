@@ -8476,6 +8476,70 @@ Refactor 0 · Bug fix 0 · **New feature 0.**
 
 ---
 
+## 2026-10-15 (cont.) — a licence split (GPL plugin, LGPL library), drafted
+
+On branch `docs/licence-split`, **not merged**: it waits on the University
+of Kent (below). At Jonah's request, after David said he did not mind and
+tended to use GPL "since it keeps it free".
+
+**Docs.** The repository had no licence. This adds two, by directory
+(`LICENSE`, the texts in `LICENSES/`, copied verbatim from the system's
+`/usr/share/common-licenses`, and checked by hash):
+- **GPL-3.0-or-later**: the plugin (`src/`, `lib/`, `test/`, `bench/`,
+  `scripts/`), the files that load and test it (`theories/loader.v`,
+  `Test.v`, `DevTest.v`), and what is not listed (build files, docs).
+- **LGPL-2.1-or-later**: the Rocq library (`theories/Bisimilarity.v`,
+  `Premises.v`, `Transfer.v`, `Hiding.v`, `Traces.v`) and `examples/`.
+
+**Why the line is there.** The plugin's lookups of library constants name
+only `MEBI.Bisimilarity` (19 names) and `MEBI.Premises`, so a proof the
+plugin generates depends on those two files and the standard library, not
+on anything GPL. `Premises.v` (the lemmas for bounded universals) is
+therefore on the LGPL side, though `loader.v` imports it. `Hiding`,
+`Transfer` and `Traces` import only `Bisimilarity`. Compatibility: Rocq is
+LGPL-2.1 (a GPL-3-or-later work may link it, through the "or later" of
+LGPL-2.1 section 3); `yojson` is BSD-3; `benchmark` is LGPL-3.0 with the
+OCaml linking exception, which is why it is GPL-3 and not GPL-2.
+
+**The packaging.** `dune-project` gets `(license "GPL-3.0-or-later AND
+LGPL-2.1-or-later")`, `rocq-mebi.opam` and `rocq-mebi.opam.locked`
+regenerated (`scripts/relock.sh`; one line each). `README.md` has a
+Licence section. Decision 3 (licence) is removed from `doc/decisions.md`
+and `OUTSTANDING.md` and the later ones renumbered 3-4, with a bullet
+under "for review". No file headers were added; the table in `LICENSE`
+carries it.
+
+**What stops it merging: Kent's Intellectual Property Policy (March 2013).**
+Read, not legal advice:
+- §3.1: the University owns the IP created by staff "in the course of
+  normal duties"; §3.3: it requires registered students to assign all IP
+  developed whilst at the University. So the copyright is probably the
+  University's, for both authors, and David's agreement is not the
+  University's. The commits carry kent.ac.uk addresses.
+- Appendix A, "Open source publication": new material "may be published
+  under an open source license with no commercial rights", and "the release
+  of commercial rights should only be done in consultation with KIE"; the
+  University must be asked (Head of School) before University-owned
+  material is made open-access. Software is "Computing works" there, and
+  KIE "can provide advice on the licencing of software ... 'open licencing'
+  may be the most appropriate route".
+- §5: a funder's contract may specify who owns the IP: the funding
+  conditions need checking.
+- The notice therefore names the University first. The wording of the
+  notice, and whether "no commercial rights" is compatible with GPL and
+  LGPL (both allow commercial use), are questions for KIE.
+
+**Not checked.** That nothing in `examples/` is copied from elsewhere (the
+CCS laws are stated after CTrees', not copied; the 2026-10 provenance audit
+found none); that the policy is current (this copy is dated 2013).
+
+Revert: delete the branch; if merged, `git revert -m 1 <merge commit>`.
+
+**Session tally (2026-10-15), cont.:** Docs 8 · Optimization 1 · Tooling 1 ·
+Refactor 0 · Bug fix 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

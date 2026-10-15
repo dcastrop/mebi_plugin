@@ -43,7 +43,7 @@ The decisions below are ordered by what blocks the upstream PR first.
 +29,310/−3,725 against your `main` (2026-10-15). The plan is one PR to
 `dcastrop/mebi_plugin` after you decide 2, because going against `Auto`
 changes what every checked-in proof bound means. (Jonah settled the
-answer policy, which used to be decision 3, on 2026-10-15: see 5.)
+answer policy, on 2026-10-15: see 4.)
 
 **Options.**
 1. **One PR of the whole fork (recommended).** You review the result
@@ -77,7 +77,7 @@ cheaper (`Model.Product.estimate`). `Auto` is the default today.
    estimate to compute.
 
 **What it commits us to.** Every checked-in `MeBi Sim Solve N` bound was
-measured under `Auto` (and since 2026-10-15 under `Answers Auto`, see 5).
+measured under `Auto` (and since 2026-10-15 under `Answers Auto`, see 4).
 Option 2 or 3 means re-measuring them all, which is best done before the
 upstream PR. If you keep `Auto`, two small follow-ups remain:
 - `Proc/Test2`'s bounds are deliberately loose, so that the file still
@@ -86,18 +86,7 @@ upstream PR. If you keep `Auto`, two small follow-ups remain:
 
 Detail: `ASSISTED-CHANGES.md`, 2026-09-29.
 
-## 3. Which licence?
-
-**Question.** There is no `LICENSE` file, and `dune-project`'s
-`(license ...)` line is commented out, so the opam package has no
-licence either. Nobody may legally reuse the code, and a release needs
-one.
-
-**Options.** Your choice of licence. MIT and BSD-3 are common for Rocq
-plugins. LGPL-2.1 matches Rocq itself. Adding it means one file and
-uncommenting one line.
-
-## 4. Do you want proofs split into separately checked lemmas?
+## 3. Do you want proofs split into separately checked lemmas?
 
 **Question.** Some systems are decided but cannot be proved. CADP's
 two-process glued ≈ layered is decided in 45s, but every proof ran out of
@@ -113,7 +102,7 @@ block. It is a new capability, and large. The design is in
 2. **Build it.** It reaches proofs the plugin cannot produce today. It
    is the largest item on the list.
 
-## 5. For review: choices made while you were away
+## 4. For review: choices made while you were away
 
 These were Jonah's calls, made as the work went. Each can be reversed.
 
@@ -134,7 +123,7 @@ These were Jonah's calls, made as the work went. Each can be reversed.
   not in method. An audit of the assisted commits found no copying. The
   13 earliest assisted commits have no session transcript.
 - **`MeBi Config Solver Answers Auto` is the default** (2026-10-15; it was
-  `Default`, and your brief for it was decision 3). Each answer is planned
+  `Default`; there was a brief for it). Each answer is planned
   at `Sim Begin`, and the cheapest of the three policies kept. Measured on
   the default suite, all 161 Solves under `Auto`, forced `True` and forced
   `False`: none takes more steps, none changes status, and 61 take fewer
@@ -145,3 +134,17 @@ These were Jonah's calls, made as the work went. Each can be reversed.
   still are. The figures are in `doc/measurements/answers-auto.md`. Back
   out with `MeBi Config Solver Answers Default`, or `git revert -m 1` the
   merge.
+- **Licence: GPL for the plugin, LGPL for the library** (2026-10-15; it was
+  a brief of its own, as there was no licence). You said you do not mind and
+  tend to use GPL. Jonah's aim is that the plugin itself stays free, so the
+  plugin (`src/`, `lib/`, and the files that load and test it) is
+  GPL-3.0-or-later, and the Rocq library that other developments import
+  (`theories/Bisimilarity.v`, `Premises.v`, `Transfer.v`, `Hiding.v`,
+  `Traces.v`) and `examples/` are LGPL-2.1-or-later, as Rocq is. The proofs
+  the plugin generates refer to nothing but `MEBI.Bisimilarity` and
+  `MEBI.Premises`, so they are not bound by the GPL. `LICENSE` has the
+  paths; change it with `dune-project`'s `(license ...)`. Kent's
+  Intellectual Property Policy (March 2013) gives the University the
+  copyright in staff's and registered students' work, so the notice names
+  it, and releasing University-owned software as open source goes through
+  the Head of School, with advice from Kent Innovation & Enterprise.

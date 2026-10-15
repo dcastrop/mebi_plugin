@@ -14,7 +14,7 @@ Work that is understood well enough to describe, but not under way.
   first touches every proof a user runs, the second only very large
   FSMs.
 - **"Proofs split into separately checked lemmas"** is a capability
-  (@dcastrop's decision 4, `decisions.md`), the one that would reach
+  (@dcastrop's decision 3, `decisions.md`), the one that would reach
   proofs the plugin cannot produce today.
 - **The rest** lists smaller possible work, and what was set aside on
   purpose.
@@ -219,7 +219,7 @@ bench/proofs.sh -s cadp-huge -f TwoProcessesGluedLayered.v -M 28G -t huge-glued-
 figures: `OUTSTANDING.md` ("CADP, the running example", the "not proved"
 lines), `examples/README.md` (the three-process table), `doc/decide-vs-prove.md`
 (the rows marked as not proved), the comments in `_CoqProject`, and the
-headers of `GluedLayered.v`, `MutualExclusionLarge.v` and `Fifo.v`. Decision 4
+headers of `GluedLayered.v`, `MutualExclusionLarge.v` and `Fifo.v`. Decision 3
 in `doc/decisions.md`, proofs split into separately checked lemmas, rests on
 these proofs being out of reach, so it needs updating too. A proof that still
 does not finish says at what memory and how long, and whether `Bounds Game`
