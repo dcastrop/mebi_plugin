@@ -325,9 +325,10 @@ Two licences, by directory (`LICENSE`; the texts are in `LICENSES/`):
 ## Acknowledgements
 
 This work was supported by the UK Engineering and Physical Sciences
-Research Council (EPSRC) grant EP/Y00339X/1, *MEBI: Mechanised
-Bisimilarities and Behavioural-typed Processes*, held at the University of
-Kent.
+Research Council (EPSRC) grants EP/Y00339X/1, *MEBI: Mechanised
+Bisimilarities and Behavioural-typed Processes* (University of Kent), and
+UKRI1247, *INDIMO: Invariant Discovery and Monitoring for Message-Passing
+Programs* (Royal Holloway, University of London).
 
 ## Other Resources
 

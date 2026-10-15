@@ -150,4 +150,5 @@ These were Jonah's calls, made as the work went. Each can be reversed.
   the Head of School, with advice from Kent Innovation & Enterprise. The
   work was funded by EPSRC grant EP/Y00339X/1 (MEBI), whose terms (RGC
   12.1) leave IP with the research organisation; UKRI does not require open
-  source, and asks for the grant to be acknowledged (`README.md` does).
+  source, and asks for the grant to be acknowledged (`README.md` does, and
+  names EPSRC UKRI1247, INDIMO, which funded the work since April 2026).

@@ -8551,6 +8551,16 @@ and the grant.** Read, not legal advice:
 - **Partners:** RGC 12.1 expects a formal collaboration agreement where
   partners are involved; whether one exists for the ITU and DTU case
   studies, and says anything about this code, is worth asking the PI.
+- **The work since April 2026** was on EPSRC UKRI1247, "INDIMO: Invariant
+  Discovery and Monitoring for Message-Passing Programs" (PI Julien Lange,
+  March 2026 to March 2029). Its Gateway to Research record lists **Royal
+  Holloway** as lead and Aarhus, SUTD, Uber and Meta as partners, and **no
+  University of Kent**. So which institution has employed the author since
+  April 2026 is a question to settle: if Kent, where Kent's share of the
+  grant sits (a record of its own, not found); if Royal Holloway, its IP
+  policy governs that work and it, too, must agree to the licence and be
+  named in the notice. The README acknowledges both grants; INDIMO's PI
+  should confirm the wording.
 - The notice therefore names the University first. The wording of the
   notice, and whether "no commercial rights" is compatible with GPL and
   LGPL (both allow commercial use), are questions for KIE.
