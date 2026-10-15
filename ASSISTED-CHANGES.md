@@ -8247,6 +8247,41 @@ Optimization 0 · **New feature 1** (`theories/` only).
 
 ---
 
+## 2026-10-15 — What upstream already holds (a correction, and a mistake)
+
+On branch `docs/upstream-state`, while assessing the upstream PR.
+
+**Docs.** `doc/decisions.md` said that 630 commits had landed on the fork
+and that "none of it is upstream yet". Both were wrong. Counted from
+`d204afb` (David's last commit, 2026-01-12), `main` is 632 commits ahead,
+and `dcastrop/mebi_plugin`'s `main` (`e05727f`) already holds 231 of them:
+- **181** reached upstream before 2026-08-17, ending at `7d36087` (the
+  Rocq 9.2 port). Upstream's own reflog shows that tip as fetched on
+  2026-08-17.
+- **50** (2026-08-17 to 2026-09-29, all Jonah's) were pushed to upstream's
+  `main` **by mistake** on 2026-09-29. An earlier session had set git up
+  so that Jonah's push went to `origin` rather than to the fork. Jonah
+  saw it and moved on; nothing was recorded until now. This is the
+  mistake: the log should have said so on the day.
+- **401** are on the fork only, as PRs #1–#73 (251 files, +29,310/−3,725
+  against upstream's `main`). The fork's `main` is a strict descendant of
+  upstream's, so the upstream PR is a plain merge.
+
+`doc/decisions.md` now says this, and decision 1 carries the real counts.
+`CLAUDE.md`'s "never push to `origin`" rule gives its reason, and says to
+read `git remote -v` and `git branch -vv` and to name the remote.
+
+Found by comparing `origin/main` with `main` for the question of how
+`paper/` could be removed from history; that work (a rewrite, which
+changes the hash of every commit since 2024-05-10) is not in this entry.
+
+Revert: `git revert -m 1 <merge commit>`.
+
+**Session tally (2026-10-15):** Docs 1 · Refactor 0 · Bug fix 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
