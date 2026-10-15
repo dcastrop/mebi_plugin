@@ -16,7 +16,7 @@ reserve its heaps.)
 |---|---|
 | `proofs.sh` | runs a proof suite under one or more solver strategies, and writes one row per `MeBi Sim Solve` and one per file |
 | `compare.sh` | diffs two `proofs.sh` runs: changed or missing Solves, plus time and memory side by side |
-| `testv-counts.sh` | lists `theories/Test.v`'s solver counts, for diffing two trees |
+| `testv-counts.sh` | lists `test/rocq/Test.v`'s solver counts, for diffing two trees |
 | `lib.sh` | shared helpers, sourced by the others |
 | `ocaml/` | pure-OCaml benchmarks of the model's algorithms, on FSMs extracted from the examples and on generated families: see [`ocaml/README.md`](ocaml/README.md) |
 

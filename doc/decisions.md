@@ -28,7 +28,7 @@ What changed is around it:
 | `lib/{utils,terms,showable,rocq_tools}/` | supporting libraries, split out of `src/` |
 | `theories/Bisimilarity.v` | `weak_sim`, `mutual_sim`, and `weak_bisimilar`, which is new: one relation in both directions |
 | `theories/{Transfer,Hiding,Traces}.v` | new: carrying results between semantics, hiding labels, and what a relation preserves |
-| `theories/Test.v` | the tests, including deliberate "known limit" pins |
+| `test/rocq/Test.v` | the tests, including deliberate "known limit" pins |
 | `examples/` | `Bisimilarity/{Proc,CCS}`, `CADP/` (the MCS lock, the running example) and `Evaluation/`. See `examples/README.md`. |
 | `bench/proofs.sh` | runs the proof suites under a memory cap and tabulates step counts |
 | `doc/` | this file, `limitations.md`, `future-work.md`, `decide-vs-prove.md`, `structural-congruence.md` |
@@ -112,7 +112,7 @@ These were Jonah's calls, made as the work went. Each can be reversed.
   split). Before, `Run Bisim` could call `a.b.x` and `b.a.y` bisimilar.
 - **`weak_bisim` is gone.** It was two `weak_sim`s, which is mutual
   similarity, strictly weaker than bisimilarity: `a.b + a` and `a.b`
-  satisfy it but are not bisimilar (proved in `theories/Test.v`). Its
+  satisfy it but are not bisimilar (proved in `test/rocq/Test.v`). Its
   honest name, `mutual_sim`, replaces it. `weak_bisimilar` is the real
   bisimulation, and it is what `MeBi Sim` proves. The theorems in
   `examples/Bisimilarity/Proc/*/ManualProofs.v` and `LtacProofs.v` were

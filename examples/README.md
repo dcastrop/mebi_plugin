@@ -3,7 +3,7 @@
 Worked examples of the MeBi plugin, mapped to the logical path
 `MEBI.Examples`. They show the plugin on real systems, and the paper may
 cite them. Plain tests (limits, refusals, regression pins) live in
-`theories/Test.v` instead. Evaluation series, one lever each, live in
+`test/rocq/Test.v` instead. Evaluation series, one lever each, live in
 `Evaluation/`.
 
 Most proof files are commented out of `_CoqProject`, because full proof

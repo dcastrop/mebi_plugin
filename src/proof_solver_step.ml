@@ -1511,7 +1511,7 @@ struct
     Logger.trace __FUNCTION__;
     (* [preorder], not the old shortest-child [minimize]: a node's children
        are its premises, all required. See [Tree.preorder] and
-       [theories/Test.v]'s [TwoPremises]. *)
+       [test/rocq/Test.v]'s [TwoPremises]. *)
     Some (Enc.Trees.min this.using |> Enc.Tree.preorder), next
   ;;
 

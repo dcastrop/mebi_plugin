@@ -2,12 +2,12 @@
 
 What MeBi cannot do today, as it behaves now. None is a bug: a verdict
 or proof the plugin gives is correct, and `Qed` checks every proof. Where
-a limit is pinned, a test in `theories/Test.v` fails on purpose (`KNOWN
+a limit is pinned, a test in `test/rocq/Test.v` fails on purpose (`KNOWN
 LIMIT` / `KNOWN WRONG`), so lifting the limit turns the pin into a
 positive test. What could be done about the cost limits is in
 `future-work.md`.
 
-Each is current behaviour. Where pinned, a test in `theories/Test.v`
+Each is current behaviour. Where pinned, a test in `test/rocq/Test.v`
 fails on purpose (`KNOWN LIMIT` / `KNOWN WRONG`), so lifting the limit
 turns the pin into a positive test.
 

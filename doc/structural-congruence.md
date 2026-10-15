@@ -32,7 +32,7 @@ states**. The plugin can extract that and decide bisimilarity on demand,
 but a proof has to cover every pair it visits, and that is out of reach.
 
 Proving one representative per silent cycle inside the coinduction does not
-help either. It is unsound: `theories/Test.v`'s `CircularTransfer` is a
+help either. It is unsound: `test/rocq/Test.v`'s `CircularTransfer` is a
 counterexample.
 
 ## The recipe
