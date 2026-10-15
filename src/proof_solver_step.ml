@@ -978,7 +978,7 @@ struct
            running all five cheap suites. See ASSISTED-CHANGES.md,
            2026-09-29.
 
-           Retried 2026-10-01 gated on the mutual block ([ac98c3c]) and
+           Retried 2026-10-01 gated on the mutual block ([53dd4c8]) and
            reverted the same day: the mutual block does NOT make it safe.
            With [MutualCofix True] forced, CADP's [wsim_lts_bigstep] went
            from 396 to not closing. Run the suites with the strategy forced

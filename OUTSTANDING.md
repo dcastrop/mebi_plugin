@@ -10,8 +10,8 @@ line, and record the resolution in `ASSISTED-CHANGES.md`. When something
 new is found, add one line, and put its detail in the right `doc/` file.
 
 (Until 2026-10-13 this file held the detail as well, and had grown to
-438 lines: `git show 3cc717e:OUTSTANDING.md`. It replaced `TODO.md`,
-deleted 2026-10-10: `git show a1b1470:TODO.md`.)
+438 lines: `git show 6b9b38f:OUTSTANDING.md`. It replaced `TODO.md`,
+deleted 2026-10-10: `git show cbbdd39:TODO.md`.)
 
 ## Waiting on @dcastrop
 

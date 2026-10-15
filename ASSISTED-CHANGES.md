@@ -23,10 +23,10 @@ after the fact. Those raised and agreed so far are tagged **New feature** in
 their own entries (B2's `MutualCofix Auto`, H2's saturation guard, ...).
 
 **Scope of this log.** It covers work identifiable by the
-`Co-Authored-By: Claude` trailer — 26 commits as of `df4f65c`, all from
+`Co-Authored-By: Claude` trailer — 26 commits as of `c318c65`, all from
 2026-08-16 onward. The
 preceding 1139 commits are the project's own history; the last of them,
-`ccfc606` "implemented benchmarking for building lts graphs", dates from
+`a52e501` "implemented benchmarking for building lts graphs", dates from
 2026-03-31, before the several-month pause. If any earlier assisted work exists
 it left no trailer and is not identifiable here.
 
@@ -34,7 +34,7 @@ it left no trailer and is not identifiable here.
 
 ## 2026-08-16 — Rocq 9.2 port and reproducible toolchain
 
-Branch `nix-setup`, seven commits, merged to `main` as `7d36087`.
+Branch `nix-setup`, seven commits, merged to `main` as `4f5ed78`.
 Net: **18 files changed, +468 / −35**.
 
 Context: the project had been untouched since March. Rocq had moved to 9.2 in
@@ -43,13 +43,13 @@ months because nothing in the repo recorded which Rocq the source required.
 The goal of this session was to get it building again and make that state
 reproducible.
 
-- `e8007c0` — **Bug fix.** Ported the plugin to Rocq 9.2. `Option.IsNone` was removed from `rocq-runtime`'s clib, so `annotation.ml` raises its own `AnnotationIsNone`; `next_evar_name` lost its sigma argument and now returns `(Id.t * bool) option`; `extern_constr` requires `~flags`, passed as `PrintingFlags.current ()` to preserve behaviour; `Declare.Proof.by` takes an env first; `Tactics.cofix` moved to `FixTactics`.
-- `b8df503` — **Bug fix** + **Tooling.** `COQBIN` probed for `coqtop`, which Rocq 9.x no longer ships, so `$(dir …)` collapsed to `/` and every invocation became `//rocq`. `rocq` now comes from `PATH` via the local opam switch, with `COQBIN` kept as an override. Added a `make dune` target, since the makefile build writes `g_mebi.ml`/`.vo`/`.glob` into the source tree and dune refuses to build over files it also generates.
-- `57a19f4` — **Bug fix.** `test/saturation.ml{,i}` predates the model refactor and refers to modules that no longer exist. Nothing links it, so `dune build` never noticed — but `dune build @check` and merlin did, which is why it showed as errors in the editor.
-- `7da83b6` — **Tooling.** Pinned the toolchain: `dune-project` gained real bounds (`rocq-core >= 9.2 < 9.3`, `yojson >= 3.0`) and declares `rocq-stdlib`, which `theories/` always required but nothing asked for; `rocq-mebi.opam.locked` pins ~100 packages exactly. Stopped ignoring `*.opam`, since `rocq-mebi.opam` is the input to `opam switch create .` and a fresh clone could not bootstrap without it. Added a nix flake covering three systems, with `OPAMNODEPEXTS=1` because opam otherwise probes the system package manager, finds no gmp or pkg-config on NixOS, and offers to run `nix-build`, aborting the bootstrap. Verified by bootstrapping an empty switch from the lockfile and building both paths in it.
-- `ff54d5c` — **Bug fix** + **Tooling.** A local opam switch is identified by its full path, so the VS Code sandbox switch must be `${workspaceFolder}`; `${workspaceFolderBasename}` resolves to a global switch name that does not exist and the OCaml LSP never starts. Shared the setting rather than leaving it to be rediscovered.
-- `5176ae1` — **Docs.** The README build section still described Coq 8.20 and `coq_makefile`. Replaced with the Rocq 9.2 toolchain, the two build paths and why switching needs `make dune`, the faster inner loops, and the from-clone bootstrap.
-- `5566c6a` — **Docs.** Recorded a structural cleanup backlog in `TODO.md`: repo size dominated by `paper/`, no CI, no LICENSE, overlapping module lists, assorted stale files.
+- `ba24411` — **Bug fix.** Ported the plugin to Rocq 9.2. `Option.IsNone` was removed from `rocq-runtime`'s clib, so `annotation.ml` raises its own `AnnotationIsNone`; `next_evar_name` lost its sigma argument and now returns `(Id.t * bool) option`; `extern_constr` requires `~flags`, passed as `PrintingFlags.current ()` to preserve behaviour; `Declare.Proof.by` takes an env first; `Tactics.cofix` moved to `FixTactics`.
+- `658d8b2` — **Bug fix** + **Tooling.** `COQBIN` probed for `coqtop`, which Rocq 9.x no longer ships, so `$(dir …)` collapsed to `/` and every invocation became `//rocq`. `rocq` now comes from `PATH` via the local opam switch, with `COQBIN` kept as an override. Added a `make dune` target, since the makefile build writes `g_mebi.ml`/`.vo`/`.glob` into the source tree and dune refuses to build over files it also generates.
+- `b210f3e` — **Bug fix.** `test/saturation.ml{,i}` predates the model refactor and refers to modules that no longer exist. Nothing links it, so `dune build` never noticed — but `dune build @check` and merlin did, which is why it showed as errors in the editor.
+- `f6d9b14` — **Tooling.** Pinned the toolchain: `dune-project` gained real bounds (`rocq-core >= 9.2 < 9.3`, `yojson >= 3.0`) and declares `rocq-stdlib`, which `theories/` always required but nothing asked for; `rocq-mebi.opam.locked` pins ~100 packages exactly. Stopped ignoring `*.opam`, since `rocq-mebi.opam` is the input to `opam switch create .` and a fresh clone could not bootstrap without it. Added a nix flake covering three systems, with `OPAMNODEPEXTS=1` because opam otherwise probes the system package manager, finds no gmp or pkg-config on NixOS, and offers to run `nix-build`, aborting the bootstrap. Verified by bootstrapping an empty switch from the lockfile and building both paths in it.
+- `ec6c857` — **Bug fix** + **Tooling.** A local opam switch is identified by its full path, so the VS Code sandbox switch must be `${workspaceFolder}`; `${workspaceFolderBasename}` resolves to a global switch name that does not exist and the OCaml LSP never starts. Shared the setting rather than leaving it to be rediscovered.
+- `e490d27` — **Docs.** The README build section still described Coq 8.20 and `coq_makefile`. Replaced with the Rocq 9.2 toolchain, the two build paths and why switching needs `make dune`, the faster inner loops, and the from-clone bootstrap.
+- `1957b83` — **Docs.** Recorded a structural cleanup backlog in `TODO.md`: repo size dominated by `paper/`, no CI, no LICENSE, overlapping module lists, assorted stale files.
 
 **Session tally:** Bug fix 4 · Tooling 3 · Docs 2 · Refactor 0 · Optimization 0 ·
 **New feature 0.**
@@ -58,7 +58,7 @@ reproducible.
 
 ## 2026-08-17 — Functor-layer refactor
 
-Branch `refactor/functor-layer`, three commits off `main` (`7d36087`).
+Branch `refactor/functor-layer`, three commits off `main` (`4f5ed78`).
 Net: **148 files changed, +2603 / −3430** — the codebase got smaller.
 
 Context: `lib/model/state.ml`'s `Make(Log)(Base)` was representative of a
@@ -66,7 +66,7 @@ pattern across ~60 files where every module took a `Log : Logger.S` functor
 parameter, which blocked running the model from plain OCaml tests. Full analysis
 in `~/.claude/plans/i-d-like-some-advice-snappy-bentley.md`.
 
-### `99b0501` — Logger and Rocq_context become values, not functor parameters
+### `5a6cf98` — Logger and Rocq_context become values, not functor parameters
 
 *145 files, +2353 / −3168*
 
@@ -80,14 +80,14 @@ in `~/.claude/plans/i-d-like-some-advice-snappy-bentley.md`.
 *Verified:* `theories/` output byte-identical to `main` apart from
 non-deterministic benchmark timings; proof suites unchanged (baseline below).
 
-### `c078308` — pure-OCaml model tests
+### `f2d3a8c` — pure-OCaml model tests
 
 *3 files, +227 / −258*
 
 - **New — test infrastructure, not a plugin feature.** `test/tests.exe` links `rocq-mebi.model` and nothing Rocq-related. Nine checks over `FSM.of_lts`, saturation, minimization, bisimilarity and JSON. This is the payoff of the Rocq-freedom work above, and doubles as a tripwire: if a Rocq dependency creeps back into those three libraries, the target stops building. Flagged as *new* because it is net-new code, but it adds no capability to the plugin itself.
 - **Bug fix** — dropped `(public_name rocq-mebi.tests)`, which made `opam install .` place a do-nothing binary in the switch's `bin/` (noted in `TODO.md`). The previous `tests.ml` was commented out end to end and referenced a pre-refactor API, so it was replaced rather than revived.
 
-### `6f94748` — proof completion detected in the iteration that closes it
+### `8aa14b8` — proof completion detected in the iteration that closes it
 
 *1 file, +23 / −4*
 
@@ -114,10 +114,10 @@ Net public API surface shrank: `Logger.S` (as a functor parameter),
 
 ## 2026-08-18 — Encoding tables unshared, contexts fixed per instance
 
-Branch `refactor/functor-layer`, one commit (`328a26f`) on top of `6f94748`.
+Branch `refactor/functor-layer`, one commit (`9e9b6b0`) on top of `8aa14b8`.
 Net: **7 files changed, +86 / −56**.
 
-Context: backing out the encoding-table sharing from `99b0501`, the first item
+Context: backing out the encoding-table sharing from `5a6cf98`, the first item
 under "Outstanding" below. Working note in `notes/1-revert-shared-encoding-table.md`.
 Tracing it before implementing turned one item into three: the note's fix as
 written would have left the hazard it was aimed at, and reintroduced a worse one
@@ -126,8 +126,8 @@ same design tension — one table with a moving context, versus two tables shari
 one counter — and (B) is only reachable because of (C).
 
 - **Refactor** — (C) `Proof_solver_wrapper.Make` drops its `M` parameter and builds its own `Rocq_monad_utils` again. The sharing was justified on the grounds that a fresh `Bi_encoding` per proof step meant nothing from a previous step could be found; that is not where the lookups that matter go. `ReModel.state`/`label` resolve against `W.M`, the command-time table, before and after. The per-step table only ever backed `Iter`'s own `encode`/`econstr_compare`/`EConstrSet`, which are per-step by construction. Measured effect of the sharing: none.
-- **Bug fix** — (A) `Rocq_monad.run` loses `?ctx` and reads its own instance's context, as it did pre-`99b0501` via `Ctx.get ()`. `Bi_encoding.set_ctx` becomes install-once, called by `Proof_solver_wrapper.Make` with the goal. Overriding a `run` default was never sufficient: `encode`, `fstring` and `Rocq_monad_utils.get_encoding` call `run` themselves and cannot pass a `~ctx`, so they defaulted to `Rocq_context.global` — including via `econstr_compare`, hence `EConstrSet`. A table can hash an entry under one sigma and look it up under another, and that was reachable both before and after (C) alone. The `run` override in `proof_solver_wrapper.ml` was `?ctx`'s only caller, so it disappears with it.
-- **Bug fix** — (B) `Bi_encoding.initialize` allocates the maps without calling `Enc.reset`. **Pre-existing, not introduced by `99b0501`** — that commit removed the reachable path by accident, and a literal revert would have restored it. `Enc` is one counter shared by every `Bi_encoding` instance, and a per-step table is a fresh instance each step, so its first `run` put the counter back to `0` while the command-time table already held encodings `0..N-1`. A later `M.encode` of a term not already in that table — reachable from `M.exists_eq` in `Proof_solver_theory` — is then handed a live encoding, and `B.add` shadows the model's binding for it: false positives in `M.econstr_eq`, wrong terms out of `Decode`. Only an explicit `~reset_encoding:true` resets the counter now, which is what every command call site passes.
+- **Bug fix** — (A) `Rocq_monad.run` loses `?ctx` and reads its own instance's context, as it did pre-`5a6cf98` via `Ctx.get ()`. `Bi_encoding.set_ctx` becomes install-once, called by `Proof_solver_wrapper.Make` with the goal. Overriding a `run` default was never sufficient: `encode`, `fstring` and `Rocq_monad_utils.get_encoding` call `run` themselves and cannot pass a `~ctx`, so they defaulted to `Rocq_context.global` — including via `econstr_compare`, hence `EConstrSet`. A table can hash an entry under one sigma and look it up under another, and that was reachable both before and after (C) alone. The `run` override in `proof_solver_wrapper.ml` was `?ctx`'s only caller, so it disappears with it.
+- **Bug fix** — (B) `Bi_encoding.initialize` allocates the maps without calling `Enc.reset`. **Pre-existing, not introduced by `5a6cf98`** — that commit removed the reachable path by accident, and a literal revert would have restored it. `Enc` is one counter shared by every `Bi_encoding` instance, and a per-step table is a fresh instance each step, so its first `run` put the counter back to `0` while the command-time table already held encodings `0..N-1`. A later `M.encode` of a term not already in that table — reachable from `M.exists_eq` in `Proof_solver_theory` — is then handed a live encoding, and `B.add` shadows the model's binding for it: false positives in `M.econstr_eq`, wrong terms out of `Decode`. Only an explicit `~reset_encoding:true` resets the counter now, which is what every command call site passes.
 
 *Verified:* per file, in emission order, against the commit's parent. Each
 `PluginProofs.v` built as its own `make -j1` target — under `make -j$(nproc)`
@@ -161,7 +161,7 @@ move. It is cheap insurance, not a fix with a reproducer behind it.
 
 ## 2026-09-27 — Model component cluster collapsed, renamed, unified with Showable
 
-Branch `refactor/model-components`, four commits off `main` (`7d36087`).
+Branch `refactor/model-components`, four commits off `main` (`4f5ed78`).
 Net: **82 files changed, +2205 / −2998** — the codebase got smaller again.
 
 Context: Jonah returned to the project after another multi-month pause,
@@ -184,11 +184,11 @@ deleted, then superseded entirely by the work below, which targets the
 actual diagnosed bottleneck (`notes/3-collapse-model-component-cluster.md`)
 rather than a wholesale port of the other project's abstractions.
 
-- `a6eec52` — **Docs.** Added `CLAUDE.md`, making the "refactoring only"
+- `6cd7e72` — **Docs.** Added `CLAUDE.md`, making the "refactoring only"
   working assumption, this log's practice, and the `PluginProofs.v`
   verification procedure discoverable by anyone, not just prior-session
   memory.
-- `16bbe37` — **Refactor.** Collapsed all 17 model components (`State`,
+- `c43e8b8` — **Refactor.** Collapsed all 17 model components (`State`,
   `Label`, `Action`, `Edge`, ...) from 17 separate files, each its own
   functor, into nested modules inside one `Components.Make` functor
   (`lib/model/components.ml`) — exactly the change `notes/3` had already
@@ -200,7 +200,7 @@ rather than a wholesale port of the other project's abstractions.
   `Traces` helpers) now takes a single `Components.S` argument (plus each
   other where needed) instead of 5–13 individually-constrained ones. No
   `src/` changes — every module path is preserved.
-- `6e436dd` — **Refactor.** Renamed each component's Set/Map/Pair to a
+- `369fb0b` — **Refactor.** Renamed each component's Set/Map/Pair to a
   submodule of its element type — `States` → `State.Set`, `Labels` →
   `Label.Set`, `Actions`/`ActionMap`/`ActionPair`/`ActionPairs` →
   `Action.Set`/`Action.Map`/`Action.Pair`/`Action.Pair.Set`, and so on —
@@ -218,9 +218,9 @@ rather than a wholesale port of the other project's abstractions.
   `graph_builder.ml`/`graph_type.ml` were deliberately left alone — their
   own `States`/`Actions`/`Transitions` are a separate, unrelated module
   hierarchy that happens to share these names.
-- `e037c18` — **Refactor.** Unified the `lib/showable` port of Jonah's
+- `acde9a9` — **Refactor.** Unified the `lib/showable` port of Jonah's
   membranes-style `Ordered`/`Set`/`Map` abstractions (committed in
-  `7249d40`, previously unused) with the existing JSON-dump mechanism
+  `40bf377`, previously unused) with the existing JSON-dump mechanism
   (`lib/utils/json.ml`) into one `Thing.Make` (new `lib/showable/thing.ml`):
   a component supplies `{name; json; equal; compare}` once and gets
   `pp`/`show`/`equal`/`compare` (from `Showable`) and `json`/`to_string`/
@@ -289,7 +289,7 @@ coverage — as backlog, recorded below.
   convention `TODO.md` already flagged as needing a decision),
   `lib/model/algorithms/similarity.{ml,mli}` (0-byte placeholders),
   `lib/utils/writer.ml`/`.mli`, `test/saturation.{ml,mli}` (already
-  excluded from `test/dune`, per `57a19f4`), `test/coqplugin/Proc.v` (uses
+  excluded from `test/dune`, per `b210f3e`), `test/coqplugin/Proc.v` (uses
   command syntax that predates the current `g_mebi.mlg` grammar), and
   `examples/CADP_v2.v` (an unreferenced fork of `examples/CADP.v`). Also
   cleared stray `.cmi`/`.cmx`/etc. build artifacts left in-tree for
@@ -323,7 +323,7 @@ coverage — as backlog, recorded below.
   actually implemented — with an accurate one-paragraph status pointing at
   `TODO.md`; and corrected the "Running tests" section, which still
   described `test/tests.ml` as commented out end-to-end (it's a real,
-  passing 9-assertion suite as of `c078308`, 2026-08-17) and had no
+  passing 9-assertion suite as of `f2d3a8c`, 2026-08-17) and had no
   mention of the `PluginProofs.v` suite being the only end-to-end
   proof-solver coverage.
 
@@ -351,15 +351,15 @@ and suspected a rename during the 9.2 port; asked for it to be traced back
 through history before trusting either the fix or the old baseline.
 
 - **Bug fix.** `compose (create N b)` was folded into `composition_create N
-  b` in `f850375` (2026-03-24, "discovered bug in CADP write_next, memory
+  b` in `e27464b` (2026-03-24, "discovered bug in CADP write_next, memory
   out of bounds"), touching `examples/CADP.v`/`examples/CADP_Glued.v` — but
-  the last edit to this specific file (`87eec6f`, 2026-03-19) predates that
+  the last edit to this specific file (`d6b76b3`, 2026-03-19) predates that
   commit by five days, so it was never updated and has been broken ever
   since. The rename also shifted the counting convention: old `create N b`
   produced exactly `N` processes; new `sys_create N b` (which
   `composition_create` wraps) recurses down to `0` inclusive, producing
   `N + 1`. A second, independent shift did the same thing to
-  `make_spec_pid` in `93dda66` (2026-03-26, "debugging CADP size 2") — its
+  `make_spec_pid` in `befda10` (2026-03-26, "debugging CADP size 2") — its
   base case changed from `Nil` (0 pids) to `Pid 0 Nil` (1 pid), so
   `make_spec N` also went from `N` pids to `N + 1`. Reconstructing the
   historically-validated (82/64-iteration) 1-process test in the current
@@ -565,7 +565,7 @@ C6) after Jonah returned to the project wanting it back to a usable state.
   CLAUDE.md); `_CoqProject`'s default subset is what `make` builds.
 - **Tooling.** Dropped a git stash entry, `WIP: broken membranes-style state
   experiment (superseded by cluster-collapse plan)` — confirmed superseded
-  by the now-completed `16bbe37` cluster collapse, per the 2026-09-27
+  by the now-completed `c43e8b8` cluster collapse, per the 2026-09-27
   cluster-collapse entry above.
 - **Tooling.** Removed `.gitignore`'s `src/commandOLDunify.ml` line —
   confirmed via `git log --all` that the file is gone from the working tree
@@ -596,14 +596,14 @@ Optimization 0 · **New feature 0.**
 Backlog item C7 explicitly withheld a verdict on
 `examples/**/_mutual_exclusion.v`, `_no_starvation.v`, `_nat_streams.v` —
 they resemble the underscore-prefixed OCaml dead files removed earlier this
-week (`5743b46`), but each needed its own check rather than a batch delete.
+week (`a5ec62c`), but each needed its own check rather than a batch delete.
 Traced each file's full rename/edit history with `git log --all --follow`.
 
 - **Tooling.** Deleted `examples/Bisimilarity/CADP/Properties/_mutual_exclusion.v`
   (and its stale, already-gitignored `.mutual_exclusion.aux`). Confirmed
-  dead: the same commit that underscore-prefixed it, `97e668c` "reorganizing
+  dead: the same commit that underscore-prefixed it, `a359d1d` "reorganizing
   and preparing to rework mutual exclusion", is immediately followed by
-  `3cc6f10`/`37d997a`/`93dda66`, which wrote the current, actively-built
+  `2da782e`/`9a04ca1`/`befda10`, which wrote the current, actively-built
   `MutualExclusion.v` from scratch as that rework — the commit's own message
   documents the supersession, and `MutualExclusion.v` is what every CADP
   mutual-exclusion `PluginProofs.v` (including this session's earlier
@@ -707,7 +707,7 @@ Optimization 0 · **New feature 0.**
 
 Attempted backlog item A2: build a minimal hand-written LTS that positively
 exercises `Proof_solver_step.ReModel.transition`'s multiple-actionpairs
-fold (`6124eeb`'s fix — picks the shortest-annotation candidate instead of
+fold (`f0cb45a`'s fix — picks the shortest-annotation candidate instead of
 raising when more than one `Action.t` matches the same `(from, label,
 goto)`). Three hand-built terms and one check against a real example
 (`CADP/Size1/MutualExclusion`, Trace-enabled) all failed to trigger it.
@@ -898,7 +898,7 @@ Optimization 0 · **New feature 0.**
 ## 2026-09-28 — A1 sized before implementing: the `ReModel` miss path never fires
 
 Branch `refactor/model-components`, merged into `main` on the `fork` remote
-first (`da32f6b`, a `--no-ff` merge of the 30-commit branch) at Jonah's
+first (`e2c1d17`, a `--no-ff` merge of the 30-commit branch) at Jonah's
 request, so upstream integration can later be a single PR from `fork/main`
 to `origin/main` that references these milestones. `origin/main` is
 deliberately untouched.
@@ -912,10 +912,10 @@ first: instrument the miss path, count misses across the five cheap
 latent rather than active. That sizing pass was done before writing any of
 the refactor.
 
-- **Freshness check.** The note survives `16bbe37` intact. `ReModel` is now
+- **Freshness check.** The note survives `c43e8b8` intact. `ReModel` is now
   at `src/proof_solver_step.ml:92-170` rather than the note's `~92-150`, and
   `Model.States`/`Model.Labels` are now `Model.State.Set`/`Model.Label.Set`
-  after the `6e436dd` nested-submodule rename. Nothing else in the analysis
+  after the `369fb0b` nested-submodule rename. Nothing else in the analysis
   has drifted — `get_encoding`, the `Hashtbl.Make` key, and the `None`/`Some`
   theory fallbacks are all exactly as described.
 
@@ -1030,7 +1030,7 @@ handled, since `nf_all` runs before both encode and lookup — the note says
 as much.
 
 Also formats `test/tests.ml`, which had drifted since the A5 regression test
-landed in `a7bd17c` without a `@fmt` pass.
+landed in `e041a47` without a `@fmt` pass.
 
 **Session tally:** Tooling 1 · Docs 1 · Bug fix 0 · Refactor 0 ·
 Optimization 0 · **New feature 0** (one capability *flagged*, not built).
@@ -1039,7 +1039,7 @@ Optimization 0 · **New feature 0** (one capability *flagged*, not built).
 
 ## 2026-09-28 — Logging: a level fix and a wasted-work fix
 
-Branch `optimize/logger-formatting`, off `main` (`da32f6b`) rather than off
+Branch `optimize/logger-formatting`, off `main` (`e2c1d17`) rather than off
 the A1 branch, since neither change has anything to do with A1. Both were
 found while trying to use the A1 probe on a large example, not by looking
 for them.
@@ -1100,7 +1100,7 @@ Verification: full five-file `PluginProofs.v` run, `make -j1` per file, all
 Refactor 0 · **New feature 0.**
 ## 2026-09-28 — B2 reframed: saturation enumerates paths, not states
 
-Branch `investigate/saturation-path-explosion`, off `main` (`da32f6b`).
+Branch `investigate/saturation-path-explosion`, off `main` (`e2c1d17`).
 `TODO.md`'s A3 ("optimize saturation -- takes a long time on larger/
 multi-layered examples") has been an unquantified hunch since it was
 written. It now has a mechanism, a location and a number.
@@ -1472,7 +1472,7 @@ Refactor 0 · **New feature 0.**
 
 ## 2026-09-29 — The solve loop retained every intermediate proof state
 
-Branch `fix/solve-loop-retains-proof-states`, off `main` (`b9e5594`).
+Branch `fix/solve-loop-retains-proof-states`, off `main` (`388a15d`).
 Prompted by Jonah asking whether `Test3` might be solvable by splitting one
 `Solve N` into several smaller `Solve` commands, and whether the same effect
 could be had from the OCaml side — he recalled relying on per-command
@@ -1623,7 +1623,7 @@ about 40KB per iteration.
 
 **On the recollection this tested.** Jonah recalled relying on per-command
 batching and finding no OCaml-side equivalent. The second half was exactly
-right and is now fixed (`87403dc`): the solve loop retained every
+right and is now fixed (`4a630ae`): the solve loop retained every
 intermediate proof state, which only a command boundary could release. That
 effect is real but about a fifth of the growth, so batching would have
 helped visibly on shorter proofs where the retained frames are
@@ -2560,7 +2560,7 @@ loose bounds should be tightened; and whether `Test3` should keep its
 explicit setting.
 
 **On the bug from the previous entry** — yes, fixed and shipped in
-`b493e1d`, not merely reported. `Partition.get_bisimilar` no longer uses
+`816b162`, not merely reported. `Partition.get_bisimilar` no longer uses
 `find_first` with a non-monotonic predicate.
 
 **Verification.** Six proof suites, 27 of 27 `Solved` with the counts above.
@@ -2686,7 +2686,7 @@ path. `Test2` and `Glued/MutualExclusion` unchanged under forced mutual.
 was `Proc/Test1`'s `wsim_pr`/`wsim_rp`; `Glued/MutualExclusion` shows no
 over-prediction (81 and 63, mutual or nested).
 
-### Step 0 (`ac98c3c`) breaks `MutualCofix True` on CADP — found, not fixed
+### Step 0 (`53dd4c8`) breaks `MutualCofix True` on CADP — found, not fixed
 
 Running the forced-mutual pass over all six suites, CADP
 `MutualExclusion`'s `wsim_lts_bigstep` (396 iterations) did not finish: 29
@@ -2695,8 +2695,8 @@ capped bound. Bisected:
 
 | commit | forced-mutual `wsim_lts_bigstep` |
 | --- | --- |
-| `acfd55c` (before Step 0) | **Solved after 396** |
-| `ac98c3c` (Step 0) | Unsolved after 1001 |
+| `6e383cb` (before Step 0) | **Solved after 396** |
+| `53dd4c8` (Step 0) | Unsolved after 1001 |
 | this change | Unsolved after 1001 (unaffected) |
 
 So the previous entry's central claim — that with the mutual block open "a
@@ -2726,7 +2726,7 @@ Refactor 0 · **Tooling 0.**
 ## 2026-10-01 — Step 0 reverted (code only), parked as a separate optimization
 
 Branch `main` (on `fork`). Reverts the `src/proof_solver_step.ml` half of
-`ac98c3c` at the user's direction; its log entry above is kept as the
+`53dd4c8` at the user's direction; its log entry above is kept as the
 record. The tie-break comment now says the gated retry was tried and
 reverted, and that heuristic changes need the strategy forced both ways.
 The idea is written up for a future session in the local note
@@ -2751,7 +2751,7 @@ loose `wsim_p3` bound, and verify-both-ways guidance; `tests.exe` expectation
 30 → 34).
 
 **A slip in the previous entry.** It reported `dune build @fmt` clean for
-`6f06ed9`; one line in `proof_solver_step.ml` was not. Formatted here.
+`2f9ea23`; one line in `proof_solver_step.ml` was not. Formatted here.
 
 **Session tally (2026-10-01, this session):** Bug fix 1 · Refactor 0 ·
 Optimization 0 (one reverted) · Docs 2 · New feature 0 · **Tooling 0.**
@@ -2874,7 +2874,7 @@ trec)) (tfix (tact A (tact A trec)))`:
 
 - with `Trace` on, `multiple actionpairs matched (2 candidates)` fires
   twice and the proof closes in 38 iterations;
-- **negative control:** with the pre-`6124eeb` behaviour (raise on more
+- **negative control:** with the pre-`f0cb45a` behaviour (raise on more
   than one candidate) patched back in, the same proof fails at that branch.
   Patch reverted.
 
@@ -3009,7 +3009,7 @@ Branch `main` (on `fork`). Refactor (dead-file removal). Backlog item C2.
 `rocq-mebi.mebi_lib` that re-exported the four `lib/` libraries. Its history
 settles what it was for: when the sub-libraries were namespaced
 `rocq-mebi.mebi_lib.{utils,terms,rocq_tools,model}`, it was their parent.
-`148ddbb` (2026-03-30) renamed them to `rocq-mebi.{utils,terms,...}` and
+`75ce55f` (2026-03-30) renamed them to `rocq-mebi.{utils,terms,...}` and
 commented the umbrella out in the same commit; it was never revived, and
 nothing in the tree references `mebi_lib`. `src/dune` already depends on
 each library by name, so finishing it would only add an unused alias.
@@ -3252,7 +3252,7 @@ No existing example triggers it: the full proof-suite build and the
 none of the repository's LTSs were being over-approximated this way. Proof
 suite: 27 counts unchanged.
 
-Also a separate `style:` commit: `40c98d5` went in without `dune fmt`
+Also a separate `style:` commit: `a45b898` went in without `dune fmt`
 (CI does not check formatting).
 
 **Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
@@ -3910,7 +3910,7 @@ procedure and no proof search. The subject overlaps with ours; the method
 does not.
 
 **Audit scope and method.** All 115 commits carrying the
-`Co-Authored-By: Claude` trailer (2026-08-16 to `9dab1b6`): 621 added lines
+`Co-Authored-By: Claude` trailer (2026-08-16 to `cd161a0`): 621 added lines
 of `.v` and 10,164 of OCaml (`.ml`/`.mli`/`.mlg`).
 - *Text.* Every added `.v` line of 25 characters or more, normalised for
   whitespace, was matched against every line of `rocq-sims`: **0 matches**.
@@ -4059,25 +4059,25 @@ byte-identical).
 
 ### What was wrong, and the fixes
 
-1. **The verdict was not rooted** (`6976ea0`). `Result.are_bisimilar` asked
+1. **The verdict was not rooted** (`3a745ee`). `Result.are_bisimilar` asked
    whether every block of the merged partition held states of both systems,
    never whether the two *initial* states shared a block. `a.b.x` against
    `b.a.y` is not even strongly bisimilar, yet both blocks ({x, b.y},
    {b.x, y}) are shared, and `MeBi Run Bisim` said bisimilar. The verdict
    now compares the roots, and falls back to the old test only for an FSM
    without an initial state. **This was Claude's error twice over:** the
-   `tests.ml` comment written with the first test binary (`c078308`,
+   `tests.ml` comment written with the first test binary (`f2d3a8c`,
    2026-08-17) noticed that the verdict ignores `init` and argued it was
    sound "because every state is reachable from the root". That argument is
    false, as this pair shows. The comment is replaced.
-2. **No `=ε⇒` split** (`f162126`). `partition_states ?silent` now also
+2. **No `=ε⇒` split** (`ee20bba`). `partition_states ?silent` now also
    splits each block by the set of blocks its states reach by `=ε⇒`.
    Closures are computed from the unsaturated silent edges and memoised,
    not stored. `Bisimilarity.fsm` passes the merged *originals*' edges, and
    `Minimization.fsm` its own. The interface doc said a saturated FSM's
-   partition "is weak bisimilarity"; that was Claude's (`2144f5c`,
+   partition "is weak bisimilarity"; that was Claude's (`fb371a6`,
    2026-10-01) and is corrected.
-3. **The solver could not answer a silent move by moving** (`2e6eb0d`).
+3. **The solver could not answer a silent move by moving** (`f37e292`).
    It stayed put when that was bisimilar, and otherwise asked the
    saturated FSM, which has no silent moves. `Product.respond ?silent` now
    answers a silent label with the nearest acceptable state reachable by
@@ -4092,7 +4092,7 @@ byte-identical).
 
 - `Test.v`:
   - `CheckerVerdicts`: both pairs are now `Fail`s. Each was pinned
-    known-wrong first (`11bd121`) and flipped by its fix. Positive checks
+    known-wrong first (`92a701a`) and flipped by its fix. Positive checks
     `p1 ≈ r1` and `a.z ≈ τ.a.z` sit beside them.
   - `SilentResponse`: now proves. It also has `rocq-sims`' `SimExample`
     LTS (attributed, both directions: 30 and 26 iterations) and a
@@ -4191,7 +4191,7 @@ with FSM a and FSM b swapping roles for `bisim_r`. That needs the
 
 ### How to revert this, if @dcastrop disagrees
 
-The change is the commits on `theories/weak-bisimilar` from `f4d268e`
+The change is the commits on `theories/weak-bisimilar` from `ce3fd5b`
 onwards (this log entry included), touching only `theories/Bisimilarity.v`,
 `theories/Test.v` and this file.
 
@@ -4293,7 +4293,7 @@ and its counts, so it should be raised before it is built.
 
 ### How to revert this, if @dcastrop disagrees
 
-The change is the commits on `solver/weak-bisimilar` from `a4a7fda`
+The change is the commits on `solver/weak-bisimilar` from `bd4fdc8`
 (this log entry included). It touches `lib/model/algorithms/product.*`,
 `lib/rocq_tools/{mebi_theories,theories}.*`, `src/{proof_solver,
 proof_solver_step,proof_solver_tactics,results,help}.*`, `test/tests.ml`,
@@ -5950,7 +5950,7 @@ Refactor 1 (review) · Docs 1 · Tooling 1 · Optimization 1.
 
 **Bug fix** (a default that should not have shipped). On branch
 `fix/dumps-off-by-default`. Found while accounting for the probe case of
-notes/15: `DumpResults` was on by default (since `e53a386`, March, "wip:
+notes/15: `DumpResults` was on by default (since `977b923`, March, "wip:
 file dumps for inspecting"), so every `Run Bisim` / `Sim Begin` wrote JSON
 dumps of its FSMs into `./_dumps/`. Jonah: it was only ever meant to be on
 during active development, and disk writes are opt-in.
@@ -6071,7 +6071,7 @@ split, each verified.
 Before: of 131 functions in the library, 106 had no comment directly above
 them (82% across the whole codebase: 1,021 of 1,240).
 
-**Comments** (`f091a80`, `a7c406a`; with comments stripped the code is
+**Comments** (`586ee79`, `07d5b01`; with comments stripped the code is
 identical, checked file by file). Also corrected stale text: two comments
 that my `respond` speed-up (PR #36) had separated from `respond` and
 `respond_silently`; `Policy` described as "measurement only" though the
@@ -6106,7 +6106,7 @@ commit hash; it failed at checkout and was re-run.
 ..." saying what the value is (a unit function: what it does), an overview
 first for orchestrating functions, the main clause before the qualifiers,
 and every doc comment ending with what it raises, directly or propagated
-("Raises nothing" otherwise). Restyled throughout (`bf4ef1a`, comments
+("Raises nothing" otherwise). Restyled throughout (`6762f8d`, comments
 only). And a split rule: a non-trivial lambda passed to fold/map/iter
 becomes a named, documented function, unless it leans on the enclosing
 scope, in which case values are passed as directly as possible. Applied in
@@ -6133,11 +6133,11 @@ review, 9 split commits) · Docs 3 · Tooling 1 · Optimization 1 · Bug fix 1.
 **Docs + Refactor.** On branch `docs/rocq-tools`. Same rules as part 1, in
 the style Jonah settled during its review.
 
-**Dead code** (`a05259c`, and inside `5b29806`): 42 commented-out blocks
+**Dead code** (`70f7931`, and inside `eff35d1`): 42 commented-out blocks
 in `rocq_utils.ml` and about 400 lines in `mebi_theories.ml`, removed (git
 history keeps them).
 
-**Comments** (`5b29806`, `af2213d`, `5d61271`, `ba18ac9`; comments only,
+**Comments** (`eff35d1`, `c4c4877`, `a60fdc7`, `6bca743`; comments only,
 checked file by file with comments stripped): every function in the twelve
 files, contracts in the `.mli` and pointers or a short "how" at the
 definitions, internal functions documented where they are defined.
@@ -6146,7 +6146,7 @@ exceptions: a `try` around *building* a monadic value does not catch what
 *running* it raises. Placeholder comments (`(** [] *)`) and separator bars
 are gone, and a stale reference (`sandbox_unify_all_opt`) is fixed.
 
-**Latent bugs found, not fixed** (`8be3944`, `a6e1987`; listed in
+**Latent bugs found, not fixed** (`38042fa`, `0ca68b8`; listed in
 `TODO.md`, "Found by the documentation pass"). Writing down what each
 function raises showed code that does not do what it appears to: 13 `try`
 blocks around monadic values (some harmless), handlers that can never fire,
@@ -6278,7 +6278,7 @@ with 702 warnings (baseline for the cross-reference pass).
 **Docs + Refactor.** On branch `docs/model-components`, after Jonah's go
 ("merge once CI is green, then continue onto the next pass"; PR #40 merged).
 
-**Comments** (`ac65dbb`; comments only, code unchanged with comments
+**Comments** (`84059dd`; comments only, code unchanged with comments
 stripped). `components.ml` has no `.mli`, so its signatures carry the
 contracts, the implementations point to them, and each signature says what
 its type stands for. `FSM.mli`'s older contracts restyled, and the copies
@@ -6287,19 +6287,19 @@ of three of them in `FSM.ml`'s own signature removed (two copies drift).
 ...") written, and a stale TODO in `model.ml` about `Traces`, deleted
 2026-09-28, replaced.
 
-**Found, recorded in `TODO.md`, not fixed** (`1064d83`): `Label.compare`
+**Found, recorded in `TODO.md`, not fixed** (`9498189`): `Label.compare`
 is not a total order (`is_silent` compared only when both labels know
 it); `Action.Map.update` means to merge the derivation trees of equal
 actions but, since `Action.equal` compares trees, never does -- and the
 proof solver relies on that (`MultipleDerivations`), so it needs a
 decision.
 
-**Dead code removed** (`c85bc64`): 23 functions of the component
+**Dead code removed** (`349f816`): 23 functions of the component
 signatures had no callers, among them `Action.Pair.try_update` and
 `merge_lists` (unused since the 2026-09-28 saturation rewrite) and four
 `EdgeMap` functions; the `Edge` component, used only by those, went too.
 
-**odoc references** (`a506314`): pointers and mentions in the new
+**odoc references** (`5b1b7e4`): pointers and mentions in the new
 comments became `{!...}` references, at Jonah's request (2026-10-05); a
 backlog item covers the earlier libraries.
 
@@ -6320,7 +6320,7 @@ the golden's 200) and briefly read the mismatch as a regression.
 its own worktree: the proof matrix in all three solver modes, every
 `Solve` identical. The last also: the `Test4` suite, identical; `Test.v`'s
 60 counts identical to `main`'s; `satdiff` byte-identical to its golden;
-`tests.exe` 103/103; `make` clean. Two later commits (`a506314`, odoc
+`tests.exe` 103/103; `make` clean. Two later commits (`5b1b7e4`, odoc
 references; a `TODO.md` baseline) are comments only.
 
 **How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
@@ -6339,12 +6339,12 @@ lines, so it is split in three PRs: this one (`api`, `config_loader`,
 `benchmarking`), then `wrapper` and the command grammar, then the proof
 solver.
 
-**Comments** (`d46064a`; comments only, checked file by file):
+**Comments** (`d11ea1a`; comments only, checked file by file):
 contracts in the `.mli`, with odoc references; pointers or a short "how"
 in the `.ml`; small local helpers commented where they stay. Stale and
 old-style comments replaced (e.g. "module Decode.ModelToString").
 
-**Dead code** (`5261803`): `Api.config_output`,
+**Dead code** (`b16a659`): `Api.config_output`,
 `Config_loader.reset_the_weak_args`, `Results.are_states_bisimilar` and
 `Model.Partition.reachable_by_label` (its only caller was commented out);
 commented-out code (`Results.get_candidates`, a `Command` module, `Api`'s
@@ -6387,7 +6387,7 @@ dead-code removals) · Tooling 1.
 **Docs + Refactor.** On branch `docs/src-wrapper`, the second of the three
 `src/` PRs.
 
-**Comments** (`ce3bff3`; comments only): the commands' contracts in
+**Comments** (`7a28910`; comments only): the commands' contracts in
 `wrapper.mli`, with what each raises; the internal guards
 (`check_if_lts_fail`, `check_saturation_size`, `on_demand_for`,
 `refuse_conflicts`, `separate`, `bisimilarity_of`) restyled; placeholder
@@ -6397,7 +6397,7 @@ contracts duplicated in the `.ml`'s own signature removed. The grammar
 file `g_mebi.mlg` has no functions of its own; its sections already have
 headings.
 
-**Dead code** (`40d22b0`): the unused `_log_kinds`, a commented-out `open`.
+**Dead code** (`d2d7833`): the unused `_log_kinds`, a commented-out `open`.
 
 **Splits**, one commit each, the user-facing messages unchanged (the
 on-demand warning checked against `Test.v`'s output): `bound_to_string`,
@@ -6435,14 +6435,14 @@ dead-code removals) · Tooling 1.
 `_tactics`, `_theory`, `_wrapper`, `_statem`), then `proof_solver` and
 `proof_solver_step`.
 
-**Comments** (`3c35e3d`, `2bdeb59`; comments only): contracts in the
+**Comments** (`17f6779`, `4c37d76`; comments only): contracts in the
 `.mli`, the state machine's description moved there from the `.ml`, the
 history kept where it is the "how" (A4's measurement in `try_unfold_any`,
 why `invert_premise` uses `inversion; clear; subst`). A small helper,
 `notes/tools/reflow.py`, rewraps comments past 80 columns (`ocamlformat`
 leaves long ones alone when they hold code spans).
 
-**Dead code** (`41a3b15`): `simplify_all`, `intro_as`,
+**Dead code** (`7c7a265`): `simplify_all`, `intro_as`,
 `apply_rt1n_trans`, `unfold_silent1`, `is_fsm_weak_labels` (and the
 exception only it raised), `new_H_name`, `do_nothing`; 24 commented-out
 debugging calls and empty comments in `Proof_solver_tactics`.
@@ -6472,7 +6472,7 @@ dead-code removals) · Tooling 2 (`relock.sh`, `reflow.py`).
 **Docs + Refactor.** On branch `docs/src-solver-core`: `proof_solver` and
 `proof_solver_step`, the last of `src/` (part 6 was the support modules).
 
-**Comments** (`5f5053c`, `d3d77f8`, `2c43e45`, `652e81b`; comments only): contracts
+**Comments** (`890eb4b`, `36a4358`, `49eb16a`, `3bcef0d`; comments only): contracts
 in the `.mli` for what the two export (`init`, `start`, `solve`, `step`,
 `guard`; the step's dispatch over the state machine), a full contract on
 each `.ml`-only definition (`ReModel`, `Hyp`, `Concl`, `Hyps`, the state
@@ -6482,7 +6482,7 @@ first). Each contract says whether an exception is raised while a
 monadic value is built or when it runs, which is what decides whether a
 handler around the call sees it.
 
-**The "try around a monadic value" sites** (`8198cf2`, `TODO.md`): each
+**The "try around a monadic value" sites** (`3b7ab02`, `TODO.md`): each
 analysed, the outcome at the site and in `TODO.md`. Of the seven in
 `proof_solver_step.ml`, two were in dead code, four work (the exception
 is raised while building, or the `try` is inside the continuation), and
@@ -6493,26 +6493,26 @@ same family: `find_lts`/`find_constructor` wrap a partial application of
 `NothingToDo`, so `solve` could not catch the step's. Fixed on a branch
 of their own (next entry).
 
-**Dead code** (`ff1d1d2`): `Proof_solver.reset_the_cache` and
+**Dead code** (`b35b6c8`): `Proof_solver.reset_the_cache` and
 `NotImplemented`; `Proof_solver_step`'s `_state_opt`, `_label_opt`,
 `_need_inversion`; six commented-out pieces.
 
 **Splits**, one commit each: `Proof_solver.init` (330 lines) into
 `goal_head_is`, the whole-game refusals and an `Init` functor
 (`fall_back_on_simulation`, `plan_answers`, `choose_cofix_strategy`, ...;
-`14991d9`); `is_lts_of_either_fsm`, from three copies of one closure
-(`df0d069`); `Hyp.invertibility` (`mentions_var`, `step_grade`,
-`is_eq_inductive`; `e413ec9`); `unfold_atomic` and `seq_opt`, from three
-`try_unfold_any`s (`49a5bcb`); `Hyps.try_invert_any` (`keep_highest`,
-carrying the tie-break history, and `invert_by_grade`; `bcb431d`);
-`handle_open_block` (`9881b80`); `handle_weaksim` (`151ff9e`);
-`handle_apply_constructors` (`19752d7`); `contains`, from `guard`
-(`7ef065c`).
+`1f051bb`); `is_lts_of_either_fsm`, from three copies of one closure
+(`a28d856`); `Hyp.invertibility` (`mentions_var`, `step_grade`,
+`is_eq_inductive`; `e0e55b1`); `unfold_atomic` and `seq_opt`, from three
+`try_unfold_any`s (`5b9444d`); `Hyps.try_invert_any` (`keep_highest`,
+carrying the tie-break history, and `invert_by_grade`; `a4f4b84`);
+`handle_open_block` (`6bd245d`); `handle_weaksim` (`efb19b1`);
+`handle_apply_constructors` (`bcb0a53`); `contains`, from `guard`
+(`0a1f01d`).
 
-**Verification.** Each code commit except `7ef065c` in its own worktree:
+**Verification.** Each code commit except `0a1f01d` in its own worktree:
 the proof matrix in all three solver modes against `main`, every `Solve`
-identical. `7ef065c` (`guard`'s error path only) is covered by the head's
-run. The head (`d3d77f8`; what follows it is comments) also: ABP
+identical. `0a1f01d` (`guard`'s error path only) is covered by the head's
+run. The head (`36a4358`; what follows it is comments) also: ABP
 (6494 / 9914) and the `Test4` suite (48,821 / 61,161) identical, `Test.v`'s
 60 counts identical, `tests.exe` 103/103, `make` clean.
 
@@ -6523,15 +6523,15 @@ committing. Three doc comments were ambiguous to `make` (warning 50),
 caught by the `make` gate. The `init` split was committed by a command
 that chained `dune build && git commit` after a comment edit that had
 failed: the commit was right, but one comment stayed past 80 columns
-until `d3d77f8`. User errors went round in a circle: I wrote them as
-`@raise CErrors.UserError`, then (`2c43e45`) switched them to
+until `36a4358`. User errors went round in a circle: I wrote them as
+`@raise CErrors.UserError`, then (`49eb16a`) switched them to
 `wrapper.mli`'s prose ("Raises Rocq's [UserError] ...") to match it and
 avoid an `odoc` warning, though `@raise` is the form everywhere else (196
 tags against about 30 prose sentences). With Jonah, `@raise` was settled
-on for the whole codebase, and `652e81b` puts the tags back, accepting the
+on for the whole codebase, and `3bcef0d` puts the tags back, accepting the
 warning; the remaining prose sentences on `main` get a branch of their
 own. A reflow had also merged `init`'s closing paragraph into its last
-list item (fixed in `652e81b`). And
+list item (fixed in `3bcef0d`). And
 `notes/tools/reflow.py` split `[code spans]` that `ocamlformat` then
 joined back past the margin; the tool now keeps a span whole.
 
@@ -6549,23 +6549,23 @@ in `notes/tools`).
 **Bug fix.** On branch `fix/try-handler-latent-bugs`, from the solver
 core's documentation pass (previous entry). Every site in `TODO.md`'s
 list analysed there; one commit for each handler that was broken:
-- `Proof_solver_tactics.find_lts` and `find_constructor` (`0ae1dc7`):
+- `Proof_solver_tactics.find_lts` and `find_constructor` (`eb2f24b`):
   the `try` wrapped a partial application of `List.find`, so a missing
   LTS or constructor escaped as `Not_found`, not the exception the
   interface names.
-- `Proof_solver_step.ReModel.label` (`49ba897`): the `None`/`Some`
+- `Proof_solver_step.ReModel.label` (`b07f0e8`): the `None`/`Some`
   fallback's lookup ran in a `let*` continuation, past the handlers, so
   an encoding missing from the alphabet escaped as a bare `Not_found`
   and ended the step. It is now `CouldNotFind_Label`, which
   `Hyps.get_transition` skips like any other unreadable label.
-- `Theories.is_theory` (`45a3c34`): false for a term that is not an
+- `Theories.is_theory` (`84bf9e6`): false for a term that is not an
   atomic type, decided inside the check, and for a product too (it named
   `EConstrIsNotA_Type` but not `EConstrIsNot_Atomic`). Every `is_*` check
   is `is_theory`, so all now raise nothing.
-- `Constructor_bindings.get_bound_term` (`809b591`): an undefined binding
+- `Constructor_bindings.get_bound_term` (`ae55eda`): an undefined binding
   names the outermost term, as its handler meant to; the handler now
   runs inside the computation (`naming_outer`).
-- `Proof_solver.NothingToDo` (`f1d0558`) is now the step's exception, and
+- `Proof_solver.NothingToDo` (`bbcf814`) is now the step's exception, and
   `S.step` unwraps it from the tactic engine's `TacticFailure`, so `solve`
   can stop on it. No suite reaches it (the state machine is `Done` only
   once the proof has no goals, which `S.step` checks first): it makes
@@ -6587,7 +6587,7 @@ all three solver modes, ABP (6494 / 9914) and `Test.v`'s 60 counts, each
 identical to `main`. The head also: the `Test4` suite (48,821 / 61,161)
 identical, `tests.exe` 103/103, `make` clean.
 
-**Mistake:** `45a3c34`'s message first said the solver's callers "already
+**Mistake:** `84bf9e6`'s message first said the solver's callers "already
 caught" these exceptions; only two do. Reworded before pushing.
 
 **How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
@@ -6604,21 +6604,21 @@ Tooling 1.
 **Docs + Refactor.** On branch `docs/lib-utils`: `Json`, `Logger`,
 `Output`, `Utils`.
 
-**Comments** (`77681d1`, `09a505d`, `12c6858`; comments only): contracts
+**Comments** (`e6a2ac7`, `e8af98e`, `ef5bdaa`; comments only): contracts
 in the `.mli`, pointers or history in the `.ml`. Two old comments were
 wrong and now say what the code does: `split_at i l` is the first `i`
 elements, *reversed* (not "the i-th tail"), and `new_int_counter`'s first
-value is `start + 1`. `Sys_error` went to prose (`09a505d`, because `odoc`
+value is `start + 1`. `Sys_error` went to prose (`e8af98e`, because `odoc`
 cannot resolve a stdlib exception and `Json.S` is included everywhere) and
-back to an `@raise` tag (`12c6858`), once `@raise` was settled on for the
+back to an `@raise` tag (`ef5bdaa`), once `@raise` was settled on for the
 whole codebase, warnings accepted.
 
-**Dead code** (`bdb27e6`): `Utils`' `swap`, `try_seq_opt`, `strip_snd`,
+**Dead code** (`615c9a3`): `Utils`' `swap`, `try_seq_opt`, `strip_snd`,
 `get_key_of_val`, `option_str`; `Logger`'s `option` and `options`.
 `Logger`'s `enable`, `disable`, `quiet` and `reset_sink` are unused too,
 but kept as the configuration API.
 
-**Split** (`e07a7d5`): `clean_char`, from `clean_string`'s fold; checked
+**Split** (`ee3a5a6`): `clean_char`, from `clean_string`'s fold; checked
 against the old function on 20,000 random strings, identical.
 
 **Noticed, not changed** (`TODO.md`): the stdout sink prints a
@@ -6642,11 +6642,11 @@ Tooling 1.
 
 **Docs + Refactor.** On branch `docs/lib-showable`.
 
-**Comments** (`a01084d`, `8e0737e`): on what stays. No `.mli` here, so the
+**Comments** (`00ce565`, `2e0aa23`): on what stays. No `.mli` here, so the
 contracts are above the definitions.
 
 **Dead code** -- about half the library, and all of `lib/json`:
-- `1098146`: `Map_` (`Showable.Map`, the whole module, out of all three
+- `2c7b423`: `Map_` (`Showable.Map`, the whole module, out of all three
   module lists) and the `Type_.Sa` signature only it used; the `Unit`,
   `String`, `Int` and `Bool` instances; and `Set_.Make`'s extras
   (`subset`, `subseteq`, `supset`, `supseteq`, `bfold`, `disjunction`,
@@ -6655,7 +6655,7 @@ contracts are above the definitions.
   `subseteq`, and `supseteq a b` was `subset b a` (meant `subseteq b a`),
   so `supset` and `supseteq` were the same too. Nothing called any of
   them.
-- `1dbd636`: `Type_.Json` was unused, and it was `lib/json`'s
+- `65b0cd3`: `Type_.Json` was unused, and it was `lib/json`'s
   (`Yojson_compare`'s) only user, so that library goes too. This takes
   the place of the `lib/json` documentation pass planned in `TODO.md`.
   Model components get their JSON from `lib/utils`' `Json`, untouched.
@@ -6676,9 +6676,9 @@ Tooling 1.
 
 **Docs + Refactor.** On branch `docs/lib-terms`. Contracts in the `.mli`
 (`Base_`, `Base_term`, `Encoding`, `Tree`, `Trees`, `Constructor_tree`,
-`Constructor_trees`), pointers in the `.ml` (`212ac1f`, `650b01b`).
+`Constructor_trees`), pointers in the `.ml` (`ca793ce`, `d8037cd`).
 Nothing here is unused. One split, `fewer_constructors` from `Trees.min`
-(`7f473f6`).
+(`2ddc2a8`).
 
 **Verification.** On the head: `tests.exe` 103/103, the proof matrix in
 all three modes and `Test.v`'s 60 counts identical to `main`'s, `make`
@@ -6747,7 +6747,7 @@ left in `TODO.md`:
   checks, 105 in all).
 
 **Verification.** `tests.exe` 105/105; `dune build` and `make` clean. On
-`84f259e`: the proof matrix in all three modes is identical to `main`'s
+`0505c13`: the proof matrix in all three modes is identical to `main`'s
 ("Every Solve identical"), and `Test.v`'s counts are identical.
 `clean_string` is on the term-printing path, hence the full run.
 `EnsureFail`'s commit changes only an interface: built, `make`-gated and
@@ -6886,7 +6886,7 @@ are corrected.
   The proof matrix was identical in all three modes ("Every Solve
   identical"), ABP identical, `Test.v` identical, `tests.exe` 105/105,
   and `satdiff -- 200` byte-identical.
-- **On the branch (`fd01d29`):** the proof matrix in all three modes, ABP, `Test.v`
+- **On the branch (`5d2909f`):** the proof matrix in all three modes, ABP, `Test.v`
   (`MixedSilence` adds no `Solve`) identical to `main`; `tests.exe` 110/110.
 - `dune build`, `make` (warning-50 gate) clean; `tests.exe` 110/110.
 
@@ -6903,7 +6903,7 @@ Optimization 2.
 **Docs.** `CLAUDE.md` told sessions to expect `tests.exe` 99/99. The
 suite has had more tests since PR #35 (101), and 110 since #52-#54, so a
 session following it would have read a clean run as a discrepancy. It now
-says 110/110, measured on `main` (`59ee03f`). Earlier entries that report
+says 110/110, measured on `main` (`bb3213e`). Earlier entries that report
 99/99 are left as written: they were true at the time.
 
 **How to revert:** `git revert -m 1 <merge-commit>` (find it with `git log
@@ -7219,7 +7219,7 @@ in `TODO.md` once trimmed. Nothing was:
 
 **Docs.**
 - `TODO.md` became a pointer to `OUTSTANDING.md`, then, at Jonah's
-  request, was deleted. The full old list is `git show a1b1470:TODO.md`.
+  request, was deleted. The full old list is `git show cbbdd39:TODO.md`.
 - `OUTSTANDING.md` now holds the detail it used to send readers to
   `TODO.md` for: the `Auto` defaults' figures, the semantics examples, the
   sketch for LTSs with parameters, and why the derivation-tree replay is
@@ -7344,9 +7344,9 @@ On branch `fix/cadp-size2-mutex`, at Jonah's request.
 **Bug fix (example).** `Size1/MutualExclusion/PluginProofs.v` was a copy
 of `Size1/Glued/PluginProofs.v` (glued against layered), found earlier
 today. Its history explains it:
-- at `3cc6f10` (2026-03-13) it proved the layered `lts` against the
+- at `2da782e` (2026-03-13) it proved the layered `lts` against the
   mutual-exclusion property, as its name says;
-- `37d997a` (2026-03-16, a restructure while debugging `Size2`) replaced
+- `9a04ca1` (2026-03-16, a restructure while debugging `Size2`) replaced
   its contents with the glued file's, divider and all.
 
 Jonah chose to restore its intent over deleting it. It now proves `lts`
@@ -7540,7 +7540,7 @@ On branch `fix/cadp-size2-mutex`, at Jonah's request.
 is deleted. It was a draft monitor for no starvation: never built, and
 imported by nothing. It had the bugs noted in the first entry today, and
 `Properties/Fifo.v` supersedes it. It is recoverable with `git show
-e043b0e:examples/Bisimilarity/CADP/Properties/_no_starvation.v`. Its
+b92c58f:examples/Bisimilarity/CADP/Properties/_no_starvation.v`. Its
 `_CoqProject` line, its `examples/README.md` mention and the
 `OUTSTANDING.md` decision item are removed.
 
@@ -7997,7 +7997,7 @@ each statement checked against the code or `MeBi Help`:
   `examples/Bisimilarity/**/PluginProofs.v`" predated the CADP restructure
   (PR #70) and the by-default CCS and Evaluation proofs, and did not
   mention `bench/proofs.sh`. The `BisimProofs.v` files it pointed at were
-  deleted on 2026-10-02 (`6552acd`), their `weak_bisimilar` proofs moved
+  deleted on 2026-10-02 (`02dc73b`), their `weak_bisimilar` proofs moved
   into the `PluginProofs.v` files; the README now names those.
 - `weak_bisimilar` and `Auto`: added that on an FSM saturated on demand
   `Auto` goes nested unless `Bounds Game` is set (OUTSTANDING §3).
@@ -8014,7 +8014,7 @@ Bug fix 0 · Optimization 0 · **New feature 0**.
 
 On branch `refactor/theories-drop-weak-bisim`, stacked on the docs branch
 above. Jonah's call, and the reason he gave: `weak_bisim` had already been
-renamed `mutual_sim` (2026-10-02, `6b7faa2`, which added the new name
+renamed `mutual_sim` (2026-10-02, `b3c2088`, which added the new name
 beside the old one "for existing proofs"), so this is removal of dead
 code. The one reason it had been parked, `OUTSTANDING.md` §1 listing it as a
 decision for @dcastrop, is recorded there and revertable below.
@@ -8146,7 +8146,7 @@ Jonah. Docs only, no code.
 
 **Docs (evaluation).** A table of deciding (`Run Bisim`) against proving
 (`Sim Begin`/`Solve`/`Qed`) for every CADP pair, `Test4` and the ABP.
-Every decision was run again today (`7b71aad`), each alone under a 6GB
+Every decision was run again today (`1514bf1`), each alone under a 6GB
 cap. CADP proof times are per command, from today's compiles of the
 checked-in files. ABP and `Test4` proofs, and the failed CADP proofs, are
 quoted from their files and marked as such.
@@ -8214,7 +8214,7 @@ item, saying who it waits on and where its detail is. The detail moved
 to three scoped files:
 - **`doc/decisions.md`:** §1, rewritten as briefs for @dcastrop (question,
   options, consequences, a marked recommendation). It opens with an
-  orientation for someone who last saw the code at `d204afb`, 2026-01-12:
+  orientation for someone who last saw the code at `33a8019`, 2026-01-12:
   what each top-level directory holds now. The settled "Semantics" and
   "Provenance" items became one "for review" brief.
 - **`doc/limitations.md`:** §3, nearly verbatim.
@@ -8238,7 +8238,7 @@ two deliberate changes:
 - A stale CADP to-do was dropped: "build the observing variant over
   `bigstep_norm`". `Obs.v` already defines `bigstep_obs_norm`.
 
-The old file is at `git show 3cc717e:OUTSTANDING.md`.
+The old file is at `git show 6b9b38f:OUTSTANDING.md`.
 
 Revert: `git revert -m 1 <merge commit>`.
 
@@ -8253,9 +8253,9 @@ On branch `docs/upstream-state`, while assessing the upstream PR.
 
 **Docs.** `doc/decisions.md` said that 630 commits had landed on the fork
 and that "none of it is upstream yet". Both were wrong. Counted from
-`d204afb` (David's last commit, 2026-01-12), `main` is 632 commits ahead,
-and `dcastrop/mebi_plugin`'s `main` (`e05727f`) already holds 231 of them:
-- **181** reached upstream before 2026-08-17, ending at `7d36087` (the
+`33a8019` (David's last commit, 2026-01-12), `main` is 632 commits ahead,
+and `dcastrop/mebi_plugin`'s `main` (`f0ae289`) already holds 231 of them:
+- **181** reached upstream before 2026-08-17, ending at `4f5ed78` (the
   Rocq 9.2 port). Upstream's own reflog shows that tip as fetched on
   2026-08-17.
 - **50** (2026-08-17 to 2026-09-29, all Jonah's) were pushed to upstream's
@@ -8286,13 +8286,13 @@ Optimization 0 · **New feature 0.**
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
 
-- ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
+- ~~Sharing the encoding table between command-time and proof-time (part of `5a6cf98`) should be backed out.~~ Done in `9e9b6b0`, 2026-08-18.
 - The term-equality problem in `ReModel` is unaddressed: goal terms are resolved to model elements by syntactic hashtable lookup, which can miss on evars, universe instances or local context. **Measured 2026-09-28 (see above) and found latent** — zero misses across all five cheap `PluginProofs.v` suites — so the unification rewrite is deliberately not done. Still unmeasured on the *failing* examples (`Proc/Test3`, `CADP/Size2/Glued`), which is where a miss would actually explain something.
-- ~~Collapsing the model component cluster (71 of `model.mli`'s 80 sharing constraints; `Saturation.Make` at 13 arguments) is deliberately deferred until after any hand refactoring of individual model components.~~ Done in `16bbe37`, 2026-09-27, together with a nested-submodule rename and a Showable/JSON-dump unification — see below.
+- ~~Collapsing the model component cluster (71 of `model.mli`'s 80 sharing constraints; `Saturation.Make` at 13 arguments) is deliberately deferred until after any hand refactoring of individual model components.~~ Done in `c43e8b8`, 2026-09-27, together with a nested-submodule rename and a Showable/JSON-dump unification — see below.
 - ~~`examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v` fails with "The reference compose was not found", raised in the `Example` statement before any `MeBi` command runs.~~ Fixed, 2026-09-27 (see above) — root cause was a rename this file missed, not a Rocq 9.2 regression.
 - ~~The "Verification baseline" table below (`268`/`396` for `CADP/Size1/MutualExclusion` and `CADP/Size1/Glued`) doesn't match the bounds checked into those files (`267`/`395`).~~ Resolved, 2026-09-27 (see above): `Proof_solver.solve` permits one step beyond its nominal bound, so this is expected behaviour, not a discrepancy.
 - ~~`_CoqProject:53` comments out `examples/Bisimilarity/Proc/Test4/PluginProofs.v` by name, but the file doesn't exist on disk. Separately, `Proc/Test3/PluginProofs.v` has two duplicate example names.~~ Both addressed 2026-09-27 (see above): the Test3 duplicates are renamed (not build-verified — see the caveat there), and the `_CoqProject` comment for Test4 now says plainly that the file was never written, rather than implying it exists. Writing an actual `Proc/Test4/PluginProofs.v` remains undone.
-- `lib/showable/` and `lib/json/` were never added to `_CoqProject` when introduced (2026-09-26), so only `dune build` ever compiled them — `make` silently skipped both libraries entirely. Fixed in `e037c18`, 2026-09-27, as a side effect of `lib/model/components.ml` becoming their first real consumer; see below for what that uncovered.
+- `lib/showable/` and `lib/json/` were never added to `_CoqProject` when introduced (2026-09-26), so only `dune build` ever compiled them — `make` silently skipped both libraries entirely. Fixed in `acde9a9`, 2026-09-27, as a side effect of `lib/model/components.ml` becoming their first real consumer; see below for what that uncovered.
 - ~~`@fmt` drift outside `lib/model`~~ — fully resolved, 2026-09-27 (see below, two entries): non-`proof_solver*` half (`rocq_monad.mli`, `thing.ml`, `tests.ml`) and `proof_solver*` half (`graph_extract_lts.ml`, `proof_solver_wrapper.ml`, `proof_solver_step.ml`, baseline-reverified). `rocq_monad_utils.ml`/`theories.ml`/`proof_solver.ml`/`graph_type.ml`, all listed as drifted in the original review, turned out already clean on re-check.
 - ~~No CI job — the Rocq 9.2 port broke the build for months without anyone noticing.~~ Added, 2026-09-27 (see below): `.github/workflows/ci.yml`.
 - ~~`.gitignore` lists `src/commandOLDunify.ml`, which no longer exists.~~ Removed, 2026-09-27 (see below). The rest of `TODO.md`'s C6 "stale detritus" item turned out to already be resolved or not actually a problem — see below for what was checked.
@@ -8314,7 +8314,7 @@ This table predates B2 (2026-09-29): its `Proc/Test2` row is now the
 a run against it.
 
 Proof-solver iteration counts from the five `PluginProofs.v` marked `### Success`
-in `_CoqProject`, unchanged from `main` through `e037c18`, and complete as of
+in `_CoqProject`, unchanged from `main` through `acde9a9`, and complete as of
 `CADP/Size1/Glued/MutualExclusion`'s fix on 2026-09-27. Recorded per file, in
 emission order, because a sorted aggregate cannot tell two files apart:
 

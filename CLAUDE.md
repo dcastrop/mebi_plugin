@@ -37,8 +37,8 @@ The index should only shrink. When an item is resolved, delete its line
 When something new is found, add one line to the index and the detail to
 the right `doc/` file. Don't grow open-item lists elsewhere (`notes/` is
 local). `TODO.md` was folded into it on 2026-10-10 (`git show
-a1b1470:TODO.md`); the index replaced a 438-line version on 2026-10-13
-(`git show 3cc717e:OUTSTANDING.md`).
+cbbdd39:TODO.md`); the index replaced a 438-line version on 2026-10-13
+(`git show 6b9b38f:OUTSTANDING.md`).
 
 ## Verifying changes to `lib/model` or the proof solver
 

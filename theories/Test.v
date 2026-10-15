@@ -681,12 +681,12 @@ End Collapsing.
 (* Qed. *)
 
 (* Regression test for the "multiple actionpairs" branch of
-   [Proof_solver_step.ReModel.transition] (backlog item A2, fix 6124eeb).
+   [Proof_solver_step.ReModel.transition] (backlog item A2, fix f0cb45a).
 
    [do_par1] and [do_par2] coincide when [a = b], so the step
    [tpar A A t -A-> tact A t] has two derivations. The unsaturated FSM keeps
    one [Action.t] per derivation tree, so resolving that hypothesis finds two
-   candidates. Before 6124eeb this raised and the proof below could not be
+   candidates. Before f0cb45a this raised and the proof below could not be
    built; it now picks the shorter annotation. Verified both ways on
    2026-10-01: with the old raising behaviour patched back in, this proof
    fails at that branch. *)

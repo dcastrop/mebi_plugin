@@ -7,7 +7,7 @@ can be backed out: `ASSISTED-CHANGES.md` gives each one's revert command.
 
 ## Since you last looked
 
-Your last commit is `d204afb` (2026-01-12, the port to Rocq 9.0.1). Since
+Your last commit is `33a8019` (2026-01-12, the port to Rocq 9.0.1). Since
 then, 632 commits have been made, and 231 of them are already on your
 `main`: 181 reached it before 2026-08-17 (the Rocq 9.2 port among them),
 and 50 (2026-08-17 to 2026-09-29) were pushed to it by mistake on

@@ -15,7 +15,7 @@ relative to the verdict, and where it stops.
 ## How it was measured
 
 - **Machine and build:** an Intel Core Ultra 5 125U with 14GB of RAM,
-  against the dune build of `main` at `7b71aad` (2026-10-13).
+  against the dune build of `main` at `1514bf1` (2026-10-13).
 - **Decisions:** each `Run Bisim` ran alone in its own process, under a
   6GB cap, from a copy of `examples/`. *Time* is that command's own time
   (`rocq compile -time`). *Memory* is the process's peak, which includes
