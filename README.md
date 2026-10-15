@@ -2,10 +2,40 @@
 
 This repository contains a Rocq (formerly Coq) plugin for automating bisimilarity proofs (which are currently taken from the methods detailed in "Advanced Topics in Bisimulation and Coinduction", Section 3.2.2).
 
-
 **Work in progress**
 
 ---
+
+
+- [MEBI: Mechanised Bisimilarities](#mebi-mechanised-bisimilarities)
+  - [Building the Project](#building-the-project)
+    - [Toolchain](#toolchain)
+    - [First-time setup on a new machine](#first-time-setup-on-a-new-machine)
+    - [Everyday environment](#everyday-environment)
+    - [Changing dependencies](#changing-dependencies)
+    - [Documentation](#documentation)
+    - [Two build paths](#two-build-paths)
+    - [Switching back to dune after running make](#switching-back-to-dune-after-running-make)
+    - [Faster inner loops](#faster-inner-loops)
+    - [Running tests](#running-tests)
+    - [Using VSCode](#using-vscode)
+      - [Issues with `vsrocqtop`](#issues-with-vsrocqtop)
+  - [Usage](#usage)
+    - [Building an LTS or FSM](#building-an-lts-or-fsm)
+    - [Bisimilarity, merging, minimizing, saturating](#bisimilarity-merging-minimizing-saturating)
+    - [Which constructor shapes are supported](#which-constructor-shapes-are-supported)
+    - [Benchmarking](#benchmarking)
+    - [Interactive proof search (`MeBi Sim`)](#interactive-proof-search-mebi-sim)
+    - [Configuration](#configuration)
+    - [Diagnostics](#diagnostics)
+    - [Help](#help)
+  - [Status \& Remaining Work](#status--remaining-work)
+  - [Other Resources](#other-resources)
+    - [Templates](#templates)
+    - [Tutorials](#tutorials)
+    - [Other](#other)
+    - [Papers](#papers)
+    - [Books](#books)
 
 
 
@@ -73,12 +103,12 @@ make dune
 ### Faster inner loops
 A full `dune build` takes ~1m40s, almost all of it the `MeBi Benchmark` vernaculars in `theories/DevTest.v`. When you don't need them:
 
-| Changing | Command |
-| --- | --- |
-| OCaml plugin code | `dune build @check` — type-checks everything in `lib/` and `src/`, builds no `.vo` (~2s) |
-| OCaml, and you want the loadable plugin | `dune build src/` |
-| A single theory file | `dune build theories/Test.vo` |
-| Everything, before committing | `dune build` |
+| Changing                                | Command                                                                                  |
+| --------------------------------------- | ---------------------------------------------------------------------------------------- |
+| OCaml plugin code                       | `dune build @check` — type-checks everything in `lib/` and `src/`, builds no `.vo` (~2s) |
+| OCaml, and you want the loadable plugin | `dune build src/`                                                                        |
+| A single theory file                    | `dune build theories/Test.vo`                                                            |
+| Everything, before committing           | `dune build`                                                                             |
 
 `dune build @check` also produces the `.cmi`/`.cmt` files merlin needs, so it doubles as the "make my editor happy" command.
 
