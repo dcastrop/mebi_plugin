@@ -35,7 +35,7 @@ bench/proofs.sh -s eval-large -f WidthLarge.v   # one file of a suite
 |---|---|---|
 | `default` | the six `PluginProofs.v` marked `### Success` in `_CoqProject`, plus `CCS/PluginProofs.v` and `CCS/LawProofs.v` | ~3 min a mode, run 8 at a time (`-j`) |
 | `abp` | `CCS/ABPProofs.v`, `CCS/ABPBisimProofs.v` | ~4 min and ~4.3GB each |
-| `test4` | `Proc/Test4/NormProofs.v`, `NormBisimProofs.v` | ~7 + ~4 min, ~3.8GB peak |
+| `test4` | `Proc/Test4/NormProofs.v`, `NormBisimProofs.v` | ~0.5 + ~4 min, ~2.8GB peak |
 | `eval` | `examples/Evaluation/{Width,Layers,Depth}.v` | ~40s |
 | `eval-large` | `examples/Evaluation/{Width,Layers,Depth}Large.v`, the same levers scaled up | ~7 + ~2 + ~10 min, ~3.9GB peak |
 

@@ -49,8 +49,8 @@ examples/Evaluation/Depth.v ### Success (K = 1-8; ~16s)
 ### Scaled up, for benchmarking (bench/proofs.sh -s eval-large): too slow to
 ### build by default.
 # examples/Evaluation/WidthLarge.v ### Success (n = 3, 162 states; ~7 min, ~3.9GB)
-# examples/Evaluation/LayersLarge.v ### Success (16, 32, 64 layers; ~2 min, Qed dominates)
-# examples/Evaluation/DepthLarge.v ### Success (K = 12, 16; ~10 min, ~3.1GB)
+# examples/Evaluation/LayersLarge.v ### Success (16, 32, 64 layers; ~1.5 min, ~2.6GB, Qed dominates)
+# examples/Evaluation/DepthLarge.v ### Success (K = 12, 16; ~1 min, ~0.7GB)
 
 ###############################################################################
 ### Proc
@@ -78,7 +78,7 @@ examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 
 examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/Proc/Test4/NormTermTests.v ### Success (Test4 under the normalised semantics: 82 states, Run Bisim 0.4s each)
-# examples/Bisimilarity/Proc/Test4/NormProofs.v ### Success (Test4's weak_sim proved, via ProcCongruence.wsim_transfer; ~7 min, ~3.8GB: run under a memory cap)
+# examples/Bisimilarity/Proc/Test4/NormProofs.v ### Success (Test4's weak_sim proved, via ProcCongruence.wsim_transfer; 6,115 steps, ~30s, ~0.7GB)
 # examples/Bisimilarity/Proc/Test4/NormBisimProofs.v ### Success (Test4's weak_bisimilar, Answers Minimal, via wbis_transfer; ~4 min, ~2.8GB: run under a memory cap; separate file, heavy proofs add up)
 # examples/Bisimilarity/Proc/Test4/TermTests.v ### KNOWN LIMIT (B3): under compLTS, 9720 states; Run Bisim/Sim Begin decide it on demand (~45s, notes/13), but the file also runs Run Saturate (74.6M weak actions), still refused. Run only under a memory cap (systemd-run -p MemoryMax=...; ulimit -v breaks OCaml 5). See its header
 # examples/Bisimilarity/Proc/Test4/PluginProofs.v ### not written: a direct proof under compLTS needs ~525k solver steps (notes/13); Test4 is proved instead via the normalised semantics, NormProofs.v above

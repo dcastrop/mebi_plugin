@@ -38,7 +38,7 @@ relative to the verdict, and where it stops.
 | system pair | states | decide | prove | ratio |
 |---|---|---|---|---|
 | **CADP, one process** | | | | |
-| glued ≈ layered | 33 | 0.14s, 0.40GB | 2,760 steps, 39s | ~290× |
+| glued ≈ layered | 33 | 0.14s, 0.40GB | 1,658 steps, 16s (2,760 steps, 39s under `Answers Default`, until 2026-10-15) | ~110× |
 | layered ≈ `spec_lts` | 33 | 0.13s, 0.40GB | 1,442 steps, 6.2s | ~50× |
 | glued ≈ `spec_lts` | 10 | 0.04s, 0.33GB | 185 steps, 1.7s | ~45× |
 | normalised (observing) ≈ `spec_fifo` | 5 | 0.03s, 0.32GB | 119 steps, 1.1s | ~40× |
@@ -52,7 +52,7 @@ relative to the verdict, and where it stops.
 | normalised vs `spec_lts` | 644 | not bisimilar, 4.6s, 0.61GB | spec ≤ system: 326 steps, 9.2s. System ≤ spec: **not proved**, OOM at 8-9GB after 11-13 min † | — |
 | **Proc `Test4`** (four components) | | | | |
 | `p` ≈ `q`, direct | 9,720 | 42s, 0.98GB (saturated on demand) | not attempted: ~525k steps predicted † | — |
-| `p` ≈ `q`, normalised | 82 | 0.45s, 0.36GB | 61,161 steps, ~4 min, ~2.8GB (`Answers Minimal`) †; `weak_sim` alone 48,821 steps, ~7 min, ~3.8GB † | ~500× |
+| `p` ≈ `q`, normalised | 82 | 0.45s, 0.36GB | 61,161 steps, ~4 min, ~2.8GB (`Answers Minimal`) †; `weak_sim` alone 6,115 steps, ~30s, ~0.7GB (48,821 steps, ~7 min, ~3.8GB under `Answers Default`, until 2026-10-15) | ~500× (`weak_bisimilar`) |
 | **CCS, Alternating Bit Protocol** | | | | |
 | `abp` ≈ one-place buffer | 108 | 3.4s, 0.36GB | 9,914 steps, ~3.8 min, ~4.2GB †; `abp` ≤ buffer alone 6,494 steps, ~3.7 min † | ~65× |
 
