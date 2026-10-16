@@ -8765,6 +8765,64 @@ Bug fix 0 · Optimization 0 · Tooling 0.
 
 ---
 
+## 2026-10-16 — the large CADP proofs, re-run on a 31GB host
+
+On branch `docs/cadp-large-rerun`, at the user's request, as planned in
+`doc/future-work.md`. No plugin or solver code changed: measurement and
+documentation only.
+
+**What was run** (one proof file per process, one at a time, `MemoryMax=24G`,
+no swap): `MutualExclusionLarge.v` under `Answers Auto` and `Default`; the two
+three-process proofs under both; glued ~ layered nested, and mutual with
+`Bounds Game 100000000`. The full tables, setup and raw files are in
+`doc/measurements/cadp-large.md` and `cadp-large-2026-10-15/`.
+
+**Findings.** The two three-process proofs (`ThreeProcessesMutex.v`,
+`ThreeProcessesFifo.v`) finish: 20,432 and 45,773 steps, 13.4 and 17.8GiB peak,
+23 and 37 min. They take the same steps under `Auto` and `Default`, so the
+host, not the policy, is what changed. Glued ~ layered does not: out of
+memory at 24GiB, nested after 2h05m and mutual after 16h (its `Begin` alone
+took 4,489s). The mutual run's game (78,202 pairs) and `Begin` time do not
+match the earlier 14GB run's (514,020 pairs, ~90s); unexplained, and the one
+run that could say (`Bounds Game` under `Default`) was not made.
+
+**Docs.** The measurements file and raw data; the three-process proofs'
+headers (no longer "NOT PROVED"), `GluedLayered.v`, `MutualExclusionLarge.v`
+and `_CoqProject`'s comments (comments only; the files were not recompiled);
+`examples/README.md`, `decide-vs-prove.md`, `limitations.md`, decision 4,
+`future-work.md` and `bench/README.md`. `OUTSTANDING.md` loses the re-run
+item and says what is proved and not for CADP.
+
+**Mistakes, mine.**
+- Two launches of the run script failed at once, so no run was real. The
+  host's bash and `time` are not at `/bin/bash` and `/usr/bin/time` (NixOS).
+  The script's `exit 1` rows were not results; I deleted them. I committed a
+  `BENCH_TIME` variable for this and called it a fix; it only helps
+  where someone sets it, so at the user's request I dropped the commit and ran
+  with a local, uncommitted edit (`"$(type -P time)"`), under
+  `nix-shell -p time`. `bench/lib.sh` still has the hard-coded path.
+- I said the first glued run was killed by my 4h `timeout` (exit 143) before
+  looking. It was the kernel OOM killer at 24GiB, after 2h05m, as the journal
+  and the user's own observation showed.
+- The first write-up read `peak_mb` (MiB) as decimal GB, wrote "flat for ~3
+  hours" where it was ~4.6, and said the relation to the "not proved" lines
+  was unchecked when the file headers said so. `ab97e1b` corrects all three.
+  I also chained a `git commit` after a Python edit that had not run
+  (`python3` is not installed), so it committed the uncorrected file; I amended
+  it before anything was pushed.
+- I predicted that the mutual path would stay near the earlier 2.2GB and
+  that memory had plateaued, more than once; it climbed to the cap.
+
+**Not done:** `Bounds Game` under `Default`, glued above 24GiB, and a fix for
+`bench/lib.sh`'s `/usr/bin/time` (all in `doc/future-work.md`).
+
+Revert: `git revert -m 1 <merge commit>` (docs and comments only).
+
+**Session tally (2026-10-16):** Docs 5 · Tooling 0 · Optimization 0 ·
+Refactor 0 · Bug fix 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
