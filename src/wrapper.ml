@@ -388,13 +388,16 @@ module Make (Enc : Encoding.S) :
              about %s of memory (measured %i--%i bytes per weak action), and \
              can take a long time. Raise the bound with [MeBi Config Bounds \
              Saturation <n>] if your machine has the memory, or carry on with \
-             only a warning with [MeBi Config FailIf Oversaturated False]."
+             only a warning with [MeBi Config FailIf Oversaturated False].%s"
             name
             (Model.SaturationEstimate.to_string e)
             bound
             (memory_range e.weak)
             lo
             hi
+            (match Memory_guard.over_bound (e.weak * hi) with
+             | Some x -> " " ^ x
+             | None -> "")
         in
         if !Api.the_fail_flags.oversaturated
         then M.Err.saturation_too_large msg
@@ -540,8 +543,9 @@ module Make (Enc : Encoding.S) :
             "MeBi: deciding weak similarity walks every pair of states \
              reachable from the two start states, and an FSM here is saturated \
              on demand (too large to saturate whole; see the warning above), \
-             so that walk saturates state after state as it goes. %s"
-            why))
+             so that walk saturates state after state as it goes. %s %s"
+            why
+            (Api.walk_memory_note ())))
   ;;
 
   (* See the [.mli]. *)

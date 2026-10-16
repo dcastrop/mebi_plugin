@@ -8676,6 +8676,95 @@ Bug fix 0 · **New feature 0.**
 
 ---
 
+## 2026-10-16 — `MeBi Config Bounds Memory`: a soft cap on memory
+
+On branch `feat/memory-bound`, at Jonah's request (feedback that the plugin
+should offer its own OOM mitigation). Raised as a new capability and agreed
+before any code was written.
+
+**New feature.** `MeBi Config Bounds Memory <mb>` stops a command with
+`Memory_Bound_Exceeded` once the whole Rocq process uses more than `<mb>`
+megabytes (resident memory, `VmRSS`, on Linux; the OCaml major heap
+elsewhere). The command fails
+like any other error, so `Fail` catches it and Rocq rolls the command back,
+instead of the OS killing the process.
+
+- `lib/utils/memory_guard.ml` (no Rocq dependency, so `lib/model` can call
+  it) holds the limit and `check`. Unset, a check reads one reference.
+  Set, it reads `/proc/self/status` at most every 20ms.
+- Checked once per unit of work in the memory-heavy loops: extraction
+  (`Graph_builder.build`, per state), saturation (`Saturation.state_actions`,
+  per state, whole or on demand), the game walks (`Product.reachable_by`,
+  the answer planner's walk), both estimates (`Product.estimate_by`'s
+  nested walk, `Saturation_estimate.tau_reach`), and `Solve` (between
+  steps). The error message names which.
+- **What it does not cover**, stated in `MeBi Help Config Bounds`: one unit
+  of work can overshoot the limit, and `Qed` (Rocq's kernel) is never
+  checked. It is a mitigation; an OS cap (`systemd-run -p MemoryMax=...`)
+  remains the backstop. Covering `Qed` via Rocq's interrupt flag was
+  considered and left out: Rocq would report it as a user interrupt.
+
+**A flaw the first test caught.** With reads throttled to every 20ms, a
+command run straight after one stopped by the limit skipped its read and
+ran on (`Fail MeBi Sim Begin` "has not failed"). A check now always reads
+while the last reading was over the limit. `Test.v`'s `MemoryBound` runs
+two capped commands back to back to pin it.
+
+**Measured.** Under a 1000MB bound, `weak_bisimilar (wl 3) (wr 3)` (the
+width lever at n = 3, normally ~7 min and ~4GB) stopped during `Solve`
+after 85s, peaking at 976,468 KiB (~1000MB): the overshoot was negligible
+there. Under 1MB, the first check fails (`Run LTS`, `Sim Begin`; Rocq alone
+uses ~75-450MB).
+
+Checked: `dune build` (with `Test.v`'s new `MemoryBound`; each `Fail` cut
+and confirmed to fail with `Memory_Bound_Exceeded`), `test/tests.exe`
+110/110, `scripts/check_module_lists.py`, `make` of the plugin and
+`test/rocq/Test.vo`, and `bench/proofs.sh` (default suite, `Auto`): every
+count as in `CLAUDE.md`, none changed.
+
+**On by default** (same branch, at Jonah's request: a user may run a
+machine out of memory without realising). A fixed figure is wrong
+somewhere: too high for an 8GB laptop, too low for the heavy opt-in
+proofs (ABP and `Test4` peak at ~4GB, the large CADP runs at 8GB and
+more). The default is relative instead: 75% of `MemTotal`, or 90% of the
+process's cgroup `memory.max` (its own and its ancestors') if smaller.
+An explicit cap is chosen for this one process, so it keeps less
+headroom; at 75% the bench scripts' 6GB cap would have stopped ABP
+(~4.3GB) at 4.8GB, too close. Under `bench/`'s caps the plugin now stops
+with a message just before the OS would kill it. `0` turns the bound
+off; `Reset Bounds` restores the default; `MeBi Help Config Bounds`
+shows the figure and where it came from. Where neither figure can be
+read (not Linux) there is no default.
+
+**Messages that now point at it.**
+- `Memory_Bound_Exceeded` names what to try in the phase it stopped in:
+  a lower state bound (extraction), `Saturation OnDemand True`
+  (saturation), the silent-SCC limit (the saturation estimate), `Bounds
+  Game` (a game walk), `Answers Default` (planning answers), `MutualCofix
+  True`/`False` (the cofix estimate), `Run Bisim` for the verdict alone
+  (`Solve`).
+- The extraction notice for a large state bound says when its estimate is
+  over the memory bound, and now also prints when it is (below 1GB).
+- `Saturation_Too_Large` says when raising `Bounds Saturation` would
+  pass the memory bound.
+- The refusals that ask for a larger `Bounds Game` say a larger walk costs
+  memory, and what the memory bound does about it.
+
+Checked again, with the default on: `Test.v` (`MemoryBound` adds `0`),
+`test/tests.exe` 110/110, `make`, the default suite (counts unchanged),
+and the heavy suites under `bench/`'s caps (`abp` at 6GB, `eval-large`
+at 5GB), which the default could have stopped. None was: ABP peaked at
+4,257 and 4,354MB under a default of 5,799MB, `WidthLarge` at 3,885MB
+under 4,832MB; every count unchanged (ABP 6494, 9914; the levers 54894,
+316, 540, 988, 6303, 13827).
+
+Revert: `git revert -m 1 <merge commit>`.
+
+**Session tally (2026-10-16):** New feature 1 · Docs 1 · Refactor 0 ·
+Bug fix 0 · Optimization 0 · Tooling 0.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

@@ -229,6 +229,7 @@ let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
       match Int.compare n bound with
       | 1 -> n, p, true
       | _ ->
+        Memory_guard.check "Solve";
         (* The recursive call must be a genuine tail call, and nothing may
            capture [p] across it. Previously this read
 
@@ -388,11 +389,12 @@ let refuse_whole_game (setting : string) (why : string) : 'a =
           "MeBi: [%s] plans the whole proof up front, walking every pair of \
            states the proof can reach, and an FSM here is saturated on demand \
            (too large to saturate whole; see the warning above), so that walk \
-           saturates state after state as it goes. %s Or use [MeBi Config \
+           saturates state after state as it goes. %s %s Or use [MeBi Config \
            Solver MutualCofix Auto] or [False], and [MeBi Config Solver \
            Answers Default]."
           setting
-          why))
+          why
+          (Api.walk_memory_note ())))
 ;;
 
 (** [refuse_unbounded setting] is {!refuse_whole_game} for [setting] with

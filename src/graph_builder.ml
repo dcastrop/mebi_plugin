@@ -174,6 +174,7 @@ module Make
     if stop g
     then M.return g
     else (
+      Memory_guard.check "extraction";
       try
         let enc_to_visit : Enc.t = next_to_visit g in
         let open M.Syntax in

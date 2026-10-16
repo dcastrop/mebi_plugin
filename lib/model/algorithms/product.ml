@@ -469,8 +469,9 @@ struct
       game walk every other walk here goes through, so the {!with_cap} cap
       applies to all of them.
 
-      @raise Game_too_large
-        past the cap (propagated from {!check_cap}); and
+      @raise Game_too_large past the cap (propagated from {!check_cap});
+      @raise Memory_guard.Exceeded
+        over the memory bound (raised here); and
         whatever [step] raises (propagated). *)
   let reachable_by (step : Pair.t -> Pair.t list) (root : Pair.t) : Pair.Set.t =
     let count : int ref = ref 1 in
@@ -484,6 +485,7 @@ struct
         in
         count := !count + List.length next;
         check_cap !count;
+        Memory_guard.check "a game walk";
         go
           (List.fold_left (fun acc q -> Pair.Set.add q acc) seen next)
           (List.rev_append next rest)
@@ -1031,6 +1033,7 @@ struct
       let rec go (st : walk_state) : Pair.t list -> walk_state = function
         | [] -> st
         | p :: rest ->
+          Memory_guard.check "planning answers";
           let st, fresh = answer_pair choose st p (game_of p) in
           go st (rest @ fresh)
       in
@@ -1578,6 +1581,7 @@ struct
     let rec walk (path : Pair.Set.t) (p : Pair.t) : unit =
       incr seen;
       if !seen > cap then raise Capped;
+      Memory_guard.check "the cofix estimate";
       if Pair.Set.mem p path
       then () (* closes against an ancestor *)
       else (

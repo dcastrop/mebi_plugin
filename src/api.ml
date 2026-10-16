@@ -199,6 +199,7 @@ let reset_bounds_args () : unit =
   the_bounds_args := default_bounds;
   the_saturation_bound := default_saturation_bound;
   the_game_bound := None;
+  Memory_guard.reset ();
   the_saturation_mode := Saturation_auto;
   Premise_search.max_depth := Premise_search.default_depth;
   Premise_search.max_range := Premise_search.default_range
@@ -244,6 +245,28 @@ let set_saturation_bound (x : int) : unit =
   |> Logger.show
 ;;
 
+(* See the [.mli]. *)
+let set_memory_bound (mb : int) : unit =
+  Memory_guard.set_limit (if mb <= 0 then None else Some (mb * 1_000_000));
+  Printf.sprintf
+    "(MeBi Config: Set Memory Bound to: %s.)"
+    (Memory_guard.describe ())
+  |> Logger.show
+;;
+
+(* See the [.mli]. *)
+let walk_memory_note () : string =
+  match !Memory_guard.limit with
+  | None ->
+    "A larger walk holds more saturated states in memory; [MeBi Config Bounds \
+     Memory <mb>] stops it cleanly before the machine runs out."
+  | Some _ ->
+    Printf.sprintf
+      "A larger walk holds more saturated states in memory; the memory bound, \
+       %s, stops it cleanly if it runs short."
+      (Memory_guard.describe ())
+;;
+
 (** Peak memory per extracted state, on top of a fixed ~0.1--0.3GB: measured
     2026-10-01, after extraction stopped keeping matching evars, as 0.01MB on
     [Proc/Test4] (9720 states, 0.40GB peak) and 0.03--0.07MB on
@@ -266,17 +289,21 @@ let set_the_bounds_args (x : bounds_args) : unit =
     let lo, hi = mb_per_extracted_state in
     (* [gb mb] is the memory for [i] states at [mb] per state, in GB. *)
     let gb (mb : float) : float = Float.of_int i *. mb /. 1000. in
-    if gb hi >= 1.
+    let over : string option =
+      Memory_guard.over_bound (int_of_float (gb hi *. 1e9))
+    in
+    if gb hi >= 1. || Stdlib.Option.is_some over
     then
       Printf.sprintf
         "(Exploring up to %i states may need %.1f--%.1fGB of memory: \
          extraction has measured %.2f--%.2fMB per state, and logging the \
-         result with Output \"Result\" adds ~0.65MB per state.)"
+         result with Output \"Result\" adds ~0.65MB per state.%s)"
         i
         (gb lo)
         (gb hi)
         lo
         hi
+        (match over with Some x -> " " ^ x | None -> "")
       |> Logger.notice
   | Transitions _ -> ()
 ;;

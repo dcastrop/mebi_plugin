@@ -275,10 +275,11 @@ module Make
       reaches by [tau*] (itself included). Successors have lower ids
       ({!silent_sccs}), so each set is built from theirs in one pass.
 
-      Raises nothing. *)
+      @raise Memory_guard.Exceeded over the memory bound (raised here). *)
   let tau_reach (k : int) (succ : int list array) : int array array =
     let reach : int array array = Array.make k [||] in
     for c = 0 to k - 1 do
+      Memory_guard.check "the saturation estimate";
       let r : int array = Bits.create k in
       Bits.add r c;
       List.iter (fun d -> Bits.union_into r reach.(d)) succ.(c);
@@ -291,7 +292,7 @@ module Make
       {!number_states}, {!split_edges}, the SCCs by {!silent_sccs}, their
       sizes, {!scc_dag} and {!tau_reach}.
 
-      Raises nothing. *)
+      @raise Memory_guard.Exceeded over the memory bound (propagated). *)
   let quotient (x : FSM.t) : quotient =
     let ids : int StateTbl.t = number_states x in
     let silent, visible, strong = split_edges ids x in

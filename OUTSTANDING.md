@@ -78,7 +78,7 @@ unless noted.
   - proofs cost far more than decisions (`doc/decide-vs-prove.md`);
   - `Auto` goes nested on an FSM saturated on demand unless
     `Bounds Game` is set (an open *optimization* question);
-  - heavy proofs need a memory cap;
+  - heavy proofs need a memory cap (`Bounds Memory` is a soft one);
   - `Qed` dominates on deep derivations.
 
 ## Future work
