@@ -182,18 +182,22 @@ let text : string list -> string option = function
           saturation bound see MeBi Help Config Bounds Saturation; for the \
           premise search depth and range, MeBi Help Premises.\n\n\
           Bounds Memory stops a command, with an error, once the whole Rocq \
-          process uses more than <mb> megabytes (its resident memory on Linux; \
-          unset by default). It is checked during extraction, saturation, the \
-          up-front game walks and estimates, and between Solve steps, so one \
-          step can overshoot it, and Qed is not checked at all: keep an \
-          OS-level cap (systemd-run -p MemoryMax=...) as a backstop. Reset \
-          Bounds removes it."
+          process uses more than <mb> megabytes (its resident memory on \
+          Linux). Now: %s. The default is 75%% of the machine's RAM, or 90%% \
+          of a cgroup memory cap the process runs under (systemd-run -p \
+          MemoryMax=...) if that is smaller; there is none where neither can \
+          be read. 0 turns it off. It is checked during extraction, \
+          saturation, the up-front game walks and estimates, and between Solve \
+          steps, so one step can overshoot it, and Qed is not checked at all: \
+          keep an OS-level cap as a backstop. Reset Bounds restores the \
+          default."
          (match Api.default_bounds with
           | Api.States n -> Printf.sprintf "%i states" n
           | Api.Transitions n -> Printf.sprintf "%i transitions" n)
          lo
          hi
-         (int_of_float (1000. /. hi)))
+         (int_of_float (1000. /. hi))
+         (Memory_guard.describe ()))
   | [ "Config"; "Bounds"; "Saturation" ] ->
     let lo, hi = Api.bytes_per_weak_action in
     Some
