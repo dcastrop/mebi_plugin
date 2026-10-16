@@ -1590,10 +1590,11 @@ End GoalShapes.
 MeBi Divider "Theories.Test.MemoryBound".
 Module MemoryBound.
   (* [MeBi Config Bounds Memory <mb>] (2026-10-16) stops a command once the
-     whole process uses more than <mb> megabytes. Rocq alone uses more than
-     1MB, so each command fails at its first check, whichever phase that
-     is; the second [Fail] runs straight after the first, which once let
-     it skip its read. *)
+     whole process uses more than <mb> megabytes; by default 75% of RAM (or
+     90% of a cgroup cap), which no test here comes near. Rocq alone uses
+     more than 1MB, so each command below fails at its first check,
+     whichever phase that is; the second [Fail] runs straight after the
+     first, which once let it skip its read. *)
   Import MultipleDerivations.
   MeBi Config Reset Weak.
   MeBi Config Weak As Option action.
@@ -1601,8 +1602,12 @@ Module MemoryBound.
   Fail MeBi Run LTS p Using termLTS.
   Example capped : weak_sim termLTS termLTS p q.
   Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
-  (* [Reset Bounds] removes it; a generous bound changes nothing. *)
+  (* [Reset Bounds] restores the default; [0] turns the bound off; a
+     generous bound changes nothing. *)
   MeBi Config Reset Bounds.
+  MeBi Run LTS p Using termLTS.
+  MeBi Config Bounds Memory 1.
+  MeBi Config Bounds Memory 0.
   MeBi Run LTS p Using termLTS.
   MeBi Config Bounds Memory 100000.
   Example uncapped : weak_sim termLTS termLTS p q.
