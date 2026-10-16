@@ -1,12 +1,18 @@
 (* Three processes, mutual exclusion proper: [weak_sim bigstep_norm spec_lts
    c3 (make_spec 2)], system <= spec, over the normalised semantics (644
-   states). NOT PROVED: this is the proof that ran out of memory.
+   states). PROVED on a machine with 31GB, not on one with 14GB: this is
+   the proof that ran out of memory there.
 
    Measured 2026-10-11 on a 14GB machine, before [Answers Auto] was the
    default: OOM-killed at 8GB after ~11 min (Auto, mutual cofix over 644
    pairs, 1932 moves), and at 9GB after ~13 min with [Solver Answers
-   Minimal]. Whether it finishes under [Answers Auto], or on a machine with
-   more memory, is what this file is for.
+   Minimal].
+
+   Measured 2026-10-15 on a 31GB machine (24GiB cap): [Solve] 20,432
+   steps, 1,205s, then [Qed] 157s; 22.8 min, 13.4GiB peak. The same under
+   [Answers Default] (20,432 steps, 23.7 min, 13.4GiB): the policy makes no
+   difference here, the machine does. See
+   doc/measurements/cadp-large.md.
 
    One proof, so that it is its own process: run it under a memory cap, as
    [bench/proofs.sh -s cadp-huge -f ThreeProcessesMutex.v -M <cap>]. The

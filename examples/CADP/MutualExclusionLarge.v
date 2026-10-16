@@ -106,18 +106,21 @@ Proof. split; [exact wsim_bigstep_2 | exact wsim_spec_lts_2]. Qed.
 (* Three processes, normalised.
 
    Over [bigstep_norm] (644 states; [bigstep] has 128044), carried back to
-   [bigstep]. Only spec <= system is proved. Mutual exclusion proper,
-   [weak_sim bigstep_norm spec_lts c3 (make_spec 2)], was OOM-killed on
-   2026-10-11: at 8GB after ~11 min under Auto (mutual cofix over 644
-   pairs, 1932 moves), and at 9GB after ~13 min with [Solver Answers
-   Minimal]. No MeBi command decides a single simulation, but it is
-   decided indirectly: [Explore.v] finds the system bisimilar to the FIFO
-   server [spec_fifo] (with the queue label visible), which only lets the
-   head of its queue enter. Hiding that label to get back to [bigstep] is
-   a theorem ([Hidden.v], [wbis_hidden]); what is missing at three
-   processes is a proof of the FIFO bisimilarity itself, which is only
-   decided. For one and two processes both are proved, and [Fifo.v]
-   derives mutual exclusion that way.
+   [bigstep]. Only spec <= system is proved in this file. Mutual exclusion
+   proper, [weak_sim bigstep_norm spec_lts c3 (make_spec 2)], was
+   OOM-killed on a 14GB machine on 2026-10-11: at 8GB after ~11 min under
+   Auto (mutual cofix over 644 pairs, 1932 moves), and at 9GB after ~13
+   min with [Solver Answers Minimal]. On a 31GB machine it is proved
+   (2026-10-15, 20,432 steps, 22.8 min, 13.4GiB): [ThreeProcessesMutex.v],
+   which is not built by default. It is also decided indirectly:
+   [Explore.v] finds the system bisimilar to the FIFO server [spec_fifo]
+   (with the queue label visible), which only lets the head of its queue
+   enter. Hiding that label to get back to [bigstep] is a theorem
+   ([Hidden.v], [wbis_hidden]). The FIFO bisimilarity at three processes is
+   proved over the normalised semantics on the same machine
+   ([ThreeProcessesFifo.v], 45,773 steps), but not carried back to
+   [bigstep_obs] there. For one and two processes both are proved, and
+   [Fifo.v] derives mutual exclusion that way.
 
    Measured 2026-10-11 (Auto, mutual cofix): [wsim_norm_r_3] 326 steps. *)
 
