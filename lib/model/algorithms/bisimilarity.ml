@@ -11,19 +11,20 @@ module type S = sig
 
     include Json.S with type k = t
 
-    val get : fsm -> t
+    val get : ?on_demand:int -> fsm -> t
   end
 
   module Result : sig
     type t =
       { bisim_states : partition
       ; non_bisim_states : partition
+      ; roots_related : bool option
       }
 
     include Json.S with type k = t
 
     val are_bisimilar : t -> bool
-    val split : partition -> states -> states -> t
+    val split : ?roots_related:bool -> partition -> states -> states -> t
   end
 
   type t =
@@ -41,7 +42,18 @@ module type S = sig
   exception NoCachedResult of unit
 
   val get_the_result : unit -> t
-  val fsm : fsm -> fsm -> t
+
+  type on_demand =
+    { a : bool
+    ; b : bool
+    ; budget : int
+    ; partition : fsm -> partition
+    }
+
+  val fsm : ?on_demand:on_demand -> fsm -> fsm -> t
+
+  (* See [bisimilarity.mli]. *)
+  val conflicts : fsm -> fsm -> states
 end
 
 module Make
@@ -92,15 +104,27 @@ module Make
         ;;
       end)
 
-    let get (x : FSM.t) : t =
-      { original = x; saturated = FSM.saturate ~only_if_weak:true x }
+    (* See the [.mli]. *)
+    let get ?(on_demand : int option) (x : FSM.t) : t =
+      match on_demand with
+      | None -> { original = x; saturated = FSM.saturate ~only_if_weak:true x }
+      | Some budget ->
+        { original = x; saturated = FSM.saturate_on_demand ~budget x }
     ;;
   end
+
+  type on_demand =
+    { a : bool
+    ; b : bool
+    ; budget : int
+    ; partition : fsm -> partition
+    }
 
   module Result = struct
     type t =
       { bisim_states : Partition.t
       ; non_bisim_states : Partition.t
+      ; roots_related : bool option
       }
 
     include Json.Thing.Make (struct
@@ -113,16 +137,33 @@ module Make
             [ "bisimilar states", Partition.json ~as_elt:true x.bisim_states
             ; ( "non-bisimilar states"
               , Partition.json ~as_elt:true x.non_bisim_states )
+            ; ( "initial states related"
+              , match x.roots_related with None -> `Null | Some b -> `Bool b )
             ]
         ;;
       end)
 
-    let are_bisimilar ({ non_bisim_states; _ } : t) : bool =
+    (* See the [.mli]. Bisimilarity of two systems is bisimilarity of their
+       initial states. "Every block holds states of both systems" is not it:
+       [a.b.x] against [b.a.y] partitions into two shared blocks, {x, b.y}
+       and {b.x, y}, with the two initial states in different ones. It
+       survives only as the fallback when an FSM has no initial state. *)
+    let are_bisimilar ({ non_bisim_states; roots_related; _ } : t) : bool =
       Logger.trace __FUNCTION__;
-      Partition.is_empty non_bisim_states
+      match roots_related with
+      | Some related -> related
+      | None -> Partition.is_empty non_bisim_states
     ;;
 
-    let split (pi : Partition.t) (a : States.t) (b : States.t) : t =
+    (* See the [.mli]. A block goes to [bisim_states] if it has a state of
+       [a] and a state of [b] ([States.has_shared_origin]). *)
+    let split
+          ?(roots_related : bool option)
+          (pi : Partition.t)
+          (a : States.t)
+          (b : States.t)
+      : t
+      =
       Logger.trace __FUNCTION__;
       let bisim_states, non_bisim_states =
         Partition.fold
@@ -133,7 +174,7 @@ module Make
           pi
           (Partition.empty, Partition.empty)
       in
-      { bisim_states; non_bisim_states }
+      { bisim_states; non_bisim_states; roots_related }
     ;;
   end
 
@@ -162,6 +203,7 @@ module Make
       ;;
     end)
 
+  (* See the [.mli] for these three. *)
   let the_cached_result : t option ref = ref None
   let set_the_result (x : t) : unit = the_cached_result := Some x
 
@@ -174,13 +216,107 @@ module Make
     | Some x -> x
   ;;
 
-  let fsm (a : FSM.t) (b : FSM.t) : t =
+  (** A state's moves, as (label, target) pairs, for {!conflicts}. *)
+  module Move = Set.Make (struct
+      type t = C.Label.t * C.State.t
+
+      (* label first, then target *)
+      let compare ((l, s) : t) ((l', s') : t) : int =
+        match C.Label.compare l l' with 0 -> C.State.compare s s' | n -> n
+      ;;
+    end)
+
+  (* See the [.mli]. For each shared state, its set of (label, target)
+     moves in [a] against that in [b]. *)
+  let conflicts (a : FSM.t) (b : FSM.t) : States.t =
     Logger.trace __FUNCTION__;
+    (* [moves x s] is [s]'s (label, target) moves in [x]. *)
+    let moves (x : FSM.t) (s : C.State.t) : Move.t =
+      match C.EdgeMap.find_opt x.edges s with
+      | None -> Move.empty
+      | Some actions ->
+        C.Action.Map.fold
+          (fun (act : C.Action.t) (ds : States.t) acc ->
+            States.fold (fun d acc -> Move.add (act.label, d) acc) ds acc)
+          actions
+          Move.empty
+    in
+    States.filter
+      (fun s -> Bool.not (Move.equal (moves a s) (moves b s)))
+      (States.inter a.states b.states)
+  ;;
+
+  (** [finish fsm_a fsm_b merged pi] is the bisimilarity result for the two
+      FSMs and their [merged] FSM partitioned by [pi]: whether their initial
+      states share a block of [pi], and [pi] split by {!Result.split}.
+
+      Raises nothing. *)
+  let finish
+        (fsm_a : FSMPair.t)
+        (fsm_b : FSMPair.t)
+        (merged : FSM.t)
+        (pi : Partition.t)
+    : t
+    =
+    let roots_related : bool option =
+      match fsm_a.original.init, fsm_b.original.init with
+      | Some x, Some y ->
+        Some
+          (States.mem
+             y
+             (try Partition.get_bisimilar x pi with Not_found -> States.empty))
+      | _ -> None
+    in
+    let result =
+      Result.split ?roots_related pi fsm_a.original.states fsm_b.original.states
+    in
+    { fsm_a; fsm_b; merged; result }
+  ;;
+
+  (** [fsm_whole a b] is {!fsm} without on-demand saturation: [a] and [b]
+      saturated whole and merged, and the merge partitioned with the
+      [=eps=>] split read from the originals' silent steps.
+
+      Raises nothing in practice; would propagate
+      {!Minimization.partition_states}'s exceptions. *)
+  let fsm_whole (a : FSM.t) (b : FSM.t) : t =
     let fsm_a : FSMPair.t = FSMPair.get a in
     let fsm_b : FSMPair.t = FSMPair.get b in
     let merged : FSM.t = FSM.merge fsm_a.saturated fsm_b.saturated in
-    let pi : Partition.t = (Minimization.fsm merged).pi in
-    let result = Result.split pi fsm_a.original.states fsm_b.original.states in
-    { fsm_a; fsm_b; merged; result }
+    (* [merged] is already saturated, so partition it as it is.
+       [Minimization.fsm] would saturate it again -- a pass that rebuilds
+       every weak action of both FSMs (the merged FSM has no silent edges
+       left, so it reproduces the same structure, and the partition only
+       reads that), roughly doubling the check's saturation memory. *)
+    (* The silent steps live only in the originals: saturation drops them.
+       [partition_states] needs them for the [=ε=>] split, without which this
+       is not weak bisimilarity (see [Minimization.for_each_block]). *)
+    let silent : C.EdgeMap.t' option =
+      if FSM.is_weak_mode fsm_a.original || FSM.is_weak_mode fsm_b.original
+      then Some (FSM.merge fsm_a.original fsm_b.original).edges
+      else None
+    in
+    let pi : Partition.t = Minimization.partition_states ?silent merged in
+    finish fsm_a fsm_b merged pi
+  ;;
+
+  (* See the [.mli]: {!fsm_whole}, or, with either FSM on demand, the
+     quotient route. *)
+  let fsm ?(on_demand : on_demand option) (a : FSM.t) (b : FSM.t) : t =
+    Logger.trace __FUNCTION__;
+    match on_demand with
+    | Some ({ a = od_a; b = od_b; budget; partition } : on_demand)
+      when od_a || od_b ->
+      (* [x] as given and saturated: on demand if [od], else whole *)
+      let get (od : bool) (x : FSM.t) : FSMPair.t =
+        FSMPair.get ?on_demand:(if od then Some budget else None) x
+      in
+      let fsm_a : FSMPair.t = get od_a a in
+      let fsm_b : FSMPair.t = get od_b b in
+      (* nothing saturated whole to merge: the originals, partitioned on
+         their silent-SCC quotient *)
+      let merged : FSM.t = FSM.merge a b in
+      finish fsm_a fsm_b merged (partition merged)
+    | _ -> fsm_whole a b
   ;;
 end

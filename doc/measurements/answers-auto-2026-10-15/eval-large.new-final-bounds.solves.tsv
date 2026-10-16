@@ -1,0 +1,4 @@
+suite	mode	file	index	status	iterations	proof	begin_s	solve_s	qed_s
+eval-large	auto	WidthLarge	1	Solved	54894	wbis_w3	0.359	367.623	35.901
+eval-large	auto	DepthLarge	1	Solved	6303	wbis_k12	0.355	11.954	2.374
+eval-large	auto	DepthLarge	2	Solved	13827	wbis_k16	1.02	39.025	6.948

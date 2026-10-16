@@ -68,6 +68,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
   module BiEnc = Bi_encoding.Make (Enc)
   include BiEnc
 
+  (* See the [.mli]. *)
   let bienc_to_list : unit -> (Enc.t * EConstr.t) list = to_list
 
   type 'a mm = wrapper ref -> 'a in_wrapper
@@ -84,17 +85,13 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
 
   (* *)
 
-  (** [run m] evaluates [m] against this instance's context -- the one
-      [set_ctx] was given, default [Rocq_context.global].
-
-      The context is a value rather than a functor parameter, so installing it
-      no longer rebuilds this module and no longer discards the encoding table
-      with it. It is still fixed per instance, though: [encode], [fstring] and
-      [Rocq_monad_utils.get_encoding] all call [run] themselves, so a per-call
-      [?ctx] could not have been honoured by them anyway, and the table would
-      end up hashing some entries under one [sigma] and looking them up under
-      another. A stack that needs a different context is a different instance --
-      see [Proof_solver_wrapper.Make]. *)
+  (* See the [.mli]. The context is a value rather than a functor
+     parameter, so installing it no longer rebuilds this module or discards
+     the encoding table. It is still fixed per instance: [encode], [fstring]
+     and [Rocq_monad_utils.get_encoding] all call [run] themselves, so a
+     per-call [?ctx] could not have been honoured by them, and the table
+     would end up hashing some entries under one [sigma] and looking them up
+     under another. See [Proof_solver_wrapper.Make]. *)
   let run ?(reset_encoding : bool = false) (x : 'a mm) : 'a =
     (* Logger.trace __FUNCTION__; *)
     if reset_encoding then reset () else initialize ();
@@ -104,6 +101,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     a.value
   ;;
 
+  (* See the [.mli] for [return], [bind], [map] and [product]. *)
   let return (x : 'a) : 'a mm =
     fun (st : wrapper ref) -> { state = st; value = x }
   [@@inline always]
@@ -128,7 +126,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
   [@@inline always]
   ;;
 
-  (** Monadic for loop *)
+  (* See the [.mli]. *)
   let rec iterate
             (index : int)
             (upper_bound : int)
@@ -142,8 +140,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     else bind (f index acc) (fun acc' -> iterate (index + 1) upper_bound acc' f)
   ;;
 
-  (** [state f] provides the [env] and [sigma] for [f] and returns the result.
-  *)
+  (* See the [.mli]. *)
   let state
         (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
         (st : wrapper ref)
@@ -155,10 +152,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     { state = st; value = a }
   ;;
 
-  (** [sandbox ?sigma m] evaluates [m] without updating the state of the monad.
-      @param ?sigma
-        allows a specific sigma to be used (instead of the one from the state).
-  *)
+  (* See the [.mli]. *)
   let sandbox ?(sigma : Evd.evar_map option) (m : 'a mm) (st : wrapper ref)
     : 'a in_wrapper
     =
@@ -206,6 +200,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     let ( and+ ) x y = product x y
   end
 
+  (* See the [.mli]. *)
   let econstr_normalize (x : EConstr.t) : EConstr.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
@@ -213,9 +208,10 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     return t
   ;;
 
+  (* See the [.mli]. *)
   let encode (x : EConstr.t) : Enc.t = run (econstr_normalize x) |> encode
 
-  (* *)
+  (* See the [.mli] for every [get_*]. *)
   let get_ctx (st : wrapper ref) : Rocq_context.t in_wrapper =
     { state = st; value = !(!st.ctx) }
   ;;
@@ -241,7 +237,7 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     { state = st; value = !(!st.maps).bck }
   ;;
 
-  (* *)
+  (* See the [.mli]. *)
   let fstring (f : Environ.env -> Evd.evar_map -> 'a -> string) : 'a -> string =
     run
       (let open Syntax in

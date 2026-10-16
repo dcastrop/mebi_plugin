@@ -101,30 +101,29 @@ module Make
   type weak = Weak.t
   type 'a mm = 'a M.mm
 
-  (** [module Action] is [Model.Action]. *)
+  (** The model's actions, which label the graph's steps. *)
   module Action = Model.Action
 
-  (** [module States] is for tracking visited states, an alternative to [Model.States].
-  *)
+  (* See the [.mli]. *)
   module States : Set.S with type elt = Enc.t = X.S
-  (* (val M.make_enc_set ()) *)
 
-  (** [module Destinations] is similar to [module States], but each "destination state" is paired with a constructor tree detailing which constructors to take to reach it, which in the context of [module Actions] and [module Transitions] later illustrates how to get from one state to another via certain constructors.
-  *)
+  (* See the [.mli]. *)
   module Destinations : Set.S with type elt = Enc.t * Enc.Tree.t = X.D
 
-  (** [module Actions] is a [Graph] alternative to [Model.ActionMap] *)
+  (* See the [.mli]. *)
   module Actions = struct
     module Map_ : Hashtbl.S with type key = Action.t = Hashtbl.Make (Action)
     include Map_
 
     type t' = Destinations.t t
 
+    (* See the [.mli]. *)
     let size (xs : t') : int =
       Logger.trace __FUNCTION__;
       fold (fun k v n -> Destinations.cardinal v + n) xs 0
     ;;
 
+    (* See the [.mli]. *)
     let update (x : t') (action : Action.t) (states : Destinations.t) : unit =
       Logger.trace __FUNCTION__;
       if Destinations.is_empty states
@@ -137,19 +136,20 @@ module Make
     ;;
   end
 
-  (** [module Transitions] is an alternative to [Model.EdgeMap], but for transitions.
-  *)
+  (* See the [.mli]. *)
   module Transitions = struct
     module Map_ : Hashtbl.S with type key = Enc.t = X.T
     include Map_
 
     type t' = Actions.t' t
 
+    (* See the [.mli]. *)
     let size (xs : t') : int =
       Logger.trace __FUNCTION__;
       fold (fun k v n -> Actions.size v + n) xs 0
     ;;
 
+    (* See the [.mli]. *)
     let update
           (x : t')
           (from : Enc.t)
@@ -165,11 +165,10 @@ module Make
     ;;
   end
 
-  (** [type indmap] maps encoded terms to their inductive Rocq LTS. @see [module M.Ind]. *)
+  (* See the [.mli]. *)
   type indmap = M.Ind.t M.B.t
 
-  (** [type t] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Tree.t].
-  *)
+  (* See the [.mli]. *)
   type t =
     { to_visit : Enc.t Queue.t
     ; init : Enc.t
@@ -181,7 +180,7 @@ module Make
     ; bounds : Api.bounds_args
     }
 
-  (** [create init ltsmap primarylts weak] returns an initial [t]. *)
+  (* See the [.mli]. *)
   let create
         (init : Enc.t)
         (ltsmap : indmap)
@@ -202,23 +201,25 @@ module Make
 
   exception NoMoreToVisit
 
+  (* See the [.mli]. *)
   let next_to_visit (g : t) : Enc.t =
     Logger.trace __FUNCTION__;
     try Queue.take g.to_visit with Queue.Empty -> raise NoMoreToVisit
   ;;
 
+  (* See the [.mli]. *)
   let update_to_visit (g : t) (x : Enc.t) : unit =
     Logger.trace __FUNCTION__;
     Queue.add x g.to_visit
   ;;
 
+  (* See the [.mli]. *)
   let update_states (g : t) (xs : States.t) : t =
     Logger.trace __FUNCTION__;
     { g with states = States.union g.states xs }
   ;;
 
-  (** [is_silent_label x weakopt] returns [Some bool] indicating if [x] is recognized to be representative of a silent action, as configured by [weakopt]. If [weakopt=None] then returns [None].
-  *)
+  (* See the [.mli]. *)
   let is_silent_label (x : EConstr.t) : Weak.t option -> bool option M.mm =
     Logger.trace __FUNCTION__;
     function

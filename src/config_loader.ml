@@ -11,14 +11,11 @@ module type S = sig
     }
 
   val the_weak_args : weak_args ref option ref
-  val reset_the_weak_args : unit -> unit
   val load_weak_args : unit -> unit mm
   val get_the_weak_args : unit -> weak_args option
   val get_the_weak_arg1 : unit -> weak option
   val get_the_weak_arg2 : unit -> weak option
   val get_weak : weak option -> weak option
-
-  (* val api_bounds_to_model_bounds : Api.bounds_args -> Model.Info.Meta.bounds *)
   val the_bounds_args : Api.bounds_args ref
   val load_the_bounds_args : unit -> unit
 end
@@ -31,6 +28,7 @@ module Make
   type weak = Weak.t
   type 'a mm = 'a M.mm
 
+  (* See the [.mli]. *)
   let load_weak_arg : Api.weak_arg -> weak M.mm =
     let open M.Syntax in
     function
@@ -52,6 +50,7 @@ module Make
       Weak.Custom (tau_enc, label_enc) |> M.return
   ;;
 
+  (* See the [.mli]. *)
   let load_weak_arg_opt : Api.weak_arg option -> weak option M.mm = function
     | None -> M.return None
     | Some x ->
@@ -65,9 +64,10 @@ module Make
     ; b : weak option
     }
 
+  (* See the [.mli]. *)
   let the_weak_args : weak_args ref option ref = ref None
-  let reset_the_weak_args () : unit = the_weak_args := None
 
+  (* See the [.mli]. *)
   let load_weak_args () : unit M.mm =
     Logger.trace __FUNCTION__;
     let open M.Syntax in
@@ -82,27 +82,30 @@ module Make
       M.return ()
   ;;
 
+  (* See the [.mli]. *)
   let get_the_weak_args () : weak_args option =
     match !the_weak_args with None -> None | Some x -> Some !x
   ;;
 
+  (* See the [.mli]. *)
   let get_the_weak_arg1 () : weak option =
     match get_the_weak_args () with None -> None | Some x -> x.a
   ;;
 
+  (* See the [.mli]. *)
   let get_the_weak_arg2 () : weak option =
     match get_the_weak_args () with None -> None | Some x -> x.b
   ;;
 
-  (** [get_weak x] will return [get_the_weak_arg1] in the case that [x] is [None], else returns [x].
-  *)
+  (* See the [.mli]. *)
   let get_weak : Weak.t option -> Weak.t option = function
     | None -> get_the_weak_arg1 ()
     | Some x -> Some x
   ;;
 
-  (***********************************************************************)
-
+  (* See the [.mli]. *)
   let the_bounds_args : Api.bounds_args ref = ref Api.default_bounds
+
+  (* See the [.mli]. *)
   let load_the_bounds_args () : unit = the_bounds_args := !Api.the_bounds_args
 end

@@ -11,6 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The OCaml sources are listed by hand in three places (_CoqProject,
+      # src/mebi_plugin.mlpack, each dune file's (modules ...)), and drift
+      # between them passes one build and breaks the other. Needs only the
+      # runner's python3, so it runs first and fails in seconds.
+      - name: Check module lists agree
+        run: python3 scripts/check_module_lists.py
+
       - uses: cachix/install-nix-action@v27
         with:
           nix_path: nixpkgs=channel:nixos-unstable
@@ -83,6 +90,17 @@ jobs:
             eval "$(opam env --switch=$(pwd) --set-switch)"
             dune exec test/satdiff.exe -- 200 2>/dev/null \
               | diff test/satdiff.expected -
+          '
+
+      # The OCaml benchmark's inputs, checked once each and not timed: the
+      # model must still give the plugin's verdict on every FSM extracted from
+      # the Rocq examples (bench/ocaml/fixtures), and on the generated
+      # families. See bench/ocaml/README.md.
+      - name: dune exec bench/ocaml/mebi_bench.exe -- --check
+        run: |
+          nix develop --command bash -euc '
+            eval "$(opam env --switch=$(pwd) --set-switch)"
+            dune exec bench/ocaml/mebi_bench.exe -- --check
           '
 
       # Also exercise the make path and the examples/ subset _CoqProject

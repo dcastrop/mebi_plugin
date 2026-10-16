@@ -1,0 +1,3 @@
+suite	mode	file	exit	seconds	peak_mb	errors
+abp	auto	CCS/ABPProofs	0	261.13	4251	0
+abp	auto	CCS/ABPBisimProofs	0	276.62	4368	0

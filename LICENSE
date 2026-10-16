@@ -1,0 +1,37 @@
+MeBi (rocq-mebi) is distributed under two licences, by directory.
+
+  Copyright (C) 2024-2026 The University of Kent, David Castro-Perez and
+  Jonah Pears.
+
+  THE PLUGIN: GNU General Public License, version 3 or (at your option) any
+  later version (SPDX: GPL-3.0-or-later; LICENSES/GPL-3.0-or-later.txt).
+
+    src/                      the plugin: commands, extraction, proof solver
+    lib/                      its OCaml libraries (model, terms, utils, ...)
+    test/  bench/  scripts/   its tests and tooling
+    theories/loader.v         the file that loads the plugin
+    and everything else not listed below: build files, documentation.
+    (test/ includes the Rocq-level tests, test/rocq/.)
+
+  THE LIBRARY: GNU Lesser General Public License, version 2.1 or (at your
+  option) any later version (SPDX: LGPL-2.1-or-later;
+  LICENSES/LGPL-2.1-or-later.txt).
+
+    theories/Bisimilarity.v   weak_sim, weak_bisimilar, mutual_sim
+    theories/Premises.v       lemmas the plugin's proofs use
+    theories/Transfer.v
+    theories/Hiding.v
+    theories/Traces.v
+    examples/                 the examples, as Rocq developments
+
+Why two. Changes to the plugin itself stay free: that is the GPL. The
+library is what other Rocq developments `Require Import`, and the proofs the
+plugin generates refer to nothing but `MEBI.Bisimilarity` and
+`MEBI.Premises` (and the standard library), both LGPL. So a development that
+imports the library, or that contains a proof the plugin generated, is not
+itself bound by the GPL; it need only keep the library's own files under the
+LGPL. This is the split Rocq makes between itself (LGPL-2.1) and what is
+built on it.
+
+The opam package, `rocq-mebi`, carries both: GPL-3.0-or-later AND
+LGPL-2.1-or-later.

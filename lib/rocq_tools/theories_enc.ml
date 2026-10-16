@@ -6,14 +6,6 @@ module type S = sig
 
   val get_theory_enc : (Evd.econstr -> bool im) -> enc mm
 
-  exception NoEncodingFoundFor_TheoriesNone
-
-  val get_None_enc : unit -> enc mm
-
-  exception NoEncodingFoundFor_TheoriesSome
-
-  val get_Some_enc : unit -> enc mm
-
   exception NotEqTheory
 
   val get_theory_enc_if_eq : Evd.econstr -> (Evd.econstr -> bool im) -> enc mm
@@ -33,6 +25,7 @@ struct
 
   include Theories
 
+  (* See the [.mli]. A linear search of the forward map. *)
   let get_theory_enc (f : EConstr.t -> bool I.mm) : Enc.t M.mm =
     Logger.trace __FUNCTION__;
     let open M.Syntax in
@@ -46,25 +39,10 @@ struct
     M.F.to_seq fm |> List.of_seq |> find_theory
   ;;
 
-  exception NoEncodingFoundFor_TheoriesNone
-
-  let get_None_enc () : Enc.t M.mm =
-    Logger.trace __FUNCTION__;
-    try get_theory_enc is_None with
-    | Not_found -> raise NoEncodingFoundFor_TheoriesNone
-  ;;
-
-  exception NoEncodingFoundFor_TheoriesSome
-
-  let get_Some_enc () : Enc.t M.mm =
-    Logger.trace __FUNCTION__;
-    try get_theory_enc is_Some with
-    | Not_found -> raise NoEncodingFoundFor_TheoriesSome
-  ;;
-
   exception NotEqTheory
 
-  (** *)
+  (* See the [.mli]. [f x] is run here, while building the value, which is
+     why [NotEqTheory] reaches a handler around the call. *)
   let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool I.mm)
     : Enc.t M.mm
     =
@@ -74,6 +52,7 @@ struct
     | Not_found -> raise NotEqTheory
   ;;
 
+  (* See the [.mli] for these two. *)
   let get_None_enc_if_eq (x : EConstr.t) : Enc.t M.mm =
     Logger.trace __FUNCTION__;
     get_theory_enc_if_eq x is_None

@@ -1,13 +1,21 @@
 {
-(* open Ltac_plugin *)
+open Ltac_plugin
+open Tacarg
 
 (* This one is necessary, to avoid message about missing wit_string *)
 open Stdarg
-(* open Pp *)
 
 (* lib/ emits through Logger, which prints to stdout until a sink is installed.
    Route it through Rocq's Feedback now that we are running inside Rocq. *)
 let () = Rocq_output.install ()
+
+(* Said once, when Rocq loads the plugin ([Require Import MEBI.loader]): where
+   the commands are listed, and how to hide the routine messages. A [Notice],
+   so it is shown by default. *)
+let () =
+  Logger.notice
+    "(MeBi loaded. [MeBi Help.] lists the commands; [MeBi Config Output \"Info\" \
+     False.] hides routine messages.)"
 }
 
 DECLARE PLUGIN "rocq-mebi.mebi"
@@ -17,20 +25,85 @@ DECLARE PLUGIN "rocq-mebi.mebi"
 VERNAC COMMAND EXTEND MeBi_Sim CLASSIFIED AS QUERY
 |![ proof ] 
   [ "MeBi" "Sim" "Solve" int(bound) ] ->
-  { fun ~pstate -> Proof_solver.solve ~bound pstate }
+  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.solve ~bound pstate) }
 
 |![ proof ] 
   [ "MeBi" "Sim" "Step" ] ->
-  { fun ~pstate -> Proof_solver.step pstate }
+  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.step pstate) }
 
 |![ proof ] 
   [ "MeBi" "Sim" "Begin" reference(a) constr(x) "And" reference(b) constr(y) ] -> 
-  { fun ~pstate -> Proof_solver.init pstate [] (x,a) (y,b) }
+  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.init pstate [] (x,a) (y,b)) }
 
 |![ proof ] 
   [ "MeBi" "Sim" "Begin" reference(a) constr(x) "And" reference(b) constr(y)
                  "Using" reference_list(rs) ] -> 
-  { fun ~pstate -> Proof_solver.init pstate rs (x,a) (y,b) }
+  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.init pstate rs (x,a) (y,b)) }
+END
+
+(* Bisimilarity, opening the proof: [... As <name>] states
+   [weak_bisimilar] as the Example <name> and begins the proof search on it
+   ([Proof_solver.start]); [MeBi Sim Solve] follows. [As] comes before
+   [Using]: grammar words are not reserved, so a [reference_list] would read
+   [As <name>] as two more relations. *)
+VERNAC COMMAND EXTEND MeBi_Run_Bisim_As
+| ![ open_proof ] ["MeBi" "Run"
+   "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
+   "As" identref(n)]
+  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
+  -> { Proof_solver.guard (fun () ->
+         Proof_solver.start ~kind:Proof_solver.Bisim ~name:n.CAst.v [] (x, a) (y, b)) }
+| ![ open_proof ] ["MeBi" "Run"
+   "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
+   "As" identref(n) "Using" reference_list(rs)]
+  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
+  -> { Proof_solver.guard (fun () ->
+         Proof_solver.start ~kind:Proof_solver.Bisim ~name:n.CAst.v rs (x, a) (y, b)) }
+END
+
+(* Weak similarity: is <x> weakly simulated by <y>? ([Wrapper.similarity]:
+   only pairs reachable from the two start states, and on demand within
+   [MeBi Config Bounds Game].) *)
+VERNAC COMMAND EXTEND MeBi_Run_Sim CLASSIFIED AS QUERY
+| ["MeBi" "Run"
+   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] ->
+  {
+    let module W : Wrapper.S = (val Wrapper.get ()) in
+    let _ = W.Command.run [] (W.Command.CheckSim {a=(x, a); b=(y, b)})
+            |> W.M.run ~reset_encoding:true
+    in
+    Logger.info "(Finished Checking Similarity.)";
+    ()
+  }
+| ["MeBi" "Run"
+   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
+   "Using" reference_list(rs)] ->
+  {
+    let module W : Wrapper.S = (val Wrapper.get ()) in
+    let _ = W.Command.run rs (W.Command.CheckSim {a=(x, a); b=(y, b)})
+            |> W.M.run ~reset_encoding:true
+    in
+    Logger.info "(Finished Checking Similarity.)";
+    ()
+  }
+END
+
+(* Weak similarity, opening the proof: [... As <name>] states [weak_sim] as
+   the Example <name> and begins the proof search on it, as [MeBi Run Bisim
+   ... As] does for [weak_bisimilar]. *)
+VERNAC COMMAND EXTEND MeBi_Run_Sim_As
+| ![ open_proof ] ["MeBi" "Run"
+   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
+   "As" identref(n)]
+  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
+  -> { Proof_solver.guard (fun () ->
+         Proof_solver.start ~kind:Proof_solver.Sim ~name:n.CAst.v [] (x, a) (y, b)) }
+| ![ open_proof ] ["MeBi" "Run"
+   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
+   "As" identref(n) "Using" reference_list(rs)]
+  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
+  -> { Proof_solver.guard (fun () ->
+         Proof_solver.start ~kind:Proof_solver.Sim ~name:n.CAst.v rs (x, a) (y, b)) }
 END
 
 (* Bisimilarity *)
@@ -215,6 +288,20 @@ VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
   { Api.set_the_bounds_args (Api.States x) }
 | ["MeBi" "Config" "Bounds" "As" "Num" "Transitions" int(x)] -> 
   { Api.set_the_bounds_args (Api.Transitions x) }
+| ["MeBi" "Config" "Bounds" "Saturation" int(x)] -> 
+  { Api.set_saturation_bound x }
+| ["MeBi" "Config" "Bounds" "Game" int(x)] -> 
+  { Api.set_game_bound x }
+| ["MeBi" "Config" "Bounds" "Memory" int(x)] -> 
+  { Api.set_memory_bound x }
+| ["MeBi" "Config" "Premise" "Depth" int(x)] -> 
+  { Api.set_premise_depth x }
+| ["MeBi" "Config" "Premise" "Range" int(x)] -> 
+  { Api.set_premise_range x }
+| ["MeBi" "Config" "Premise" "Tactic" tactic(t)] -> 
+  { Api.set_premise_tactic (Tacinterp.interp t) }
+| ["MeBi" "Config" "Reset" "Premise"] -> 
+  { Api.reset_premise () }
 END
 
 (* Config -- weak_args for both *)
@@ -265,6 +352,45 @@ VERNAC COMMAND EXTEND MeBi_Config_FailIf_NotBisimilar CLASSIFIED AS QUERY
   { Api.set_fail_flag_non_bisimilar false }
 END
 
+(* Config -- fail-if oversaturated flag *)
+VERNAC COMMAND EXTEND MeBi_Config_FailIf_Oversaturated CLASSIFIED AS QUERY
+| ["MeBi" "Config" "FailIf" "Oversaturated" "True"] -> 
+  { Api.set_fail_flag_oversaturated true }
+| ["MeBi" "Config" "FailIf" "Oversaturated" "False"] -> 
+  { Api.set_fail_flag_oversaturated false }
+END
+
+(* Config -- saturation: whole, or on demand (notes/13) *)
+VERNAC COMMAND EXTEND MeBi_Config_Saturation_OnDemand CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Saturation" "OnDemand" "True"] ->
+  { Api.set_saturation_mode Api.Saturation_on_demand }
+| ["MeBi" "Config" "Saturation" "OnDemand" "False"] ->
+  { Api.set_saturation_mode Api.Saturation_whole }
+| ["MeBi" "Config" "Saturation" "OnDemand" "Auto"] ->
+  { Api.set_saturation_mode Api.Saturation_auto }
+END
+
+(* Config -- solver strategy *)
+VERNAC COMMAND EXTEND MeBi_Config_Solver_MutualCofix CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Solver" "MutualCofix" "True"] ->
+  { Api.set_solver_strategy Api.Mutual }
+| ["MeBi" "Config" "Solver" "MutualCofix" "False"] ->
+  { Api.set_solver_strategy Api.Nested }
+| ["MeBi" "Config" "Solver" "MutualCofix" "Auto"] ->
+  { Api.set_solver_strategy Api.Auto }
+END
+
+VERNAC COMMAND EXTEND MeBi_Config_Solver_Answers CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Solver" "Answers" "Default"] ->
+  { Api.set_answer_policy Api.Answers_default }
+| ["MeBi" "Config" "Solver" "Answers" "Greedy"] ->
+  { Api.set_answer_policy Api.Answers_greedy }
+| ["MeBi" "Config" "Solver" "Answers" "Minimal"] ->
+  { Api.set_answer_policy Api.Answers_minimal }
+| ["MeBi" "Config" "Solver" "Answers" "Auto"] ->
+  { Api.set_answer_policy Api.Answers_auto }
+END
+
 (* Config -- output *)
 VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Output" string(x) "True"] -> 
@@ -273,10 +399,23 @@ VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
   { Api.set_output false x }
 END
 
-(* VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
-(* TODO: update me *)
-| ["MeBi" "Help"] -> {Logger.show "TODO: Update Mebi_help"}
-END  *)
+(* Help -- topics and text in [src/help.ml] *)
+VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
+| ["MeBi" "Help"] -> { Help.show [] }
+| ["MeBi" "Help" "Run"] -> { Help.show [ "Run" ] }
+| ["MeBi" "Help" "Sim"] -> { Help.show [ "Sim" ] }
+| ["MeBi" "Help" "Benchmark"] -> { Help.show [ "Benchmark" ] }
+| ["MeBi" "Help" "Premises"] -> { Help.show [ "Premises" ] }
+| ["MeBi" "Help" "Config"] -> { Help.show [ "Config" ] }
+| ["MeBi" "Help" "Config" "Bounds"] -> { Help.show [ "Config"; "Bounds" ] }
+| ["MeBi" "Help" "Config" "Bounds" "Saturation"] ->
+  { Help.show [ "Config"; "Bounds"; "Saturation" ] }
+| ["MeBi" "Help" "Config" "Saturation"] -> { Help.show [ "Config"; "Saturation" ] }
+| ["MeBi" "Help" "Config" "Weak"] -> { Help.show [ "Config"; "Weak" ] }
+| ["MeBi" "Help" "Config" "FailIf"] -> { Help.show [ "Config"; "FailIf" ] }
+| ["MeBi" "Help" "Config" "Solver"] -> { Help.show [ "Config"; "Solver" ] }
+| ["MeBi" "Help" "Config" "Output"] -> { Help.show [ "Config"; "Output" ] }
+END
 
 VERNAC COMMAND EXTEND MeBi_Divider CLASSIFIED AS QUERY
 (* for outputting messages -- useful for sifting through compiler output *)

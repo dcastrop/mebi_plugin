@@ -1,3 +1,4 @@
+(* See the [.mli] for everything here. *)
 let option ?(as_elt : bool = false) (f : ?as_elt:bool -> 'a -> Yojson.t)
   : 'a option -> Yojson.t
   = function
@@ -45,8 +46,6 @@ module Make (X : sig
         (x : k)
     : unit
     =
-    (* TODO: *)
-    Utils.FileWriter.create_parent_dir dir;
     let filepath : string =
       Printf.sprintf
         "%s | %s | %s%s"
@@ -56,6 +55,12 @@ module Make (X : sig
         ".json"
       |> Filename.concat dir
     in
+    (* [create_parent_dir] takes the path of the file being written, not the
+       directory to hold it. It used to be handed [dir] itself, whose parent
+       ([Filename.dirname "./_dumps/"] = ["."]) already exists, so nothing was
+       created and the [open_out] below aborted the whole .v file with a
+       [System error] unless [_dumps/] happened to exist already. *)
+    Utils.FileWriter.create_parent_dir filepath;
     Printf.sprintf "Writing to: %s" filepath |> Logger.info;
     let oc = open_out filepath in
     try
@@ -164,7 +169,6 @@ module List = struct
 
       let name = X.name
 
-      (** ... *)
       let json ?(as_elt : bool = false) (xs : k) : Yojson.t =
         let y : Yojson.t =
           `List

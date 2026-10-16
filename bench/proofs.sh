@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# bench/proofs.sh -- run the plugin's proof suites and tabulate the results.
+#
+# usage: bench/proofs.sh [-s SUITE] [-f FILES] [-m MODES] [-j JOBS] [-t TAG]
+#                        [-M MEM] [-a POLICY]
+#   -s SUITE  default (Proc's three PluginProofs.v, CADP's
+#             MutualExclusion.v and GluedLayered.v, CCS's PluginProofs.v
+#             and LawProofs.v; ~3 min a mode), abp (the
+#             Alternating Bit Protocol proofs, ~4 min and ~4.3GB each),
+#             test4 (Test4 through the normalised semantics, ~5 min,
+#             ~2.8GB peak), eval (the evaluation levers in
+#             examples/Evaluation as built by default, ~40s), eval-large
+#             (the same levers scaled up), cadp-large (CADP's
+#             MutualExclusionLarge.v: ~10 min and ~4.4GB at two processes
+#             direct, as measured) or cadp-huge (the three CADP proofs
+#             that ran out of memory at 7-10GB, one per file: they may
+#             not finish; give both -M on a large machine).
+#             Default: default.
+#   -f FILES  comma-separated subset of the suite's proof files to run,
+#             as listed below (e.g. -s eval-large -f WidthLarge.v).
+#             Default: all of them.
+#   -m MODES  comma-separated solver strategies: auto (each file as
+#             written), True, False (MeBi Config Solver MutualCofix forced
+#             for the whole file). Default: auto.
+#   -j JOBS   files compiled at once (default suite only; abp and test4 run
+#             one file at a time, as two heavy proofs together can exhaust
+#             memory). Default: 8.
+#   -t TAG    name of the run's directory. Default: SUITE-YYYYmmdd-HHMMSS.
+#   -M MEM    the memory cap of each file's process, as systemd-run takes it
+#             (for example 28G), instead of the suite's. Use it on a machine
+#             with more memory than the caps below assume.
+#   -a POLICY force MeBi Config Solver Answers (Default, Greedy, Minimal or
+#             Auto) at the start of every file, to measure one policy against
+#             another on the same machine (a file that sets its own policy
+#             later keeps it). Default: the files as written, i.e. the
+#             plugin's default. Put the policy in -t, as it is not in the
+#             tables. A file's checked-in bounds are for the plugin's
+#             default, so a policy that needs more steps stops at its first
+#             Solve ("Unsolved after N"); that is the answer, not a fault.
+#
+# Each file is its own memory-capped process (5G, or 6G for abp/test4)
+# with its own log, so every "Solved after N" line is attributable. The run
+# directory ($MEBI_BENCH_DIR/TAG, or a fresh temporary directory) gets:
+#   solves.tsv  suite, mode, file, index, Solved/Unsolved, iterations,
+#               then the proof's name and the seconds its MeBi Sim Begin,
+#               MeBi Sim Solve and Qed took (from rocq compile -time; "?"
+#               where a command did not finish) -- one row per MeBi Sim
+#               Solve, in file order;
+#   runs.tsv    suite, mode, file, exit, seconds, peak MB, errors -- one row
+#               per file;
+#   logs/       the full output of each file.
+# Compare two runs with bench/compare.sh. The known-good iteration counts
+# are in CLAUDE.md.
+
+. "$(dirname "$0")/lib.sh"
+
+suite=default only= modes=auto jobs=8 tag= mem_override= answers=
+while getopts "s:f:m:j:t:M:a:h" opt; do
+  case $opt in
+    s) suite=$OPTARG ;;
+    f) only=$OPTARG ;;
+    m) modes=$OPTARG ;;
+    j) jobs=$OPTARG ;;
+    t) tag=$OPTARG ;;
+    M) mem_override=$OPTARG ;;
+    a) answers=$OPTARG ;;
+    *) sed -n '2,/^$/s/^# \{0,1\}//p' "$0"; exit 2 ;;
+  esac
+done
+
+case $answers in
+  "" | Default | Greedy | Minimal | Auto) ;;
+  *) bench_die "unknown answer policy '$answers' (expected Default, Greedy, Minimal or Auto)" ;;
+esac
+
+# Per suite: the examples to compile first (in order), the directory under
+# examples/ holding its proof files, the proof files (relative to it), the
+# memory cap, the parallelism. The default suite's CADP files are outside
+# Bisimilarity/ (examples/CADP/), hence their "../": the others keep the
+# names earlier runs were tabulated under.
+dir=Bisimilarity
+case $suite in
+  default)
+    deps="CCS.v Proc.v Bisimilarity/Proc/Test1/Terms.v Bisimilarity/Proc/Test2/Terms.v
+          Bisimilarity/Proc/Test3/Terms.v CADP/Model.v CADP/Glued.v CADP/SpecMutex.v
+          CADP/Terms.v"
+    files="Proc/Test1/PluginProofs.v Proc/Test2/PluginProofs.v Proc/Test3/PluginProofs.v
+           ../CADP/MutualExclusion.v ../CADP/GluedLayered.v
+           CCS/PluginProofs.v CCS/LawProofs.v"
+    mem=5G ;;
+  abp)
+    deps="CCS.v"
+    files="CCS/ABPProofs.v CCS/ABPBisimProofs.v"
+    mem=6G jobs=1 ;;
+  test4)
+    deps="Proc.v ProcCongruence.v Bisimilarity/Proc/Test4/Terms.v"
+    files="Proc/Test4/NormProofs.v Proc/Test4/NormBisimProofs.v"
+    mem=6G jobs=1 ;;
+  eval)
+    deps="Evaluation/Base.v" dir=Evaluation
+    files="Width.v Layers.v Depth.v"
+    mem=5G ;;
+  eval-large)
+    deps="Evaluation/Base.v Evaluation/Layers.v Evaluation/Depth.v" dir=Evaluation
+    files="WidthLarge.v LayersLarge.v DepthLarge.v"
+    mem=6G jobs=1 ;;
+  cadp-large)
+    deps="CADP/Model.v CADP/Glued.v CADP/Norm.v CADP/Terms.v CADP/SpecMutex.v" dir=CADP
+    files="MutualExclusionLarge.v"
+    mem=8G jobs=1 ;;
+  cadp-huge)
+    deps="CADP/Model.v CADP/Glued.v CADP/Norm.v CADP/Obs.v CADP/Terms.v CADP/SpecFifo.v
+          CADP/SpecMutex.v" dir=CADP
+    files="ThreeProcessesMutex.v ThreeProcessesFifo.v TwoProcessesGluedLayered.v"
+    mem=8G jobs=1 ;;
+  *) bench_die "unknown suite '$suite' (expected default, abp, test4, eval, eval-large, cadp-large or cadp-huge)" ;;
+esac
+[ -z "$mem_override" ] || mem=$mem_override
+
+if [ -n "$only" ]; then
+  for f in ${only//,/ }; do
+    case " $(echo $files) " in
+      *" $f "*) ;;
+      *) bench_die "$f is not in suite '$suite' (its files: $(echo $files))" ;;
+    esac
+  done
+  files=${only//,/ }
+fi
+
+bench_check_build
+run=$(bench_run_dir "${tag:-$suite-$(date +%Y%m%d-%H%M%S)}")
+mkdir -p "$run/logs"
+bench_copy_examples "$run"
+# shellcheck disable=SC2086 # word-splitting the lists is intended
+bench_compile_deps "$run" $deps
+printf 'suite\tmode\tfile\tindex\tstatus\titerations\tproof\tbegin_s\tsolve_s\tqed_s\n' > "$run/solves.tsv"
+printf 'suite\tmode\tfile\texit\tseconds\tpeak_mb\terrors\n' > "$run/runs.tsv"
+
+# run_one MODE FILE: compile one proof FILE under MODE from its own copy
+# (forcing the strategy edits the file), memory-capped, logging to logs/.
+run_one() {
+  local mode=$1 file=$2
+  local name=${file#../}; name=${name//\//_}
+  local src="$run/examples/$dir/$file"
+  local copy="${src%.v}_bench_$mode.v"
+  # the copy must keep a valid module name: no dots or dashes
+  cp "$src" "$copy"
+  bench_force_strategy "$copy" "$mode"
+  bench_force_answers "$copy" "$answers"
+  bench_rocq_argv "$run"
+  bench_capped "$mem" "$run/logs/$mode.${name%.v}.log" \
+    "${BENCH_RC[@]}" -time -o "${copy%.v}.vo" "$copy"
+}
+export -f run_one bench_rocq_argv bench_capped bench_force_strategy bench_force_answers bench_die
+export run mem dir answers BENCH_ROOT
+
+for mode in ${modes//,/ }; do
+  echo "bench: $suite, mode $mode ..." >&2
+  # shellcheck disable=SC2086
+  printf '%s\n' $files | xargs -P "$jobs" -I{} bash -c 'run_one "$0" "$1"' "$mode" {}
+  for file in $files; do
+    name=${file#../}; name=${name//\//_}
+    bench_rows "$suite" "$mode" "${file%.v}" "$run/logs/$mode.${name%.v}.log" \
+      "$run/solves.tsv" "$run/runs.tsv"
+  done
+done
+
+column -t -s $'\t' "$run/runs.tsv" >&2
+echo "$run"

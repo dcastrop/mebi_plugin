@@ -1,0 +1,2 @@
+suite	mode	file	index	status	iterations	proof	begin_s	solve_s	qed_s
+test4	auto	Proc/Test4/NormProofs	1	Solved	48821	wsim_pq_norm	0.462	357.56	44.104

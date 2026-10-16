@@ -107,8 +107,8 @@ Proof. wsim_begin; do 7 wsim_next_case. Qed.
 Example wsim_qp : weak_sim termLTS termLTS q p. 
 Proof. wsim_begin; do 9 wsim_next_case. Qed. 
   
-Theorem wbisim_pq : weak_bisim termLTS termLTS p q.
-Proof. unfold weak_bisim; split; [apply wsim_pq | apply wsim_qp]. Qed.
+Theorem wbisim_pq : mutual_sim termLTS termLTS p q.
+Proof. unfold mutual_sim; split; [apply wsim_pq | apply wsim_qp]. Qed.
 
 (****************************************************************************)
 Example wsim_qr : weak_sim termLTS termLTS q r. 
@@ -117,8 +117,8 @@ Proof. wsim_begin; do 9 wsim_next_case. Qed.
 Example wsim_rq : weak_sim termLTS termLTS r q. 
 Proof. wsim_begin; do 8 wsim_next_case. Qed. 
   
-Theorem wbisim_qr : weak_bisim termLTS termLTS q r.
-Proof. unfold weak_bisim; split; [apply wsim_qr | apply wsim_rq]. Qed.
+Theorem wbisim_qr : mutual_sim termLTS termLTS q r.
+Proof. unfold mutual_sim; split; [apply wsim_qr | apply wsim_rq]. Qed.
 
 (****************************************************************************)
 Example wsim_pr : weak_sim termLTS termLTS p r. 
@@ -127,5 +127,5 @@ Proof. wsim_begin; do 10 wsim_next_case. Qed.
 Example wsim_rp : weak_sim termLTS termLTS r p. 
 Proof. wsim_begin; do 9 wsim_next_case. Qed. 
   
-Theorem wbisim_pr : weak_bisim termLTS termLTS p r.
-Proof. unfold weak_bisim; split; [apply wsim_pr | apply wsim_rp]. Qed.
+Theorem wbisim_pr : mutual_sim termLTS termLTS p r.
+Proof. unfold mutual_sim; split; [apply wsim_pr | apply wsim_rp]. Qed.
