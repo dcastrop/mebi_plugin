@@ -29,11 +29,6 @@ Decision 2 would change every checked-in proof bound if it went against
 
 ## Waiting on Jonah
 
-- **Re-run the large CADP proofs on the 32GB host** (`doc/future-work.md`,
-  "Re-running the large CADP proofs"). Three proofs ran out of memory at
-  7-10GB under `Answers Default`; `bench/proofs.sh -s cadp-large` and
-  `-s cadp-huge` (with `-M`) run them. Needs this on `origin/main`
-  (PR #53).
 - **An observing label in layered `step`** (a model change). It would
   carry FIFO order with joining *visible* to the layered CADP model. Today
   only the hidden form carries over, at one process (`examples/README.md`,
@@ -47,14 +42,17 @@ Decision 2 would change every checked-in proof bound if it went against
 
 ## CADP, the running example
 
-- **Two processes, glued ≈ layered:** decided, not proved (*limit*). The
-  measurements are in `examples/CADP/GluedLayered.v`. A way round is
-  decision 3.
+- **Two processes, glued ≈ layered:** decided, not proved (*limit*): out
+  of memory at 24GiB on a 31GB host, nested and mutual alike. The
+  measurements are in `doc/measurements/cadp-large.md`; a way round is
+  decision 3. Two runs are not done (`doc/future-work.md`, "Re-running
+  the large CADP proofs").
 - **Three processes:** FIFO order, and mutual exclusion (system ≤ spec),
-  are decided but not proved: out of memory at 8-9GB (*limit*;
-  `examples/CADP/MutualExclusionLarge.v`, `examples/README.md`). Why they
-  need so much more memory than two processes is unexplained
-  (`doc/future-work.md`, "The solver's own per-step cost").
+  are proved over the normalised semantics, but only on a 31GB host (13.4
+  and 17.8GiB peak; `examples/CADP/ThreeProcesses*.v`, not built by
+  default). Why 644 states need so much more memory than 48 is
+  unexplained (`doc/future-work.md`, "The solver's own per-step cost").
+  The FIFO one is not carried back to `bigstep_obs`.
 
 ## Limits of the tool
 

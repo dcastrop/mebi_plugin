@@ -43,13 +43,13 @@ relative to the verdict, and where it stops.
 | glued ≈ `spec_lts` | 10 | 0.04s, 0.33GB | 185 steps, 1.7s | ~45× |
 | normalised (observing) ≈ `spec_fifo` | 5 | 0.03s, 0.32GB | 119 steps, 1.1s | ~40× |
 | **CADP, two processes** | | | | |
-| glued ≈ layered | 12,027 | 45s, 1.48GB | **not proved**: OOM at 10GB (nested, 25-52 min); mutual unfinished after 2.5h † | — |
+| glued ≈ layered | 12,027 | 45s, 1.48GB | **not proved**: OOM at 10GB (nested, 25-52 min); mutual unfinished after 2.5h †. On a 31GB host, still OOM at 24GiB: nested after 2h05m, mutual (`Bounds Game`) after 16h † | — |
 | normalised (observing) ≈ `spec_fifo` | 48 | 0.24s, 0.40GB | 2,228 steps, 24.5s | ~100× |
 | glued vs `spec_lts` | 772 | not bisimilar, 2.1s, 0.47GB | ≤ both ways: 11,128 steps, 9.9 min, ≤4.4GB; and 405 steps, 4.9s | ~280× |
 | normalised vs `spec_lts` | 48 | not bisimilar, 0.25s, 0.40GB | ≤ both ways: 1,038 steps, 14.5s; and 153 steps, 1.6s | ~65× |
 | **CADP, three processes** | | | | |
-| normalised (observing) ≈ `spec_fifo` | 644 | 4.8s, 0.64GB | **not proved**: OOM at 9GB after ~15 min † | — |
-| normalised vs `spec_lts` | 644 | not bisimilar, 4.6s, 0.61GB | spec ≤ system: 326 steps, 9.2s. System ≤ spec: **not proved**, OOM at 8-9GB after 11-13 min † | — |
+| normalised (observing) ≈ `spec_fifo` | 644 | 4.8s, 0.64GB | 45,773 steps, 37.6 min, 17.8GiB, on a 31GB host (OOM at 9GB after ~15 min on a 14GB host) † | ~470× |
+| normalised vs `spec_lts` | 644 | not bisimilar, 4.6s, 0.61GB | spec ≤ system: 124 steps, 9.2s (326 under `Answers Default`). System ≤ spec: 20,432 steps, 22.8 min, 13.4GiB, on a 31GB host (OOM at 8-9GB after 11-13 min on a 14GB host) † | ~300× (system ≤ spec) |
 | **Proc `Test4`** (four components) | | | | |
 | `p` ≈ `q`, direct | 9,720 | 42s, 0.98GB (saturated on demand) | not attempted: ~525k steps predicted † | — |
 | `p` ≈ `q`, normalised | 82 | 0.45s, 0.36GB | 61,161 steps, ~4 min, ~2.8GB (`Answers Minimal`) †; `weak_sim` alone 6,115 steps, ~30s, ~0.7GB (48,821 steps, ~7 min, ~3.8GB under `Answers Default`, until 2026-10-15) | ~500× (`weak_bisimilar`) |
@@ -60,6 +60,12 @@ The figures marked † are recorded in:
 - the header of `examples/CADP/GluedLayered.v` (2026-10-12);
 - `examples/CADP/MutualExclusionLarge.v`, and `examples/README.md`'s
   "No starvation" table, for three processes (2026-10-11);
+- `doc/measurements/cadp-large.md` and the headers of
+  `ThreeProcessesMutex.v`, `ThreeProcessesFifo.v` and
+  `TwoProcessesGluedLayered.v`, for the 31GB host (2026-10-15/16; the
+  three-process ratios are the proof's `Begin` + `Solve` + `Qed` time over
+  the decision's, and `spec ≤ system`'s 124 steps are from the same
+  re-run of `MutualExclusionLarge.v`);
 - `examples/Bisimilarity/Proc/Test4/TermTests.v`, `NormProofs.v` and
   `NormBisimProofs.v`;
 - `_CoqProject`, for the ABP.
@@ -81,21 +87,25 @@ spec are smaller.
 
 2. **Where a proof stops, the verdict usually still comes cheaply.**
    - Two-process glued ≈ layered is decided in 45s and 1.5GB, but no
-     proof finished within 10GB or 2.5 hours.
-   - Three-process FIFO order is decided in 4.8s, but its proof ran out
-     of memory at 9GB.
+     proof finished: not within 10GB or 2.5 hours, and not within 24GiB
+     either (nested, out of memory after 2h05m; mutual with `Bounds Game`,
+     after 16h).
+   - Three-process FIFO order is decided in 4.8s. Its proof ran out of
+     memory at 9GB on a 14GB host, and finishes on a 31GB one (37.6 min,
+     17.8GiB peak): the same proof, with more room, not a better
+     strategy (`Answers Default` takes the same steps).
 
-   So for these sizes, the plugin's result is a decision, not a proof.
+   So for the largest sizes, the plugin's result is a decision, not a proof.
    `OUTSTANDING.md` records this as a limit, and `future-work.md`
    ("Proofs split into separately checked lemmas") a possible way round.
 
 3. **A proof's cost follows the game, not the state count.**
    - Two-process glued vs `spec_lts` (772 states) is proved in 10 min.
-   - Three-process normalised vs `spec_lts` (644 states) is not, in the
-     system ≤ spec direction.
+   - Three-process normalised vs `spec_lts` (644 states) is proved in the
+     system ≤ spec direction only with 13.4GiB (20,432 steps, 22.8 min).
    - The direction matters as much as the size: at three processes,
-     spec ≤ system takes 326 steps, while system ≤ spec ran out of
-     memory.
+     spec ≤ system takes 124 steps (326 under `Answers Default`), while
+     system ≤ spec takes 20,432, and ran out of memory on a 14GB host.
 
    What grows is the number of pairs the proof visits and the moves it
    answers. `Auto` estimates both before choosing a strategy

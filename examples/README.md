@@ -108,7 +108,7 @@ extract beyond one process.
 | size | processes | layered | glued | normalised | glued ≈ layered |
 |---|---|---|---|---|---|
 | `Size1` | 1 | small | small | 5 states | proved (`GluedLayered.v`) |
-| `Size2` | 2 | 12027 states (~32s) | 772 states | 48 states | decided, bisimilar (`ExploreLarge.v`, ~35s); not proved: out of memory at 10GB (nested cofix), unfinished after 2.5h (mutual) (`GluedLayered.v`) |
+| `Size2` | 2 | 12027 states (~32s) | 772 states | 48 states | decided, bisimilar (`ExploreLarge.v`, ~35s); not proved: out of memory at 10GB (nested cofix), unfinished after 2.5h (mutual) (`GluedLayered.v`); still out of memory at 24GiB on a 31GB host, nested after 2h05m and mutual (with `Bounds Game`) after 16h (`TwoProcessesGluedLayered.v`) |
 | `Size3` | 3 | not tried | 128044 states (~19 min, ~4.7GB) | 644 states (~3s) | not tried |
 
 Glued ≈ normalised needs no plugin run: it is `Norm.link`, for every
@@ -145,7 +145,7 @@ memory cap.
 | `Terms.v` | the systems: `c1`, `c2`, `c3` for one, two and three processes |
 | `Explore.v`, `ExploreLarge.v` | state spaces and decisions (`MeBi Run`), no proofs |
 | `GluedLayered.v` | glued ≈ layered |
-| `TwoProcessesGluedLayered.v`, `ThreeProcessesMutex.v`, `ThreeProcessesFifo.v` | the three proofs that ran out of memory, one per file, for a machine with more memory (`bench/proofs.sh -s cadp-huge`); not built |
+| `TwoProcessesGluedLayered.v`, `ThreeProcessesMutex.v`, `ThreeProcessesFifo.v` | the three proofs that ran out of memory on a 14GB host, one per file (`bench/proofs.sh -s cadp-huge`); not built. On a 31GB host the two three-process ones are proved (13.4 and 17.8GiB peak) and glued ≈ layered is still out of memory at 24GiB |
 | `MutualExclusion.v`, `MutualExclusionLarge.v` | mutual exclusion: one process, then two and three |
 | `Fifo.v` | FIFO order, one and two processes |
 | `LayeredTransfer.v` | the transfer to layered, one process |
@@ -195,13 +195,18 @@ part of the system's behaviour, and the spec does not see it.
 **Three processes.** Only through `bigstep_norm` (644 states; `bigstep`
 has 128,044). As before, the system and `spec_lts` are not bisimilar
 (`Explore.v`). Spec ≤ system is proved
-(`MutualExclusionLarge.v`, 326 steps, ~7s). Mutual
-exclusion proper, system ≤ spec, is not proved: its proof was OOM-killed
-at 9GB after ~13 min. It is decided only indirectly: the system is
+(`MutualExclusionLarge.v`, 124 steps under `Answers Auto`, 326 under
+`Default`). Mutual exclusion proper, system ≤ spec, is proved over
+`bigstep_norm` only on a host with more memory: `ThreeProcessesMutex.v`
+(20,432 steps, ~23 min, 13.4GiB peak, measured 2026-10-15 on a 31GB host,
+under `Auto` and `Default` alike). On a 14GB host it was OOM-killed at 8-9GB.
+It is not built by default. It is also decided indirectly: the system is
 bisimilar to the FIFO server (below), which lets only the head of its queue
 enter. Going from there to `bigstep`, by hiding the queue label, is a
-theorem (`Hidden.v`); what is missing is a *proof* of the FIFO
-bisimilarity at three processes, which is only decided.
+theorem (`Hidden.v`). That bisimilarity, over the normalised semantics, is
+proved at three processes on the same host (`ThreeProcessesFifo.v`, below);
+it is not carried back to `bigstep_obs` there. See
+`doc/measurements/cadp-large.md`.
 
 ### No starvation: FIFO order (`Fifo.v`)
 
@@ -230,7 +235,7 @@ How it is stated:
   |---|---|---|
   | 1 | 5 | proved, 119 steps (`Fifo.v`) |
   | 2 | 48 | proved, 2,228 steps, ~24s (`Fifo.v`) |
-  | 3 | 644 | decided, ~4s (`Explore.v`); proof OOM-killed at 9GB after ~15 min |
+  | 3 | 644 | decided, ~4s (`Explore.v`); proved over the normalised semantics only on a 31GB host, 45,773 steps, ~37 min, 17.8GiB peak (`ThreeProcessesFifo.v`, not built by default; OOM-killed at 9GB on 14GB); not carried to `bigstep_obs` |
 
   As a check that the verdict discriminates, a LIFO variant of the spec is
   found not bisimilar for three processes.

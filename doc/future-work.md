@@ -165,65 +165,32 @@ patch is kept locally (`notes/tools/extraction-profile.diff`).
 
 ## Re-running the large CADP proofs
 
-**Why.** The two- and three-process CADP figures were measured on a 14GB
-machine under `Answers Default`. Three proofs ran out of memory, at 7-10GB.
-Since 2026-10-15 `Answers Auto` is the default, and it cut `Test4`'s
-`weak_sim` from 48,821 steps and 3.75GB to 6,115 steps and 0.72GB
-(`doc/measurements/answers-auto.md`). A 90-second look at
-`MutualExclusionLarge.v` under it already showed `wsim_norm_r_2` at 75
-steps (153 before) and the three-process `wsim_norm_r_3` at 124 (326
-before). So the heavy proofs may now fit, or finish, and a 32GB machine
-says which. Nothing here is new: the same statements, the same plugin.
-This is not measured yet; the look above was a smoke run, not a result.
+**Done 2026-10-15/16, on a 31GB host; the results are in
+`doc/measurements/cadp-large.md`.** The two three-process proofs
+(`ThreeProcessesMutex.v`, `ThreeProcessesFifo.v`) finish there, at 13.4 and
+17.8GiB peak, and take the same steps under `Answers Auto` and `Default`: the
+machine, not the policy, is what changed. Glued ≈ layered
+(`TwoProcessesGluedLayered.v`) still ran out of memory at 24GiB, nested after
+2h05m and mutual (with `Bounds Game`) after 16h. The proof headers, `OUTSTANDING.md`,
+`examples/README.md`, `decide-vs-prove.md`, `limitations.md` and decision 3
+were updated from them. The commands are in `bench/README.md` (`-s cadp-large`,
+`-s cadp-huge`, with `-M` and `-a`).
 
-**On the host.** Clone, `nix develop`, then `opam switch create . --locked
---deps-only` and `dune build` (`README.md`, "Build"). `dune exec
-test/tests.exe` should say 110/110. Nothing else is needed: `bench/` copies
-the examples and compiles what each proof needs.
-
-**The runs.** One file is one process, memory-capped (`-M`), and heavy
-proofs go one at a time (`-j 1`, the suites' default):
-
-| run | how | measured before (14GB, `Answers Default`) | cap |
-|---|---|---|---|
-| `MutualExclusionLarge.v`: two processes normalised (1,037 and 152 steps) and direct (11,127 and 404), three processes spec <= system (325) | `-s cadp-large` | ~10 min, ~4.4GB; forced nested OOM-killed at 6GB | 24G |
-| three processes, system <= spec | `-s cadp-huge -f ThreeProcessesMutex.v` | OOM at 8GB after ~11 min (Auto), 9GB after ~13 min (`Answers Minimal`) | 28G |
-| three processes, FIFO bisimilarity | `-s cadp-huge -f ThreeProcessesFifo.v` | OOM at 9GB after ~15 min | 28G |
-| two processes, glued ~ layered | `-s cadp-huge -f TwoProcessesGluedLayered.v` | OOM at 7GB (17-35 min) and 10GB (25-52 min); mutual cofix, with `Bounds Game 100000000`, unfinished after 2h28m with memory flat at ~2.2GB | 28G |
-
-```sh
-export MEBI_BENCH_DIR=$HOME/mebi-bench      # where the runs go
-bench/proofs.sh -s cadp-large -M 24G -t cadp-large-auto
-bench/proofs.sh -s cadp-large -M 24G -a Default -t cadp-large-default   # the old policy, same host
-bench/proofs.sh -s cadp-huge -f ThreeProcessesMutex.v -M 28G -t huge-mutex-auto
-bench/proofs.sh -s cadp-huge -f ThreeProcessesFifo.v -M 28G -t huge-fifo-auto
-bench/proofs.sh -s cadp-huge -f TwoProcessesGluedLayered.v -M 28G -t huge-glued-auto
-```
-
-- **The `-a Default` runs are the baseline** for the same machine. They may
-  run out of memory or take hours; that is an answer too. `cadp-large`'s
-  bounds are the old counts, so it passes under both policies.
-- **The huge proofs may not finish.** Run them one at a time, overnight,
-  and stop them with a timeout rather than waiting. The log keeps the last
-  `Auto:` and `Answers:` lines, which say which cofix and policy it chose.
-  `runs.tsv` has the exit status and the peak memory.
-- **Also try the mutual cofix on glued ~ layered**: add
-  `MeBi Config Bounds Game 100000000.` before its proof, in a working copy
-  (not committed). It was the path that never finished a 2000-step chunk.
-- **Record the results** like `doc/measurements/answers-auto.md`: the
-  machine, the toolchain, the commands, the tables from `solves.tsv` and
-  `runs.tsv`, and the raw files beside them in
-  `doc/measurements/cadp-large-<date>/`.
-
-**What a result changes.** A proof that now finishes updates, with the new
-figures: `OUTSTANDING.md` ("CADP, the running example", the "not proved"
-lines), `examples/README.md` (the three-process table), `doc/decide-vs-prove.md`
-(the rows marked as not proved), the comments in `_CoqProject`, and the
-headers of `GluedLayered.v`, `MutualExclusionLarge.v` and `Fifo.v`. Decision 3
-in `doc/decisions.md`, proofs split into separately checked lemmas, rests on
-these proofs being out of reach, so it needs updating too. A proof that still
-does not finish says at what memory and how long, and whether `Bounds Game`
-changed it.
+**What remains.**
+- **Glued ≈ layered under `Answers Default` with `Bounds Game`**, on this
+  host. The 14GB host's run (2026-10-12) had a game of 514,020 pairs and 2,056,080 moves,
+  a `Begin` of ~90s and memory flat at ~2.2GB. The re-run under `Auto` had 78,202 pairs
+  and 312,808 moves, a `Begin` of 4,489s and memory up to the 24GiB cap. They
+  differ in policy and host, so nothing can be said until this one run is
+  made; it would say whether `Answers Auto` is the cause.
+- **Glued ≈ layered above 24GiB**, if a host has room: the proof sat at
+  16.7GiB for ~4.6h and then climbed, so it needs more than 24GiB, by an
+  unknown amount.
+- **`bench/lib.sh` needs GNU `time` at `/usr/bin/time`**, and fails
+  at once without it ("Failed to find executable /usr/bin/time", exit 1, 0
+  errors, easily mistaken for a result). NixOS has none. The re-run
+  used `nix-shell -p time --run '...'` with the line changed to
+  `"$(type -P time)"`, as a local edit; that edit is not committed.
 
 ## Smaller possible work
 

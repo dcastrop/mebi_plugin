@@ -118,8 +118,9 @@ and then it grew again to the cap.
 
 `TwoProcessesGluedLayered.v`'s header records that run (2026-10-12, before
 `Answers Auto`): the mutual cofix over **514,020 pairs, 2,056,080 moves**,
-unfinished after 2h28m with memory flat at ~2.2GB. This run, under Auto,
-had a game of **78,202 pairs, 312,808 moves** (6.6 times fewer pairs), yet
+unfinished after 2h28m with memory flat at ~2.2GB, and a `Begin` of ~90s
+(`GluedLayered.v`). This run, under Auto, had a `Begin` of **4,489s** and
+a game of **78,202 pairs, 312,808 moves** (6.6 times fewer pairs), yet
 memory was 12.1 GiB at the same point (2h29m: 12,412 MiB).
 The two differ in answer policy and host (and possibly toolchain), so they are
 not comparable, and I have not run `Bounds Game` under `-a Default` here.
@@ -132,14 +133,17 @@ That run would say whether the policy caused it.
   little room; the steady 16.7 GiB stretch and the final climb suggest the
   need is well above 24 GiB.
 
-## Docs these results would update (not yet done)
+## Docs updated from these results
 
-`OUTSTANDING.md` ("CADP, the running example"; the "Waiting on Jonah"
-entry for this re-run); `examples/README.md` (the three-process table);
-`doc/decide-vs-prove.md` (rows marked not proved); `doc/decisions.md`
-item 4; the headers of `ThreeProcessesMutex.v`, `ThreeProcessesFifo.v`,
-`TwoProcessesGluedLayered.v` and `MutualExclusionLarge.v`, and the
-comments in `_CoqProject`; `ASSISTED-CHANGES.md`.
+`OUTSTANDING.md` (the re-run item is removed; the two CADP lines are
+updated); `examples/README.md` (the three-process table and prose);
+`doc/decide-vs-prove.md` (rows, ratios and points 2 and 3);
+`doc/decisions.md` item 4; `doc/limitations.md`; `doc/future-work.md`
+(the section is now what remains); `bench/README.md`; the headers of
+`ThreeProcessesMutex.v`, `ThreeProcessesFifo.v`,
+`TwoProcessesGluedLayered.v`, `GluedLayered.v` and
+`MutualExclusionLarge.v`, and the comments in `_CoqProject`;
+`ASSISTED-CHANGES.md`.
 
 ## Corrections to the first pass (`ea452ed`)
 
