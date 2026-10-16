@@ -1,0 +1,39 @@
+
+(MeBi loaded. [MeBi Help.] lists the commands; [MeBi Config Output "Info" False.] hides routine messages.)
+Chars 903 - 930 [Require~Import~MEBI.loader.] 0.008 secs (0.005u,0.003s)
+Chars 931 - 966 [MeBi~Config~Solver~Answers~Def...] 0. secs (0.u,0.s)
+Chars 968 - 1001 [MeBi~Config~Output~"Debug"~False.] 0. secs (0.u,0.s)
+Chars 1002 - 1034 [MeBi~Config~Output~"Info"~False.] 0. secs (0.u,0.s)
+Chars 1035 - 1068 [MeBi~Config~Output~"Notice"~True.] 0. secs (0.u,0.s)
+Chars 1069 - 1103 [MeBi~Config~Output~"Warning"~T...] 0. secs (0.u,0.s)
+Chars 1104 - 1136 [MeBi~Config~Output~"Error"~True.] 0. secs (0.u,0.s)
+Chars 1137 - 1170 [MeBi~Config~Output~"Trace"~False.] 0. secs (0.u,0.s)
+Chars 1171 - 1205 [MeBi~Config~Output~"Result"~Fa...] 0. secs (0.u,0.s)
+Chars 1206 - 1238 [MeBi~Config~Output~"Show"~False.] 0. secs (0.u,0.s)
+Chars 1239 - 1280 [MeBi~Config~Output~"DecodeResu...] 0. secs (0.u,0.s)
+Chars 1281 - 1320 [MeBi~Config~Output~"DumpResult...] 0. secs (0.u,0.s)
+Chars 1322 - 1355 [Require~Import~MEBI.Bisimilarity.] 0. secs (0.u,0.s)
+Chars 1356 - 1396 [Require~Import~MEBI.Examples.C...] 0.108 secs (0.061u,0.046s)
+Chars 1397 - 1437 [Require~Import~MEBI.Examples.C...] 0. secs (0.u,0.s)
+Chars 1438 - 1477 [Require~Import~MEBI.Examples.C...] 0.074 secs (0.044u,0.03s)
+Chars 1478 - 1518 [Require~Import~MEBI.Examples.C...] 0. secs (0.u,0.s)
+Chars 1519 - 1563 [Require~Import~MEBI.Examples.C...] 0.001 secs (0.u,0.001s)
+Chars 1565 - 1598 [MeBi~Config~Weak~As~Option~label.] 0. secs (0.u,0.s)
+Chars 1599 - 1637 [MeBi~Config~Bounds~As~Num~Stat...] 0. secs (0.u,0.s)
+
+- - - - - - - - - - - - - - - -
+Examples.CADP.ThreeProcessesMutex
+Chars 1639 - 1688 [MeBi~Divider~"Examples.CADP.Th...] 0. secs (0.u,0.s)
+Chars 1689 - 1759 [Example~wsim_norm_3~:~weak_sim...] 0. secs (0.u,0.s)
+Chars 1760 - 1766 [Proof.] 0. secs (0.u,0.s)
+
+(Not bisimilar, but similar: the proof search falls back on the weak simulation preorder.)
+
+(Auto: mutual cofix -- 644 pairs, 1932 moves; a nested cofix would visit over 10304 goals.)
+Chars 1767 - 1839 [MeBi~Sim~Begin~bigstep_norm~c3...] 3.586 secs (3.45u,0.117s)
+(Mutual cofix over 644 pairs.)
+(Stopped) Solved after 20432 iterations.
+Chars 1842 - 1865 [MeBi~Sim~Solve~1000000.] 1260.272 secs (1250.141u,5.156s)
+Chars 1866 - 1870 [Qed.] 156.781 secs (155.904u,0.249s)
+BENCH_MAXRSS_KB 14018492 BENCH_SECONDS 1422.08
+BENCH_EXIT 0

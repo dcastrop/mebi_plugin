@@ -1,0 +1,132 @@
+
+(MeBi loaded. [MeBi Help.] lists the commands; [MeBi Config Output "Info" False.] hides routine messages.)
+Chars 0 - 27 [Require~Import~MEBI.loader.] 0.008 secs (0.006u,0.002s)
+Chars 29 - 62 [MeBi~Config~Output~"Debug"~False.] 0. secs (0.u,0.s)
+Chars 63 - 95 [MeBi~Config~Output~"Info"~False.] 0. secs (0.u,0.s)
+Chars 96 - 129 [MeBi~Config~Output~"Notice"~True.] 0. secs (0.u,0.s)
+Chars 130 - 164 [MeBi~Config~Output~"Warning"~T...] 0. secs (0.u,0.s)
+Chars 165 - 197 [MeBi~Config~Output~"Error"~True.] 0. secs (0.u,0.s)
+Chars 198 - 231 [MeBi~Config~Output~"Trace"~False.] 0. secs (0.u,0.s)
+Chars 232 - 266 [MeBi~Config~Output~"Result"~Fa...] 0. secs (0.u,0.s)
+Chars 267 - 299 [MeBi~Config~Output~"Show"~False.] 0. secs (0.u,0.s)
+Chars 300 - 341 [MeBi~Config~Output~"DecodeResu...] 0. secs (0.u,0.s)
+Chars 342 - 381 [MeBi~Config~Output~"DumpResult...] 0. secs (0.u,0.s)
+Chars 383 - 414 [Require~Stdlib.Program.Tactics.] 0. secs (0.u,0.s)
+Chars 416 - 475 [From~Corelib~Require~Import~Re...] 0. secs (0.u,0.s)
+Chars 476 - 532 [From~Stdlib~Require~Import~Rel...] 0. secs (0.u,0.s)
+Chars 533 - 574 [From~Stdlib~Require~Operators_...] 0.001 secs (0.001u,0.s)
+Chars 576 - 609 [Require~Import~MEBI.Bisimilarity.] 0. secs (0.u,0.s)
+Chars 610 - 650 [Require~Import~MEBI.Examples.C...] 0.106 secs (0.067u,0.037s)
+Chars 651 - 691 [Require~Import~MEBI.Examples.C...] 0. secs (0.u,0.s)
+Chars 692 - 731 [Require~Import~MEBI.Examples.C...] 0.074 secs (0.048u,0.025s)
+Chars 733 - 773 [Require~Import~MEBI.Examples.C...] 0. secs (0.u,0.s)
+Chars 774 - 818 [Require~Import~MEBI.Examples.C...] 0.001 secs (0.u,0.001s)
+
+- - - - - - - - - - - - - - - -
+Examples.CADP.MutualExclusionLarge
+Chars 2338 - 2388 [MeBi~Divider~"Examples.CADP.Mu...] 0. secs (0.u,0.s)
+Chars 2390 - 2423 [MeBi~Config~Weak~As~Option~label.] 0. secs (0.u,0.s)
+Chars 2425 - 2446 [Require~Import~Logic.] 0. secs (0.u,0.s)
+Chars 3187 - 3224 [MeBi~Config~Bounds~As~Num~Stat...] 0. secs (0.u,0.s)
+
+- - - - - - - - - - - - - - - -
+Examples.CADP.MutualExclusionLarge.Size2.bigstep_norm
+Chars 3226 - 3295 [MeBi~Divider~"Examples.CADP.Mu...] 0. secs (0.u,0.s)
+Chars 3296 - 3366 [Example~wsim_norm_2~:~weak_sim...] 0. secs (0.u,0.s)
+Chars 3367 - 3373 [Proof.] 0. secs (0.u,0.s)
+
+(Not bisimilar, but similar: the proof search falls back on the weak simulation preorder.)
+
+(Auto: mutual cofix -- 48 pairs, 96 moves; a nested cofix would visit over 576 goals.)
+Chars 3374 - 3446 [MeBi~Sim~Begin~bigstep_norm~c2...] 0.21 secs (0.152u,0.056s)
+(Mutual cofix over 48 pairs.)
+(Stopped) Solved after 1038 iterations.
+Chars 3449 - 3469 [MeBi~Sim~Solve~1037.] 9.177 secs (8.973u,0.089s)
+Chars 3470 - 3474 [Qed.] 4.299 secs (4.203u,0.011s)
+
+- - - - - - - - - - - - - - - -
+Examples.CADP.MutualExclusionLarge.Size2.bigstep_norm.spec_lts
+Chars 3476 - 3554 [MeBi~Divider~"Examples.CADP.Mu...] 0. secs (0.u,0.s)
+Chars 3555 - 3627 [Example~wsim_norm_r_2~:~weak_s...] 0. secs (0.u,0.s)
+Chars 3628 - 3634 [Proof.] 0. secs (0.u,0.s)
+
+(Not bisimilar, but similar: the proof search falls back on the weak simulation preorder.)
+Chars 3635 - 3707 [MeBi~Sim~Begin~spec_lts~(make_...] 0.124 secs (0.121u,0.s)
+(Stopped) Solved after 75 iterations.
+Chars 3710 - 3729 [MeBi~Sim~Solve~152.] 0.19 secs (0.184u,0.001s)
+Chars 3730 - 3734 [Qed.] 0.221 secs (0.217u,0.s)
+
+- - - - - - - - - - - - - - - -
+Examples.CADP.MutualExclusionLarge.Size2.transfer
+Chars 3736 - 3801 [MeBi~Divider~"Examples.CADP.Mu...] 0. secs (0.u,0.s)
+Chars 3933 - 4001 [Example~wsim_bigstep_2~:~weak_...] 0. secs (0.u,0.s)
+Chars 4002 - 4008 [Proof.] 0. secs (0.u,0.s)
+Chars 4009 - 4080 [apply~wsim_transfer;~[~apply~c...] 0. secs (0.u,0.s)
+Chars 4081 - 4085 [Qed.] 0. secs (0.u,0.s)
+Chars 4087 - 4156 [Example~wsim_spec_lts_2~:~weak...] 0. secs (0.u,0.s)
+Chars 4157 - 4163 [Proof.] 0. secs (0.u,0.s)
+Chars 4166 - 4241 [apply~wsim_transfer_r;~[~apply...] 0. secs (0.u,0.s)
+Chars 4242 - 4246 [Qed.] 0. secs (0.u,0.s)
+Chars 4248 - 4318 [Example~msim_bigstep_2~:~mutua...] 0. secs (0.u,0.s)
+Chars 4319 - 4325 [Proof.] 0. secs (0.u,0.s)
+Chars 4326 - 4380 [split;~[~exact~wsim_bigstep_2~...] 0. secs (0.u,0.s)
+Chars 4381 - 4385 [Qed.] 0. secs (0.u,0.s)
+Chars 5441 - 5479 [MeBi~Config~Bounds~As~Num~Stat...] 0. secs (0.u,0.s)
+
+- - - - - - - - - - - - - - - -
+Examples.CADP.MutualExclusionLarge.Size3.spec_lts
+Chars 5481 - 5546 [MeBi~Divider~"Examples.CADP.Mu...] 0. secs (0.u,0.s)
+Chars 5547 - 5619 [Example~wsim_norm_r_3~:~weak_s...] 0. secs (0.u,0.s)
+Chars 5620 - 5626 [Proof.] 0. secs (0.u,0.s)
+
+(Not bisimilar, but similar: the proof search falls back on the weak simulation preorder.)
+Chars 5627 - 5699 [MeBi~Sim~Begin~spec_lts~(make_...] 3.621 secs (3.484u,0.066s)
+(Stopped) Solved after 124 iterations.
+Chars 5702 - 5721 [MeBi~Sim~Solve~325.] 0.392 secs (0.384u,0.s)
+Chars 5722 - 5726 [Qed.] 0.522 secs (0.509u,0.001s)
+
+- - - - - - - - - - - - - - - -
+Examples.CADP.MutualExclusionLarge.Size3.transfer
+Chars 5728 - 5793 [MeBi~Divider~"Examples.CADP.Mu...] 0. secs (0.u,0.s)
+Chars 5794 - 5863 [Example~wsim_spec_lts_3~:~weak...] 0. secs (0.u,0.s)
+Chars 5864 - 5870 [Proof.] 0. secs (0.u,0.s)
+Chars 5873 - 5948 [apply~wsim_transfer_r;~[~apply...] 0. secs (0.u,0.s)
+Chars 5949 - 5953 [Qed.] 0. secs (0.u,0.s)
+Chars 6538 - 6576 [MeBi~Config~Bounds~As~Num~Stat...] 0. secs (0.u,0.s)
+
+- - - - - - - - - - - - - - - -
+Examples.CADP.MutualExclusionLarge.Size2.bigstep
+Chars 6578 - 6642 [MeBi~Divider~"Examples.CADP.Mu...] 0. secs (0.u,0.s)
+Chars 6643 - 6718 [Example~wsim_bigstep_direct_2~...] 0. secs (0.u,0.s)
+Chars 6719 - 6725 [Proof.] 0. secs (0.u,0.s)
+
+(Not bisimilar, but similar: the proof search falls back on the weak simulation preorder.)
+
+(Auto: mutual cofix -- 772 pairs, 1544 moves; a nested cofix would visit over 9264 goals.)
+Chars 6726 - 6794 [MeBi~Sim~Begin~bigstep~c2~And~...] 1.333 secs (1.292u,0.014s)
+(Mutual cofix over 772 pairs.)
+(Stopped) Solved after 11128 iterations.
+Chars 6797 - 6818 [MeBi~Sim~Solve~11127.] 561.981 secs (557.349u,1.421s)
+Chars 6819 - 6823 [Qed.] 46.771 secs (46.507u,0.095s)
+
+- - - - - - - - - - - - - - - -
+Examples.CADP.MutualExclusionLarge.Size2.bigstep.spec_lts
+Chars 6825 - 6898 [MeBi~Divider~"Examples.CADP.Mu...] 0. secs (0.u,0.s)
+Chars 6899 - 6975 [Example~wsim_spec_lts_direct_2...] 0. secs (0.u,0.s)
+Chars 6976 - 6982 [Proof.] 0. secs (0.u,0.s)
+
+(Not bisimilar, but similar: the proof search falls back on the weak simulation preorder.)
+Chars 6983 - 7051 [MeBi~Sim~Begin~spec_lts~(make_...] 1.34 secs (1.329u,0.003s)
+(Stopped) Solved after 305 iterations.
+Chars 7054 - 7073 [MeBi~Sim~Solve~404.] 1.118 secs (1.112u,0.s)
+Chars 7074 - 7078 [Qed.] 1.2 secs (1.196u,0.s)
+
+- - - - - - - - - - - - - - - -
+Examples.CADP.MutualExclusionLarge.Size2.bigstep.mutual
+Chars 7080 - 7151 [MeBi~Divider~"Examples.CADP.Mu...] 0. secs (0.u,0.s)
+Chars 7218 - 7295 [Example~msim_bigstep_direct_2~...] 0. secs (0.u,0.s)
+Chars 7296 - 7302 [Proof.] 0. secs (0.u,0.s)
+Chars 7303 - 7371 [split;~[~exact~wsim_bigstep_di...] 0. secs (0.u,0.s)
+Chars 7372 - 7376 [Qed.] 0. secs (0.u,0.s)
+BENCH_MAXRSS_KB 4697676 BENCH_SECONDS 633.19
+BENCH_EXIT 0

@@ -1,0 +1,2 @@
+suite	mode	file	exit	seconds	peak_mb	errors
+cadp-huge	auto	ThreeProcessesFifo	0	2179.02	18292	0

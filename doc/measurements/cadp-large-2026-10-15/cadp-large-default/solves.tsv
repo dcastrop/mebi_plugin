@@ -1,0 +1,6 @@
+suite	mode	file	index	status	iterations	proof	begin_s	solve_s	qed_s
+cadp-large	auto	MutualExclusionLarge	1	Solved	1038	wsim_norm_2	0.212	8.992	4.148
+cadp-large	auto	MutualExclusionLarge	2	Solved	153	wsim_norm_r_2	0.12	0.502	0.77
+cadp-large	auto	MutualExclusionLarge	3	Solved	326	wsim_norm_r_3	3.476	1.172	2.113
+cadp-large	auto	MutualExclusionLarge	4	Solved	11128	wsim_bigstep_direct_2	1.243	557.1	45.98
+cadp-large	auto	MutualExclusionLarge	5	Solved	405	wsim_spec_lts_direct_2	1.398	1.687	2.015

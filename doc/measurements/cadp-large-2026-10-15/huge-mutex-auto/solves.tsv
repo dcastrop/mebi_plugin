@@ -1,0 +1,2 @@
+suite	mode	file	index	status	iterations	proof	begin_s	solve_s	qed_s
+cadp-huge	auto	ThreeProcessesMutex	1	Solved	20432	wsim_norm_3	3.623	1205.284	156.752
