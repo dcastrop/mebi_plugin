@@ -169,6 +169,7 @@ let text : string list -> string option = function
           MeBi Config Bounds As Num Transitions <n>.\n\
           MeBi Config Bounds Saturation <n>.\n\
           MeBi Config Bounds Game <n>.\n\
+          MeBi Config Bounds Memory <mb>.\n\
           MeBi Config Premise Depth <n>.\n\
           MeBi Config Premise Range <n>.\n\
           MeBi Config Reset Bounds.\n\n\
@@ -179,7 +180,14 @@ let text : string list -> string option = function
           Logging the result (Output \"Result\" / \"DecodeResults\" / \
           \"DumpResults\") costs far more, ~0.65MB per state. For the \
           saturation bound see MeBi Help Config Bounds Saturation; for the \
-          premise search depth and range, MeBi Help Premises."
+          premise search depth and range, MeBi Help Premises.\n\n\
+          Bounds Memory stops a command, with an error, once the whole Rocq \
+          process uses more than <mb> megabytes (its resident memory on Linux; \
+          unset by default). It is checked during extraction, saturation, the \
+          up-front game walks and estimates, and between Solve steps, so one \
+          step can overshoot it, and Qed is not checked at all: keep an \
+          OS-level cap (systemd-run -p MemoryMax=...) as a backstop. Reset \
+          Bounds removes it."
          (match Api.default_bounds with
           | Api.States n -> Printf.sprintf "%i states" n
           | Api.Transitions n -> Printf.sprintf "%i transitions" n)

@@ -229,6 +229,7 @@ let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
       match Int.compare n bound with
       | 1 -> n, p, true
       | _ ->
+        Memory_guard.check "Solve";
         (* The recursive call must be a genuine tail call, and nothing may
            capture [p] across it. Previously this read
 

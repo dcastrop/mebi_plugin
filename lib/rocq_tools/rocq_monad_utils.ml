@@ -730,6 +730,15 @@ module Make (Enc : Encoding.S) :
       CErrors.register_handler (fun e ->
         match e with MEBI_exn e -> Some (Pp.str (mebi_handler e)) | _ -> None)
     ;;
+
+    (* [Memory_guard] has no Rocq dependency, so its exception is given its
+       message here. *)
+    let _ =
+      CErrors.register_handler (function
+        | Memory_guard.Exceeded { phase; used; limit } ->
+          Some (Pp.str (Memory_guard.message phase used limit))
+        | _ -> None)
+    ;;
   end
 
   module type SErr = sig

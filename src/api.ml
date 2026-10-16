@@ -199,6 +199,7 @@ let reset_bounds_args () : unit =
   the_bounds_args := default_bounds;
   the_saturation_bound := default_saturation_bound;
   the_game_bound := None;
+  Memory_guard.set_limit None;
   the_saturation_mode := Saturation_auto;
   Premise_search.max_depth := Premise_search.default_depth;
   Premise_search.max_range := Premise_search.default_range
@@ -242,6 +243,12 @@ let set_saturation_bound (x : int) : unit =
   the_saturation_bound := x;
   Printf.sprintf "(MeBi Config: Set Saturation Bound to: %i weak actions.)" x
   |> Logger.show
+;;
+
+(* See the [.mli]. *)
+let set_memory_bound (mb : int) : unit =
+  Memory_guard.set_limit (Some (mb * 1_000_000));
+  Printf.sprintf "(MeBi Config: Set Memory Bound to: %iMB.)" mb |> Logger.show
 ;;
 
 (** Peak memory per extracted state, on top of a fixed ~0.1--0.3GB: measured

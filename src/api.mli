@@ -165,7 +165,7 @@ val set_game_bound : int -> unit
 val set_saturation_mode : saturation_mode -> unit
 
 (** [reset_bounds_args ()] restores the default exploration and saturation
-    bounds, the game bound, the saturation mode, and the premise search's
+    bounds, the game bound, the memory bound (none), the saturation mode, and the premise search's
     depth and range ([MeBi Reset Bounds]). Raises nothing. *)
 val reset_bounds_args : unit -> unit
 
@@ -184,6 +184,11 @@ val the_saturation_bound : int ref
 (** [set_saturation_bound n] sets {!the_saturation_bound} to [n], and shows
     the change. Raises nothing. *)
 val set_saturation_bound : int -> unit
+
+(** [set_memory_bound mb] caps the process's memory at [mb] megabytes
+    ([MeBi Config Bounds Memory <mb>]; {!Memory_guard}), and shows the
+    change. Unset by default; removed by [Reset Bounds]. Raises nothing. *)
+val set_memory_bound : int -> unit
 
 (** [set_premise_depth n] sets the premise search's depth
     ({!Premise_search.max_depth}), and shows the change. Raises nothing. *)

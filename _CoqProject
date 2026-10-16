@@ -122,6 +122,8 @@ lib/utils/logger.ml
 lib/utils/logger.mli
 lib/utils/json.ml
 lib/utils/json.mli
+lib/utils/memory_guard.ml
+lib/utils/memory_guard.mli
 
 lib/terms/base_.mli
 lib/terms/tree.ml

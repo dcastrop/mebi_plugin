@@ -446,13 +446,16 @@ module Make
       or [None] if it has none. The one place a state is saturated: {!edges}
       and {!on_demand} both use it, so they agree by construction.
 
-      Raises nothing directly; propagates whatever [closure_of] raises. *)
+      @raise Memory_guard.Exceeded
+        over the memory bound (raised here); and whatever [closure_of]
+        raises (propagated). *)
   let state_actions
         (closure_of : State.t -> (State.t * Note.t list * int) list)
         (old_edges : EdgeMap.t')
         (from : State.t)
     : ActionMap.t' option
     =
+    Memory_guard.check "saturation";
     let new_actions : ActionMap.t' = ActionMap.create 0 in
     edge_bfs closure_of new_actions from old_edges;
     if ActionMap.length new_actions > 0 then Some new_actions else None
