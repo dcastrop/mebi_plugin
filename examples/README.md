@@ -108,7 +108,7 @@ extract beyond one process.
 | size | processes | layered | glued | normalised | glued ≈ layered |
 |---|---|---|---|---|---|
 | `Size1` | 1 | small | small | 5 states | proved (`GluedLayered.v`) |
-| `Size2` | 2 | 12027 states (~32s) | 772 states | 48 states | decided, bisimilar (`ExploreLarge.v`, ~35s); not proved: out of memory at 10GB (nested cofix), unfinished after 2.5h (mutual) (`GluedLayered.v`); still out of memory at 24GiB on a 31GB host, nested after 2h05m and mutual (with `Bounds Game`) after 16h (`TwoProcessesGluedLayered.v`) |
+| `Size2` | 2 | 12027 states (~32s) | 772 states | 48 states | decided, bisimilar (`ExploreLarge.v`, ~35s); not proved: out of memory at 10GB (nested cofix), unfinished after 2.5h (mutual) (`GluedLayered.v`); still out of memory at 24GiB on a 31GB host, nested after 2h05m and mutual (with `Bounds Game`, `Answers Auto`) after 16h; with `Answers Default` unfinished after 24h at 5.0GiB (`TwoProcessesGluedLayered.v`) |
 | `Size3` | 3 | not tried | 128044 states (~19 min, ~4.7GB) | 644 states (~3s) | not tried |
 
 Glued ≈ normalised needs no plugin run: it is `Norm.link`, for every

@@ -89,9 +89,10 @@ Detail: `ASSISTED-CHANGES.md`, 2026-09-29.
 ## 3. Do you want proofs split into separately checked lemmas?
 
 **Question.** Some systems are decided but cannot be proved. CADP's
-two-process glued ≈ layered is decided in 45s, but every proof ran out of
+two-process glued ≈ layered is decided in 45s, but no proof finished. They ran out of
 memory, at 10GB on a 14GB host and again at 24GiB on a 31GB one (nested
-after 2h05m; mutual, with `Bounds Game`, after 16h; `doc/measurements/
+after 2h05m; mutual, with `Bounds Game`, after 16h under `Auto`, and unfinished
+after 24h at 5.0GiB under `Default`; `doc/measurements/
 cadp-large.md`). The three-process proofs that also ran out of memory at
 9GB now finish on the larger host (13.4 and 17.8GiB), so they no longer
 argue for this; glued ≈ layered at two processes is the case that does.

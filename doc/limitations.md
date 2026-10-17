@@ -85,8 +85,11 @@ turns the pin into a positive test.
   *optimization* question. On the 31GB host, under `Answers Auto`, the
   estimate took 4,489s (not ~1 min) and found a game of 78,202 pairs and
   312,808 moves, and the mutual proof still ran out of memory at 24GiB after
-  16h in all; why the figures differ from the earlier ones is unexplained
-  (`measurements/cadp-large.md`).
+  16h in all. Under `Answers Default` the earlier figures come back (`Begin`
+  82s, 514,020 pairs, memory ~2.2GiB for 16h, 5.0GiB at 24h) and the proof
+  was still unfinished when stopped at 24h. So the answer policy changes this
+  proof's game and cost a great deal, and `Auto`'s plan was the costlier to
+  run in memory; why is unknown (`measurements/cadp-large.md`).
 - **Heavy proofs need a memory cap**, one per process. The ABP and
   `Test4` proofs peak at ~3.8-4.3GB; two such proofs in one file were
   OOM-killed at 6GB. `MeBi Config Bounds Memory <mb>` (2026-10-16; on by

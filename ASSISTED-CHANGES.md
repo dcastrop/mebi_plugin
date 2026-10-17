@@ -8823,6 +8823,47 @@ Refactor 0 · Bug fix 0 · **New feature 0.**
 
 ---
 
+## 2026-10-17 — the glued run under `Answers Default`
+
+Same branch, `docs/cadp-large-rerun`. One more run, and the docs updated
+from it. No plugin or solver code changed.
+
+**Run:** glued ~ layered, mutual cofix with `Bounds Game 100000000`, under
+`Answers Default`, 24G cap, 24h timeout. It was stopped by the timeout at
+13:51:33, with no `Solved` line, no OOM kill (the journal's line for its scope
+has none) and memory at 5.0GiB. `Begin` took 81.9s on the 14GB host's game
+(514,020 pairs, 2,056,080 moves), and memory was flat at ~2.2GiB for 16h
+before one step of 1.7GiB. Raw files are in
+`doc/measurements/cadp-large-2026-10-15/huge-glued-boundsgame-default/`.
+
+**Finding.** The `Auto` run's different game (78,202 pairs), `Begin` time
+(4,489s) and memory are the answer policy's doing: only `-a` differs between
+the two runs. `Auto` plans 6.6 times fewer pairs and moves, and the run that
+follows uses far more memory. Why is not known. Neither run finished, so
+nothing is claimed about which would. This replaces the "unexplained" in the
+2026-10-16 entry and `ab97e1b`.
+
+**Docs:** `cadp-large.md` (the run, a memory table, the explanation, the
+changes since `ab97e1b`), the two glued proof files' headers, `_CoqProject`,
+`examples/README.md`, `decide-vs-prove.md`, `limitations.md`, decision 4,
+`future-work.md` and `OUTSTANDING.md`.
+
+**Not run:** the `Default` run for longer than 24h (stopped there at the
+user's choice; time, not memory, is its limit) and `Auto` above 24GiB.
+
+**Noted, not understood:** a host-level kernel OOM kill at 09:45:31 hit some
+other process (not the run) while a `nix build` and an odoc build were
+running. I did not identify it. `rocqworker` has `oom_score_adj=200`, so a
+run like this is a likelier victim than desktop processes under host
+pressure.
+
+Revert: `git revert -m 1 <merge commit>` (docs and comments only).
+
+**Session tally (2026-10-17):** Docs 1 · Tooling 0 · Optimization 0 ·
+Refactor 0 · Bug fix 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

@@ -43,7 +43,7 @@ relative to the verdict, and where it stops.
 | glued ≈ `spec_lts` | 10 | 0.04s, 0.33GB | 185 steps, 1.7s | ~45× |
 | normalised (observing) ≈ `spec_fifo` | 5 | 0.03s, 0.32GB | 119 steps, 1.1s | ~40× |
 | **CADP, two processes** | | | | |
-| glued ≈ layered | 12,027 | 45s, 1.48GB | **not proved**: OOM at 10GB (nested, 25-52 min); mutual unfinished after 2.5h †. On a 31GB host, still OOM at 24GiB: nested after 2h05m, mutual (`Bounds Game`) after 16h † | — |
+| glued ≈ layered | 12,027 | 45s, 1.48GB | **not proved**: OOM at 10GB (nested, 25-52 min); mutual unfinished after 2.5h †. On a 31GB host, still OOM at 24GiB: nested after 2h05m, mutual (`Bounds Game`, `Auto`) after 16h; mutual under `Default` unfinished after 24h at 5.0GiB † | — |
 | normalised (observing) ≈ `spec_fifo` | 48 | 0.24s, 0.40GB | 2,228 steps, 24.5s | ~100× |
 | glued vs `spec_lts` | 772 | not bisimilar, 2.1s, 0.47GB | ≤ both ways: 11,128 steps, 9.9 min, ≤4.4GB; and 405 steps, 4.9s | ~280× |
 | normalised vs `spec_lts` | 48 | not bisimilar, 0.25s, 0.40GB | ≤ both ways: 1,038 steps, 14.5s; and 153 steps, 1.6s | ~65× |
@@ -89,7 +89,7 @@ spec are smaller.
    - Two-process glued ≈ layered is decided in 45s and 1.5GB, but no
      proof finished: not within 10GB or 2.5 hours, and not within 24GiB
      either (nested, out of memory after 2h05m; mutual with `Bounds Game`,
-     after 16h).
+     under `Auto` after 16h; under `Default`, unfinished after 24h at 5.0GiB).
    - Three-process FIFO order is decided in 4.8s. Its proof ran out of
      memory at 9GB on a 14GB host, and finishes on a 31GB one (37.6 min,
      17.8GiB peak): the same proof, with more room, not a better

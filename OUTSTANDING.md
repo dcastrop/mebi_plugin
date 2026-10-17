@@ -43,9 +43,10 @@ Decision 2 would change every checked-in proof bound if it went against
 ## CADP, the running example
 
 - **Two processes, glued ≈ layered:** decided, not proved (*limit*): out
-  of memory at 24GiB on a 31GB host, nested and mutual alike. The
+  of memory at 24GiB on a 31GB host (nested, and mutual under `Auto`), and
+  unfinished after 24h under `Default` at 5GiB. The
   measurements are in `doc/measurements/cadp-large.md`; a way round is
-  decision 3. Two runs are not done (`doc/future-work.md`, "Re-running
+  decision 3. A longer `Default` run is not done (`doc/future-work.md`, "Re-running
   the large CADP proofs").
 - **Three processes:** FIFO order, and mutual exclusion (system ≤ spec),
   are proved over the normalised semantics, but only on a 31GB host (13.4

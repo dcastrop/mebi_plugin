@@ -100,7 +100,7 @@ CADP sidesteps it with `bigstep_norm` (644 states). Any user model with
 attempt ran out of memory *during `Solve`*, before `Qed` was reached.
 Both `weak_sim`s and the `weak_bisimilar`, on the nested path, were
 OOM-killed at 7GB and at 10GB, and memory grew steadily to the cap. The
-mutual path's game has 514,020 pairs and 2,056,080 moves.
+mutual path's game has 514,020 pairs and 2,056,080 moves (under `Answers Default`; `Auto` plans 78,202 pairs and 312,808 moves). On a 31GB host both nested and mutual-under-`Auto` ran out of memory at 24GiB, and mutual-under-`Default` was unfinished after 24h at 5.0GiB (`doc/measurements/cadp-large.md`).
 
 **Why one proof cannot simply be cut up.** Today a proof is one `cofix`.
 A pair that reaches a pair already under proof closes the cycle with the
@@ -165,27 +165,35 @@ patch is kept locally (`notes/tools/extraction-profile.diff`).
 
 ## Re-running the large CADP proofs
 
-**Done 2026-10-15/16, on a 31GB host; the results are in
+**Done 2026-10-15/17, on a 31GB host; the results are in
 `doc/measurements/cadp-large.md`.** The two three-process proofs
 (`ThreeProcessesMutex.v`, `ThreeProcessesFifo.v`) finish there, at 13.4 and
 17.8GiB peak, and take the same steps under `Answers Auto` and `Default`: the
 machine, not the policy, is what changed. Glued ≈ layered
-(`TwoProcessesGluedLayered.v`) still ran out of memory at 24GiB, nested after
-2h05m and mutual (with `Bounds Game`) after 16h. The proof headers, `OUTSTANDING.md`,
-`examples/README.md`, `decide-vs-prove.md`, `limitations.md` and decision 3
-were updated from them. The commands are in `bench/README.md` (`-s cadp-large`,
-`-s cadp-huge`, with `-M` and `-a`).
+(`TwoProcessesGluedLayered.v`) does not finish: out of memory at 24GiB,
+nested after 2h05m and mutual (with `Bounds Game`) under `Auto` after 16h;
+and unfinished after 24h mutual under `Default`, at only 5.0GiB. Under
+`Default` the mutual game is the 14GB host's (514,020 pairs, 2,056,080
+moves, `Begin` 82s, memory flat at ~2.2GiB), under `Auto` it is 78,202 pairs
+and 312,808 moves with a `Begin` of 4,489s and much more memory: so the
+answer policy, not the host, accounts for that difference. The proof
+headers, `OUTSTANDING.md`, `examples/README.md`, `decide-vs-prove.md`,
+`limitations.md` and decision 3 were updated from these. The commands are
+in `bench/README.md` (`-s cadp-large`, `-s cadp-huge`, with `-M` and `-a`).
 
 **What remains.**
-- **Glued ≈ layered under `Answers Default` with `Bounds Game`**, on this
-  host. The 14GB host's run (2026-10-12) had a game of 514,020 pairs and 2,056,080 moves,
-  a `Begin` of ~90s and memory flat at ~2.2GB. The re-run under `Auto` had 78,202 pairs
-  and 312,808 moves, a `Begin` of 4,489s and memory up to the 24GiB cap. They
-  differ in policy and host, so nothing can be said until this one run is
-  made; it would say whether `Answers Auto` is the cause.
-- **Glued ≈ layered above 24GiB**, if a host has room: the proof sat at
-  16.7GiB for ~4.6h and then climbed, so it needs more than 24GiB, by an
-  unknown amount.
+- **Glued ≈ layered under `Answers Default` for longer than 24h.** It was
+  stopped at 24h with no `Solved` line and at 5.0GiB, far below the cap, so
+  time is its limit and how long is unknown. The solver prints nothing before
+  it ends, so a run cannot say how far it got.
+- **Why `Auto` plans a game with 6.6 times fewer pairs that takes 55 times as
+  long to set up and uses far more memory.** The plan is chosen by
+  prediction (`Model.Product.estimate` and the answer planner); this proof
+  is a case where the cheapest predicted plan is not the cheapest run. An
+  open *optimization* question.
+- **Glued ≈ layered under `Auto` above 24GiB**, if a host has room: the
+  proof sat at 16.7GiB for ~4.6h and then climbed, so it needs more than
+  24GiB, by an unknown amount. Less promising than the first item.
 - **`bench/lib.sh` needs GNU `time` at `/usr/bin/time`**, and fails
   at once without it ("Failed to find executable /usr/bin/time", exit 1, 0
   errors, easily mistaken for a result). NixOS has none. The re-run
