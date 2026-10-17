@@ -8848,6 +8848,13 @@ changes since `ab97e1b`), the two glued proof files' headers, `_CoqProject`,
 `examples/README.md`, `decide-vs-prove.md`, `limitations.md`, decision 4,
 `future-work.md` and `OUTSTANDING.md`.
 
+**Also:** `bench/README.md` has a "Requirements" note on GNU `time` at
+`/usr/bin/time` and how to work around its absence (NixOS, minimal images). The
+code is unchanged on purpose: the user chose a note over a `PATH` fallback that
+has not been tried on hosts where the path already works. The header comments of
+the five edited `.v` files compile (truncated before their long proofs; the
+mutual exclusion Large file up to its direct two-process proof).
+
 **Not run:** the `Default` run for longer than 24h (stopped there at the
 user's choice; time, not memory, is its limit) and `Auto` above 24GiB.
 
@@ -8859,7 +8866,7 @@ pressure.
 
 Revert: `git revert -m 1 <merge commit>` (docs and comments only).
 
-**Session tally (2026-10-17):** Docs 1 · Tooling 0 · Optimization 0 ·
+**Session tally (2026-10-17):** Docs 2 · Tooling 0 · Optimization 0 ·
 Refactor 0 · Bug fix 0 · **New feature 0.**
 
 ---

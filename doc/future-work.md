@@ -198,7 +198,10 @@ in `bench/README.md` (`-s cadp-large`, `-s cadp-huge`, with `-M` and `-a`).
   at once without it ("Failed to find executable /usr/bin/time", exit 1, 0
   errors, easily mistaken for a result). NixOS has none. The re-run
   used `nix-shell -p time --run '...'` with the line changed to
-  `"$(type -P time)"`, as a local edit; that edit is not committed.
+  `"$(type -P time)"`, as a local edit that is not committed. It is documented
+  in `bench/README.md` ("Requirements") rather than fixed in code: hosts with
+  `/usr/bin/time` work as they are, and a `PATH` fallback has not been tried
+  on them.
 
 ## Smaller possible work
 

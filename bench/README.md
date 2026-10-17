@@ -20,6 +20,25 @@ reserve its heaps.)
 | `lib.sh` | shared helpers, sourced by the others |
 | `ocaml/` | pure-OCaml benchmarks of the model's algorithms, on FSMs extracted from the examples and on generated families: see [`ocaml/README.md`](ocaml/README.md) |
 
+## Requirements
+
+`proofs.sh` needs `systemd-run` and **GNU `time` at `/usr/bin/time`**
+(`lib.sh`, `bench_capped`, calls it with `-f` to get each run's peak memory
+and seconds). Where `/usr/bin/time` is missing, such as NixOS or a minimal
+Debian or Ubuntu image, every run fails at once with `Failed to find
+executable /usr/bin/time` in its log, `exit 1` and 0 errors in `runs.tsv`.
+That looks like a result and is not one.
+
+To fix it on a host where it matters:
+- Debian or Ubuntu: `apt install time`.
+- Nix: run under `nix-shell -p time --run 'bench/proofs.sh ...'` and, in a
+  local copy of `lib.sh`, change `/usr/bin/time` to `"$(type -P time)"`
+  (`type -P` finds the program, not bash's `time` keyword). This is not
+  committed: hosts that have `/usr/bin/time` need no change, and a lookup
+  that falls back to `PATH` has not been tried on them.
+- Any other host: install GNU `time` (not BSD or busybox: they lack `-f`)
+  and edit the same line.
+
 ## Running the proof suites
 
 ```sh
