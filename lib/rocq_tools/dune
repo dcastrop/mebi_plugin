@@ -14,6 +14,7 @@
   bi_encoding
   rocq_monad
   rocq_monad_strfy
+  premise_search
   rocq_monad_utils
   theories
   theories_enc

@@ -6,6 +6,7 @@ description:
   "MeBi (Mechanised Bisimilarities) builds labelled transition systems and finite state machines from Rocq inductive relations, checks (weak) bisimilarity between them, and drives interactive tactic-based proof search for bisimilarity goals, following the methods in Sangiorgi and Rutten's \"Advanced Topics in Bisimulation and Coinduction\", Section 3.2.2."
 maintainer: ["David Castro-Perez"]
 authors: ["David Castro-Perez" "Jonah Pears"]
+license: "GPL-3.0-or-later AND LGPL-2.1-or-later"
 tags: [
   "bisimulation" "coinduction" "process algebra" "proof automation" "rocq"
 ]
@@ -18,10 +19,11 @@ depends: [
   "rocq-stdlib" {>= "9.1"}
   "yojson" {>= "3.0"}
   "benchmark" {>= "1.6"}
+  "odoc" {with-doc | with-dev-setup}
+  "odig" {with-dev-setup}
   "ocaml-lsp-server" {with-dev-setup}
   "ocamlformat" {with-dev-setup & = "0.29.0"}
   "vsrocq-language-server" {with-dev-setup}
-  "odoc" {with-doc}
 ]
 build: [
   ["dune" "subst"] {dev}

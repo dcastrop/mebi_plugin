@@ -43,12 +43,17 @@ struct
 
   open Model
 
+  (** [state x] is the model state of the encoding [x]. Raises nothing. *)
   let state (x : Enc.t) : State.t = { base = x }
 
+  (** [states xs] is the model states of the encodings [xs]. Raises
+      nothing. *)
   let states (xs : G.States.t) : State.Set.t =
     xs |> G.States.to_list |> List.map state |> State.Set.of_list
   ;;
 
+  (** [terminals xs ts] is the states of [xs] with no step in [ts]. Raises
+      nothing. *)
   let terminals (xs : G.States.t) (ys : G.Transitions.t') : State.Set.t =
     xs
     |> G.States.filter (fun (x : Enc.t) -> Bool.not (G.Transitions.mem ys x))
@@ -57,9 +62,15 @@ struct
     |> State.Set.of_list
   ;;
 
+  (** [label a] is the action [a]'s label. Raises nothing. *)
   let label (x : Action.t) : Label.t = x.label
 
+  (** [transitions ts] is the graph's steps [ts] as model transitions, one
+      per action and destination, each with its derivation tree. Raises
+      nothing. *)
   let transitions (xs : G.Transitions.t') : Model.Transition.Set.t =
+    (* [goto from label (goto, tree)] adds the transition
+       [from -label-> goto], derived by [tree]. *)
     let goto (from : State.t) (label : Label.t) (goto, tree)
       : Transition.Set.t -> Transition.Set.t
       =
@@ -67,11 +78,14 @@ struct
       Transition.Set.add
         { from; goto; label; tree = Some tree; annotation = None }
     in
+    (* [action from a ds] adds a transition from [from] by [a] to each of
+       [ds]. *)
     let action (from : State.t) (action : Action.t)
       : G.Destinations.t -> Transition.Set.t -> Transition.Set.t
       =
       G.Destinations.fold (goto from (label action))
     in
+    (* [from s as] adds the transitions of each of [s]'s actions [as]. *)
     let from (from : Enc.t)
       : G.Actions.t' -> Transition.Set.t -> Transition.Set.t
       =
@@ -80,22 +94,36 @@ struct
     G.Transitions.fold from xs Transition.Set.empty
   ;;
 
+  (** [add_rocq_lts (enc, l) ls] is [ls] with, if [l] is an LTS (not its
+      label or state type), its encoding [enc] and its constructors' binder
+      locations ({!Constructor_bindings.S.extract_info}) in front. Raises as
+      that, when run (propagated). *)
+  let add_rocq_lts
+        ((enc, v) : Enc.t * M.Ind.t)
+        (acc : Model.Info.Meta.RocqLTS.t list)
+    : Model.Info.Meta.RocqLTS.t list M.mm
+    =
+    let open M.Syntax in
+    match v.kind with
+    | LTS _ ->
+      let* constructors = ConstructorBindings.extract_info v in
+      M.return ({ Model.Info.Meta.RocqLTS.base = enc; constructors } :: acc)
+    | _ -> M.return acc
+  ;;
+
+  (** [constructor_info g] is, for each LTS [g] may use, its encoding and
+      its constructors' binder locations
+      ({!Constructor_bindings.S.extract_info}). Raises as that, when run
+      (propagated). *)
   let constructor_info (g : G.t) : Model.Info.Meta.RocqLTS.t list M.mm =
     Logger.trace __FUNCTION__;
     let xs = M.B.to_seq g.ltsmap |> List.of_seq in
-    let open M.Syntax in
-    let f (i : int) (acc : Model.Info.Meta.RocqLTS.t list) =
-      let (enc, v) : Enc.t * M.Ind.t = List.nth xs i in
-      match v.kind with
-      | LTS x ->
-        let* constructors = ConstructorBindings.extract_info v in
-        let open Model.Info.Meta.RocqLTS in
-        { base = enc; constructors } :: acc |> M.return
-      | _ -> M.return acc
-    in
-    M.iterate 0 (List.length xs - 1) [] f
+    M.iterate 0 (List.length xs - 1) [] (fun i -> add_rocq_lts (List.nth xs i))
   ;;
 
+  (** [meta g] is [g]'s metadata: whether exploration finished (nothing left
+      to visit), its bounds, and {!constructor_info}. Raises as
+      {!constructor_info}, when run. *)
   let meta (g : G.t) : Info.Meta.t M.mm =
     Logger.trace __FUNCTION__;
     let open M.Syntax in
@@ -113,27 +141,46 @@ struct
     M.return x
   ;;
 
+  (** [is_silent_under w l] is whether the label encoded by [l] is silent
+      under the silent label [w]: for [Option], whether it is [None]; for
+      [Custom (tau, _)], whether it is [tau].
+
+      @raise Bi_encoding.S.CannotDecode
+        for [Option], if [l] encodes no term (propagated). *)
+  let is_silent_under : Weak.t -> Enc.t -> bool M.mm = function
+    | Weak.Option _ -> fun (y : Enc.t) -> M.decode y |> Theory.is_None
+    | Weak.Custom (tau_enc, _) ->
+      fun (y : Enc.t) -> Enc.equal tau_enc y |> M.return
+  ;;
+
+  (** [add_if_silent w x ls] is [ls] with the label [x] added if it is
+      silent under [w] ({!is_silent_under}). Raises as that. *)
+  let add_if_silent (w : Weak.t) (x : Label.t) (acc : Label.Set.t)
+    : Label.Set.t M.mm
+    =
+    let open M.Syntax in
+    let* is_weak : bool = is_silent_under w x.base in
+    M.return (if is_weak then Label.Set.add x acc else acc)
+  ;;
+
+  (** [weak_labels g ls] is the labels of [ls] that are silent under [g]'s
+      silent label (none without one).
+
+      @raise Bi_encoding.S.CannotDecode as {!is_silent_under}. *)
   let weak_labels (g : G.t) (xs : Label.Set.t) : Label.Set.t M.mm =
     Logger.trace __FUNCTION__;
     match g.weak with
     | None -> Label.Set.empty |> M.return
     | Some weak ->
-      let f : Enc.t -> bool M.mm =
-        match weak with
-        | Weak.Option x -> fun (y : Enc.t) -> M.decode y |> Theory.is_None
-        | Weak.Custom (tau_enc, _) ->
-          fun (y : Enc.t) -> Enc.equal tau_enc y |> M.return
-      in
-      let open M.Syntax in
       let xs : Label.t list = Label.Set.to_list xs in
-      let g (i : int) (acc : Label.Set.t) =
-        let x : Label.t = List.nth xs i in
-        let* is_weak : bool = f x.base in
-        if is_weak then Label.Set.add x acc |> M.return else M.return acc
-      in
-      M.iterate 0 (List.length xs - 1) Label.Set.empty g
+      M.iterate
+        0
+        (List.length xs - 1)
+        Label.Set.empty
+        (fun i -> add_if_silent weak (List.nth xs i))
   ;;
 
+  (* See the [.mli]. *)
   let extract (g : G.t) : LTS.t M.mm =
     Logger.trace __FUNCTION__;
     let states : State.Set.t = states g.states in

@@ -1,0 +1,13 @@
+Oct 15 14:57:34 nixos systemd[3145]: run-p470505-i477043.scope: Consumed 10min 29.478s CPU time over 10min 33.202s wall clock time, 4.4G memory peak.
+Oct 15 15:08:41 nixos systemd[3145]: run-p477336-i473800.scope: Consumed 10min 26.361s CPU time over 10min 31.625s wall clock time, 4.2G memory peak.
+Oct 15 15:32:04 nixos systemd[3145]: run-p484145-i496755.scope: Consumed 22min 29.110s CPU time over 22min 46.973s wall clock time, 13.3G memory peak.
+Oct 15 16:10:18 nixos systemd[3145]: run-p498502-i520858.scope: Consumed 37min 579ms CPU time over 37min 37.427s wall clock time, 17.8G memory peak.
+Oct 15 18:16:31 nixos systemd[3145]: run-p521675-i499058.scope: The kernel OOM killer killed some processes in this unit.
+Oct 15 18:16:33 nixos systemd[3145]: run-p521675-i499058.scope: Failed with result 'oom-kill'.
+Oct 15 18:16:33 nixos systemd[3145]: run-p521675-i499058.scope: Consumed 2h 2min 29.786s CPU time over 2h 5min 39.501s wall clock time, 24G memory peak.
+Oct 16 11:20:06 nixos systemd[3145]: run-p673267-i681124.scope: The kernel OOM killer killed some processes in this unit.
+Oct 16 11:20:08 nixos systemd[3145]: run-p673267-i681124.scope: Failed with result 'oom-kill'.
+Oct 16 11:20:08 nixos systemd[3145]: run-p673267-i681124.scope: Consumed 15h 55min 31.407s CPU time over 16h 29.065s wall clock time, 24G memory peak.
+Oct 16 11:44:42 nixos systemd[3145]: run-p1409615-i1430396.scope: Consumed 23min 36.456s CPU time over 23min 42.085s wall clock time, 13.3G memory peak.
+Oct 16 12:21:37 nixos systemd[3145]: run-p1427074-i1450030.scope: Consumed 36min 10.353s CPU time over 36min 19.021s wall clock time, 17.9G memory peak.
+Oct 17 13:51:34 nixos systemd[3145]: run-p1519733-i1536501.scope: Consumed 23h 51min 21ms CPU time over 23h 59min 24.636s wall clock time, 5G memory peak.

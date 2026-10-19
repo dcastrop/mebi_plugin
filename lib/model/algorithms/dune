@@ -23,6 +23,8 @@
  (modules
   minimization
   bisimilarity
+  product
+  saturation_estimate
   ; similarity
   )
  (wrapped false))

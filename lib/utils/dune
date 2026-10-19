@@ -8,7 +8,7 @@
  ; unix: for FileWriter.get_local_timestamp. Previously arrived transitively
  ; via rocq-runtime, so it has to be explicit now.
  (libraries unix yojson)
- (modules utils output logger json)
+ (modules utils output logger json memory_guard)
  (wrapped false))
 
 (include_subdirs no)

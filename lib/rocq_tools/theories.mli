@@ -1,20 +1,68 @@
+(** Recognising the plugin's theory terms ([weak_sim], [tau], [Some], ...;
+    {!Mebi_theories}) in goals and hypotheses. Each [is_*] check is a
+    monadic value, run in the current environment. *)
 module type S = sig
   type 'a im
 
+  (** [is_theory x y] is whether the head of [x], read as an atomic type,
+      is the theory term [y]; [false] if [x] is not an atomic type (a
+      product such as a negation, a sort, or not a type at all). Raises
+      nothing. *)
   val is_theory : Evd.econstr -> Evd.econstr -> bool im
+
+  (** [is_any_theory x] is whether [x] equals any of the terms
+      {!Mebi_theories} loads. Raises nothing. *)
   val is_any_theory : Evd.econstr -> bool
+
+  (** [is_exists x] is whether [x]'s head is [ex] ([exists]). Each of the
+      [is_*] checks below is {!is_theory} against one theory term, and
+      like it raises nothing. *)
   val is_exists : Evd.econstr -> bool im
+
+  (** [is_weak_sim x] is whether [x]'s head is [weak_sim]. *)
   val is_weak_sim : Evd.econstr -> bool im
+
+  (** [is_weak_bisimilar x] is whether [x]'s head is [weak_bisimilar]. *)
+  val is_weak_bisimilar : Evd.econstr -> bool im
+
+  (** [is_weak x] is whether [x]'s head is [weak] (a weak transition). *)
   val is_weak : Evd.econstr -> bool im
+
+  (** [is_tau x] is whether [x]'s head is [tau]. *)
   val is_tau : Evd.econstr -> bool im
+
+  (** [is_silent x] is whether [x]'s head is [silent]. *)
   val is_silent : Evd.econstr -> bool im
+
+  (** [is_silent1 x] is whether [x]'s head is [silent1]. *)
   val is_silent1 : Evd.econstr -> bool im
+
+  (** [is_LTS x] is whether [x]'s head is [LTS]. *)
   val is_LTS : Evd.econstr -> bool im
+
+  (** [is_None x] is whether [x]'s head is [None]. *)
   val is_None : Evd.econstr -> bool im
+
+  (** [is_Some x] is whether [x]'s head is [Some]. *)
   val is_Some : Evd.econstr -> bool im
+
+  (** [is_list x] is whether [x]'s head is [list]. *)
   val is_list : Evd.econstr -> bool im
+
+  (** [is_cons x] is whether [x]'s head is [cons]. *)
   val is_cons : Evd.econstr -> bool im
+
+  (** [is_nil x] is whether [x]'s head is [nil]. *)
   val is_nil : Evd.econstr -> bool im
+
+  (** Raised by {!ensure}: the check failed. *)
+  exception EnsureFail
+
+  (** [ensure x f] checks that [f x] holds.
+
+      @raise EnsureFail
+        when run, if [f x] is [false] (raised here); and
+        whatever [f x] raises (propagated). *)
   val ensure : Evd.econstr -> (Evd.econstr -> bool im) -> unit im
 end
 

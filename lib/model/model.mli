@@ -23,9 +23,9 @@ module type S = sig
 
   (** {1 Model Components}
 
-      [State] (with nested [Set]), [Label] (with [Set]), [Note], [Annotation]
-      (with [Set]), [Transition] (with [Set]), [Action] (with [Set], [Map]
-      and [Pair]), [Edge] (with [Set]), [EdgeMap], [Partition] and [Info] --
+      {!State} (with nested [Set]), {!Label} (with [Set]), {!Note}, {!Annotation}
+      (with [Set]), {!Transition} (with [Set]), {!Action} (with [Set], [Map]
+      and [Pair]), {!EdgeMap}, {!Partition} and {!Info} --
       see {!Components.S} for each. *)
   include
     Components.S
@@ -38,7 +38,8 @@ module type S = sig
 
   (** {2 LTS} *)
 
-  (** {!LTS} has an *)
+  (** {!LTS}: a labelled transition system as extracted from Rocq, its
+      transitions listed one by one. *)
   module LTS :
     LTS.S
     with type state = State.t
@@ -49,7 +50,9 @@ module type S = sig
 
   (** {2 FSM} *)
 
-  (** {!FSM} ... *)
+  (** {!FSM}: the form the algorithms work on, each state mapped to its
+      actions and their destinations ({!EdgeMap}); built from an {!LTS} by
+      {!FSM.of_lts}, and saturated by {!FSM.saturate}. *)
   module FSM :
     FSM.S
     with type state = State.t
@@ -71,6 +74,8 @@ module type S = sig
      and type states = State.Set.t
      and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
+     and type annotation = Annotation.t
+     and type actionmap = Action.Map.t'
   (** {i See {!FSM.saturate}.} *)
 
   (** {2 Minimization} *)
@@ -96,6 +101,34 @@ module type S = sig
     with type states = State.Set.t
      and type partition = Partition.t
      and type fsm = FSM.t
+
+  (** {2 Product} *)
+
+  (** {!Product} provides {!val:Product.respond}: the simulation game's
+      response choice, i.e. which state the right-hand FSM must move to when
+      the left-hand one has made a labelled move. This is the decision the
+      proof solver takes at every step; it lives here because it is pure
+      model code, and because everything that needs it must {b call} it
+      rather than reproduce it. *)
+  module Product :
+    Product.S
+    with type state = State.t
+     and type states = State.Set.t
+     and type label = Label.t
+     and type transition = Transition.t
+     and type fsm = FSM.t
+     and type partition = Partition.t
+     and type edgemap = EdgeMap.t'
+
+  (** {2 Saturation estimate} *)
+
+  (** {!SaturationEstimate} provides {!val:SaturationEstimate.fsm}: the exact
+      number of weak actions {!FSM.saturate} would produce, computed on the
+      quotient by silent SCCs without saturating. The plugin checks it
+      against a bound before every saturation, as saturating a large LTS can
+      exhaust memory. *)
+  module SaturationEstimate :
+    Saturation_estimate.S with type fsm = FSM.t and type partition = Partition.t
 end
 
 (** Builds a model from a term's [base] representation, plus a source of constructor-bindings used for the proof solver.

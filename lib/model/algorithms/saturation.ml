@@ -4,10 +4,24 @@ module type S = sig
   type states
   type labels
   type edgemap
+  type annotation
 
   (** [edges labels states old_edges] returns a saturated [edgemap], paired
       with the states that now have no outgoing actions. *)
   val edges : labels -> states -> edgemap -> edgemap * states
+
+  (** [silent_paths edges s] is every state [s] reaches by zero or more
+      silent steps of [edges], each with the length and the annotation of a
+      shortest such path ([None] for [s] itself). *)
+  val silent_paths : edgemap -> state -> (state * annotation option * int) list
+
+  type actionmap
+
+  (** [on_demand old_edges] saturates one state at a time: applied to [s], it
+      returns [s]'s weak actions exactly as [edges] would ([None] if it has
+      none). Silent closures are shared between calls, in a cache cleared once
+      it holds [closure_cap] states (default 4096). *)
+  val on_demand : ?closure_cap:int -> edgemap -> state -> actionmap option
 end
 
 module Make
@@ -17,25 +31,29 @@ module Make
   with type state = C.State.t
    and type states = C.State.Set.t
    and type labels = C.Label.Set.t
-   and type edgemap = C.EdgeMap.t' = struct
+   and type edgemap = C.EdgeMap.t'
+   and type annotation = C.Annotation.t
+   and type actionmap = C.Action.Map.t' = struct
   module State = C.State
   module States = C.State.Set
   module Labels = C.Label.Set
   module Annotation = C.Annotation
   module Action = C.Action
-  module ActionPair = C.Action.Pair
   module ActionPairs = C.Action.Pair.Set
   module ActionMap = C.Action.Map
   module EdgeMap = C.EdgeMap
   module Note = C.Note
+  module StateTbl = Hashtbl.Make (C.State)
 
   type state = State.t
   type states = States.t
   type labels = Labels.t
+  type annotation = Annotation.t
   type edgemap = EdgeMap.t'
-  (* Closure-based saturation. Replaces the depth-first path enumeration
-     above, which cost time exponential in the path count rather than the
-     state count -- 101 states took 437 seconds on a grid (see
+  type actionmap = ActionMap.t'
+  (* Closure-based saturation. It replaced (2026-09-28) a depth-first path
+     enumeration, which cost time exponential in the path count rather than
+     the state count -- 101 states took 437 seconds on a grid (see
      [test/satscale.ml]). The specification it computes is unchanged, and is
      derived in [notes/5-saturation-rewrite.md]:
 
@@ -49,8 +67,10 @@ module Make
      traversal explored, only the shortest per destination ever survived. A
      breadth-first closure produces exactly those survivors directly. *)
 
-  (** Silent steps leaving [s], each silent action paired with one of its
-      destinations. *)
+  (** [silent_steps old_edges s] is every silent step out of [s] in
+      [old_edges], as (action, destination) pairs, one per destination.
+
+      Raises nothing. *)
   let silent_steps (old_edges : EdgeMap.t') (s : State.t)
     : (Action.t * State.t) list
     =
@@ -66,13 +86,20 @@ module Make
         []
   ;;
 
+  (** [note_of from a goto] is the witness step [from -a-> goto], recording
+      [a]'s label and derivation trees.
+
+      Raises nothing. *)
   let note_of (from : State.t) (a : Action.t) (goto : State.t) : Note.t =
     { from; label = a.label; using = a.trees; goto }
   ;;
 
-  (** Reflexive-transitive silent closure of [src], breadth-first, pairing
-      each reachable state with a shortest silent path to it. Paths are
-      accumulated most-recent-first and reversed at the point of use. *)
+  (** [silent_closure old_edges src] is every state [src] reaches by zero or
+      more silent steps of [old_edges] ([src] first), each paired with a
+      shortest such path, most recent step first (reversed at the point of
+      use). Breadth-first, so each state is met first by a shortest path.
+
+      Raises nothing. *)
   let silent_closure (old_edges : EdgeMap.t') (src : State.t)
     : (State.t * Note.t list) list
     =
@@ -106,84 +133,365 @@ module Make
     bfs start (States.singleton src) start
   ;;
 
+  (** [annotation_of_notes notes] is the witness path [notes] (first step
+      first) as an annotation, linked step to step, or [None] for the empty
+      path.
+
+      Raises nothing. *)
   let rec annotation_of_notes : Note.t list -> Annotation.t option = function
     | [] -> None
     | x :: tl -> Some { this = x; next = annotation_of_notes tl }
   ;;
 
-  (** The closure-based counterpart of [edge]. *)
-  let edge_closure
+  (** [with_lengths closure] is [closure] with each path's length added.
+
+      Raises nothing. *)
+  let with_lengths
+    : (State.t * Note.t list) list -> (State.t * Note.t list * int) list
+    =
+    List.map (fun ((s, path) : State.t * Note.t list) ->
+      s, path, List.length path)
+  ;;
+
+  (* See the [.mli]. {!silent_closure}'s paths, reversed into first-step-
+     first order and turned into annotations. *)
+  let silent_paths (old_edges : EdgeMap.t') (src : State.t)
+    : (State.t * Annotation.t option * int) list
+    =
+    List.map
+      (fun ((s, path_rev, len) : State.t * Note.t list * int) ->
+        s, annotation_of_notes (List.rev path_rev), len)
+      (with_lengths (silent_closure old_edges src))
+  ;;
+
+  (** [closures_of ?cap old_edges] is a memoised lookup of silent closures
+      over [old_edges] ({!silent_closure}, with lengths). A state's silent
+      closure does not depend on where the weak step started, so each is
+      computed once rather than once per visible move into it (backlog item
+      3b). With [cap], the memo is emptied whenever it reaches [cap] states,
+      bounding its memory for on-demand use.
+
+      Raises nothing. *)
+  let closures_of ?(cap : int option) (old_edges : EdgeMap.t')
+    : State.t -> (State.t * Note.t list * int) list
+    =
+    let closures : (State.t * Note.t list * int) list StateTbl.t =
+      StateTbl.create 64
+    in
+    fun (t : State.t) ->
+      match StateTbl.find_opt closures t with
+      | Some c -> c
+      | None ->
+        let c = with_lengths (silent_closure old_edges t) in
+        (match cap with
+         | Some n when StateTbl.length closures >= n -> StateTbl.reset closures
+         | _ -> ());
+        StateTbl.add closures t c;
+        c
+  ;;
+
+  (** [visible_steps old_edges s] is every visible step out of [s] in
+      [old_edges], as (action, destination) pairs, in the order the actions
+      and their destinations are stored (that order decides arrival indices
+      in {!visible_sources}, and so ties).
+
+      Raises nothing. *)
+  let visible_steps (old_edges : EdgeMap.t') (s : State.t)
+    : (Action.t * State.t) list
+    =
+    match EdgeMap.find_opt old_edges s with
+    | None -> []
+    | Some actions ->
+      ActionMap.fold
+        (fun (a : Action.t) (ds : States.t) (acc : (Action.t * State.t) list) ->
+          if Action.is_silent a
+          then acc
+          else States.fold (fun (t : State.t) acc -> (a, t) :: acc) ds acc)
+        actions
+        []
+      |> List.rev
+  ;;
+
+  (** [offer_source tbl (s, pre_rev, pre_len) (a, t)] offers [tbl] the path
+      to [t] made of the silent prefix [pre_rev] (length [pre_len]) then
+      [s -a-> t], keeping it only if it is strictly shorter than [t]'s
+      current path. A state seen for the first time gets the next arrival
+      index; a shorter path keeps the old index.
+
+      Raises nothing. *)
+  let offer_source
+        (tbl : (Note.t list * int * int) StateTbl.t)
+        ((s, pre_rev, pre_len) : State.t * Note.t list * int)
+        ((a, t) : Action.t * State.t)
+    : unit
+    =
+    let len = pre_len + 1 in
+    match StateTbl.find_opt tbl t with
+    | Some (_, len', _) when len' <= len -> ()
+    | Some (_, _, k) -> StateTbl.replace tbl t (note_of s a t :: pre_rev, len, k)
+    | None ->
+      StateTbl.replace tbl t (note_of s a t :: pre_rev, len, StateTbl.length tbl)
+  ;;
+
+  (** [visible_sources closure_of from old_edges] is the table of states [t]
+      with [from -tau*-> s -a-> t], each mapped to its shortest path (most
+      recent step first), that path's length, and its arrival index, for
+      each visible label [a] reachable from [from] by [tau* a] (labels in
+      the order first met).
+
+      It walks [from]'s silent closure ([closure_of from]) in order, and
+      offers every visible step out of each state of it ({!visible_steps})
+      to its label's table ({!offer_source}). The arrival index breaks ties
+      between equally short paths later, in {!silent_bfs}.
+
+      Raises nothing directly; propagates whatever [closure_of] raises. *)
+  let visible_sources
+        (closure_of : State.t -> (State.t * Note.t list * int) list)
+        (from : State.t)
+        (old_edges : EdgeMap.t')
+    : (C.Label.t * (Note.t list * int * int) StateTbl.t) list
+    =
+    let labels : (C.Label.t * (Note.t list * int * int) StateTbl.t) list ref =
+      ref []
+    in
+    (* [table_for l] is [l]'s table, added (at the end) if new *)
+    let table_for (l : C.Label.t) : (Note.t list * int * int) StateTbl.t =
+      match List.find_opt (fun (l', _) -> C.Label.equal l l') !labels with
+      | Some (_, tbl) -> tbl
+      | None ->
+        let tbl = StateTbl.create 64 in
+        labels := !labels @ [ l, tbl ];
+        tbl
+    in
+    List.iter
+      (fun ((s, _, _) as prefix : State.t * Note.t list * int) ->
+        List.iter
+          (fun ((a, _) as step : Action.t * State.t) ->
+            offer_source (table_for a.label) prefix step)
+          (visible_steps old_edges s))
+      (closure_of from);
+    !labels
+  ;;
+
+  (** A breadth-first search by distance over silent steps: [best] maps each
+      state reached to the path that first reached it (most recent step
+      first) and that path's length; [buckets] holds the frontier by
+      distance, each distance in arrival order. *)
+  type search =
+    { best : (Note.t list * int) StateTbl.t
+    ; buckets : (int, (State.t * Note.t list) Queue.t) Hashtbl.t
+    }
+
+  (** [push_at search d x] queues [x] at distance [d] of [search]'s
+      frontier. Raises nothing. *)
+  let push_at (search : search) (d : int) (x : State.t * Note.t list) : unit =
+    match Hashtbl.find_opt search.buckets d with
+    | Some q -> Queue.push x q
+    | None ->
+      let q = Queue.create () in
+      Queue.push x q;
+      Hashtbl.replace search.buckets d q
+  ;;
+
+  (** [seed search sources] records and queues each of one label's
+      [sources] ({!visible_sources}) at its own length, in order of length
+      then arrival index. Raises nothing. *)
+  let seed (search : search) (sources : (Note.t list * int * int) StateTbl.t)
+    : unit
+    =
+    StateTbl.fold
+      (fun (t : State.t) ((path, len, k) : Note.t list * int * int) acc ->
+        (len, k, t, path) :: acc)
+      sources
+      []
+    |> List.sort (fun (l, k, _, _) (l', k', _, _) ->
+      match Int.compare l l' with 0 -> Int.compare k k' | n -> n)
+    |> List.iter (fun ((len, _, t, path) : int * int * State.t * Note.t list) ->
+      StateTbl.replace search.best t (path, len);
+      push_at search len (t, path))
+  ;;
+
+  (** [relax search d (u, path) (a, v)] records the step [u -a-> v], taken
+      at distance [d] after [path], as [v]'s path at distance [d + 1] and
+      queues it there, unless [v] already has a path that short. Raises
+      nothing. *)
+  let relax
+        (search : search)
+        (d : int)
+        ((u, path) : State.t * Note.t list)
+        ((a, v) : Action.t * State.t)
+    : unit
+    =
+    match StateTbl.find_opt search.best v with
+    | Some (_, dv) when dv <= d + 1 -> ()
+    | _ ->
+      let p = note_of u a v :: path in
+      StateTbl.replace search.best v (p, d + 1);
+      push_at search (d + 1) (v, p)
+  ;;
+
+  (** [settle search old_edges d (u, path)] relaxes every silent step out of
+      [u] ({!relax}), [u] having been reached at distance [d] by [path];
+      nothing if [u] has since been reached by a shorter path. Raises
+      nothing. *)
+  let settle
+        (search : search)
+        (old_edges : EdgeMap.t')
+        (d : int)
+        ((u, _) as reached : State.t * Note.t list)
+    : unit
+    =
+    match StateTbl.find_opt search.best u with
+    | Some (_, du) when du < d -> ()
+    | _ -> List.iter (relax search d reached) (silent_steps old_edges u)
+  ;;
+
+  (** [silent_bfs old_edges sources] is every state reachable by silent
+      steps of [old_edges] from one label's [sources] ({!visible_sources}),
+      each mapped to the path that first reached it (most recent step
+      first) and its length, the shortest there is.
+
+      A search by distance ({!type-search}): the sources are queued at
+      their own lengths ({!seed}), and each distance is settled
+      ({!settle}) before the next, so of equally short paths the one met
+      first wins.
+
+      Raises nothing. *)
+  let silent_bfs
+        (old_edges : EdgeMap.t')
+        (sources : (Note.t list * int * int) StateTbl.t)
+    : (Note.t list * int) StateTbl.t
+    =
+    let search = { best = StateTbl.create 256; buckets = Hashtbl.create 16 } in
+    seed search sources;
+    let d =
+      ref (Hashtbl.fold (fun k _ acc -> min k acc) search.buckets max_int)
+    in
+    while Hashtbl.length search.buckets > 0 do
+      (match Hashtbl.find_opt search.buckets !d with
+       | None -> ()
+       | Some q ->
+         Hashtbl.remove search.buckets !d;
+         Queue.iter (settle search old_edges !d) q);
+      incr d
+    done;
+    search.best
+  ;;
+
+  (** [weak_action label path] is the weak action under [label] with [path]
+      (most recent step first) as its annotation, or [None] for the empty
+      path. Raises nothing. *)
+  let weak_action (label : C.Label.t) (path : Note.t list) : Action.t option =
+    Stdlib.Option.map
+      (fun (ann : Annotation.t) : Action.t ->
+        { label; annotation = Some ann; trees = Base.Trees.empty })
+      (annotation_of_notes (List.rev path))
+  ;;
+
+  (** [emit_weak_actions new_actions label best] adds to [new_actions] one
+      weak action under [label] for each state of [best] ({!silent_bfs}),
+      with that state as its only destination and its path as the
+      annotation ({!weak_action}).
+
+      Raises nothing. *)
+  let emit_weak_actions
+        (new_actions : ActionMap.t')
+        (label : C.Label.t)
+        (best : (Note.t list * int) StateTbl.t)
+    : unit
+    =
+    StateTbl.fold
+      (fun (goto : State.t) ((path, _) : Note.t list * int) acc ->
+        match weak_action label path with
+        | None -> acc
+        | Some a -> (a, States.singleton goto) :: acc)
+      best
+      []
+    |> ActionPairs.of_list
+    |> ActionPairs.iter (fun ((x, ds) : Action.t * States.t) ->
+      ActionMap.update new_actions x ds)
+  ;;
+
+  (** [edge_bfs closure_of new_actions from old_edges] adds [from]'s weak
+      actions to [new_actions], in time linear in their number rather than
+      in the number of witnesses: {!visible_sources}, then per label
+      {!silent_bfs} and {!emit_weak_actions}.
+
+      Every state the search reaches from a label's sources is a weak
+      target under that label, at its shortest distance, with the path
+      that reached it first as its witness. It replaced [edge_closure]
+      (backlog item 3b, 2026-10-03; see git history), which proposed one
+      witness per (s, visible step, state reachable from t): 2.3M-4.7M per
+      state on [Proc/Test4], for 5,280-7,680 weak actions; 2.9s a state,
+      now 35ms. Same targets and lengths as [edge_closure]; among witnesses
+      of equal length it may keep a different one (2 of the 2426 in
+      [satdiff]; no proof count changed).
+
+      Raises nothing directly; propagates whatever [closure_of] raises. *)
+  let edge_bfs
+        (closure_of : State.t -> (State.t * Note.t list * int) list)
         (new_actions : ActionMap.t')
         (from : State.t)
         (old_edges : EdgeMap.t')
     : unit
     =
     Logger.trace __FUNCTION__;
-    let pairs : ActionPair.t list ref = ref [] in
     List.iter
-      (fun ((s, pre_rev) : State.t * Note.t list) ->
-        match EdgeMap.find_opt old_edges s with
-        | None -> ()
-        | Some actions ->
-          ActionMap.fold
-            (fun (a : Action.t) (ds : States.t) () ->
-              if Action.is_silent a
-              then ()
-              else
-                States.iter
-                  (fun (t : State.t) ->
-                    let mid : Note.t = note_of s a t in
-                    List.iter
-                      (fun ((goto, post_rev) : State.t * Note.t list) ->
-                        let notes : Note.t list =
-                          List.rev pre_rev @ (mid :: List.rev post_rev)
-                        in
-                        match annotation_of_notes notes with
-                        | None -> ()
-                        | Some ann ->
-                          let act : Action.t =
-                            { label = a.label
-                            ; annotation = Some ann
-                            ; trees = Base.Trees.empty
-                            }
-                          in
-                          pairs := (act, States.singleton goto) :: !pairs)
-                      (silent_closure old_edges t))
-                  ds)
-            actions
-            ())
-      (silent_closure old_edges from);
-    ActionPair.merge_lists [] !pairs
-    |> ActionPairs.of_list
-    |> ActionPairs.iter
-         (fun ((saturated_action, destinations) : Action.t * States.t) ->
-         ActionMap.update new_actions saturated_action destinations)
+      (fun ((label, sources) : C.Label.t * (Note.t list * int * int) StateTbl.t) ->
+        emit_weak_actions new_actions label (silent_bfs old_edges sources))
+      (visible_sources closure_of from old_edges)
   ;;
 
-  (****************************************************************************)
+  (** [state_actions closure_of old_edges from] is [from]'s weak actions,
+      or [None] if it has none. The one place a state is saturated: {!edges}
+      and {!on_demand} both use it, so they agree by construction.
 
-  (** [] returns a saturated [EdgeMap.t'] paired with a set of terminals states {i (i.e., states that now have no outgoing actions, and if reached)}.*)
+      @raise Memory_guard.Exceeded
+        over the memory bound (raised here); and whatever [closure_of]
+        raises (propagated). *)
+  let state_actions
+        (closure_of : State.t -> (State.t * Note.t list * int) list)
+        (old_edges : EdgeMap.t')
+        (from : State.t)
+    : ActionMap.t' option
+    =
+    Memory_guard.check "saturation";
+    let new_actions : ActionMap.t' = ActionMap.create 0 in
+    edge_bfs closure_of new_actions from old_edges;
+    if ActionMap.length new_actions > 0 then Some new_actions else None
+  ;;
+
+  (* See the [.mli]. Every state with outgoing edges is saturated by
+     {!state_actions}, sharing one closure memo (uncapped: the whole FSM is
+     saturated anyway); a state left with no weak action is a terminal. *)
   let edges (labels : Labels.t) (states : States.t) (old_edges : EdgeMap.t')
     : EdgeMap.t' * States.t
     =
     Logger.trace __FUNCTION__;
     let new_edges : EdgeMap.t' = EdgeMap.create 0 in
+    let closure_of = closures_of old_edges in
     let terminals : States.t =
       EdgeMap.fold
         (fun (from : State.t) (_old_actions : ActionMap.t') (acc : States.t) ->
-          (* [edge_closure] reads [from]'s actions out of [old_edges] itself,
+          (* [state_actions] reads [from]'s actions out of [old_edges] itself,
              along with those of every state in its silent closure, so the
              fold's own [_old_actions] is redundant here. *)
-          let new_actions : ActionMap.t' = ActionMap.create 0 in
-          let () = edge_closure new_actions from old_edges in
-          if ActionMap.length new_actions > 0
-          then (
+          match state_actions closure_of old_edges from with
+          | Some new_actions ->
             EdgeMap.replace new_edges from new_actions;
-            acc)
-          else States.add from acc)
+            acc
+          | None -> States.add from acc)
         old_edges
         States.empty
     in
     new_edges, terminals
+  ;;
+
+  (* See the [.mli]. {!state_actions} with a closure memo capped at
+     [closure_cap] states. *)
+  let on_demand ?(closure_cap : int = 4096) (old_edges : EdgeMap.t')
+    : State.t -> ActionMap.t' option
+    =
+    state_actions (closures_of ~cap:closure_cap old_edges) old_edges
   ;;
 end

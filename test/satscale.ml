@@ -133,6 +133,24 @@ let chain (k : int) : M.FSM.t =
   fsm ~weak_labels:(M.Label.Set.singleton tau) 0 !ts
 ;;
 
+(** [Proc/Test4]'s shape (backlog 3b): [k] silent cycles of [m] states,
+    chained by silent edges, every state able to do [a] back to the head of
+    its own cycle. Few paths per destination, but many weak actions per
+    state -- [m^2 k(k+1)/2] in total -- which is what made per-state
+    deduplication cost (actions) x (witnesses). *)
+let cycles (k : int) (m : int) : M.FSM.t =
+  let st (i : int) (j : int) : int = (i * m) + j in
+  let ts = ref [] in
+  for i = 0 to k - 1 do
+    for j = 0 to m - 1 do
+      ts := transition (st i j) tau (st i ((j + 1) mod m)) :: !ts;
+      ts := transition (st i j) a (st i 0) :: !ts
+    done;
+    if i + 1 < k then ts := transition (st i 0) tau (st (i + 1) 0) :: !ts
+  done;
+  fsm ~weak_labels:(M.Label.Set.singleton tau) 0 !ts
+;;
+
 let time (f : unit -> 'a) : float * 'a =
   let t0 = Unix.gettimeofday () in
   let r = f () in
@@ -163,5 +181,19 @@ let () =
       (central_binomial k)
       tg
       tc
-  done
+  done;
+  Printf.printf "\n%-6s %-8s %-12s %-12s\n" "k" "states" "weak" "cycles (s)";
+  print_endline (String.make 40 '-');
+  let m = 20 in
+  List.iter
+    (fun k ->
+      let f = cycles k m in
+      let t, s = time (fun () -> M.FSM.saturate f) in
+      Printf.printf
+        "%-6i %-8i %-12i %-12.4f\n%!"
+        k
+        (k * m)
+        (M.EdgeMap.size s.edges)
+        t)
+    [ 2; 4; 8; 16; 32 ]
 ;;

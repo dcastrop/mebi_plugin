@@ -44,6 +44,7 @@
   proof_solver_tactics
   proof_solver_step
   proof_solver ; 
+  help ; [MeBi Help]
   g_mebi))
 
 (include_subdirs unqualified)

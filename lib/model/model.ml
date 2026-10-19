@@ -34,6 +34,8 @@ module type S = sig
      and type states = State.Set.t
      and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
+     and type annotation = Annotation.t
+     and type actionmap = Action.Map.t'
 
   module Minimization :
     Minimization.S
@@ -50,16 +52,32 @@ module type S = sig
     with type states = State.Set.t
      and type partition = Partition.t
      and type fsm = FSM.t
+
+  module Product :
+    Product.S
+    with type state = State.t
+     and type states = State.Set.t
+     and type label = Label.t
+     and type transition = Transition.t
+     and type fsm = FSM.t
+     and type partition = Partition.t
+     and type edgemap = EdgeMap.t'
+
+  module SaturationEstimate :
+    Saturation_estimate.S with type fsm = FSM.t and type partition = Partition.t
 end
 
 module Make (Base : Base_term.S) (ConstructorBindings : Json.S) = struct
   module C = Components.Make (Base) (ConstructorBindings)
   include C
 
-  (* TODO: the idea of [Traces] needs to be revisited. It does provide optimizations to examples with a lot of silent actions, where the saturated FSM is considerably larger, but i believe that there are areas where this can still be improved. *)
+  (* Each algorithm is a functor over the components and the models it
+     needs; the order is their dependency order. *)
   module LTS = LTS.Make (C)
   module Saturation = Saturation.Make (Base) (C)
   module FSM = FSM.Make (C) (LTS) (Saturation)
   module Minimization = Minimization.Make (C) (FSM)
   module Bisimilarity = Bisimilarity.Make (C) (FSM) (Minimization)
+  module Product = Product.Make (Base) (C) (FSM) (Saturation)
+  module SaturationEstimate = Saturation_estimate.Make (C) (FSM)
 end

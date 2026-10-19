@@ -21,22 +21,45 @@ module type S = sig
   type result
   type bisimilarity
 
+  (** [enc x] is the term the encoding [x] stands for.
+
+      @raise Bi_encoding.S.CannotDecode if [x] encodes no term (propagated). *)
   val enc : enc -> EConstr.t
+
+  (** [handle x e] is {!val-enc} of [x], raising [e] instead if it encodes no
+      term. Raises [e] if [x] encodes no term (raised here). *)
   val handle : enc -> exn -> EConstr.t
 
+  (** Raised by {!val-state}: the state's encoding stands for no term. *)
   exception CouldNotDecode_State of state
 
+  (** [state s] is the term the state [s] stands for.
+
+      @raise CouldNotDecode_State if there is none (raised here). *)
   val state : state -> EConstr.t
 
+  (** Raised by {!val-label}: the label's encoding stands for no term. *)
   exception CouldNotDecode_Label of label
 
+  (** [label l] is the term the label [l] stands for.
+
+      @raise CouldNotDecode_Label if there is none (raised here). *)
   val label : label -> EConstr.t
 
+  (** Raised by {!lts_constructor}: the LTS's encoding stands for no term. *)
   exception CouldNotDecode_LTS_Constructor of rocqlts
 
+  (** [lts_constructor l] is the inductive LTS [l] stands for.
+
+      @raise CouldNotDecode_LTS_Constructor if there is none (raised here). *)
   val lts_constructor : rocqlts -> EConstr.t
 
+  (** JSON printers for the model with each encoding shown as its Rocq
+      term, for results and dumps; one per component. Each [json] raises
+      {!Bi_encoding.S.CannotDecode} if an encoding stands for no term
+      (propagated). *)
   module Base : Json.S with type k = enc
+
   module State : Json.S with type k = state
   module States : Json.S with type k = states
   module Partition : Json.S with type k = partition
@@ -55,6 +78,24 @@ module type S = sig
   module FSM : Json.S with type k = fsm
   module Result : Json.S with type k = result
   module Bisimilarity : Json.S with type k = bisimilarity
+
+  (** Plain-text renderings of results ([MeBi Config Output Format Text],
+      the default): the states and labels numbered once, with their terms,
+      then the moves as [from -label-> to]. With [detail], each move also
+      shows its derivation as constructor names ([via s_l(s_pre)]), and the
+      relations are listed with their constructors. *)
+  module Plain : sig
+    (** [lts ~detail x] is the LTS [x] as text. Raises nothing. *)
+    val lts : detail:bool -> lts -> string
+
+    (** [fsm ~detail x] is the FSM [x] as text. Raises nothing. *)
+    val fsm : detail:bool -> fsm -> string
+
+    (** [result ~detail x] is the bisimilarity result [x] as text: whether
+        the initial states are related, and the classes, each as its
+        states' terms. [detail] adds nothing. Raises nothing. *)
+    val result : detail:bool -> result -> string
+  end
 end
 
 module Make

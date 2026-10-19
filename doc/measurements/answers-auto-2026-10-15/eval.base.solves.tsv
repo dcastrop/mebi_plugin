@@ -1,0 +1,15 @@
+suite	mode	file	index	status	iterations	proof	begin_s	solve_s	qed_s
+eval	auto	Width	1	Solved	77	wbis_w0	0.011	0.262	0.041
+eval	auto	Width	2	Solved	1163	wbis_w1	0.023	2.044	0.628
+eval	auto	Width	3	Solved	8256	wbis_w2	0.068	16.925	6.139
+eval	auto	Layers	1	Solved	92	wbis_n0	0.019	0.297	0.041
+eval	auto	Layers	2	Solved	120	wbis_n2	0.009	0.175	0.085
+eval	auto	Layers	3	Solved	148	wbis_n4	0.009	0.242	0.116
+eval	auto	Layers	4	Solved	204	wbis_n8	0.011	0.338	0.259
+eval	auto	Layers	5	Solved	91	wbis_s1	0.003	0.089	0.046
+eval	auto	Layers	6	Solved	105	wbis_s2	0.004	0.116	0.06
+eval	auto	Layers	7	Solved	119	wbis_s3	0.005	0.147	0.069
+eval	auto	Depth	1	Solved	21	wbis_k1	0.009	0.079	0.02
+eval	auto	Depth	2	Solved	108	wbis_k2	0.021	0.257	0.059
+eval	auto	Depth	3	Solved	672	wbis_k4	0.025	0.959	0.295
+eval	auto	Depth	4	Solved	4704	wbis_k8	0.102	12.82	2.925

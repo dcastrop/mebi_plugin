@@ -1,11 +1,11 @@
 src/META.rocq-mebi
 -R theories/ MEBI
+-R test/rocq/ MEBITests
 -R examples/ MEBI.Examples
 -I lib/
 -I lib/utils/
 -I lib/terms/
 -I lib/rocq_tools/
--I lib/json/
 -I lib/showable/
 -I lib/model/
 -I lib/model/algorithms/
@@ -13,10 +13,14 @@ src/META.rocq-mebi
 -arg "-w all"
 
 theories/loader.v ###
-theories/DevTest.v ###
-theories/Test.v ###
+test/rocq/DevTest.v ###
+test/rocq/Test.v ###
 
 theories/Bisimilarity.v ###
+theories/Premises.v ###
+theories/Transfer.v ###
+theories/Hiding.v ###
+theories/Traces.v ###
 
 ###############################################################################
 ###############################################################################
@@ -25,8 +29,34 @@ theories/Bisimilarity.v ###
 ### NOTE: compilation to take far longer if manual/ltac proofs included
 
 ###############################################################################
+### CCS (value-free, Milner 1989): textbook pairs and the Alternating Bit
+### Protocol, and instances of CTrees' CCS laws. Fast (under 30s together),
+### so built by default and in CI.
+examples/CCS.v ### REQUIRED FOR BELOW
+examples/Bisimilarity/CCS/PluginProofs.v ### Success
+examples/Bisimilarity/CCS/LawProofs.v ### Success (CTrees' CCS laws, tau-laws; ~20s)
+# examples/Bisimilarity/CCS/ABPProofs.v ### Success (ABP: abp <= spec; ~3.7 min, peaks ~4.2GB: run under a memory cap)
+# examples/Bisimilarity/CCS/ABPBisimProofs.v ### Success (ABP: weak_bisimilar; ~3.8 min, peaks ~4.2GB: separate file, both in one process exceed 6GB)
+
+###############################################################################
+### Evaluation series: one lever each (width, semantic layers, nesting
+### depth), sizes and Solve counts pinned with least bounds. Small instances,
+### ~40s together, so built by default and in CI; scale them up for
+### benchmarking.
+examples/Evaluation/Base.v ### REQUIRED FOR BELOW
+examples/Evaluation/Width.v ### Success (6, 18, 54 states; ~22s)
+examples/Evaluation/Layers.v ### Success (6 states, 0-8 layers; ~2s)
+examples/Evaluation/Depth.v ### Success (K = 1-8; ~16s)
+### Scaled up, for benchmarking (bench/proofs.sh -s eval-large): too slow to
+### build by default.
+# examples/Evaluation/WidthLarge.v ### Success (n = 3, 162 states; ~7 min, ~3.9GB)
+# examples/Evaluation/LayersLarge.v ### Success (16, 32, 64 layers; ~1.5 min, ~2.6GB, Qed dominates)
+# examples/Evaluation/DepthLarge.v ### Success (K = 12, 16; ~1 min, ~0.7GB)
+
+###############################################################################
 ### Proc
 examples/Proc.v ### REQUIRED FOR BELOW
+examples/ProcCongruence.v ### structural congruence made explicit: a normalised semantics for Proc.Layered, proved weakly bisimilar to it (fast, no plugin calls)
 
 ### Proc.Flat.Simple
 examples/Bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
@@ -45,41 +75,36 @@ examples/Bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
 ### Proc.Layered
 examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test3/TermTests.v ### RETEST: (takes a long time) Success
-# examples/Bisimilarity/Proc/Test3/PluginProofs.v ### TODO: proof explosion
+# examples/Bisimilarity/Proc/Test3/PluginProofs.v ### Success (18s; needs MeBi Config Solver MutualCofix True, which the file sets)
 
-# examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/Proc/Test4/TermTests.v ### Success
-# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### was never written -- Test3's own PluginProofs.v was already hitting proof explosion (Solve 100000, some unfinished even at 500000-1000000), so Test4's was skipped as expected to be worse (see ASSISTED-CHANGES.md, 2026-09-27)
+examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
+examples/Bisimilarity/Proc/Test4/NormTermTests.v ### Success (Test4 under the normalised semantics: 82 states, Run Bisim 0.4s each)
+# examples/Bisimilarity/Proc/Test4/NormProofs.v ### Success (Test4's weak_sim proved, via ProcCongruence.wsim_transfer; 6,115 steps, ~30s, ~0.7GB)
+# examples/Bisimilarity/Proc/Test4/NormBisimProofs.v ### Success (Test4's weak_bisimilar, Answers Minimal, via wbis_transfer; ~4 min, ~2.8GB: run under a memory cap; separate file, heavy proofs add up)
+# examples/Bisimilarity/Proc/Test4/TermTests.v ### KNOWN LIMIT (B3): under compLTS, 9720 states; Run Bisim/Sim Begin decide it on demand (~45s, notes/13), but the file also runs Run Saturate (74.6M weak actions), still refused. Run only under a memory cap (systemd-run -p MemoryMax=...; ulimit -v breaks OCaml 5). See its header
+# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### not written: a direct proof under compLTS needs ~525k solver steps (notes/13); Test4 is proved instead via the normalised semantics, NormProofs.v above
 
 ###############################################################################
-### CADP
-examples/CADP.v ### REQUIRED FOR BELOW
-examples/CADP_Glued.v ### REQUIRED FOR BELOW
-examples/Bisimilarity/CADP/Properties/MutualExclusion.v ### REQUIRED FOR BELOW
-
-examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
-# examples/Bisimilarity/CADP/Size1/MutualExclusion/PluginProofs.v ### Success
-
-# examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
-# examples/Bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
-# examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v ### Success
-
-# TODO:
-examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/CADP/Size2/TermTests.v ### FAIL: state-explosion
-
-# examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
-# examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### FAIL: ^
-# examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### !!! WIP -- not bisim
-
-
-# TODO:
-### CADP properties
-# examples/Bisimilarity/CADP/Properties/_no_starvation.v ### unfinished draft, no starvation still unimplemented
-
-### CADP Simple
-# examples/CADP_simple.v
+### CADP (examples/README.md, "CADP"). Every proof file's measurements are in its header
+examples/CADP/Model.v ### REQUIRED FOR BELOW; the layered model
+examples/CADP/Glued.v ### REQUIRED FOR BELOW; the glued big-step semantics
+examples/CADP/Norm.v ### REQUIRED FOR BELOW; the glued semantics with dead data erased, proved weakly bisimilar to it by hand (~35s, no plugin calls)
+examples/CADP/Obs.v ### REQUIRED FOR BELOW; the glued semantics with joining the queue visible, and its normalised form (hand proof, fast)
+examples/CADP/SpecMutex.v ### REQUIRED FOR BELOW; the lock server, for mutual exclusion
+examples/CADP/SpecFifo.v ### REQUIRED FOR BELOW; the FIFO lock server, for no starvation
+examples/CADP/Hidden.v ### REQUIRED FOR BELOW; joining the queue hidden again (hand proof, fast)
+examples/CADP/Terms.v ### REQUIRED FOR BELOW; c1, c2, c3: one, two and three processes
+# examples/CADP/Explore.v ### Success (FSMs, saturation, minimisation and Run Bisim for each size; ~13s)
+# examples/CADP/ExploreLarge.v ### Success (layered c2: 12027 states, ~32s; then Run Bisim against glued, bisimilar, decided on demand ~35s, ~1GB. Measured 2026-10-11; run under a memory cap)
+# examples/CADP/GluedLayered.v ### Success (one process, ~52s; two processes not proved: out of memory at 10GB nested, unfinished after 2.5h mutual, measured 2026-10-12; still out of memory at 24GiB on a 31GB machine (Auto) and unfinished after 24h (Default), 2026-10-17, see the file)
+# examples/CADP/MutualExclusion.v ### Success (one process, layered and glued; ~18s)
+# examples/CADP/MutualExclusionLarge.v ### Success (two processes: normalised ~15s, direct ~10 min and ~4.4GB; three: spec <= system only, ~7s. Run under a memory cap)
+# examples/CADP/TwoProcessesGluedLayered.v ### NOT PROVED (glued ~ layered at two processes: out of memory at 7-10GB on 14GB, and at 24GiB on 31GB, nested after 2h05m and mutual with Bounds Game under Auto after 16h, unfinished after 24h under Default; one proof per file, bench/proofs.sh -s cadp-huge -M <cap>)
+# examples/CADP/ThreeProcessesMutex.v ### Success on a 31GB machine only (three processes, system <= spec: 20,432 steps, ~23 min, 13.4GiB; out of memory at 8-9GB on 14GB; bench/proofs.sh -s cadp-huge -M <cap>)
+# examples/CADP/ThreeProcessesFifo.v ### Success on a 31GB machine only (three processes, FIFO bisimilarity, normalised: 45,773 steps, ~37 min, 17.8GiB; out of memory at 9GB on 14GB; bench/proofs.sh -s cadp-huge -M <cap>)
+# examples/CADP/Fifo.v ### Success (weak_bisimilar to spec_fifo, 119 and 2228 steps; hidden, mutual exclusion 23 and 98; ~25s)
+# examples/CADP/LayeredTransfer.v ### Success (one process: layered ≈ FIFO hidden and layered mutual exclusion, from GluedLayered.v and Fifo.v; no plugin calls, <1s)
+# examples/CADP/Simple.v ### an early, simpler counter-based lock; not built and not used elsewhere
 
 ### Other (nat streams)
 # examples/Bisimilarity/_nat_streams.v ### unfinished draft, sidelined during a reorg, not superseded
@@ -97,6 +122,8 @@ lib/utils/logger.ml
 lib/utils/logger.mli
 lib/utils/json.ml
 lib/utils/json.mli
+lib/utils/memory_guard.ml
+lib/utils/memory_guard.mli
 
 lib/terms/base_.mli
 lib/terms/tree.ml
@@ -126,6 +153,8 @@ lib/rocq_tools/rocq_monad.ml
 lib/rocq_tools/rocq_monad.mli
 lib/rocq_tools/rocq_monad_strfy.ml
 lib/rocq_tools/rocq_monad_strfy.mli
+lib/rocq_tools/premise_search.ml
+lib/rocq_tools/premise_search.mli
 lib/rocq_tools/rocq_monad_utils.ml
 lib/rocq_tools/rocq_monad_utils.mli
 lib/rocq_tools/theories.ml
@@ -137,11 +166,9 @@ lib/rocq_tools/bindings.mli
 lib/rocq_tools/constructor_bindings.ml
 lib/rocq_tools/constructor_bindings.mli
 
-lib/json/yojson_compare.ml
 
 lib/showable/type_.ml
 lib/showable/set_.ml
-lib/showable/map_.ml
 lib/showable/showable.ml
 lib/showable/thing.ml
 
@@ -157,10 +184,14 @@ lib/model/FSM.mli
 
 lib/model/algorithms/saturation.ml
 lib/model/algorithms/saturation.mli
+lib/model/algorithms/saturation_estimate.ml
+lib/model/algorithms/saturation_estimate.mli
 lib/model/algorithms/minimization.ml
 lib/model/algorithms/minimization.mli
 lib/model/algorithms/bisimilarity.ml
 lib/model/algorithms/bisimilarity.mli
+lib/model/algorithms/product.ml
+lib/model/algorithms/product.mli
 
 lib/model/model.ml
 lib/model/model.mli
@@ -210,6 +241,9 @@ src/proof_solver_step.ml
 src/proof_solver_step.mli
 src/proof_solver.ml
 src/proof_solver.mli
+
+src/help.ml
+src/help.mli
 
 ### installs the Rocq Feedback sink that lib/ emits through
 src/rocq_output.ml

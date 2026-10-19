@@ -1,9 +1,62 @@
+(* See the [.mli] for everything here. *)
 let option ?(as_elt : bool = false) (f : ?as_elt:bool -> 'a -> Yojson.t)
   : 'a option -> Yojson.t
   = function
   | None -> `Null
   | Some x -> f ~as_elt x
 ;;
+
+let rec without (keys : string list) : Yojson.t -> Yojson.t = function
+  | `Assoc l ->
+    `Assoc
+      (List.filter_map
+         (fun (k, v) ->
+           if List.mem k keys then None else Some (k, without keys v))
+         l)
+  | `List l -> `List (List.map (without keys) l)
+  | y -> y
+;;
+
+let write_file
+      ?(dir : string = Utils.FileWriter.default_dir)
+      (name : string)
+      (ext : string)
+      (f : out_channel -> unit)
+  : unit
+  =
+  let filepath : string =
+    Printf.sprintf
+      "%s | %s | %s%s"
+      Utils.FileWriter.get_local_timestamp
+      (Utils.FileWriter.get_loc ())
+      name
+      ext
+    |> Filename.concat dir
+  in
+  (* [create_parent_dir] takes the path of the file being written, not the
+     directory to hold it. It used to be handed [dir] itself, whose parent
+     ([Filename.dirname "./_dumps/"] = ["."]) already exists, so nothing was
+     created and the [open_out] below aborted the whole .v file with a
+     [System error] unless [_dumps/] happened to exist already. *)
+  Utils.FileWriter.create_parent_dir filepath;
+  Printf.sprintf "Writing to: %s" filepath |> Logger.info;
+  let oc = open_out filepath in
+  try
+    f oc;
+    close_out oc;
+    Logger.info "Finish Writing."
+  with
+  | e ->
+    close_out_noerr oc;
+    raise e
+;;
+
+module type Log = sig
+  type k
+
+  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+  val write : ?dir:string -> string -> k -> unit
+end
 
 module type S = sig
   type k
@@ -39,34 +92,35 @@ module Make (X : sig
     Logger.thing ~__FUNCTION__ m s x to_string
   ;;
 
-  let write
-        ?(dir : string = Utils.FileWriter.default_dir)
-        (name : string)
-        (x : k)
-    : unit
-    =
-    (* TODO: *)
-    Utils.FileWriter.create_parent_dir dir;
-    let filepath : string =
-      Printf.sprintf
-        "%s | %s | %s%s"
-        Utils.FileWriter.get_local_timestamp
-        (Utils.FileWriter.get_loc ())
-        name
-        ".json"
-      |> Filename.concat dir
-    in
-    Printf.sprintf "Writing to: %s" filepath |> Logger.info;
-    let oc = open_out filepath in
-    try
-      json ~as_elt:false x |> Yojson.pretty_to_channel oc;
-      close_out oc;
-      Logger.info "Finish Writing."
-    with
-    | e ->
-      close_out_noerr oc;
-      raise e
+  let write ?dir (name : string) (x : k) : unit =
+    write_file ?dir name ".json" (fun oc ->
+      json ~as_elt:false x |> Yojson.pretty_to_channel oc)
   ;;
+end
+
+module Text = struct
+  module Make (X : sig
+      type k
+
+      val name : string
+      val text : k -> string
+    end) : Log with type k = X.k = struct
+    type k = X.k
+
+    let log
+          ?(__FUNCTION__ : string = "")
+          ?(m : Output.Kind.t = Debug)
+          ?(s : string = X.name)
+          (x : k)
+      : unit
+      =
+      Logger.thing ~__FUNCTION__ m s x X.text
+    ;;
+
+    let write ?dir (name : string) (x : k) : unit =
+      write_file ?dir name ".txt" (fun oc -> output_string oc (X.text x))
+    ;;
+  end
 end
 
 module Thing = struct
@@ -164,7 +218,6 @@ module List = struct
 
       let name = X.name
 
-      (** ... *)
       let json ?(as_elt : bool = false) (xs : k) : Yojson.t =
         let y : Yojson.t =
           `List

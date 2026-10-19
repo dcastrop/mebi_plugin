@@ -1,0 +1,3 @@
+suite	mode	file	index	status	iterations	proof	begin_s	solve_s	qed_s
+abp	auto	CCS/ABPProofs	1	Solved	6494	wsim_abp_spec	4.34	192.581	69.035
+abp	auto	CCS/ABPBisimProofs	1	Solved	9914	wbis_abp_spec	5.044	203.394	63.524
