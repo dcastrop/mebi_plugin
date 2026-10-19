@@ -101,6 +101,7 @@ module type S = sig
       | Minimize of rocq_args
       | Merge of rocq_pair
       | CheckBisim of rocq_pair
+      | RunBisim of rocq_pair
       | CheckSim of rocq_pair
       | BenchmarkGraph of (rocq_args * (int * int))
 
@@ -143,6 +144,11 @@ module type S = sig
       -> Model.Bisimilarity.t option M.mm
 
     val do_check_bisim
+      :  rocq_pair
+      -> Libnames.qualid list
+      -> Model.Bisimilarity.t option M.mm
+
+    val do_run_bisim
       :  rocq_pair
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
@@ -607,6 +613,26 @@ module Make (Enc : Encoding.S) :
       Model.FSM.of_lts the_lts |> M.return
     ;;
 
+    (** [user_term (t, _)] is the term [t] as the user wrote it, printed,
+        for a verdict. Raises, when run, Rocq's errors if [t] is ill-formed
+        (propagated). *)
+    let user_term ((x, _) : Constrexpr.constr_expr * Libnames.qualid)
+      : string M.mm
+      =
+      let open M.Syntax in
+      let* e = M.constrexpr_to_econstr x in
+      M.state (fun env sigma -> sigma, Rocq_utils.Strfy.econstr env sigma e)
+    ;;
+
+    (** [fsm_size fsm] is ["<n> states, <m> edges"], for a [Notice]. Raises
+        nothing. *)
+    let fsm_size (fsm : FSM.t) : string =
+      Printf.sprintf
+        "%i states, %i edges"
+        (Model.State.Set.cardinal fsm.states)
+        (Model.EdgeMap.size fsm.edges)
+    ;;
+
     (* See the [.mli]. *)
     let do_make_lts (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
       Logger.trace __FUNCTION__;
@@ -615,6 +641,19 @@ module Make (Enc : Encoding.S) :
       let* the_lts = build_lts primary_lts x refs in
       result_log (module Model.LTS) (module Decode.LTS)
       |> handle_results Result "Finished Extracting LTS" the_lts;
+      let* t = user_term (x, primary_lts) in
+      let incomplete : string =
+        match the_lts.info.meta with
+        | Some { is_complete = false; _ } -> ", incomplete"
+        | _ -> ""
+      in
+      Logger.notice
+        (Printf.sprintf
+           "(LTS of %s: %i states, %i transitions%s.)"
+           t
+           (Model.State.Set.cardinal the_lts.states)
+           (Model.Transition.Set.cardinal the_lts.transitions)
+           incomplete);
       M.return None
     ;;
 
@@ -626,6 +665,8 @@ module Make (Enc : Encoding.S) :
       let* the_fsm = build_fsm primary_lts x refs in
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Making FSM" the_fsm;
+      let* t = user_term (x, primary_lts) in
+      Logger.notice (Printf.sprintf "(FSM of %s: %s.)" t (fsm_size the_fsm));
       M.return None
     ;;
 
@@ -642,6 +683,9 @@ module Make (Enc : Encoding.S) :
       let the_fsm = Model.FSM.saturate the_fsm in
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Saturating FSM" the_fsm;
+      let* t = user_term (x, primary_lts) in
+      Logger.notice
+        (Printf.sprintf "(Saturated FSM of %s: %s.)" t (fsm_size the_fsm));
       M.return None
     ;;
 
@@ -659,6 +703,13 @@ module Make (Enc : Encoding.S) :
       Decode.Partition.log ~m:Info ~s:"pi" pi;
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Minimizing FSM" the_fsm;
+      let* t = user_term (x, primary_lts) in
+      Logger.notice
+        (Printf.sprintf
+           "(FSM of %s: %s; minimized, %i classes.)"
+           t
+           (fsm_size the_fsm)
+           (Model.Partition.cardinal pi));
       M.return None
     ;;
 
@@ -670,6 +721,7 @@ module Make (Enc : Encoding.S) :
       | Minimize of rocq_args
       | Merge of rocq_pair
       | CheckBisim of rocq_pair
+      | RunBisim of rocq_pair
       | CheckSim of rocq_pair
       | BenchmarkGraph of (rocq_args * (int * int))
 
@@ -785,21 +837,61 @@ module Make (Enc : Encoding.S) :
       let the_fsm = FSM.merge the_fsm_a the_fsm_b in
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Merging FSMs" the_fsm;
+      let* left = user_term a in
+      let* right = user_term b in
+      Logger.notice
+        (Printf.sprintf
+           "(Merged FSM of %s and %s: %s.)"
+           left
+           right
+           (fsm_size the_fsm));
       M.return None
     ;;
 
-    (** [fail_if_not_bisim r] does nothing unless [r] says the two systems are
-        not bisimilar and [FailIf NotBisimilar] is set; then it logs [r].
+    (** [not_bisimilar_msg {a; b} r] is the sentence for the verdict [r] that
+        [a]'s and [b]'s terms are not weakly bisimilar, with what to try. *)
+    let not_bisimilar_msg ({ a; b } : rocq_pair) (r : Model.Bisimilarity.t)
+      : string M.mm
+      =
+      let open M.Syntax in
+      let* left = user_term a in
+      let* right = user_term b in
+      M.return
+        (Printf.sprintf
+           "%s and %s are not weakly bisimilar: their start states fall in \
+            different classes of weak bisimilarity (%i classes over both \
+            systems; [MeBi Config Output \"Result\" True] lists them)."
+           left
+           right
+           (Model.Partition.cardinal r.result.bisim_states
+            + Model.Partition.cardinal r.result.non_bisim_states))
+    ;;
 
-        @raise Rocq_monad_utils.S.Errors.MEBI_exn in that case (raised here). *)
-    let fail_if_not_bisim (x : Model.Bisimilarity.Result.t) : unit =
-      if !Api.the_fail_flags.non_bisimilar
-      then
-        if Bool.not (Model.Bisimilarity.Result.are_bisimilar x)
-        then (
-          result_log (module Model.Bisimilarity.Result) (module Decode.Result)
-          |> handle_results Result "Not Bisimilar" x;
-          M.Err.not_bisimilar ())
+    (** [fail_if_not_bisim args r] does nothing unless [r] says the two
+        systems are not bisimilar and [FailIf NotBisimilar] is set; then it
+        logs [r] and fails with {!not_bisimilar_msg}. Until 2026-10-19 the
+        error was the bare [Not_Bisimilar], so under [Fail] the reason was
+        not visible.
+
+        @raise CErrors.UserError in that case, when run (raised here). *)
+    let fail_if_not_bisim (args : rocq_pair) (r : Model.Bisimilarity.t)
+      : unit M.mm
+      =
+      let open M.Syntax in
+      if
+        !Api.the_fail_flags.non_bisimilar
+        && Bool.not (Model.Bisimilarity.Result.are_bisimilar r.result)
+      then (
+        result_log (module Model.Bisimilarity.Result) (module Decode.Result)
+        |> handle_results Result "Not Bisimilar" r.result;
+        let* msg = not_bisimilar_msg args r in
+        CErrors.user_err
+          (Pp.str
+             ("MeBi: "
+              ^ msg
+              ^ " [MeBi Config FailIf NotBisimilar False] makes this a warning."
+             )))
+      else M.return ()
     ;;
 
     (** [bisimilarity_of {a; b} using] is the weak bisimilarity check of the
@@ -846,17 +938,34 @@ module Make (Enc : Encoding.S) :
       Logger.trace __FUNCTION__;
       let open M.Syntax in
       let* result = bisimilarity_of args refs in
-      fail_if_not_bisim result.result;
+      let* () = fail_if_not_bisim args result in
       M.return (Some result)
     ;;
 
-    (** [user_term (t, _)] is the term [t] as the user wrote it, printed,
-        for a verdict. Raises, when run, Rocq's errors if [t] is ill-formed
-        (propagated). *)
-    let user_term ((x, _) : rocq_args) : string M.mm =
+    (* See the [.mli]. *)
+    let do_run_bisim (args : rocq_pair) refs : Model.Bisimilarity.t option M.mm =
+      Logger.trace __FUNCTION__;
       let open M.Syntax in
-      let* e = M.constrexpr_to_econstr x in
-      M.state (fun env sigma -> sigma, Rocq_utils.Strfy.econstr env sigma e)
+      let* result = do_check_bisim args refs in
+      let* () =
+        match result with
+        | Some r when Model.Bisimilarity.Result.are_bisimilar r.result ->
+          let* left = user_term args.a in
+          let* right = user_term args.b in
+          Logger.notice
+            (Printf.sprintf
+               "(Bisimilar: %s and %s are weakly bisimilar.)"
+               left
+               right);
+          M.return ()
+        | Some r ->
+          (* not bisimilar, and [FailIf NotBisimilar] is off *)
+          let* msg = not_bisimilar_msg args r in
+          Logger.warning msg;
+          M.return ()
+        | None -> M.return ()
+      in
+      M.return result
     ;;
 
     (** [is_similar r] is whether, by the check [r], the first system's start
@@ -884,7 +993,7 @@ module Make (Enc : Encoding.S) :
       let* right = user_term args.b in
       if is_similar result
       then
-        Logger.info
+        Logger.notice
           (Printf.sprintf "(Similar: %s is weakly simulated by %s.)" left right)
       else (
         let msg =
@@ -1000,6 +1109,7 @@ module Make (Enc : Encoding.S) :
       | Minimize args -> do_minimize args refs
       | Merge args -> do_merge args refs
       | CheckBisim args -> do_check_bisim args refs
+      | RunBisim args -> do_run_bisim args refs
       | CheckSim args -> do_check_sim args refs
       | BenchmarkGraph args -> do_benchmark_graph args refs
     ;;

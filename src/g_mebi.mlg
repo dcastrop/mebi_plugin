@@ -112,7 +112,7 @@ VERNAC COMMAND EXTEND MeBi_Run_Bisim CLASSIFIED AS QUERY
    "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run [] (W.Command.CheckBisim {a=(x, a); b=(y, b)}) 
+    let _ = W.Command.run [] (W.Command.RunBisim {a=(x, a); b=(y, b)}) 
             |> W.M.run ~reset_encoding:true
     in 
     Logger.info "(Finished Checking Bisimilarity.)";
@@ -124,7 +124,7 @@ VERNAC COMMAND EXTEND MeBi_Run_Bisim CLASSIFIED AS QUERY
    "Using" reference_list(rs)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run rs (W.Command.CheckBisim {a=(x, a); b=(y, b)})
+    let _ = W.Command.run rs (W.Command.RunBisim {a=(x, a); b=(y, b)})
             |> W.M.run ~reset_encoding:true
     in 
     Logger.info "(Finished Checking Bisimilarity.)";
