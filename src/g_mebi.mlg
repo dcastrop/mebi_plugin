@@ -397,6 +397,10 @@ VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
   { Api.set_output true x }
 | ["MeBi" "Config" "Output" string(x) "False"] -> 
   { Api.set_output false x }
+| ["MeBi" "Config" "Output" "Format" "Text"] ->
+  { Api.set_output_format Api.Text }
+| ["MeBi" "Config" "Output" "Format" "JSON"] ->
+  { Api.set_output_format Api.Json }
 END
 
 (* Help -- topics and text in [src/help.ml] *)

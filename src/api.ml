@@ -2,9 +2,15 @@
    a record here that a per-command [Logger.Make] closed over. What remains
    below is the part that was never about logging. *)
 
+type output_format =
+  | Text
+  | Json
+
 type output_config =
   { mutable decode_results : bool
   ; mutable dump_results : bool
+  ; mutable format : output_format
+  ; mutable detail : bool option
   }
 
 (** [dump_results] is off by default: dumping writes JSON files of every
@@ -13,7 +19,7 @@ type output_config =
     during active development (from [977b923]) and turned off 2026-10-04;
     [MeBi Config Output "DumpResults" True] turns it on for debugging. *)
 let output_config_default () : output_config =
-  { decode_results = true; dump_results = false }
+  { decode_results = true; dump_results = false; format = Text; detail = None }
 ;;
 
 (* See the [.mli]. *)
@@ -36,16 +42,62 @@ let output_config_dump_results (x : bool) : unit =
 ;;
 
 (* See the [.mli]. *)
+let detail () : bool =
+  match !the_output_config.detail with
+  | Some b -> b
+  | None -> !the_output_config.format = Json
+;;
+
+(* See the [.mli]. *)
+let describe_output () : string =
+  let format, other =
+    match !the_output_config.format with
+    | Text -> "plain text (the default)", "JSON"
+    | Json -> "JSON", "Text"
+  in
+  let with_detail =
+    match !the_output_config.detail, detail () with
+    | None, true ->
+      "with the relations' constructors and each move's derivation tree \
+       (JSON's default)"
+    | None, false ->
+      "without the relations' constructors or the moves' derivation trees \
+       (plain text's default)"
+    | Some _, true ->
+      "with the relations' constructors and each move's derivation tree"
+    | Some _, false ->
+      "without the relations' constructors or the moves' derivation trees"
+  in
+  Printf.sprintf
+    "Results are printed as %s, %s. [MeBi Config Output Format %s] and [MeBi \
+     Config Output \"Detail\" %s] change that; see [MeBi Help Config Output]."
+    format
+    with_detail
+    other
+    (if detail () then "False" else "True")
+;;
+
+(* See the [.mli]. *)
+let set_output_format (f : output_format) : unit =
+  !the_output_config.format <- f;
+  Logger.notice (Printf.sprintf "(MeBi Config: %s)" (describe_output ()))
+;;
+
+(* See the [.mli]. *)
 let set_output (x : bool) : string -> unit = function
   | "DecodeResults" -> output_config_decode_results x
   | "DumpResults" -> output_config_dump_results x
+  | "Detail" ->
+    !the_output_config.detail <- Some x;
+    Logger.notice (Printf.sprintf "(MeBi Config: %s)" (describe_output ()))
   | s ->
     (match Output.Kind.of_string s with
      | Some k -> Logger.configure k x
      | None ->
        Printf.sprintf
          "Unrecognised option \"%s\". Valid options are: Debug, Info, Notice, \
-          Warning, Error, Trace, Result, Show, DecodeResults, DumpResults"
+          Warning, Error, Trace, Result, Show, DecodeResults, DumpResults, \
+          Detail"
          s
        |> Logger.warning)
 ;;

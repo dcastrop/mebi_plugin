@@ -66,24 +66,32 @@ module type S = sig
   module Config :
     Config_loader.S with type weak = Weak.t and type 'a mm = 'a M.mm
 
-  (** [result_log ?decode enc dec] is the printer to log a result with:
-      [dec], showing Rocq terms, when [decode] (the default) and
-      [DecodeResults] are on; [enc], showing encodings, otherwise. Raises
-      nothing. *)
+  (** [result_log ?decode ?text enc dec] is the printer to log a result
+      with, as [MeBi Config Output] has it. As plain text (the default
+      format) by [text ~detail], when given; otherwise as JSON: [dec],
+      showing Rocq terms, when [decode] (the default) and [DecodeResults]
+      are on, [enc], showing encodings, otherwise, without constructor
+      bindings, derivation trees and annotations unless [Detail] is on
+      ({!Api.detail}). Each title it logs is tagged with the form, e.g.
+      [[plain text]]. Raises nothing. *)
   val result_log
     :  ?decode:bool
+    -> ?text:(detail:bool -> 'a -> string)
     -> (module Json.S with type k = 'a)
     -> (module Json.S with type k = 'a)
-    -> (module Json.S with type k = 'a)
+    -> (module Json.Log with type k = 'a)
 
   (** [handle_results k s x printer] logs [x] at the kind [k] under the
-      title [s], and, for a [Result] with [DumpResults] on, writes it as JSON
-      into [./_dumps/]. Raises whatever [printer] raises (propagated). *)
+      title [s], and, for a [Result] with [DumpResults] on, writes it as
+      the printer has it (JSON or text) into [./_dumps/]. The first [Result]
+      printed in a session is preceded by a [Notice] saying how results are
+      printed and how to change it. Raises whatever [printer] raises (propagated).
+  *)
   val handle_results
     :  Output.Kind.t
     -> string
     -> 'a
-    -> (module Json.S with type k = 'a)
+    -> (module Json.Log with type k = 'a)
     -> unit
 
   (** [extract_lts lts t using weak] is the LTS of the term [t] by the

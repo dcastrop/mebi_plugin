@@ -55,6 +55,24 @@ module type S = sig
   module FSM : Json.S with type k = fsm
   module Result : Json.S with type k = result
   module Bisimilarity : Json.S with type k = bisimilarity
+
+  (** Plain-text renderings of results ([MeBi Config Output Format Text],
+      the default): the states and labels numbered once, with their terms,
+      then the moves as [from -label-> to]. With [detail], each move also
+      shows its derivation as constructor names ([via s_l(s_pre)]), and the
+      relations are listed with their constructors. *)
+  module Plain : sig
+    (** [lts ~detail x] is the LTS [x] as text. Raises nothing. *)
+    val lts : detail:bool -> lts -> string
+
+    (** [fsm ~detail x] is the FSM [x] as text. Raises nothing. *)
+    val fsm : detail:bool -> fsm -> string
+
+    (** [result ~detail x] is the bisimilarity result [x] as text: whether
+        the initial states are related, and the classes, each as its
+        states' terms. [detail] adds nothing. Raises nothing. *)
+    val result : detail:bool -> result -> string
+  end
 end
 
 module Make
@@ -484,5 +502,262 @@ module Make
             ]
         ;;
       end)
+  end
+
+  (* See the [.mli]. *)
+  module Plain = struct
+    module SMap = Map.Make (Model.State)
+    module LMap = Map.Make (Model.Label)
+
+    (** [term x] is the Rocq term [x] encodes, printed. *)
+    let term (x : Enc.t) : string = M.decode x |> M.Strfy.econstr
+
+    (** [constructor (r, i)] is the name of the [i]th constructor of the
+        relation [r], or [r#i] if [r] does not decode to an inductive. *)
+    let constructor ((r, i) : Enc.Tree.Node.t) : string =
+      let env = Global.env () in
+      let sigma = Evd.from_env env in
+      match EConstr.kind sigma (M.decode r) with
+      | Ind ((mind, j), _) ->
+        let names =
+          (Environ.lookup_mind mind env).mind_packets.(j).mind_consnames
+        in
+        if i < Array.length names
+        then Names.Id.to_string names.(i)
+        else Printf.sprintf "%s#%i" (term r) i
+      | _ -> Printf.sprintf "%s#%i" (term r) i
+    ;;
+
+    (** [tree t] is the derivation [t] as constructor names, the premises'
+        derivations in brackets: [s_l(s_pre)]. *)
+    let rec tree (Enc.Tree.N (n, ts) : Enc.Tree.t) : string =
+      match ts with
+      | [] -> constructor n
+      | ts ->
+        Printf.sprintf
+          "%s(%s)"
+          (constructor n)
+          (String.concat ", " (List.map tree ts))
+    ;;
+
+    (** [relations info] is one line per relation the system was extracted
+        with, naming its constructors. *)
+    let relations (info : Model.Info.t) : string list =
+      match info.meta with
+      | None -> []
+      | Some meta ->
+        "relations:"
+        :: List.map
+             (fun (r : Model.Info.Meta.RocqLTS.t) ->
+               let n = List.length r.constructors in
+               Printf.sprintf
+                 "  %s: %s"
+                 (term r.base)
+                 (String.concat
+                    ", "
+                    (List.init n (fun i -> constructor (r.base, i)))))
+             meta.lts
+    ;;
+
+    (** [header kind info init nstates nlabels nmoves moves] is the first
+        line: the sizes, whether complete, and the initial state. *)
+    let header
+          (kind : string)
+          (info : Model.Info.t)
+          (init : string)
+          ((ns, nl, nm, moves) : int * int * int * string)
+      : string
+      =
+      let complete =
+        match info.meta with
+        | Some { is_complete = false; _ } -> ", incomplete"
+        | _ -> ""
+      in
+      Printf.sprintf
+        "%s: %i states, %i labels, %i %s%s.%s"
+        kind
+        ns
+        nl
+        nm
+        moves
+        complete
+        init
+    ;;
+
+    (** [tables states labels] numbers [states] and [labels] in order, and
+        is their tables' lines with the two numberings. *)
+    let tables
+          (states : Model.State.Set.t)
+          (terminals : Model.State.Set.t)
+          (labels : Model.Label.t list)
+      : string list * int SMap.t * int LMap.t
+      =
+      let sidx, _ =
+        Model.State.Set.fold
+          (fun s (m, i) -> SMap.add s i m, i + 1)
+          states
+          (SMap.empty, 0)
+      in
+      let lidx, _ =
+        List.fold_left
+          (fun (m, i) l -> if LMap.mem l m then m, i else LMap.add l i m, i + 1)
+          (LMap.empty, 0)
+          labels
+      in
+      let state_lines =
+        SMap.bindings sidx
+        |> List.sort (fun (_, a) (_, b) -> Int.compare a b)
+        |> List.map (fun ((s : Model.State.t), i) ->
+          Printf.sprintf
+            "  %i  %s%s"
+            i
+            (term s.base)
+            (if Model.State.Set.mem s terminals then "  (terminal)" else ""))
+      in
+      let label_lines =
+        LMap.bindings lidx
+        |> List.sort (fun (_, a) (_, b) -> Int.compare a b)
+        |> List.map (fun ((l : Model.Label.t), i) ->
+          Printf.sprintf
+            "  %i  %s%s"
+            i
+            (term l.base)
+            (if l.is_silent = Some true then "  (silent)" else ""))
+      in
+      ("states:" :: state_lines) @ ("labels:" :: label_lines), sidx, lidx
+    ;;
+
+    (** [moves word lines] is the moves section, sorted. *)
+    let moves (word : string) (lines : ((int * int * int) * string) list)
+      : string list
+      =
+      (word ^ ":")
+      :: (List.sort_uniq Stdlib.compare lines
+          |> List.map (fun ((f, l, t), via) ->
+            Printf.sprintf "  %i -%i-> %i%s" f l t via))
+    ;;
+
+    let init_line sidx = function
+      | Some s ->
+        (match SMap.find_opt s sidx with
+         | Some i -> Printf.sprintf " Initial state: %i." i
+         | None -> "")
+      | None -> ""
+    ;;
+
+    (* See the [.mli]. *)
+    let lts ~(detail : bool) (x : Model.LTS.t) : string =
+      let labels =
+        Model.Label.Set.elements x.alphabet
+        @ List.map
+            (fun (t : Model.Transition.t) -> t.label)
+            (Model.Transition.Set.elements x.transitions)
+      in
+      let tabs, sidx, lidx = tables x.states x.terminals labels in
+      let edges =
+        Model.Transition.Set.elements x.transitions
+        |> List.map (fun (t : Model.Transition.t) ->
+          ( ( SMap.find t.from sidx
+            , LMap.find t.label lidx
+            , SMap.find t.goto sidx )
+          , match detail, t.tree with
+            | true, Some d -> "  via " ^ tree d
+            | _ -> "" ))
+      in
+      String.concat
+        "\n"
+        ((header
+            "LTS"
+            x.info
+            (init_line sidx x.init)
+            ( Model.State.Set.cardinal x.states
+            , LMap.cardinal lidx
+            , List.length edges
+            , "transitions" )
+          :: tabs)
+         @ moves "transitions" edges
+         @ if detail then relations x.info else [])
+    ;;
+
+    (* See the [.mli]. *)
+    let fsm ~(detail : bool) (x : Model.FSM.t) : string =
+      let triples =
+        Model.EdgeMap.fold
+          (fun from am acc ->
+            Model.Action.Map.fold
+              (fun (a : Model.Action.t) dests acc ->
+                Model.State.Set.fold
+                  (fun d acc -> (from, a, d) :: acc)
+                  dests
+                  acc)
+              am
+              acc)
+          x.edges
+          []
+      in
+      let labels =
+        Model.Label.Set.elements x.alphabet
+        @ List.map (fun (_, (a : Model.Action.t), _) -> a.label) triples
+      in
+      let tabs, sidx, lidx = tables x.states x.terminals labels in
+      let edges =
+        List.map
+          (fun ((f : Model.State.t), (a : Model.Action.t), (d : Model.State.t)) ->
+            ( (SMap.find f sidx, LMap.find a.label lidx, SMap.find d sidx)
+            , if detail && Bool.not (Enc.Trees.is_empty a.trees)
+              then
+                "  via "
+                ^ String.concat
+                    " | "
+                    (List.map tree (Enc.Trees.elements a.trees))
+              else "" ))
+          triples
+      in
+      String.concat
+        "\n"
+        ((header
+            "FSM"
+            x.info
+            (init_line sidx x.init)
+            ( Model.State.Set.cardinal x.states
+            , LMap.cardinal lidx
+            , List.length (List.sort_uniq Stdlib.compare (List.map fst edges))
+            , "edges" )
+          :: tabs)
+         @ moves "edges" edges
+         @ if detail then relations x.info else [])
+    ;;
+
+    (* See the [.mli]. *)
+    let result ~detail:(_ : bool) (x : Model.Bisimilarity.Result.t) : string =
+      let classes (p : Model.Partition.t) : string list =
+        Model.Partition.elements p
+        |> List.mapi (fun i (c : Model.State.Set.t) ->
+          Printf.sprintf
+            "  %i  %s"
+            i
+            (Model.State.Set.elements c
+             |> List.map (fun (s : Model.State.t) -> term s.base)
+             |> String.concat " | "))
+      in
+      let related =
+        match x.roots_related with
+        | Some true -> "yes"
+        | Some false -> "no"
+        | None -> "unknown"
+      in
+      String.concat
+        "\n"
+        ((Printf.sprintf
+            "Bisimilarity: initial states related: %s. %i classes with states \
+             of both systems, %i with states of one."
+            related
+            (Model.Partition.cardinal x.bisim_states)
+            (Model.Partition.cardinal x.non_bisim_states)
+          :: "classes with states of both systems:"
+          :: classes x.bisim_states)
+         @ ("classes with states of one system:" :: classes x.non_bisim_states)
+        )
+    ;;
   end
 end

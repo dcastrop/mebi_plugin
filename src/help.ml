@@ -160,7 +160,8 @@ let text : string list -> string option = function
       \  MeBi Help Config Weak.       which label is silent (weak bisimilarity)\n\
       \  MeBi Help Config FailIf.     which outcomes are errors, not warnings\n\
       \  MeBi Help Config Solver.     the proof search's cofix strategy\n\
-      \  MeBi Help Config Output.     which messages are shown"
+      \  MeBi Help Config Output.     which messages are shown, and the \
+       results' format (plain text by default)"
   | [ "Config"; "Bounds" ] ->
     let lo, hi = Api.mb_per_extracted_state in
     Some
@@ -311,14 +312,23 @@ let text : string list -> string option = function
   | [ "Config"; "Output" ] ->
     Some
       "MeBi Config Output \"<Kind>\" True | False.\n\
+       MeBi Config Output Format Text | JSON.\n\
        MeBi Config Reset Output.\n\n\
+       Results (the FSMs, LTSs and verdicts shown with Output \"Result\" True, \
+       and dumps) are plain text by default: the states and labels numbered \
+       with their terms, then the moves as from -label-> to. Format JSON \
+       prints them as JSON instead. Output \"Detail\" adds the relations' \
+       constructors and each move's derivation tree (in JSON, the \
+       constructors' bindings and the annotations of weak actions too); it is \
+       off for plain text and on for JSON unless set, and once set holds for \
+       both. Reset Output restores plain text, detail as the format has it.\n\n\
        Toggle one message kind: Debug, Info, Notice, Warning, Error, Trace, \
-       Result, Show, DecodeResults, DumpResults. Info, Notice, Warning, Error \
-       and Show are on by default; Debug, Trace and Result are off. Info is \
-       the routine kind: MeBi Config Output \"Info\" False hides it and keeps \
-       the rest. DumpResults (off by default) writes each FSM and result as \
-       JSON into ./_dumps/, for debugging: on a large FSM that is hundreds of \
-       MB and many seconds a command."
+       Result, Show, DecodeResults, DumpResults, Detail. Info, Notice, \
+       Warning, Error and Show are on by default; Debug, Trace and Result are \
+       off. Info is the routine kind: MeBi Config Output \"Info\" False hides \
+       it and keeps the rest. DumpResults (off by default) writes each FSM and \
+       result, in the format set, into ./_dumps/, for debugging: on a large \
+       FSM that is hundreds of MB and many seconds a command."
   | _ -> None
 ;;
 

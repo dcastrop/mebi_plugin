@@ -59,15 +59,16 @@ module type S = sig
 
   val result_log
     :  ?decode:bool
+    -> ?text:(detail:bool -> 'a -> string)
     -> (module Json.S with type k = 'a)
     -> (module Json.S with type k = 'a)
-    -> (module Json.S with type k = 'a)
+    -> (module Json.Log with type k = 'a)
 
   val handle_results
     :  Output.Kind.t
     -> string
     -> 'a
-    -> (module Json.S with type k = 'a)
+    -> (module Json.Log with type k = 'a)
     -> unit
 
   val extract_lts
@@ -213,21 +214,70 @@ module Make (Enc : Encoding.S) :
   (* See the [.mli]. *)
   module Config = Config_loader.Make (Enc) (M) (Weak)
 
+  (** The JSON fields left out when [Detail] is off: constructor bindings,
+      derivation trees and the annotations of weak actions. *)
+  let detail_keys : string list = [ "rocq lts"; "tree"; "trees"; "annotation" ]
+
   (* See the [.mli]. *)
   let result_log
         ?(decode : bool = true)
         (type a)
+        ?(text : (detail:bool -> a -> string) option)
         (module FEnc : Json.S with type k = a)
         (module FDec : Json.S with type k = a)
-    : (module Json.S with type k = a)
+    : (module Json.Log with type k = a)
     =
-    let module E : Json.S with type k = a =
+    let module J : Json.S with type k = a =
       (val if decode && !Api.the_output_config.decode_results
            then (module FDec : Json.S with type k = a)
            else (module FEnc : Json.S with type k = a))
     in
-    (module E : Json.S with type k = a)
+    let detail : bool = Api.detail () in
+    let module L : Json.Log with type k = a =
+      (val match !Api.the_output_config.format, text with
+           | Text, Some text ->
+             (module Json.Text.Make (struct
+                  type k = a
+
+                  let name = J.name
+                  let text = text ~detail
+                end) : Json.Log
+                with type k = a)
+           | _, _ when detail -> (module J : Json.Log with type k = a)
+           | _, _ ->
+             (module Json.Make (struct
+                  type k = a
+
+                  let name = J.name
+
+                  let json ?as_elt (x : a) : Yojson.t =
+                    Json.without detail_keys (J.json ?as_elt x)
+                  ;;
+                end) : Json.Log
+                with type k = a))
+    in
+    let tag : string =
+      match !Api.the_output_config.format, text, detail with
+      | Text, Some _, false -> "plain text"
+      | Text, Some _, true -> "plain text, with detail"
+      | _, _, true -> "JSON"
+      | _, _, false -> "JSON, without detail"
+    in
+    (module struct
+      type k = a
+
+      let log ?__FUNCTION__ ?m ?(s : string = J.name) (x : a) : unit =
+        L.log ?__FUNCTION__ ?m ~s:(Printf.sprintf "%s [%s]" s tag) x
+      ;;
+
+      let write = L.write
+    end : Json.Log
+      with type k = a)
   ;;
+
+  (** Whether a result has been printed this session, so that the first
+      one says how results are printed ({!handle_results}). *)
+  let results_explained : bool ref = ref false
 
   (* See the [.mli]. *)
   let handle_results
@@ -235,9 +285,16 @@ module Make (Enc : Encoding.S) :
         (m : Output.Kind.t)
         (s : string)
         (x : a)
-        (module FLog : Json.S with type k = a)
+        (module FLog : Json.Log with type k = a)
     : unit
     =
+    if
+      (match m with Result -> true | _ -> false)
+      && Logger.is_enabled Result
+      && Bool.not !results_explained
+    then (
+      results_explained := true;
+      Logger.notice (Printf.sprintf "(%s)" (Api.describe_output ())));
     FLog.log ~m ~s x;
     match m with
     | Result -> if !Api.the_output_config.dump_results then FLog.write s x
@@ -324,7 +381,7 @@ module Make (Enc : Encoding.S) :
     then (
       match x with
       | { info = { meta = Some { is_complete = false; bounds; _ }; _ }; _ } ->
-        result_log (module Model.LTS) (module Decode.LTS)
+        result_log ~text:Decode.Plain.lts (module Model.LTS) (module Decode.LTS)
         |> handle_results Result "LTS Incomplete" x;
         let states = Model.State.Set.cardinal x.states
         and transitions = Model.Transition.Set.cardinal x.transitions in
@@ -639,7 +696,7 @@ module Make (Enc : Encoding.S) :
       let open M.Syntax in
       Logger.info "Extracting LTS...";
       let* the_lts = build_lts primary_lts x refs in
-      result_log (module Model.LTS) (module Decode.LTS)
+      result_log ~text:Decode.Plain.lts (module Model.LTS) (module Decode.LTS)
       |> handle_results Result "Finished Extracting LTS" the_lts;
       let* t = user_term (x, primary_lts) in
       let incomplete : string =
@@ -663,7 +720,7 @@ module Make (Enc : Encoding.S) :
       Logger.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      result_log (module Model.FSM) (module Decode.FSM)
+      result_log ~text:Decode.Plain.fsm (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Making FSM" the_fsm;
       let* t = user_term (x, primary_lts) in
       Logger.notice (Printf.sprintf "(FSM of %s: %s.)" t (fsm_size the_fsm));
@@ -676,12 +733,12 @@ module Make (Enc : Encoding.S) :
       Logger.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      result_log (module Model.FSM) (module Decode.FSM)
+      result_log ~text:Decode.Plain.fsm (module Model.FSM) (module Decode.FSM)
       |> handle_results Info "Finished Making FSM" the_fsm;
       check_saturation_size "the FSM" the_fsm;
       Logger.info "Saturating FSM...";
       let the_fsm = Model.FSM.saturate the_fsm in
-      result_log (module Model.FSM) (module Decode.FSM)
+      result_log ~text:Decode.Plain.fsm (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Saturating FSM" the_fsm;
       let* t = user_term (x, primary_lts) in
       Logger.notice
@@ -695,13 +752,13 @@ module Make (Enc : Encoding.S) :
       Logger.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      result_log (module Model.FSM) (module Decode.FSM)
+      result_log ~text:Decode.Plain.fsm (module Model.FSM) (module Decode.FSM)
       |> handle_results Info "Finished Making FSM" the_fsm;
       check_saturation_size "the FSM" the_fsm;
       Logger.info "Minimizing FSM...";
       let { fsm; pi } : Model.Minimization.t = Model.Minimization.fsm the_fsm in
       Decode.Partition.log ~m:Info ~s:"pi" pi;
-      result_log (module Model.FSM) (module Decode.FSM)
+      result_log ~text:Decode.Plain.fsm (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Minimizing FSM" the_fsm;
       let* t = user_term (x, primary_lts) in
       Logger.notice
@@ -745,12 +802,12 @@ module Make (Enc : Encoding.S) :
       Logger.info "Making FSM A...";
       let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
       let* the_fsm_a = build_fsm ~weak:weak1 alts ax refs in
-      result_log (module Model.FSM) (module Decode.FSM)
+      result_log ~text:Decode.Plain.fsm (module Model.FSM) (module Decode.FSM)
       |> handle_results Info "Finished Making FSM A" the_fsm_a;
       Logger.info "Making FSM B...";
       let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
       let* the_fsm_b = build_fsm ~weak:weak2 blts bx refs in
-      result_log (module Model.FSM) (module Decode.FSM)
+      result_log ~text:Decode.Plain.fsm (module Model.FSM) (module Decode.FSM)
       |> handle_results Info "Finished Making FSM B" the_fsm_b;
       M.return (the_fsm_a, the_fsm_b)
     ;;
@@ -835,7 +892,7 @@ module Make (Enc : Encoding.S) :
       let* () = refuse_conflicts the_fsm_a the_fsm_b in
       Logger.info "Merging FSMs...";
       let the_fsm = FSM.merge the_fsm_a the_fsm_b in
-      result_log (module Model.FSM) (module Decode.FSM)
+      result_log ~text:Decode.Plain.fsm (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Merging FSMs" the_fsm;
       let* left = user_term a in
       let* right = user_term b in
@@ -882,7 +939,10 @@ module Make (Enc : Encoding.S) :
         !Api.the_fail_flags.non_bisimilar
         && Bool.not (Model.Bisimilarity.Result.are_bisimilar r.result)
       then (
-        result_log (module Model.Bisimilarity.Result) (module Decode.Result)
+        result_log
+          ~text:Decode.Plain.result
+          (module Model.Bisimilarity.Result)
+          (module Decode.Result)
         |> handle_results Result "Not Bisimilar" r.result;
         let* msg = not_bisimilar_msg args r in
         CErrors.user_err
@@ -918,13 +978,16 @@ module Make (Enc : Encoding.S) :
       in
       Logger.info "Checking Bisimilarity of FSMs...";
       let result = Model.Bisimilarity.fsm ~on_demand the_fsm_a the_fsm_b in
-      let r = result_log (module Model.FSM) (module Decode.FSM) in
+      let r =
+        result_log ~text:Decode.Plain.fsm (module Model.FSM) (module Decode.FSM)
+      in
       r |> handle_results Result "FSM a (original)" result.fsm_a.original;
       r |> handle_results Result "FSM a (saturated)" result.fsm_a.saturated;
       r |> handle_results Result "FSM b (original)" result.fsm_b.original;
       r |> handle_results Result "FSM b (saturated)" result.fsm_b.saturated;
       result_log
         ~decode:false
+        ~text:Decode.Plain.result
         (module Model.Bisimilarity.Result)
         (module Decode.Result)
       |> handle_results Result "Finished Merging FSMs" result.result;
