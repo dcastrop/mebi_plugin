@@ -8959,6 +8959,55 @@ Refactor 0 · Bug fix 0 · Optimization 0.
 
 ---
 
+## 2026-10-19 (cont.) — results as plain text by default
+
+On branch `feat/output-format`, at Jonah's request (his choice of the
+three options set out for the feedback's item 5c). Output only; no new
+capability.
+
+**New feature.** `MeBi Config Output Format Text|JSON` sets how results
+(`Output "Result"`, and dumps) are printed. Plain text is the default: the
+states and labels numbered once with their terms, then each move as
+`from -label-> to`. `Output "Detail"` adds each move's derivation as
+constructor names (`via s_l(s_pre)`) and the relations' constructors; in
+JSON it also keeps the constructor bindings and annotations, which are
+otherwise dropped. Unless set, `Detail` is off for text and on for JSON,
+so JSON prints exactly what it did. Each printed result is tagged with its
+form, and the first of a session, and each change of setting, prints a
+`Notice` saying how to change it. `MeBi Help Config Output` and the README
+say plain text is the default. Benchmark samples stay JSON.
+
+How: `Json.Log` (log and write) is what result printing now takes;
+`Json.S` gives it as JSON, `Json.Text.Make` from a renderer;
+`Json.without` drops fields. The renderers are `Decoder.Plain`, beside
+the JSON decoder they share terms with.
+
+**Bug fix (tooling), found on the way.** `bench/ocaml/fixtures.py` builds
+the OCaml benchmark's fixtures from JSON dumps, so it now asks for JSON.
+Regenerated from this branch and from `main`, the 47 fixtures are the same
+apart from the work directory each records. The checked-in fixtures are
+stale (2026-10-10), which this branch does not change: a line in
+`OUTSTANDING.md`, detail in `doc/future-work.md`.
+
+**Mistake, mine, on the previous branch.** I merged fork PR #84 while its
+CI was still pending: `gh pr checks --watch`, started right after the PR
+was opened, saw no checks yet, printed "no checks reported" and exited 0,
+and I took that for a pass. Both runs then passed. Before a merge I now
+require a listed check reading `pass`.
+
+**Verified.** `dune build`, `make` (which caught a warning 50 that dune
+does not: an `.mli`'s opening comment directly above a new doc comment),
+`tests.exe` 111/111 (one new: `Json.without`), `Test.v` running every
+renderer (`OutputFormat`), and the default proof suite under `Auto`: every
+count unchanged.
+
+Revert: `git revert -m 1 <merge commit>`.
+
+**Session tally (2026-10-19), cont.:** New feature 1 · Bug fix 1 · Docs 2 ·
+Tooling 0 · Refactor 0 · Optimization 0.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

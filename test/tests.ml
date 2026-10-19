@@ -1492,7 +1492,27 @@ let test_json () : unit =
   check
     "state serialises"
     true
-    (String.length (M.State.to_string ~pretty:false (state 0)) > 2)
+    (String.length (M.State.to_string ~pretty:false (state 0)) > 2);
+  (* [Output "Detail" False] in JSON: the detail fields go, at any depth,
+     and nothing else does. *)
+  let y : Yojson.t =
+    `Assoc
+      [ "states", `List [ `Int 0 ]
+      ; "rocq lts", `List [ `Int 1 ]
+      ; ( "edges"
+        , `List
+            [ `Assoc [ "label", `Int 2; "trees", `List []; "annotation", `Null ]
+            ] )
+      ]
+  in
+  check
+    "without drops the named keys at any depth"
+    true
+    (Json.without [ "rocq lts"; "trees"; "annotation" ] y
+     = `Assoc
+         [ "states", `List [ `Int 0 ]
+         ; "edges", `List [ `Assoc [ "label", `Int 2 ] ]
+         ])
 ;;
 
 let () =

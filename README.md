@@ -226,7 +226,7 @@ MeBi Run Saturate <term> Using <relation> [<relation>...].
 
 `Run Bisim` checks (weak, if `Config Weak` is set — see below) bisimilarity between the two terms' LTSs. `Run Merge` combines two FSMs into one. `Run Minimize` partition-refines an FSM down to its bisimulation quotient. `Run Saturate` computes weak transitions across silent (tau) steps.
 
-Each `Run` command ends with a `Notice` saying what it found: the term and its size (`(LTS of p: 3 states, 2 transitions.)`), or the verdict (`(Bisimilar: p and q are weakly bisimilar.)`). Two terms that are not bisimilar (or not similar) are an error naming both, or a warning under `MeBi Config FailIf NotBisimilar False`. `rocq compile` does not print the message of a command under `Fail`, so a test that should show why a verdict is negative can use that setting and read the warning. The full FSMs and results are printed with `MeBi Config Output "Result" True`.
+Each `Run` command ends with a `Notice` saying what it found: the term and its size (`(LTS of p: 3 states, 2 transitions.)`), or the verdict (`(Bisimilar: p and q are weakly bisimilar.)`). Two terms that are not bisimilar (or not similar) are an error naming both, or a warning under `MeBi Config FailIf NotBisimilar False`. `rocq compile` does not print the message of a command under `Fail`, so a test that should show why a verdict is negative can use that setting and read the warning. The full FSMs and results are printed with `MeBi Config Output "Result" True`, as plain text by default (`Output Format`, below).
 
 ### Which constructor shapes are supported
 
@@ -314,6 +314,7 @@ MeBi Config Weak1 / Weak2 As Option <term>.        (* set only the first/second 
 MeBi Config Weak1 / Weak2 As <term> Of <relation>.
 MeBi Config FailIf Empty/Incomplete/NotBisimilar/Oversaturated True/False.
 MeBi Config Output "<Kind>" True/False.
+MeBi Config Output Format Text/JSON.                (* how results are printed and dumped; Text (plain text) is the default *)
 MeBi Config Solver MutualCofix True|False|Auto.
 MeBi Config Solver Answers Default|Greedy|Minimal|Auto.
 ```
@@ -335,7 +336,26 @@ MeBi Config Solver Answers Default|Greedy|Minimal|Auto.
 - `Bounds Memory <mb>` stops a command with `Memory_Bound_Exceeded` once the whole Rocq process uses more than `<mb>` megabytes (resident memory on Linux), so a heavy run fails with a message instead of taking the machine down. **On by default**: 75% of the machine's RAM, or 90% of a cgroup memory cap the process runs under (`systemd-run -p MemoryMax=...`) if that is smaller; `MeBi Help Config Bounds` shows the figure. `0` turns it off; `Reset Bounds` restores the default. The error names the phase it stopped in and what to try there. It is checked during extraction, saturation, the game walks and estimates, and between `Solve` steps, so one step can overshoot it, and `Qed` is not checked at all: run heavy proofs under an OS cap as well (`systemd-run --user --scope -p MemoryMax=6G -p MemorySwapMax=0 ...`).
 - `FailIf` controls whether an empty LTS (default `False`), an incomplete one (default `True`: exploration cut short by a bound, or a premise the search could not decide), a negative bisimilarity result (default `True`), or a saturation above `Bounds Saturation` (`Oversaturated`, default `True`) raises a hard error instead of a warning. `Oversaturated` defaults to `True` because past the bound the likely alternative is running out of memory; `False` warns and saturates anyway.
 - `Solver MutualCofix` picks how `MeBi Sim` introduces coinduction hypotheses (one nested cofix per new pair, or one mutual cofix over the whole relation; `Auto`, the default, measures both). `Solver Answers` picks how it chooses each answer to the other system's move: `Auto` (the default, since 2026-10-15) the plan with the lowest predicted cost, among `Default`, `Greedy` and `Minimal`; `Default` move by move, as the solver did before; `Greedy`/`Minimal` from one of those plans. On the checked-in examples `Auto` was never slower than `Default`, and cut the `weak_bisimilar` proofs by 60% (`ASSISTED-CHANGES.md`, 2026-10-02). On an FSM saturated on demand, `Auto` answers move by move unless `Bounds Game` is set.
-- `Output "<Kind>" <bool>` toggles one log channel. `<Kind>` is one of `Debug`, `Info`, `Notice`, `Warning`, `Error`, `Trace`, `Result`, `Show`, `DecodeResults`, `DumpResults`. `Info`, `Notice`, `Warning`, `Error` and `Show` are on by default, `Debug`, `Trace` and `Result` off; `Info` is the routine kind, so `MeBi Config Output "Info" False.` quiets a run and keeps the rest. Loading the plugin prints one `Notice` saying so. `DumpResults` is off by default: when on, every command writes its FSMs and results as JSON files into `./_dumps/` in the working directory, which is useful for debugging but costly on large systems (on `Proc/Test4`, about 20s, hundreds of MB on disk and 1GB of extra memory per command).
+- `Output "<Kind>" <bool>` toggles one log channel. `<Kind>` is one of `Debug`, `Info`, `Notice`, `Warning`, `Error`, `Trace`, `Result`, `Show`, `DecodeResults`, `DumpResults`, `Detail`. `Info`, `Notice`, `Warning`, `Error` and `Show` are on by default, `Debug`, `Trace` and `Result` off; `Info` is the routine kind, so `MeBi Config Output "Info" False.` quiets a run and keeps the rest. Loading the plugin prints one `Notice` saying so. `DumpResults` is off by default: when on, every command writes its FSMs and results , in the format set, into `./_dumps/` in the working directory, which is useful for debugging but costly on large systems (on `Proc/Test4`, about 20s, hundreds of MB on disk and 1GB of extra memory per command).
+- `Output Format Text|JSON` sets how results are printed (`Output "Result" True`) and dumped. **Plain text is the default**: the states and labels numbered once, with their terms, then each move as `from -label-> to`:
+
+  ```
+  FSM: 3 states, 3 labels, 3 edges. Initial state: 0.
+  states:
+    0  (choice (pre A done) (tau (pre B done)))
+    1  done  (terminal)
+    2  (pre B done)
+  labels:
+    0  (Some A)
+    1  None  (silent)
+    2  (Some B)
+  edges:
+    0 -0-> 1
+    0 -1-> 2
+    2 -2-> 1
+  ```
+
+  `Format JSON` prints the full structure instead, as before 2026-10-19. `Output "Detail"` adds each move's derivation tree (`0 -0-> 1  via s_l(s_pre)`) and the relations' constructors; in JSON it also keeps the constructors' bindings and the annotations of weak actions. Unless set, `Detail` is off for plain text and on for JSON; once set, it holds for both. Each printed result is tagged with its form (`[plain text]`, `[JSON, without detail]`, ...), and the first one in a session is preceded by a `Notice` saying how to change it. Benchmark samples are always JSON. `Reset Output` restores the defaults.
 
 ### Diagnostics
 

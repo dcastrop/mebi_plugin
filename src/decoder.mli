@@ -78,6 +78,24 @@ module type S = sig
   module FSM : Json.S with type k = fsm
   module Result : Json.S with type k = result
   module Bisimilarity : Json.S with type k = bisimilarity
+
+  (** Plain-text renderings of results ([MeBi Config Output Format Text],
+      the default): the states and labels numbered once, with their terms,
+      then the moves as [from -label-> to]. With [detail], each move also
+      shows its derivation as constructor names ([via s_l(s_pre)]), and the
+      relations are listed with their constructors. *)
+  module Plain : sig
+    (** [lts ~detail x] is the LTS [x] as text. Raises nothing. *)
+    val lts : detail:bool -> lts -> string
+
+    (** [fsm ~detail x] is the FSM [x] as text. Raises nothing. *)
+    val fsm : detail:bool -> fsm -> string
+
+    (** [result ~detail x] is the bisimilarity result [x] as text: whether
+        the initial states are related, and the classes, each as its
+        states' terms. [detail] adds nothing. Raises nothing. *)
+    val result : detail:bool -> result -> string
+  end
 end
 
 module Make

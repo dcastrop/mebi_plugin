@@ -1,13 +1,25 @@
 (** The plugin's configuration, as the [MeBi Config] commands set it. Per
     message kind output settings live in {!Logger}; {!set_output} forwards
     to it. *)
+
+(** How results are printed and dumped: plain text (the default) or
+    JSON. *)
+type output_format =
+  | Text
+  | Json
+
 type output_config =
   { mutable decode_results : bool
   ; mutable dump_results : bool
+  ; mutable format : output_format
+  ; mutable detail : bool option
+    (** constructor bindings and derivation trees: [None] for the format's
+        default ({!detail}) *)
   }
 
 (** [output_config_default ()]: a fresh default output configuration
-    (results decoded, not dumped to [./_dumps/]). A fresh record each time,
+    (results decoded, as plain text, detail as the format has it, not
+    dumped to [./_dumps/]). A fresh record each time,
     as its fields are mutable: the [MeBi Config Output] setters update the
     current one in place. *)
 val output_config_default : unit -> output_config
@@ -29,11 +41,25 @@ val output_config_decode_results : bool -> unit
 val output_config_dump_results : bool -> unit
 
 (** [set_output b k] sets the output option named [k] to [b]
-    ([MeBi Config Output k b]): [DecodeResults], [DumpResults], or a
+    ([MeBi Config Output k b]): [DecodeResults], [DumpResults], [Detail], or a
     message kind ({!Output.Kind.of_string}), forwarded to
     {!Logger.configure}. An unknown name is warned about and ignored.
     Raises nothing. *)
 val set_output : bool -> string -> unit
+
+(** [detail ()] is whether results include the relations' constructor
+    bindings and each transition's derivation trees: as set by
+    [MeBi Config Output "Detail"], else off for plain text and on for JSON.
+    Raises nothing. *)
+val detail : unit -> bool
+
+(** [describe_output ()] is a sentence saying how results are printed now,
+    and how to change it, for messages. Raises nothing. *)
+val describe_output : unit -> string
+
+(** [set_output_format f] sets how results are printed and dumped
+    ([MeBi Config Output Format Text|JSON]), and says so. Raises nothing. *)
+val set_output_format : output_format -> unit
 
 (** [make_enc p] is the encoding module unpacked from [p]. Raises
     nothing. *)
