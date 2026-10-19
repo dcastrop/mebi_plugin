@@ -72,8 +72,9 @@ turns the pin into a positive test.
 - **Proofs cost far more than deciding.** At width n = 3 (162 states a
   side), `Bisimilarity.fsm` takes 19ms and the proof 7 minutes (55k
   steps, 4.0GB). CADP `Size2` glued ≈ layered is decided in ~45s and
-  ~1.5GB, but its proof runs out of memory at 10GB. `decide-vs-prove.md`
-  has the full comparison.
+  ~1.5GB, but its proof runs out of memory at 10GB, and still at 24GiB on a
+  31GB host (2026-10-15/16; `measurements/cadp-large.md`).
+  `decide-vs-prove.md` has the full comparison.
 - **`Auto` goes nested on an FSM saturated on demand** unless `MeBi
   Config Bounds Game` is set, because estimating would walk the whole
   game. It says so in a notice. For a `weak_bisimilar` goal the nested
@@ -81,7 +82,14 @@ turns the pin into a positive test.
   `Size2` the estimate (~1 min) put nested at over 10.3M goals, against
   514,020 pairs and 2.06M moves mutual. Setting the bound by hand avoids
   it. Whether `Auto` should estimate by default there is an open
-  *optimization* question.
+  *optimization* question. On the 31GB host, under `Answers Auto`, the
+  estimate took 4,489s (not ~1 min) and found a game of 78,202 pairs and
+  312,808 moves, and the mutual proof still ran out of memory at 24GiB after
+  16h in all. Under `Answers Default` the earlier figures come back (`Begin`
+  82s, 514,020 pairs, memory ~2.2GiB for 16h, 5.0GiB at 24h) and the proof
+  was still unfinished when stopped at 24h. So the answer policy changes this
+  proof's game and cost a great deal, and `Auto`'s plan was the costlier to
+  run in memory; why is unknown (`measurements/cadp-large.md`).
 - **Heavy proofs need a memory cap**, one per process. The ABP and
   `Test4` proofs peak at ~3.8-4.3GB; two such proofs in one file were
   OOM-killed at 6GB. `MeBi Config Bounds Memory <mb>` (2026-10-16; on by

@@ -1,0 +1,2 @@
+suite	mode	file	index	status	iterations	proof	begin_s	solve_s	qed_s
+cadp-huge	auto	ThreeProcessesFifo	1	Solved	45773	wbis_norm_3	3.871	1905.507	346.268

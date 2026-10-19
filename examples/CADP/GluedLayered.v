@@ -98,6 +98,17 @@ Proof. MeBi Sim Begin bigstep c1 And lts c1 Using step.
    stopped then. Where that time goes (setting up the mutual cofix over
    514,020 pairs is the likely place) is unmeasured.
 
+   Repeated 2026-10-15/16 on a 31GB machine under [Answers Auto], 24GiB
+   cap (see [TwoProcessesGluedLayered.v] and
+   doc/measurements/cadp-large.md): still out of memory, nested after
+   2h05m and, with [Bounds Game], after 16h00m. With [Bounds Game] [Begin]
+   took 4,489s (not ~90s) and the mutual cofix had 78,202 pairs and
+   312,808 moves (not 514,020 and 2,056,080). Under [Answers Default] the
+   old figures come back (Begin 81.9s, 514,020 pairs), with memory flat at
+   ~2.2GiB for 16h and 5.0GiB at 24h, where a timeout stopped it with no
+   proof: so those differences are the answer policy, for reasons not
+   known.
+
    See OUTSTANDING.md (CADP) and doc/future-work.md ("Proofs split into
    separately checked lemmas"). *)
 

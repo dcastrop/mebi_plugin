@@ -11,8 +11,23 @@
    [Auto] then takes the nested cofix without estimating. With
    [MeBi Config Bounds Game 100000000] it estimates instead and picks the
    mutual cofix (514,020 pairs, 2,056,080 moves); that run did not finish
-   its first 2000-step chunk in 2h28m, with memory flat at ~2.2GB. Both are
-   worth repeating under [Answers Auto] and with more memory.
+   its first 2000-step chunk in 2h28m, with memory flat at ~2.2GB.
+
+   Repeated 2026-10-15/16 on a 31GB machine under [Answers Auto], 24GiB
+   cap, [Solve 1000000]: still NOT PROVED. Nested: OOM in [Solve] after
+   2h05m ([Begin] 30.6s). With [Bounds Game 100000000]: [Begin] took
+   4,489s, then the mutual cofix over 78,202 pairs and 312,808 moves (not
+   514,020 and 2,056,080), and OOM in [Solve] after 16h00m in all. Memory
+   rose to 12.5GiB in 3h, sat at 16.7GiB for about 4.6h, then reached the
+   cap.
+
+   The same with [Answers Default] and [Bounds Game] reproduces the 14GB
+   machine: [Begin] 81.9s, the 514,020-pair game, and memory flat at
+   ~2.2GiB for 16h, then 4.0GiB and 5.0GiB at 24h, where it was stopped by
+   a 24h timeout (not by memory) with no proof. So the difference from the
+   [Auto] run is the answer policy; why is not known. Not run: this proof
+   under [Auto] above 24GiB, or under [Default] for longer than 24h. See
+   doc/measurements/cadp-large.md.
 
    Run it under a memory cap, as [bench/proofs.sh -s cadp-huge -f
    TwoProcessesGluedLayered.v -M <cap>]. To try the mutual cofix, put

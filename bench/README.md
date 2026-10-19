@@ -20,6 +20,25 @@ reserve its heaps.)
 | `lib.sh` | shared helpers, sourced by the others |
 | `ocaml/` | pure-OCaml benchmarks of the model's algorithms, on FSMs extracted from the examples and on generated families: see [`ocaml/README.md`](ocaml/README.md) |
 
+## Requirements
+
+`proofs.sh` needs `systemd-run` and **GNU `time` at `/usr/bin/time`**
+(`lib.sh`, `bench_capped`, calls it with `-f` to get each run's peak memory
+and seconds). Where `/usr/bin/time` is missing, such as NixOS or a minimal
+Debian or Ubuntu image, every run fails at once with `Failed to find
+executable /usr/bin/time` in its log, `exit 1` and 0 errors in `runs.tsv`.
+That looks like a result and is not one.
+
+To fix it on a host where it matters:
+- Debian or Ubuntu: `apt install time`.
+- Nix: run under `nix-shell -p time --run 'bench/proofs.sh ...'` and, in a
+  local copy of `lib.sh`, change `/usr/bin/time` to `"$(type -P time)"`
+  (`type -P` finds the program, not bash's `time` keyword). This is not
+  committed: hosts that have `/usr/bin/time` need no change, and a lookup
+  that falls back to `PATH` has not been tried on them.
+- Any other host: install GNU `time` (not BSD or busybox: they lack `-f`)
+  and edit the same line.
+
 ## Running the proof suites
 
 ```sh
@@ -40,8 +59,8 @@ bench/proofs.sh -s cadp-large -a Default -t old   # force an answer policy, to c
 | `test4` | `Proc/Test4/NormProofs.v`, `NormBisimProofs.v` | ~0.5 + ~4 min, ~2.8GB peak |
 | `eval` | `examples/Evaluation/{Width,Layers,Depth}.v` | ~40s |
 | `eval-large` | `examples/Evaluation/{Width,Layers,Depth}Large.v`, the same levers scaled up | ~7 + ~1.5 + ~1 min, ~4GB peak |
-| `cadp-large` | `examples/CADP/MutualExclusionLarge.v` | ~10 min, ~4.4GB (two processes direct), as measured under `Answers Default` |
-| `cadp-huge` | `examples/CADP/{ThreeProcessesMutex,ThreeProcessesFifo,TwoProcessesGluedLayered}.v`, the three proofs that ran out of memory at 7-10GB, one per file | unknown: may not finish; give `-M` and run one at a time |
+| `cadp-large` | `examples/CADP/MutualExclusionLarge.v` | ~10 min, ~4.5GiB (two processes direct), under `Answers Auto` and `Default` alike |
+| `cadp-huge` | `examples/CADP/{ThreeProcessesMutex,ThreeProcessesFifo,TwoProcessesGluedLayered}.v`, the three proofs that ran out of memory at 7-10GB on a 14GB host, one per file | on a 31GB host: mutex ~23 min, 13.4GiB; fifo ~37 min, 17.8GiB; glued ≈ layered out of memory at 24GiB after 2-16h (`doc/measurements/cadp-large.md`). Give `-M` and run one at a time |
 
 `-m` takes a comma-separated list of the following:
 - `auto` runs each file as written.

@@ -1,0 +1,2 @@
+suite	mode	file	exit	seconds	peak_mb	errors
+cadp-huge	auto	ThreeProcessesMutex	0	1366.97	13679	0

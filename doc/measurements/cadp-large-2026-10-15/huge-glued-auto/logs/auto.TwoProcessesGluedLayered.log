@@ -1,0 +1,37 @@
+
+(MeBi loaded. [MeBi Help.] lists the commands; [MeBi Config Output "Info" False.] hides routine messages.)
+Chars 1204 - 1231 [Require~Import~MEBI.loader.] 0.008 secs (0.006u,0.002s)
+Chars 1233 - 1266 [MeBi~Config~Output~"Debug"~False.] 0. secs (0.u,0.s)
+Chars 1267 - 1299 [MeBi~Config~Output~"Info"~False.] 0. secs (0.u,0.s)
+Chars 1300 - 1333 [MeBi~Config~Output~"Notice"~True.] 0. secs (0.u,0.s)
+Chars 1334 - 1368 [MeBi~Config~Output~"Warning"~T...] 0. secs (0.u,0.s)
+Chars 1369 - 1401 [MeBi~Config~Output~"Error"~True.] 0. secs (0.u,0.s)
+Chars 1402 - 1435 [MeBi~Config~Output~"Trace"~False.] 0. secs (0.u,0.s)
+Chars 1436 - 1470 [MeBi~Config~Output~"Result"~Fa...] 0. secs (0.u,0.s)
+Chars 1471 - 1503 [MeBi~Config~Output~"Show"~False.] 0. secs (0.u,0.s)
+Chars 1504 - 1545 [MeBi~Config~Output~"DecodeResu...] 0. secs (0.u,0.s)
+Chars 1546 - 1585 [MeBi~Config~Output~"DumpResult...] 0. secs (0.u,0.s)
+Chars 1587 - 1620 [Require~Import~MEBI.Bisimilarity.] 0. secs (0.u,0.s)
+Chars 1621 - 1661 [Require~Import~MEBI.Examples.C...] 0.108 secs (0.064u,0.043s)
+Chars 1662 - 1702 [Require~Import~MEBI.Examples.C...] 0. secs (0.u,0.s)
+Chars 1703 - 1743 [Require~Import~MEBI.Examples.C...] 0. secs (0.u,0.s)
+Chars 1745 - 1778 [MeBi~Config~Weak~As~Option~label.] 0. secs (0.u,0.s)
+
+(Exploring up to 15000 states may need 0.1--1.1GB of memory: extraction has measured 0.01--0.07MB per state, and logging the result with Output "Result" adds ~0.65MB per state.)
+Chars 1779 - 1818 [MeBi~Config~Bounds~As~Num~Stat...] 0. secs (0.u,0.s)
+
+- - - - - - - - - - - - - - - -
+Examples.CADP.TwoProcessesGluedLayered
+Chars 1820 - 1874 [MeBi~Divider~"Examples.CADP.Tw...] 0. secs (0.u,0.s)
+Chars 1875 - 1935 [Example~wbis_bigstep_lts~:~wea...] 0. secs (0.u,0.s)
+Chars 1936 - 1942 [Proof.] 0. secs (0.u,0.s)
+
+(The two systems share 772 states, 750 of which move differently on each side: two relations whose state terms coincide. The second system's copies are kept apart.)
+File "/home/cathe/mebi-bench/huge-glued-auto/examples/CADP/TwoProcessesGluedLayered_bench_auto.v", line 45, characters 7-55:
+Warning:
+
+FSM B would saturate to 1091776 weak actions from 12027 states (24054 strong transitions, 10083 silent SCCs, the largest with 4), above the bound of 1000000 (about 491MB--983MB of memory). Instead, MeBi saturates each state only when it is needed, holding at most 1000000 weak actions (about 450MB--900MB) and saturating again any it had to drop, and decides bisimilarity on the 10083 silent SCCs rather than on the saturated FSM. The verdict is the same; a proof may take longer. [MeBi Config Saturation OnDemand False] refuses such FSMs instead. See [MeBi Help Config Saturation].
+
+(Saturated on demand: Auto takes the nested cofix without estimating, as estimating would walk the whole game up front. [MeBi Config Bounds Game <n>] lets it estimate within <n> pairs.)
+Chars 1943 - 1991 [MeBi~Sim~Begin~bigstep~c2~And~...] 30.605 secs (30.155u,0.29s)
+BENCH_EXIT 143

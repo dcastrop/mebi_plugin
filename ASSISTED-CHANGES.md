@@ -8765,6 +8765,139 @@ Bug fix 0 · Optimization 0 · Tooling 0.
 
 ---
 
+## 2026-10-16 — the large CADP proofs, re-run on a 31GB host
+
+On branch `docs/cadp-large-rerun`, at the user's request, as planned in
+`doc/future-work.md`. No plugin or solver code changed: measurement and
+documentation only.
+
+**What was run** (one proof file per process, one at a time, `MemoryMax=24G`,
+no swap): `MutualExclusionLarge.v` under `Answers Auto` and `Default`; the two
+three-process proofs under both; glued ~ layered nested, and mutual with
+`Bounds Game 100000000`. The full tables, setup and raw files are in
+`doc/measurements/cadp-large.md` and `cadp-large-2026-10-15/`.
+
+**Findings.** The two three-process proofs (`ThreeProcessesMutex.v`,
+`ThreeProcessesFifo.v`) finish: 20,432 and 45,773 steps, 13.4 and 17.8GiB peak,
+23 and 37 min. They take the same steps under `Auto` and `Default`, so the
+host, not the policy, is what changed. Glued ~ layered does not: out of
+memory at 24GiB, nested after 2h05m and mutual after 16h (its `Begin` alone
+took 4,489s). The mutual run's game (78,202 pairs) and `Begin` time do not
+match the earlier 14GB run's (514,020 pairs, ~90s); unexplained, and the one
+run that could say (`Bounds Game` under `Default`) was not made.
+
+**Docs.** The measurements file and raw data; the three-process proofs'
+headers (no longer "NOT PROVED"), `GluedLayered.v`, `MutualExclusionLarge.v`
+and `_CoqProject`'s comments (comments only; the files were not recompiled);
+`examples/README.md`, `decide-vs-prove.md`, `limitations.md`, decision 4,
+`future-work.md` and `bench/README.md`. `OUTSTANDING.md` loses the re-run
+item and says what is proved and not for CADP.
+
+**Mistakes, mine.**
+- Two launches of the run script failed at once, so no run was real. The
+  host's bash and `time` are not at `/bin/bash` and `/usr/bin/time` (NixOS).
+  The script's `exit 1` rows were not results; I deleted them. I committed a
+  `BENCH_TIME` variable for this and called it a fix; it only helps
+  where someone sets it, so at the user's request I dropped the commit and ran
+  with a local, uncommitted edit (`"$(type -P time)"`), under
+  `nix-shell -p time`. `bench/lib.sh` still has the hard-coded path.
+- I said the first glued run was killed by my 4h `timeout` (exit 143) before
+  looking. It was the kernel OOM killer at 24GiB, after 2h05m, as the journal
+  and the user's own observation showed.
+- The first write-up read `peak_mb` (MiB) as decimal GB, wrote "flat for ~3
+  hours" where it was ~4.6, and said the relation to the "not proved" lines
+  was unchecked when the file headers said so. `ab97e1b` corrects all three.
+  I also chained a `git commit` after a Python edit that had not run
+  (`python3` is not installed), so it committed the uncorrected file; I amended
+  it before anything was pushed.
+- I predicted that the mutual path would stay near the earlier 2.2GB and
+  that memory had plateaued, more than once; it climbed to the cap.
+
+**Not done:** `Bounds Game` under `Default`, glued above 24GiB, and a fix for
+`bench/lib.sh`'s `/usr/bin/time` (all in `doc/future-work.md`).
+
+Revert: `git revert -m 1 <merge commit>` (docs and comments only).
+
+**Session tally (2026-10-16):** Docs 5 · Tooling 0 · Optimization 0 ·
+Refactor 0 · Bug fix 0 · **New feature 0.**
+
+---
+
+## 2026-10-17 — the glued run under `Answers Default`
+
+Same branch, `docs/cadp-large-rerun`. One more run, and the docs updated
+from it. No plugin or solver code changed.
+
+**Run:** glued ~ layered, mutual cofix with `Bounds Game 100000000`, under
+`Answers Default`, 24G cap, 24h timeout. It was stopped by the timeout at
+13:51:33, with no `Solved` line, no OOM kill (the journal's line for its scope
+has none) and memory at 5.0GiB. `Begin` took 81.9s on the 14GB host's game
+(514,020 pairs, 2,056,080 moves), and memory was flat at ~2.2GiB for 16h
+before one step of 1.7GiB. Raw files are in
+`doc/measurements/cadp-large-2026-10-15/huge-glued-boundsgame-default/`.
+
+**Finding.** The `Auto` run's different game (78,202 pairs), `Begin` time
+(4,489s) and memory are the answer policy's doing: only `-a` differs between
+the two runs. `Auto` plans 6.6 times fewer pairs and moves, and the run that
+follows uses far more memory. Why is not known. Neither run finished, so
+nothing is claimed about which would. This replaces the "unexplained" in the
+2026-10-16 entry and `ab97e1b`.
+
+**Docs:** `cadp-large.md` (the run, a memory table, the explanation, the
+changes since `ab97e1b`), the two glued proof files' headers, `_CoqProject`,
+`examples/README.md`, `decide-vs-prove.md`, `limitations.md`, decision 4,
+`future-work.md` and `OUTSTANDING.md`.
+
+**Also:** `bench/README.md` has a "Requirements" note on GNU `time` at
+`/usr/bin/time` and how to work around its absence (NixOS, minimal images). The
+code is unchanged on purpose: the user chose a note over a `PATH` fallback that
+has not been tried on hosts where the path already works. The header comments of
+the five edited `.v` files compile (truncated before their long proofs; the
+mutual exclusion Large file up to its direct two-process proof).
+
+**Not run:** the `Default` run for longer than 24h (stopped there at the
+user's choice; time, not memory, is its limit) and `Auto` above 24GiB.
+
+**Noted, not understood:** a host-level kernel OOM kill at 09:45:31 hit some
+other process (not the run) while a `nix build` and an odoc build were
+running. I did not identify it. `rocqworker` has `oom_score_adj=200`, so a
+run like this is a likelier victim than desktop processes under host
+pressure.
+
+Revert: `git revert -m 1 <merge commit>` (docs and comments only).
+
+**Session tally (2026-10-17):** Docs 2 · Tooling 0 · Optimization 0 ·
+Refactor 0 · Bug fix 0 · **New feature 0.**
+
+---
+
+## 2026-10-19 — the CADP re-run branch, rebased onto `main`
+
+`docs/cadp-large-rerun` was cut from `e593bf5`; `main` had since gained the
+`test/rocq/` move, the licence decision's removal from `doc/decisions.md`
+and `Bounds Memory`. Rebased onto it, at Jonah's request, so that merging it
+into the fork's `main` adds it to upstream PR dcastrop#53.
+
+**Conflicts**, all resolved to the branch's text: `OUTSTANDING.md`'s glued ≈
+layered line, `doc/future-work.md`'s re-run section (the branch replaces the
+recipe with "What remains", so `main`'s edits to the recipe go with it), and
+`ASSISTED-CHANGES.md`, where both sides appended entries; the branch's two
+now follow `main`'s.
+
+**Follow-ups.** The decision the CADP lines point to, proofs split into
+separately checked lemmas, is number 3 now, not 4: renumbered in
+`OUTSTANDING.md` and `doc/future-work.md`, and noted in
+`measurements/cadp-large.md`, which is left as recorded. That file and
+`future-work.md` ("What remains") now say that the runs predate `Bounds
+Memory`, whose default under `-M 24G` (90% of the cap, ~21.6GiB) would stop
+the glued `Auto` run with `Memory_Bound_Exceeded` before the cap, so a run
+above 24GiB must raise it.
+
+**Session tally (2026-10-19):** Docs 1 · Tooling 0 · Optimization 0 ·
+Refactor 0 · Bug fix 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

@@ -1,0 +1,216 @@
+# The large CADP proofs, re-run on a bigger host: measurements
+
+Recorded 2026-10-16, with the `Answers Default` glued run added 2026-10-17.
+Every figure below was checked against the raw files in
+[`cadp-large-2026-10-15/`](cadp-large-2026-10-15/) (the first pass,
+`ea452ed`, was written from the run output; this version corrects it, see
+"Corrections").
+
+Raw files, one directory per run: `solves.tsv`, `runs.tsv` and `logs/` from
+`bench/proofs.sh`. `journal-scopes.txt` is the systemd journal's line for
+each run's memory-capped scope (the cgroup's peak, and the OOM kills).
+`huge-glued-boundsgame/rss-samples.txt` and
+`huge-glued-boundsgame-default/rss-samples.txt` are those two runs'
+resident memory (MiB, with the process's elapsed time) every 30s. The plan is `doc/future-work.md`, "Re-running the large
+CADP proofs".
+
+## Setup
+
+AMD Ryzen 7 5700X (8 cores, 16 threads), 31GB RAM, Linux 7.2.9-zen1,
+NixOS. Rocq 9.2, OCaml 5.4.0. Plugin at `main` (`e593bf5`). One proof file
+per process, run strictly one at a time of these (the host was in desktop
+use throughout, including builds; a host-level OOM kill hit some other
+process at 2026-10-17 09:45:31 during the last run, which survived it).
+Each run is in a
+`systemd-run --user --scope` with `MemoryMax=24G` (24 GiB) and no swap. The
+only difference from `main` was a local, uncommitted edit of
+`bench/lib.sh` to find GNU `time` (NixOS has no `/usr/bin/time`).
+
+The runs predate `MeBi Config Bounds Memory` (on by default since
+2026-10-16, after `e593bf5`). Under a `MemoryMax=24G` scope its default is
+90% of the cap, about 21.6 GiB, so on later builds the two runs that reached
+the cap would stop with `Memory_Bound_Exceeded` a little earlier instead of
+being OOM-killed. The finished runs peaked below it.
+
+**Units.** Memory is in GiB (1024³ bytes), as systemd's `24G` is.
+`runs.tsv`'s `peak_mb` is MiB: the largest resident size of the process
+(`time`'s `%M`). The journal's "memory peak" is the whole scope's, so it is
+a little higher or lower. Both are given where they differ.
+
+## Results
+
+| run | policy | result | wall | peak (`runs.tsv`; journal) |
+|---|---|---|---|---|
+| `MutualExclusionLarge.v` (5 proofs) | Auto | all Solved | 10.6 min | 4.5 GiB; 4.4 |
+| `MutualExclusionLarge.v` (5 proofs) | Default | all Solved | 10.5 min | 4.3 GiB; 4.2 |
+| `ThreeProcessesMutex.v` | Auto | Solved, 20,432 steps | 22.8 min | 13.4 GiB; 13.3 |
+| `ThreeProcessesMutex.v` | Default | Solved, 20,432 steps | 23.7 min | 13.4 GiB; 13.3 |
+| `ThreeProcessesFifo.v` | Auto | Solved, 45,773 steps | 37.6 min | 17.8 GiB; 17.8 |
+| `ThreeProcessesFifo.v` | Default | Solved, 45,773 steps | 36.3 min | 17.9 GiB; 17.9 |
+| `TwoProcessesGluedLayered.v`, nested cofix | Auto | **out of memory** in `Solve` | 2h05m | 24 GiB (cap); 24 |
+| `TwoProcessesGluedLayered.v`, mutual cofix, `Bounds Game 100000000` | Auto | **out of memory** in `Solve` | 16h00m | 24 GiB (cap); 24 |
+| `TwoProcessesGluedLayered.v`, mutual cofix, `Bounds Game 100000000` | Default | **not finished**: stopped by my 24h timeout, no OOM, no `Solved` | 23h59m | 5.0 GiB (last sample; journal 5) |
+
+`Default` is `-a Default` to `bench/proofs.sh` (`MeBi Config Solver Answers
+Default`), the policy before 2026-10-15; `Auto` is the plugin's default.
+All six finished runs exited 0 with 0 errors, and each proof's `Qed` is in
+its log. The three glued runs have no peak or row in `runs.tsv`: `time` and
+`proofs.sh` were killed with the process, so the journal and the memory
+samples are the only sources.
+
+### `MutualExclusionLarge.v`, steps per proof
+
+| proof | Auto | Default |
+|---|---|---|
+| `wsim_norm_2` | 1,038 | 1,038 |
+| `wsim_norm_r_2` | 75 | 153 |
+| `wsim_norm_r_3` | 124 | 326 |
+| `wsim_bigstep_direct_2` | 11,128 | 11,128 |
+| `wsim_spec_lts_direct_2` | 305 | 405 |
+
+Counts are `Solved after N iterations`. Total time and memory are the same
+for both policies: the 11,128-step proof is ~560s of the ~630s.
+
+### The three-process proofs
+
+| | Auto | Default |
+|---|---|---|
+| mutex `wsim_norm_3`: `Solve` / `Qed` | 1,205s / 157s | 1,260s / 157s |
+| fifo `wbis_norm_3`: `Solve` / `Qed` | 1,906s / 346s | 1,839s / 334s |
+
+Both chose the mutual cofix (`Auto:` line in each log): mutex over 644
+pairs and 1,932 moves, fifo over 644 pairs and 3,714 moves. `Qed` is a
+large share of the fifo proof's time.
+
+### Glued ~ layered
+
+Both runs saturated FSM B on demand (1,091,776 weak actions from 12,027
+states, over the 1,000,000 bound; 10,083 silent SCCs).
+
+- **Nested (no `Bounds Game`):** Auto takes the nested cofix without
+  estimating. `Sim Begin` took 30.6s. Out of memory in `Solve` after 2h05m.
+- **`Bounds Game 100000000`:** Auto estimates, which took the whole of
+  `Sim Begin`: 4,489s. It chose the mutual cofix over 78,202 pairs (312,808
+  moves; the nested path would visit over 1,564,040 goals). `Solve` then
+  ran about 14.7 hours until it was killed at 11:20:06. Resident memory
+  (`rss-samples.txt`):
+
+| elapsed | resident |
+|---|---|
+| 0:09 (first sample) | 3.9 GiB (4,010 MiB) |
+| 1:00 | 5.6 GiB (5,737 MiB) |
+| 2:00 | 11.7 GiB (11,948 MiB) |
+| 3:00 | 12.5 GiB (12,844 MiB) |
+| 4:00 | 13.8 GiB (14,144 MiB) |
+| 5:00 | 15.3 GiB (15,698 MiB) |
+| 6:00 | 16.7 GiB (17,133 MiB) |
+| 6:00 to 10:42 | 16.7 GiB, then 16.7 (17,059 MiB), changing by under 75 MiB |
+| 16:00 (last sample) | 24.0 GiB (24,544 MiB), the maximum |
+
+So `Begin`'s estimate does not hold it down: most of the growth came during
+the first hours, there was a flat stretch of about 4.6 hours at 16.7 GiB,
+and then it grew again to the cap.
+
+- **`Bounds Game 100000000` under `Answers Default`:** the same file and
+  build, with only the policy changed. `Sim Begin` took 81.9s. `Auto:` chose
+  the mutual cofix over **514,020 pairs, 2,056,080 moves** (nested: over
+  10,280,400 goals). `Solve` then ran about 23h40m until my 24h `timeout`
+  stopped it at 13:51:33 on 2026-10-17: no `Solved` line, no OOM kill (the
+  journal's line for the scope has none), 23h51m CPU over 23h59m wall. The
+  solver prints nothing before it ends, so how far it got is unknown.
+  Resident memory (`huge-glued-boundsgame-default/rss-samples.txt`):
+
+| elapsed | resident |
+|---|---|
+| 0:10 (first sample) | 0.5 GiB (471 MiB, during `Begin`) |
+| 2:00 | 2.2 GiB (2,234 MiB) |
+| 6:00 | 2.2 GiB (2,301 MiB) |
+| 12:00 | 2.3 GiB (2,401 MiB) |
+| 16:00 | 2.4 GiB (2,482 MiB) |
+| 16:27 to 16:30 | steps from 2.4 to 4.0 GiB (2,488, 3,392, 4,116 MiB) |
+| 18:00 | 4.2 GiB (4,251 MiB) |
+| 22:00 | 4.6 GiB (4,675 MiB) |
+| 23:59 (last sample) | 5.0 GiB (5,137 MiB), the maximum |
+
+  From the first two hours to hour 16 it grew by about 10-25 MiB an hour,
+  then once by 1.7 GiB, then by about 100-250 MiB an hour. A's growth in the
+  same stage was about 1.0-1.5 GiB an hour. (The first column is the
+  process's own elapsed time, about 40s less than the run's wall time.)
+
+## What this says
+
+- **Auto's step savings** on `MutualExclusionLarge.v` are real (three of
+  five proofs), and cost nothing in status, time or memory.
+- **The three-process proofs fit on this host, and `Answers Auto` is not why.**
+  The `Default` runs of both take the same steps, and about the same time
+  and memory, as the `Auto` runs. The 14GB host ran out of memory at 8GB on
+  mutex under Auto (`ThreeProcessesMutex.v` header), so what changed is the
+  host. These two files are the proofs their headers call "NOT PROVED: this
+  is the proof that ran out of memory", over the same normalised semantics
+  (644 states), so they are now proved, with the figures above.
+- **Glued ~ layered is still not proved**, on any path tried: out of memory
+  at 24 GiB nested (after 2h05m) and mutual under `Auto` (after 16h), and
+  not finished in 24h mutual under `Default`. More memory than the 14GB host
+  did not change the nested result (7-10GB there, 24 GiB here).
+
+### The `Bounds Game` difference from the 14GB host is the answer policy
+
+`TwoProcessesGluedLayered.v`'s header records the 14GB host's `Bounds Game`
+run (2026-10-12, before `Answers Auto`): the mutual cofix over 514,020
+pairs and 2,056,080 moves, unfinished after 2h28m with memory flat at
+~2.2GB, and a `Begin` of ~90s. The first re-run here, under `Auto`, was
+different: `Begin` 4,489s, a game of 78,202 pairs and 312,808 moves, and
+memory of 12.1 GiB at the same point (2h29m: 12,412 MiB), rising to the cap.
+
+The `Default` run reproduces the 14GB host's figures: the same game
+(514,020 pairs, 2,056,080 moves), `Begin` 81.9s, and ~2.2 GiB flat for 16
+hours. Only the policy differs between the two runs here (same host, same
+build, same file), so the policy is what changed them. Why is not known:
+the `Auto` plan has 6.6 times fewer pairs and 6.6 times fewer moves, yet its
+`Begin` takes 55 times as long and its `Solve` uses far more memory. For
+this proof `Auto`'s predicted-cheapest plan is not cheaper to run. That says
+nothing about which would finish: neither did.
+
+## Not run
+
+- Glued ~ layered under `Auto` at a cap above 24 GiB. The host has 31GB, so
+  there is little room; the steady 16.7 GiB stretch and the final climb
+  suggest the need is well above 24 GiB.
+- Glued ~ layered under `Default` for longer than 24h. I stopped it there;
+  its memory at that point (5.0 GiB, growing about 100-250 MiB an hour)
+  was not the limit, so time is.
+
+## Docs updated from these results
+
+`OUTSTANDING.md` (the re-run item is removed; the two CADP lines are
+updated); `examples/README.md` (the three-process table and prose);
+`doc/decide-vs-prove.md` (rows, ratios and points 2 and 3);
+`doc/decisions.md` item 4 (item 3 since the licence decision left the list on 2026-10-17); `doc/limitations.md`; `doc/future-work.md`
+(the section is now what remains); `bench/README.md`; the headers of
+`ThreeProcessesMutex.v`, `ThreeProcessesFifo.v`,
+`TwoProcessesGluedLayered.v`, `GluedLayered.v` and
+`MutualExclusionLarge.v`, and the comments in `_CoqProject`;
+`ASSISTED-CHANGES.md`.
+
+## Corrections to the first pass (`ea452ed`)
+
+- **Units.** The first pass wrote `peak_mb` values as decimal GB (13.7GB
+  for 13,679 MiB). They are MiB; the figures above are GiB.
+- **Caveat withdrawn.** It said the relation of `wsim_norm_3`/`wbis_norm_3`
+  to the "not proved" lines was unchecked. The files' headers say they are
+  those proofs.
+- **Flat stretch.** It said memory stayed flat for "about 3 hours"; the
+  samples show about 4.6 hours (16.7 GiB, 17,133 then 17,059 MiB).
+- **An earlier claim in the session, not in this file.** The first glued
+  run was first described as killed by the 4h timeout. It was an OOM kill
+  at 24 GiB (kernel log), not a timeout.
+
+## Changes since `ab97e1b`
+
+- 2026-10-17: the `Answers Default` glued run was added, and with it the
+  explanation of the `Bounds Game` difference from the 14GB host (the
+  policy). `ab97e1b` called that difference unexplained and the `Default`
+  run not made; both are superseded. It also said the policy was untested
+  as a cause; that is now tested.
+- The same commit's "Not run" list had `Bounds Game` under `Default`; that
+  is now run, and "above 24 GiB" is now about the `Auto` path only.
