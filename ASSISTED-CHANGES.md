@@ -8871,6 +8871,33 @@ Refactor 0 · Bug fix 0 · **New feature 0.**
 
 ---
 
+## 2026-10-19 — the CADP re-run branch, rebased onto `main`
+
+`docs/cadp-large-rerun` was cut from `e593bf5`; `main` had since gained the
+`test/rocq/` move, the licence decision's removal from `doc/decisions.md`
+and `Bounds Memory`. Rebased onto it, at Jonah's request, so that merging it
+into the fork's `main` adds it to upstream PR dcastrop#53.
+
+**Conflicts**, all resolved to the branch's text: `OUTSTANDING.md`'s glued ≈
+layered line, `doc/future-work.md`'s re-run section (the branch replaces the
+recipe with "What remains", so `main`'s edits to the recipe go with it), and
+`ASSISTED-CHANGES.md`, where both sides appended entries; the branch's two
+now follow `main`'s.
+
+**Follow-ups.** The decision the CADP lines point to, proofs split into
+separately checked lemmas, is number 3 now, not 4: renumbered in
+`OUTSTANDING.md` and `doc/future-work.md`, and noted in
+`measurements/cadp-large.md`, which is left as recorded. That file and
+`future-work.md` ("What remains") now say that the runs predate `Bounds
+Memory`, whose default under `-M 24G` (90% of the cap, ~21.6GiB) would stop
+the glued `Auto` run with `Memory_Bound_Exceeded` before the cap, so a run
+above 24GiB must raise it.
+
+**Session tally (2026-10-19):** Docs 1 · Tooling 0 · Optimization 0 ·
+Refactor 0 · Bug fix 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

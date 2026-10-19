@@ -193,7 +193,10 @@ in `bench/README.md` (`-s cadp-large`, `-s cadp-huge`, with `-M` and `-a`).
   open *optimization* question.
 - **Glued ≈ layered under `Auto` above 24GiB**, if a host has room: the
   proof sat at 16.7GiB for ~4.6h and then climbed, so it needs more than
-  24GiB, by an unknown amount. Less promising than the first item.
+  24GiB, by an unknown amount. Less promising than the first item. Since
+  2026-10-16 `Bounds Memory` stops a command at 90% of a cgroup cap by
+  default (about 21.6GiB under `-M 24G`), so set it higher, or to `0`, in the
+  working copy for this run, and rely on the cap.
 - **`bench/lib.sh` needs GNU `time` at `/usr/bin/time`**, and fails
   at once without it ("Failed to find executable /usr/bin/time", exit 1, 0
   errors, easily mistaken for a result). NixOS has none. The re-run

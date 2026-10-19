@@ -26,6 +26,12 @@ Each run is in a
 only difference from `main` was a local, uncommitted edit of
 `bench/lib.sh` to find GNU `time` (NixOS has no `/usr/bin/time`).
 
+The runs predate `MeBi Config Bounds Memory` (on by default since
+2026-10-16, after `e593bf5`). Under a `MemoryMax=24G` scope its default is
+90% of the cap, about 21.6 GiB, so on later builds the two runs that reached
+the cap would stop with `Memory_Bound_Exceeded` a little earlier instead of
+being OOM-killed. The finished runs peaked below it.
+
 **Units.** Memory is in GiB (1024³ bytes), as systemd's `24G` is.
 `runs.tsv`'s `peak_mb` is MiB: the largest resident size of the process
 (`time`'s `%M`). The journal's "memory peak" is the whole scope's, so it is
@@ -179,7 +185,7 @@ nothing about which would finish: neither did.
 `OUTSTANDING.md` (the re-run item is removed; the two CADP lines are
 updated); `examples/README.md` (the three-process table and prose);
 `doc/decide-vs-prove.md` (rows, ratios and points 2 and 3);
-`doc/decisions.md` item 4; `doc/limitations.md`; `doc/future-work.md`
+`doc/decisions.md` item 4 (item 3 since the licence decision left the list on 2026-10-17); `doc/limitations.md`; `doc/future-work.md`
 (the section is now what remains); `bench/README.md`; the headers of
 `ThreeProcessesMutex.v`, `ThreeProcessesFifo.v`,
 `TwoProcessesGluedLayered.v`, `GluedLayered.v` and
