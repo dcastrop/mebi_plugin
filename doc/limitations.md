@@ -22,13 +22,25 @@ turns the pin into a positive test.
   `DepthLarge.v` at K = 16 needs the depth raised.
 - **LTS premises whose source nothing determines** find only some of their
   steps (*limit*, warned; pinned `OutputPremises.open_u`/`open_ur`).
+- **A premise that matches on an argument nothing fixes** (`match x with
+  ...` for an `x` only the conclusion mentions) is undecided:
+  `LTS_Incomplete` (*limit*, pinned `ExternalFeedback`). A `match` on the
+  source term works, and so does `In x (f p)` with `f` computable.
+  Enumerating the matched argument's constructors would be a new
+  *capability* (small). From external feedback
+  (`feedback-2026-10-15.md`, item 3).
 - **Self-referential "collapsing" definitions** with a silent collapse
   (B1) are infinite with no finite quotient, and are refused at the state
   bound (*limit*, pinned `Collapsing`). Guarded variants work.
 - **LTSs with parameters** are refused (`LTS_Has_Parameters`; *limit*,
   pinned `ParameterisedLTS`). This rules out an LTS generic in its label
   type, or one defined in a `Section`. Workaround: fix the values in a
-  module (`examples/Evaluation/Depth.v`). Making this work would be a new
+  module (`examples/Evaluation/Depth.v`). Cheaper (2026-10-19): a
+  one-constructor wrapper whose premise is the applied relation,
+  `wrap3 n l m : countLTS 3 n l m -> wrapped3 n l m` (pinned
+  `ParameterisedLTS.wrapped3`). Its premise is decided by the proof
+  search, so derivations deeper than `Premise Depth` need it raised.
+  Making this work would be a new
   *capability* (medium). Sketch:
   - accept a term (`constr`) where an LTS is named;
   - instantiate the parameters in the constructor types (`mind_nf_lc`);

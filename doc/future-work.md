@@ -206,6 +206,43 @@ in `bench/README.md` (`-s cadp-large`, `-s cadp-huge`, with `-M` and `-a`).
   `/usr/bin/time` work as they are, and a `PATH` fallback has not been tried
   on them.
 
+## Compact output
+
+**The problem** (external feedback, `feedback-2026-10-15.md`, item 5):
+`Output "Result"` prints thousands of lines of JSON for six states.
+Measured 2026-10-19 on a 3-state FSM (`Run FSM`, 2 edges): 180 lines, of
+which ~135 are `info.meta."rocq lts"`, the relation's constructors and how
+each binds its arguments. That block grows with the number of
+constructors, not with the system: the feedback's calculus had ~25
+constructors, and `Run Bisim` prints four FSMs (each original and
+saturated) before its result. Most of the rest is per edge: the label's
+encoding, `annotation` and the derivation `trees`. The states and edges
+proper are a dozen lines.
+
+It is not JSON's "bloat" so much as what is printed. Options, smallest
+first:
+1. **Leave the metadata out** of what `Output "Result"` prints (constructor
+   bindings, derivation trees, annotations), behind a switch that brings
+   it back, e.g. `MeBi Config Output "Detail" True`. Dumps to `_dumps/`
+   keep everything, since tools read them; a checker such as the
+   feedback's needs only states, labels and edges. Small, and most of the gain.
+2. **A compact form**: states and labels numbered once, edges as triples,
+   e.g.
+   ```
+   states: 0 (pre A (pre B done)); 1 (pre B done); 2 done
+   labels: 0 A; 1 B
+   edges:  0 -0-> 1; 1 -1-> 2
+   ```
+   For `Run Bisim`, one more line per class of bisimilar states (the
+   "compact table of classes" the feedback asked for). A YAML form would
+   do too, but needs an emitter of its own (`yojson` has none), and
+   nothing else reads it.
+3. Both: 1 for JSON, 2 as what a person reads by default.
+
+Recommendation: 1 now, 2 if 1 is not enough. Either changes only output,
+not what the plugin can do. Not started: Jonah's choice
+(`OUTSTANDING.md`).
+
 ## Smaller possible work
 
 **Evaluation** (detail in Jonah's local notes 10 and 12)

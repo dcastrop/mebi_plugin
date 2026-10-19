@@ -693,6 +693,7 @@ End Collapsing.
 MeBi Divider "Theories.Test.MultipleDerivations".
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Traces.
+Require MEBI.Transfer.
 Module MultipleDerivations.
   Inductive action : Set := | A | B.
 
@@ -1505,6 +1506,40 @@ Module ParameterisedLTS.
     MeBi Config Reset Bounds.
   End Count3.
 
+  (* A cheaper workaround (2026-10-19, from external feedback, where the
+     module above meant restating ~25 constructors): a one-constructor
+     wrapper whose premise is the applied relation. MeBi does not explore
+     [countLTS 3] as an LTS; it decides the premise by its proof search,
+     which enumerates the target. So derivations deeper than
+     [Premise Depth] (default 16) need the depth raised. Proofs work too:
+     here against the module's copy. *)
+  Inductive wrapped3 : nat -> option unit -> nat -> Prop :=
+  | wrap3 n l m : countLTS 3 n l m -> wrapped3 n l m.
+  MeBi Config Weak As Option unit.
+  MeBi Config Bounds As Num States 4.
+  MeBi Run LTS 0 Using wrapped3.
+  MeBi Config Reset Bounds.
+  MeBi Run Bisim 0 With wrapped3 And 0 With Count3.countLTS As wbis_wrapped3.
+  MeBi Sim Solve 100. Qed.
+  MeBi Config Reset Weak.
+  (* A result about the wrapper carries back to [countLTS 3]: the two take
+     the same steps, so [Transfer.stutter_bisimilar] at [eq] relates them,
+     and [transfer_wbis_l] moves the result across. *)
+  Lemma wrapped3_bisim : forall c, weak_bisimilar (countLTS 3) wrapped3 c c.
+  Proof.
+    intro c; apply (MEBI.Transfer.stutter_bisimilar _ _ eq);
+      [ | | reflexivity ].
+    - intros m n m' a -> T; left; exists m'; split;
+        [ constructor; exact T | reflexivity ].
+    - intros m n n' a -> T; left; exists n'; split;
+        [ inversion T; assumption | reflexivity ].
+  Qed.
+  Example wbis_countLTS3 : weak_bisimilar (countLTS 3) Count3.countLTS 0 0.
+  Proof.
+    exact (MEBI.Transfer.transfer_wbis_l (countLTS 3) wrapped3
+             Count3.countLTS 0 0 (wrapped3_bisim 0) wbis_wrapped3).
+  Qed.
+
   (* 2. Generic in its label type, with the type implicit. *)
   Inductive popLTS {A : Type} : list A -> A -> list A -> Prop :=
   | pop a l : popLTS (a :: l) a l.
@@ -2231,3 +2266,91 @@ Module MixedSilence.
   MeBi Run Bisim q With lts And p With lts Using lts.
   MeBi Config Reset Weak.
 End MixedSilence.
+
+(* From external feedback, 2026-10-15 (doc/feedback-2026-10-15.md): a
+   message-passing calculus with a structural congruence, observed through
+   barbs. Each case is a minimal version of one item there. *)
+MeBi Divider "Theories.Test.ExternalFeedback".
+Module ExternalFeedback.
+  Inductive act := a | b.
+  Inductive proc :=
+  | done | pre (x : act) (k : proc) | tau (k : proc) | loop | par (p q : proc).
+
+  (* Structural congruence as the calculus has it: reflexive, symmetric
+     ([par p done] ~ [p] both ways), no transitivity. *)
+  Inductive cong : proc -> proc -> Prop :=
+  | c_refl p : cong p p
+  | c_nil p : cong (par p done) p
+  | c_nil' p : cong p (par p done).
+
+  Inductive base : proc -> option act -> proc -> Prop :=
+  | s_pre x k : base (pre x k) (Some x) k
+  | s_tau k : base (tau k) None k
+  | s_loop : base loop (Some a) (tau (pre b loop)).
+
+  (* Item 1. A rule whose step premise is the relation being defined, on a
+     congruent copy of its source, does not terminate: [cong] is
+     reflexive, so exploring [step p'] asks for [step p'] again. On one
+     enabled transition it passed 2GB in 12s, and [Bounds Memory] did not
+     stop it (it is checked between states, and this is inside one). Not
+     run here; to see it, run under a memory cap:
+
+       Inductive step_rec : proc -> option act -> proc -> Prop :=
+       | r_base p l q : base p l q -> step_rec p l q
+       | r_str p p' q q' l :
+           cong p p' -> cong q q' -> step_rec p l q -> step_rec p' l q'.
+       MeBi Run LTS (pre a done) Using step_rec.
+
+     When it ends in [LTS_Incomplete] instead, put that here as a [Fail].
+     The workaround the feedback used, the step premise over [base] (the
+     rule applied at most once), extracts: *)
+  Inductive step : proc -> option act -> proc -> Prop :=
+  | s_base p l q : base p l q -> step p l q
+  | s_str p p' q q' l :
+      cong p p' -> cong q q' -> base p l q -> step p' l q'.
+  MeBi Config Weak As Option act.
+  MeBi Run LTS loop Using step base.
+  MeBi Run Bisim loop With step And (par loop done) With step Using base.
+
+  (* Item 4. A KNOWN-WRONG pin: the two are bisimilar (above, and a proof
+     of [loop] against itself closes), but the proof does not. At step 13
+     the focused goal is [base ?p None ?q], the source of [s_str]'s step
+     premise still open, and the next step fails with "Tried to normalize
+     ill-typed term", under either cofix strategy. The feedback saw a
+     related shape loop without closing instead. When this is fixed, drop
+     the [Fail] and replace [Abort] with [Qed]. *)
+  MeBi Run Bisim loop With step And (par loop done) With step As w_cong
+    Using base.
+  Fail MeBi Sim Solve 300.
+  Abort.
+  MeBi Config Reset Weak.
+
+  (* Item 3. A premise defined by a [match] on an argument nothing fixes
+     (here the barb [x]) cannot be enumerated: [LTS_Incomplete]. A KNOWN
+     limit. The same predicate as [In x (barbs_of p)], with [barbs_of]
+     computable, is the supported form, and so is a [match] on the source
+     term, which is known. *)
+  Inductive ost := run (p : proc) | sink.
+  Inductive olbl := L (x : act) | Barb (x : act).
+  Definition barb_unknown (p : proc) (x : act) : Prop :=
+    match x with
+    | a => match p with pre a _ => True | _ => False end
+    | b => match p with pre b _ => True | _ => False end
+    end.
+  Definition barb_known (p : proc) (x : act) : Prop :=
+    match p with pre y _ => x = y | _ => False end.
+  Definition barbs_of (p : proc) : list act :=
+    match p with pre y _ => y :: nil | _ => nil end.
+  Inductive obs_unknown : ost -> olbl -> ost -> Prop :=
+  | u_step x k : obs_unknown (run (pre x k)) (L x) (run k)
+  | u_barb p x : barb_unknown p x -> obs_unknown (run p) (Barb x) sink.
+  Inductive obs_known : ost -> olbl -> ost -> Prop :=
+  | k_step x k : obs_known (run (pre x k)) (L x) (run k)
+  | k_barb p x : barb_known p x -> obs_known (run p) (Barb x) sink.
+  Inductive obs_in : ost -> olbl -> ost -> Prop :=
+  | i_step x k : obs_in (run (pre x k)) (L x) (run k)
+  | i_barb p x : List.In x (barbs_of p) -> obs_in (run p) (Barb x) sink.
+  Fail MeBi Run LTS (run (pre a done)) Using obs_unknown.
+  MeBi Run LTS (run (pre a done)) Using obs_known.
+  MeBi Run LTS (run (pre a done)) Using obs_in.
+End ExternalFeedback.

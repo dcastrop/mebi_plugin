@@ -145,6 +145,7 @@ module type S = sig
       | Minimize of rocq_args
       | Merge of rocq_pair
       | CheckBisim of rocq_pair
+      | RunBisim of rocq_pair
       | CheckSim of rocq_pair
       | BenchmarkGraph of (rocq_args * (int * int))
 
@@ -207,15 +208,25 @@ module type S = sig
       -> Model.Bisimilarity.t option M.mm
 
     (** [do_check_bisim {a; b} using] is the weak bisimilarity check of the
-        two systems ([MeBi Run Bisim]), each saturated, on demand when too
-        large; the FSMs and the result are logged.
+        two systems, each saturated, on demand when too large; the FSMs and
+        the result are logged. It is the check [MeBi Sim Begin] runs, and
+        reports no verdict unless it fails.
 
-        @raise Rocq_monad_utils.S.Errors.MEBI_exn
+        @raise CErrors.UserError
           when run, if they are not bisimilar and [FailIf NotBisimilar] is
-          set (the default) (raised here). Also raises as {!extract_lts}
-          and, when the two systems share states that move differently,
-          Rocq's [UserError]. *)
+          set (the default), naming the two terms (raised here). Also raises
+          as {!extract_lts} and, when the two systems share states that move
+          differently, Rocq's [UserError]. *)
     val do_check_bisim
+      :  rocq_pair
+      -> Libnames.qualid list
+      -> Model.Bisimilarity.t option M.mm
+
+    (** [do_run_bisim {a; b} using] is {!do_check_bisim} reporting its verdict
+        ([MeBi Run Bisim]): a [Notice] when the two are bisimilar, a warning
+        when they are not and [FailIf NotBisimilar] is off. Raises as
+        {!do_check_bisim}, when run. *)
+    val do_run_bisim
       :  rocq_pair
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm

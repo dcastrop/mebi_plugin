@@ -8898,6 +8898,67 @@ Refactor 0 · Bug fix 0 · **New feature 0.**
 
 ---
 
+## 2026-10-19 (cont.) — external feedback: Notices, tests, docs
+
+On branch `fix/external-feedback`. A user tried the plugin on their own
+calculus and wrote it up; Jonah passed it on. The write-up and what each
+item turned out to be are in `doc/feedback-2026-10-15.md`.
+
+**New feature (output only, at Jonah's request; no new capability).**
+Every `Run` command ends with a `Notice`: the term and its size for `LTS`,
+`FSM`, `Saturate`, `Minimize` and `Merge`, the verdict for `Bisim` and
+`Sim` (`Sim`'s positive verdict was `Info`). `Run Bisim`'s failure was the
+bare `Not_Bisimilar`; it now names the two terms and the class count, as
+`Run Sim`'s did, and under `FailIf NotBisimilar False` it is a warning
+where it was silent. `Sim Begin`'s check (`CheckBisim`) stays quiet unless
+it fails; `Run Bisim` has its own variant, `RunBisim`.
+
+**Tests** (`test/rocq/Test.v`): a section `ExternalFeedback`, one minimal
+case per item. A known-wrong pin of a proof that crashes ("Tried to
+normalize ill-typed term", at step 13, under both cofix strategies) when a
+congruence premise precedes a step premise; the workaround for a
+self-recursive congruence rule (the runaway itself is in a comment: it
+passed 2GB in 12s and `Bounds Memory` did not stop it); a `match` on an
+unfixed argument pinned as `LTS_Incomplete`, with the supported forms.
+In `ParameterisedLTS`, a cheaper workaround for relations with parameters
+than the documented module copy: a one-constructor wrapper, whose premise
+the proof search enumerates, and the proof carried back with
+`Transfer.stutter_bisimilar` and `transfer_wbis_l`. Each new `Fail` was
+cut at its line and checked to fail for the stated reason.
+
+**Docs.** The README and `MeBi Help Sim` said a `weak_bisimilar` proof
+needs the mutual cofix and `Auto` picks it; `Auto` costs both and can pick
+nested. Corrected, with the premise shapes and the wrapper.
+`OUTSTANDING.md` gains a Bugs section (three lines) and Jonah's choice of
+output form; `limitations.md` and `future-work.md` ("Compact output": 135
+of 180 lines of a 3-state FSM's `Result` are constructor metadata) the
+rest.
+
+**Not done.** Neither bug is fixed. The feedback's own symptom for item 4
+(a proof whose open goals stay constant while the context grows) did not
+reproduce: an unused record field alone, and a layered barb relation, both
+close. The crash above is the nearest; whether it is the same bug is
+unknown without their semantics.
+
+**Mistakes, mine.** A README line said a proof about the wrapper "carries
+to" the original "through the constructor" before I had checked; it does,
+but only through `Transfer`, so I proved it and pinned it before
+committing. A `sed` by line number missed after an insertion above it
+shifted the line (caught by the next `grep`). The first wrapper test
+reused a name `Test.v` already had.
+
+**Verified.** `dune build`, `make` of the plugin and `Test.v`, `dune exec
+test/tests.exe` 110/110, and the default proof suite under `Auto` against
+the baseline in `CLAUDE.md`: all Solved, every count unchanged (the 27
+`weak_sim`, 14 `weak_bisimilar` and 14 `LawProofs` figures).
+
+Revert: `git revert -m 1 <merge commit>`.
+
+**Session tally (2026-10-19), cont.:** New feature 1 · Tooling 3 · Docs 2 ·
+Refactor 0 · Bug fix 0 · Optimization 0.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
