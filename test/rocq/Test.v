@@ -2354,3 +2354,34 @@ Module ExternalFeedback.
   MeBi Run LTS (run (pre a done)) Using obs_known.
   MeBi Run LTS (run (pre a done)) Using obs_in.
 End ExternalFeedback.
+
+(* [MeBi Config Output Format Text|JSON] and [Output "Detail"]
+   (2026-10-19): each combination prints the result of a tiny FSM, so
+   every renderer runs. Plain text without detail is the default. Then
+   back to this file's output settings (its top), which [Reset Output]
+   would otherwise undo. *)
+MeBi Divider "Theories.Test.OutputFormat".
+Module OutputFormat.
+  Inductive act := a | b.
+  Inductive tm := done | pre (x : act) (k : tm) | tau (k : tm).
+  Inductive step : tm -> option act -> tm -> Prop :=
+  | s_pre x k : step (pre x k) (Some x) k
+  | s_tau k : step (tau k) None k.
+  MeBi Config Weak As Option act.
+  MeBi Config Output "Result" True.
+  MeBi Run LTS (pre a (tau (pre b done))) Using step.
+  MeBi Config Output "Detail" True.
+  MeBi Run FSM (pre a (tau (pre b done))) Using step.
+  MeBi Config Output Format JSON.
+  MeBi Run Saturate (pre a (tau (pre b done))) Using step.
+  MeBi Config Output "Detail" False.
+  MeBi Run Bisim (pre a (pre b done)) With step
+    And (pre a (tau (pre b done))) With step.
+  MeBi Config Reset Output.
+  MeBi Config Output "Info" False.
+  MeBi Config Output "Notice" False.
+  MeBi Config Output "Result" False.
+  MeBi Config Output "Show" False.
+  MeBi Config Output "DecodeResults" False.
+  MeBi Config Reset Weak.
+End OutputFormat.
