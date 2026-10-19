@@ -693,6 +693,7 @@ End Collapsing.
 MeBi Divider "Theories.Test.MultipleDerivations".
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Traces.
+Require MEBI.Transfer.
 Module MultipleDerivations.
   Inductive action : Set := | A | B.
 
@@ -1521,6 +1522,23 @@ Module ParameterisedLTS.
   MeBi Run Bisim 0 With wrapped3 And 0 With Count3.countLTS As wbis_wrapped3.
   MeBi Sim Solve 100. Qed.
   MeBi Config Reset Weak.
+  (* A result about the wrapper carries back to [countLTS 3]: the two take
+     the same steps, so [Transfer.stutter_bisimilar] at [eq] relates them,
+     and [transfer_wbis_l] moves the result across. *)
+  Lemma wrapped3_bisim : forall c, weak_bisimilar (countLTS 3) wrapped3 c c.
+  Proof.
+    intro c; apply (MEBI.Transfer.stutter_bisimilar _ _ eq);
+      [ | | reflexivity ].
+    - intros m n m' a -> T; left; exists m'; split;
+        [ constructor; exact T | reflexivity ].
+    - intros m n n' a -> T; left; exists n'; split;
+        [ inversion T; assumption | reflexivity ].
+  Qed.
+  Example wbis_countLTS3 : weak_bisimilar (countLTS 3) Count3.countLTS 0 0.
+  Proof.
+    exact (MEBI.Transfer.transfer_wbis_l (countLTS 3) wrapped3
+             Count3.countLTS 0 0 (wrapped3_bisim 0) wbis_wrapped3).
+  Qed.
 
   (* 2. Generic in its label type, with the type implicit. *)
   Inductive popLTS {A : Type} : list A -> A -> list A -> Prop :=
