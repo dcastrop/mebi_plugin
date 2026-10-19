@@ -33,6 +33,8 @@ Decision 2 would change every checked-in proof bound if it went against
   carry FIFO order with joining *visible* to the layered CADP model. Today
   only the hidden form carries over, at one process (`examples/README.md`,
   "No starvation").
+- **How to compact the `Result` output** (`doc/future-work.md`,
+  "Compact output").
 - **Whether a CADP/mCRL2 comparison is in scope** (`doc/future-work.md`,
   "Smaller possible work"). Neither tool is installed, and CADP needs a
   licence.
@@ -55,6 +57,19 @@ Decision 2 would change every checked-in proof bound if it went against
   unexplained (`doc/future-work.md`, "The solver's own per-step cost").
   The FIFO one is not carried back to `bigstep_obs`.
 
+## Bugs
+
+Found through external feedback; detail in
+[`doc/feedback-2026-10-15.md`](doc/feedback-2026-10-15.md).
+- **Extraction runs away on a step rule whose premise is the relation
+  itself** (on a congruent copy of the source): no bound stops it, not
+  even `Bounds Memory` (item 1).
+- **A proof through a congruence premise crashes** ("Tried to normalize
+  ill-typed term"; known-wrong pin `ExternalFeedback`). Possibly the
+  feedback's proof that never closed (item 4).
+- **A warning blames the target for an unknown in the label** (item 3;
+  small).
+
 ## Limits of the tool
 
 Detail, with the pinning tests, is in
@@ -66,6 +81,8 @@ unless noted.
   - collapsing definitions are refused;
   - LTSs with parameters are refused (lifting this would be a
     *capability*);
+  - a premise that matches on an argument nothing fixes is undecided
+    (enumerating it would be a *capability*);
   - size;
   - memory quadratic in the number of silent SCCs.
 - **Goals and proofs:**
