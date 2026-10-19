@@ -1505,6 +1505,23 @@ Module ParameterisedLTS.
     MeBi Config Reset Bounds.
   End Count3.
 
+  (* A cheaper workaround (2026-10-19, from external feedback, where the
+     module above meant restating ~25 constructors): a one-constructor
+     wrapper whose premise is the applied relation. MeBi does not explore
+     [countLTS 3] as an LTS; it decides the premise by its proof search,
+     which enumerates the target. So derivations deeper than
+     [Premise Depth] (default 16) need the depth raised. Proofs work too:
+     here against the module's copy. *)
+  Inductive wrapped3 : nat -> option unit -> nat -> Prop :=
+  | wrap3 n l m : countLTS 3 n l m -> wrapped3 n l m.
+  MeBi Config Weak As Option unit.
+  MeBi Config Bounds As Num States 4.
+  MeBi Run LTS 0 Using wrapped3.
+  MeBi Config Reset Bounds.
+  MeBi Run Bisim 0 With wrapped3 And 0 With Count3.countLTS As wbis_wrapped3.
+  MeBi Sim Solve 100. Qed.
+  MeBi Config Reset Weak.
+
   (* 2. Generic in its label type, with the type implicit. *)
   Inductive popLTS {A : Type} : list A -> A -> list A -> Prop :=
   | pop a l : popLTS (a :: l) a l.
