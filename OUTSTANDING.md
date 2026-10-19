@@ -33,8 +33,6 @@ Decision 2 would change every checked-in proof bound if it went against
   carry FIFO order with joining *visible* to the layered CADP model. Today
   only the hidden form carries over, at one process (`examples/README.md`,
   "No starvation").
-- **How to compact the `Result` output** (`doc/future-work.md`,
-  "Compact output").
 - **Whether a CADP/mCRL2 comparison is in scope** (`doc/future-work.md`,
   "Smaller possible work"). Neither tool is installed, and CADP needs a
   licence.
@@ -113,5 +111,6 @@ way.
   - scale the evaluation levers further;
   - the CADP/mCRL2 comparison (see above);
   - `examples/Bisimilarity/_nat_streams.v`, unfinished.
+  - `bench/ocaml/fixtures/` is stale (from 2026-10-10).
 - **Set aside on purpose**, so they are not rediscovered as new: listed
   at the end of `doc/future-work.md`.
