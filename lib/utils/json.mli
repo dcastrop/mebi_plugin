@@ -10,6 +10,40 @@ val option
   -> 'a option
   -> Yojson.t
 
+(** [without keys y] is [y] with every field named in [keys] removed, at
+    any depth. Raises nothing. *)
+val without : string list -> Yojson.t -> Yojson.t
+
+(** [write_file ?dir name ext f] calls [f] on a new file in [dir] (default
+    {!Utils.FileWriter.default_dir}) named after the session's timestamp,
+    the source location and [name], with extension [ext], creating [dir] if
+    needed, and closes it.
+
+    @raise Sys_error
+      if the directory or file cannot be created or written (propagated;
+      the file is closed first). Also raises whatever [f] raises. *)
+val write_file
+  :  ?dir:string
+  -> string
+  -> string
+  -> (out_channel -> unit)
+  -> unit
+
+(** Logging and dumping for one type, [k], in whatever form: {!S} gives
+    them as JSON, {!Text} as plain text. *)
+module type Log = sig
+  type k
+
+  (** [log ?__FUNCTION__ ?m ?s x] logs [x] at kind [m] (default [Debug]),
+      headed [s]. Raises nothing. *)
+  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+  (** [write ?dir name x] writes [x] to a new file, as {!write_file}.
+
+      @raise Sys_error as {!write_file}. *)
+  val write : ?dir:string -> string -> k -> unit
+end
+
 (** JSON, printing, logging and dumping for one type, [k]. *)
 module type S = sig
   (**/**)
@@ -53,6 +87,18 @@ module Make (X : sig
     val name : string
     val json : ?as_elt:bool -> k -> Yojson.t
   end) : S with type k = X.k
+
+(** Plain text in place of JSON. *)
+module Text : sig
+  (** [Make (X)] is {!Log} for [X.k]: [X.text x] is logged, headed [s]
+      (default [X.name]), and dumped to a [.txt] file. *)
+  module Make (X : sig
+      type k
+
+      val name : string
+      val text : k -> string
+    end) : Log with type k = X.k
+end
 
 (** For a single value. *)
 module Thing : sig
