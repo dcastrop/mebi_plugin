@@ -78,11 +78,13 @@ def prepare(src, out, manifest):
         )
         pieces.append(
             'Admitted.\nMeBi Config Output "DumpResults" True. '
+            + "MeBi Config Output Format JSON. "
             + 'MeBi Config Output "DecodeResults" True. '
             + "MeBi Config FailIf NotBisimilar False.\n"
             + command
             + '\nMeBi Config Output "DumpResults" False. '
             + 'MeBi Config Output "DecodeResults" False. '
+            + "MeBi Config Output Format Text. "
             + "MeBi Config FailIf NotBisimilar True."
         )
     pieces.append(text[last:])
