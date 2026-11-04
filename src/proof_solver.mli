@@ -45,15 +45,6 @@ module type S = sig
   module Step : (_ : Proof_solver_wrapper.Args) ->
     Proof_solver_step.S with type tactic = Tactic.t
 
-  (** [get_updated_pstate x] is the proof being solved
-      ({!ProofState.get_pstate}) after the tactic [x] runs on it; a tactic
-      Rocq reports as unsafe is logged as a warning.
-
-      @raise Proof_solver_statem.S.NoStateFound
-        if no proof is being solved (propagated). Also raises whatever [x]
-        raises when it runs (propagated). *)
-  val get_updated_pstate : unit Proofview.tactic -> Declare.Proof.t
-
   (** [step pstate] is [pstate] after one solver step: the tactic
       {!Proof_solver_step.S.step} chooses for the goal in focus, followed by
       [simpl in *] and [subst] everywhere. [pstate] becomes the proof being
@@ -78,10 +69,6 @@ module Make (Enc : Encoding.S) :
 (** The cached solver: the one {!make} built last, which every command of
     the proof then uses. *)
 type t = { solver : (module S) }
-
-(** Raised by {!is_done}, {!step} and {!solve}: no solver has been built
-    ({!make}, run by {!init}). *)
-exception NoCachedModules
 
 (** [make (module Enc) ()] is the cache, set to a fresh solver for [Enc]
     ({!Make}). Raises nothing. *)

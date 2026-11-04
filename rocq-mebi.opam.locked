@@ -26,7 +26,7 @@ depends: [
   "conf-gmp" {= "5"}
   "conf-linux-libc-dev" {= "0"}
   "conf-pkg-config" {= "5"}
-  "cppo" {= "1.8.0" & (with-doc | with-dev-setup)}
+  "cppo" {= "1.8.0"}
   "crunch" {= "4.1.0" & (with-doc | with-dev-setup)}
   "csexp" {= "1.5.2" & with-dev-setup}
   "dune" {= "3.23.1"}

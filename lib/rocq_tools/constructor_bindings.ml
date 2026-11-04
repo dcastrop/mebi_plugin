@@ -14,18 +14,8 @@ module type S = sig
   include Json.S with type k = t
 
   val extract_info : ind -> t list mm
-  val get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis
 
   exception BindingInstruction_NotApp of EConstr.t
-  exception BindingInstruction_Undefined of EConstr.t * EConstr.t
-  exception BindingInstruction_IndexOutOfBounds of EConstr.t * int
-  exception BindingInstruction_NEQ of EConstr.t * Constr.t
-
-  val get_bound_term : EConstr.t -> instructions -> EConstr.t mm
-
-  val get_explicit_bindings
-    :  EConstr.t * constrmap option
-    -> EConstr.t Tactypes.explicit_bindings mm
 
   val get
     :  EConstr.t
@@ -277,12 +267,12 @@ module Make
       in
       let open Syntax in
       let* bindings : EConstr.t Tactypes.explicit_bindings =
-        let f (i : int) acc =
+        let f y acc =
           Logger.trace __FUNCTION__;
-          let* x = get_explicit_bindings (List.nth to_iter i) in
+          let* x = get_explicit_bindings y in
           x :: acc |> return
         in
-        let* xs = iterate 0 (List.length to_iter - 1) [] f in
+        let* xs = fold [] to_iter f in
         List.flatten xs |> return
       in
       (match bind_once bindings with

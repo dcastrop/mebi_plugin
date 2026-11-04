@@ -48,9 +48,6 @@ val describe : unit -> string
     not, or no limit is set. Raises nothing. *)
 val over_bound : int -> string option
 
-(** The least time in seconds between two reads of memory by {!check}. *)
-val interval : float
-
 (** [used ()] is the process's memory in bytes: its resident set
     ([VmRSS] in [/proc/self/status]) on Linux, otherwise the size of the
     OCaml major heap. [None] if neither can be read. Raises nothing. *)

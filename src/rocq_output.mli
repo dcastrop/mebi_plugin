@@ -13,10 +13,6 @@
     [Error] as debug: it does not raise). Raises nothing. *)
 val sink : Logger.sink
 
-(** [loc_provider ()] is the [.v] file and line of the command now running,
-    to name dump files by. Raises nothing. *)
-val loc_provider : unit -> string
-
 (** [install ()] makes {!Logger} print through {!sink} and name dumps with
     {!loc_provider}. Raises nothing. *)
 val install : unit -> unit

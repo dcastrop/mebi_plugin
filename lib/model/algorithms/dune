@@ -20,9 +20,12 @@
   rocq-mebi.model.fsm
   ; rocq-mebi.model
   yojson)
+ (modules_without_implementation bisimilarity_intf product_intf)
  (modules
   minimization
+  bisimilarity_intf
   bisimilarity
+  product_intf
   product
   saturation_estimate
   ; similarity

@@ -14,46 +14,6 @@ module type S = sig
 
   include Json.S with type k = t
 
-  exception CannotSplitEmptyBlock of unit
-
-  val ensure_nonempty : states -> unit
-
-  val split_block_by
-    :  (state -> partition)
-    -> state
-    -> states
-    -> states * states option
-
-  val split_block
-    :  partition
-    -> state
-    -> edgemap
-    -> states
-    -> states * states option
-
-  exception Split_OnlyReturnedOneBlock_ButNeqBlock of (states * states)
-
-  val ensure_equal : states -> states -> unit
-
-  val for_each_label
-    :  partition ref
-    -> bool ref
-    -> edgemap
-    -> states ref
-    -> label
-    -> unit
-
-  val silent_closures : edgemap -> state -> states
-
-  val for_each_block
-    :  ?closure:(state -> states)
-    -> partition ref
-    -> bool ref
-    -> labels
-    -> edgemap
-    -> states
-    -> unit
-
   val partition_states : ?silent:edgemap -> fsm -> partition
   val fsm : fsm -> t
 end

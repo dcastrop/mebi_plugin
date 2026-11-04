@@ -7,7 +7,6 @@ module type S = sig
 
     and msg = Output.Kind.t * string
 
-    val to_string_opt : t -> string option
   end
 
   type t =
@@ -18,8 +17,6 @@ module type S = sig
   val create : ?kind:Output.Kind.t -> ?msg:string -> unit Proofview.tactic -> t
   val empty : unit -> t
   val seq : t -> t -> t
-
-  exception EmptyTacticChain
 
   val chain : ?nonempty:bool -> t list -> t
   val unpack : t -> unit Proofview.tactic

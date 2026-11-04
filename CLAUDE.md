@@ -231,6 +231,18 @@ session has them.
   ambiguous doc comment, one directly after a `val` with no blank line,
   and does *not* catch a doc comment left before a `module`. After
   inserting code, check where each `(** ... *)` sits.
+- **Code that differs between Rocq 9.2 and 9.3 is under cppo's
+  `#if ROCQ_VERSION >= (9, 3, 0)`.** Only the files listed in three places
+  are preprocessed: the `(preprocess (per_module ...))` in
+  `lib/rocq_tools/dune` and `src/dune`, `CPPO_MODULES` in
+  `Makefile.rocq.local`, and `.ocamlformat-ignore` (ocamlformat cannot
+  parse `#if`). A file that gains an `#if` goes in all three.
+- **A signature shared by a module's `.ml` and `.mli` lives once, in
+  `foo_intf.mli`** (an interface-only module: no `.ml`, declared in dune's
+  `(modules_without_implementation ...)`), and both files say
+  `module type S = Foo_intf.S`. Edit the signature there. An `_intf.ml`
+  without an `.mli` breaks a parallel `make`: both compilers write its
+  `.cmi` ("inconsistent assumptions").
 - **A rebuild invalidates compiled example copies** ("inconsistent
   assumptions over library MEBI.loader"), and copied `examples/` trees
   carry stale `.vo` files. `bench/` scripts copy and clean for you; by

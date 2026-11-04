@@ -1,78 +1,4 @@
-module type S = sig
-  type 'a mm
-
-  module Instructions : sig
-    type t =
-      | Undefined
-      | Done
-      | Arg of
-          { root : Constr.t
-          ; index : int
-          ; cont : t
-          }
-
-    include Json.S with type k = t
-
-    exception CannotAppendDone of unit
-
-    val append : t -> t -> t
-    val length : t -> int
-  end
-
-  module NamedInstructions : sig
-    type t = Names.Name.t * Instructions.t
-
-    include Json.S with type k = t
-  end
-
-  module ConstrMap : sig
-    include Hashtbl.S with type key = Constr.t
-
-    type t' = NamedInstructions.t t
-
-    include Json.S with type k = t'
-
-    val update : t' -> Constr.t -> NamedInstructions.t -> unit
-
-    exception Rocq_bindings_CannotFindBindingName of EConstr.t
-
-    val find_name
-      :  (EConstr.t * Names.Name.t) list
-      -> EConstr.t
-      -> Names.Name.t mm
-
-    val extract_binding_map
-      :  (EConstr.t * Names.Name.t) list
-      -> EConstr.t
-      -> Constr.t
-      -> t' mm
-
-    val make_opt
-      :  ?keep_var:bool
-      -> (EConstr.t * Names.Name.t) list
-      -> EConstr.t * Constr.t
-      -> t' option mm
-  end
-
-  type t =
-    | No_Bindings
-    | Use_Bindings of
-        { from : ConstrMap.t' option
-        ; action : ConstrMap.t' option
-        ; goto : ConstrMap.t' option
-        }
-
-  include Json.S with type k = t
-
-  val use_no_bindings : ConstrMap.t' option list -> bool
-
-  val extract
-    :  (EConstr.t * Names.Name.t) list
-    -> EConstr.t * Constr.t
-    -> EConstr.t * Constr.t
-    -> EConstr.t * Constr.t
-    -> t mm
-end
+module type S = Bindings_intf.S
 
 module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
   type 'a mm = 'a M.mm
@@ -114,7 +40,6 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
     (* See the [.mli]. *)
     let rec append (x : t) : t -> t
       =
-      (* Logger.trace __FUNCTION__; *)
       function
       | Arg { root; index; cont } -> Arg { root; index; cont = append x cont }
       | Undefined -> x
@@ -123,7 +48,6 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
 
     (* See the [.mli]. *)
     let rec length : t -> int =
-      (* Logger.trace __FUNCTION__; *)
       function
       | Undefined -> 0
       | Done -> -1
@@ -153,7 +77,11 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
         type t = Constr.t
 
         let equal : t -> t -> bool = Constr.equal
+#if ROCQ_VERSION >= (9, 3, 0)
+        let hash : t -> int = Termops.ConstrData.hash
+#else
         let hash : t -> int = Constr.hash
+#endif
       end)
 
     include Map_
@@ -177,7 +105,11 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
               let json ?(as_elt : bool = false) x = `String (Strfy.constr x)
             end)
 
+#if ROCQ_VERSION >= (9, 3, 0)
+          let compare a b : int = Termops.ConstrData.compare a b
+#else
           let compare a b : int = Constr.compare a b
+#endif
         end)
         (struct
           include NamedInstructions

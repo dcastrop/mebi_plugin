@@ -8,26 +8,11 @@
 (** Where a message goes once it passes the configuration. *)
 type sink = Output.message -> unit
 
-(** The sink that prints to [stdout]. Active until {!set_sink} is called,
-    which is what makes [lib/utils], [lib/terms] and [lib/model] usable from
-    a plain OCaml test binary with no Rocq runtime linked. *)
-val default_sink : sink
-
 (** [set_sink f] sends every message from now on to [f] ([src/] installs
     Rocq's [Feedback] at plugin load). Raises nothing. *)
 val set_sink : sink -> unit
 
-(** [reset_sink ()] goes back to {!default_sink}. Raises nothing. *)
-val reset_sink : unit -> unit
-
 (** {1 Configuration} *)
-
-(** [enable ()] turns output on, under the per-kind configuration. Raises
-    nothing. *)
-val enable : unit -> unit
-
-(** [disable ()] turns all output off. Raises nothing. *)
-val disable : unit -> unit
 
 (** [configure k b] sets whether kind [k] is emitted, overriding
     {!Output.Kind.default}. Raises nothing. *)
@@ -39,19 +24,14 @@ val reset_config : unit -> unit
 
 (* [is_enabled] is not declared here: it comes from [include S] below. *)
 
-(** [quiet f] is [f ()], with all output off while it runs and the previous
-    setting restored afterwards, even if [f] raises. Raises whatever [f]
-    raises (propagated). *)
-val quiet : (unit -> 'a) -> 'a
-
 (** {1 Emission} *)
 
 (** The logging API: at the top level of {!Logger} against the global
     configuration, and through {!Scoped} with a module's own. None of it
     raises, beyond what the sink or a given printer raises. *)
 module type S = sig
-  (** [is_enabled k] is whether a message of kind [k] is emitted: output is
-      on, and [k] is configured on (or is on by default). *)
+  (** [is_enabled k] is whether a message of kind [k] is emitted: [k] is
+      configured on (or is on by default). *)
   val is_enabled : Output.Kind.t -> bool
 
   (** [debug ?__FUNCTION__ s] emits [s] at [Debug], naming the calling

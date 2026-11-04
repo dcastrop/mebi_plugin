@@ -1,1 +1,18 @@
 CAMLPKGS = -package yojson -package benchmark
+
+# cppo, for code that differs between Rocq versions (#if ROCQ_VERSION >= ...):
+# the same modules as the (preprocess (per_module ...)) in lib/rocq_tools/dune
+# and src/dune. The version is asked of rocq itself (9.2 prints "9.2", 9.3
+# "9.3.0"). This file is read before Makefile.rocq defines $(ROCQ) and adds
+# the slash to $(COQBIN), hence the path spelled out as Makefile does.
+ROCQ_VERSION_WORDS := $(subst ., ,$(firstword $(shell $(if $(COQBIN),$(COQBIN)/,)rocq -print-version)))
+CPPO := cppo -V ROCQ:$(word 1,$(ROCQ_VERSION_WORDS)).$(word 2,$(ROCQ_VERSION_WORDS)).0
+CPPO_MODULES := \
+  lib/rocq_tools/bi_encoding \
+  lib/rocq_tools/bindings \
+  lib/rocq_tools/premise_search \
+  lib/rocq_tools/rocq_monad_utils \
+  src/proof_solver_step
+
+$(addsuffix .cmx,$(CPPO_MODULES)) $(addsuffix .cmo,$(CPPO_MODULES)): CAMLFLAGS += -pp '$(CPPO)'
+$(addsuffix .ml.d,$(CPPO_MODULES)): CAMLDEP += -pp '$(CPPO)'

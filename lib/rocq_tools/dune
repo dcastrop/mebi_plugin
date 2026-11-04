@@ -7,17 +7,34 @@
   rocq-mebi.utils
   rocq-mebi.terms
   yojson)
+ ; Code that differs between Rocq versions is under cppo's
+ ; #if ROCQ_VERSION >= (9, 3, 0). Only the modules listed here are
+ ; preprocessed. Makefile.rocq.local lists the same ones for `make`, and
+ ; .ocamlformat-ignore keeps `dune fmt` off them.
+ (preprocess
+  (per_module
+   ((action
+     (run %{bin:cppo} -V ROCQ:%{rocq:version.major}.%{rocq:version.minor}.0 %{input-file}))
+    bi_encoding
+    bindings
+    premise_search
+    rocq_monad_utils)))
+ (modules_without_implementation bi_encoding_intf rocq_monad_intf rocq_monad_utils_intf bindings_intf)
  (modules
   mebi_theories
   rocq_utils
   rocq_context
+  bi_encoding_intf
   bi_encoding
+  rocq_monad_intf
   rocq_monad
   rocq_monad_strfy
   premise_search
+  rocq_monad_utils_intf
   rocq_monad_utils
   theories
   theories_enc
+  bindings_intf
   bindings
   constructor_bindings)
  (wrapped false))

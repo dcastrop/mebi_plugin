@@ -1,65 +1,4 @@
-module type S = sig
-  include Wrapper.S
-
-  (* module Command :
-     Command.S
-     with type weak = Weak.t
-     and type 'a mm = 'a M.mm
-     and type lts = Model.LTS.t
-     and type fsm = Model.FSM.t
-     and type bisimilarity = Model.Bisimilarity.t
-     and type result = Model.Bisimilarity.Result.t *)
-
-  val the_result : Decode.bisimilarity ref option ref
-
-  exception NoResultFound
-
-  val get_the_result : unit -> Model.Bisimilarity.t
-
-  (** Whether the two systems' roles are swapped for the goal in focus: [true]
-      while answering the right-hand obligation ([bisim_r]) of a
-      [weak_bisimilar] goal, where the {e right} system moves and the left
-      answers. {!get_fsm_a} and {!get_fsm_b} follow it. *)
-  val swapped : bool ref
-
-  (** FSM "a": the system whose move is being answered -- the left one,
-      unless {!swapped}. *)
-  val get_fsm_a : ?saturated:bool -> unit -> Model.FSM.t
-
-  (** FSM "b": the system that answers -- the right one, unless
-      {!swapped}. *)
-  val get_fsm_b : ?saturated:bool -> unit -> Model.FSM.t
-
-  exception CannotOverrideResult of Model.Bisimilarity.t
-
-  val set_the_result : Model.Bisimilarity.t -> unit
-
-  exception BisimilarityResultNotFound
-
-  (** For a [weak_sim] goal whose two states are not bisimilar: each left
-      state's simulators ({!Model.Product.simulation}), the answers the
-      solver falls back on when no bisimilar one exists. [None] otherwise. *)
-  val simulators : (Model.State.t -> Model.State.Set.t) option ref
-
-  (** The answer plan for the proof now being solved, when the answer policy
-      is not [Default] ({!Model.Product.Policy.plan}); [None] otherwise, and
-      the solver answers with {!Model.Product.answer}. *)
-  val plan : Model.Product.Policy.plan option ref
-
-  val check_bisimilarity
-    :  ?fail_if_not_bisim:bool
-    -> Libnames.qualid list
-    -> Constrexpr.constr_expr * Libnames.qualid
-    -> Constrexpr.constr_expr * Libnames.qualid
-    -> unit
-
-  val get_bisimilar_partition : unit -> Model.Partition.t
-
-  val get_bisimilar_states
-    :  ?pi:Model.Partition.t
-    -> Model.State.t
-    -> Model.State.Set.t
-end
+module type S = Results_intf.S
 
 module Make (Enc : Encoding.S) :
   S
@@ -151,13 +90,4 @@ module Make (Enc : Encoding.S) :
     (get_the_result ()).result.bisim_states
   ;;
 
-  (* See the [.mli]. *)
-  let get_bisimilar_states
-        ?(pi : Model.Partition.t = get_bisimilar_partition ())
-        (x : Model.State.t)
-    : Model.State.Set.t
-    =
-    try pi |> Model.Partition.get_bisimilar x with
-    | Not_found -> Model.State.Set.empty
-  ;;
 end

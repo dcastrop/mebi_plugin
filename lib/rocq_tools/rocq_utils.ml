@@ -24,7 +24,6 @@ let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t)
     | k -> raise (Rocq_utils_EConstrIsNot_Atomic (sigma, x, k))
   with
   | Failure e ->
-    (* Logger.debug ~__FUNCTION__ e; *)
     raise (Rocq_utils_EConstrIsNotA_Type (sigma, x, e))
 ;;
 
@@ -107,114 +106,9 @@ let get_econstr_decls (ctx : Constr.rel_context) : econstr_decl list =
 ;;
 
 (* See the [.mli]. *)
-let list_of_constr_kinds : Constr.t -> (string * bool) list =
-  fun (x : Constr.t) ->
-  [ "App", Constr.isApp x
-  ; "Case", Constr.isCase x
-  ; "Cast", Constr.isCast x
-  ; "CoFix", Constr.isCoFix x
-  ; "Const", Constr.isConst x
-  ; "Construct", Constr.isConstruct x
-  ; "Evar", Constr.isEvar x
-  ; "Fix", Constr.isFix x
-  ; "Ind", Constr.isInd x
-  ; "Prod", Constr.isProd x
-  ; "Lambda", Constr.isLambda x
-  ; "LetIn", Constr.isLetIn x
-  ; "Meta", Constr.isMeta x
-  ; "Proj", Constr.isProj x
-  ; "Rel", Constr.isRel x
-  ; "Ref", Constr.isRef x
-  ; "Sort", Constr.isSort x
-  ; "Var", Constr.isVar x
-  ]
-;;
-
-(* See the [.mli]. *)
-let list_of_econstr_kinds sigma (x : EConstr.t) : (string * bool) list =
-  [ "App", EConstr.isApp sigma x
-  ; "Arity", EConstr.isArity sigma x
-  ; "Case", EConstr.isCase sigma x
-  ; "Cast", EConstr.isCast sigma x
-  ; "CoFix", EConstr.isCoFix sigma x
-  ; "Const", EConstr.isConst sigma x
-  ; "Construct", EConstr.isConstruct sigma x
-  ; "Evar", EConstr.isEvar sigma x
-  ; "Fix", EConstr.isFix sigma x
-  ; "Ind", EConstr.isInd sigma x
-  ; "Prod", EConstr.isProd sigma x
-  ; "Lambda", EConstr.isLambda sigma x
-  ; "LetIn", EConstr.isLetIn sigma x
-  ; "Meta", EConstr.isMeta sigma x
-  ; "Proj", EConstr.isProj sigma x
-  ; "Rel", EConstr.isRel sigma x
-  ; "Ref", EConstr.isRef sigma x
-  ; "Sort", EConstr.isSort sigma x
-  ; "Type", EConstr.isType sigma x
-  ; "Var", EConstr.isVar sigma x
-  ]
-;;
-
-(* See the [.mli]. *)
-let list_of_econstr_kinds_of_type sigma (x : EConstr.t) : (string * bool) list =
-  [ ( "SortType"
-    , try
-        match EConstr.kind_of_type sigma x with
-        | SortType _ -> true
-        | _ -> false
-      with
-      | Failure _ -> false )
-  ; ( "CastType"
-    , try
-        match EConstr.kind_of_type sigma x with
-        | CastType _ -> true
-        | _ -> false
-      with
-      | Failure _ -> false )
-  ; ( "ProdType"
-    , try
-        match EConstr.kind_of_type sigma x with
-        | ProdType _ -> true
-        | _ -> false
-      with
-      | Failure _ -> false )
-  ; ( "LetInType"
-    , try
-        match EConstr.kind_of_type sigma x with
-        | LetInType _ -> true
-        | _ -> false
-      with
-      | Failure _ -> false )
-  ; ( "AtomicType "
-    , try
-        match EConstr.kind_of_type sigma x with
-        | AtomicType _ -> true
-        | _ -> false
-      with
-      | Failure _ -> false )
-  ]
-;;
-
-(* See the [.mli]. *)
-let list_of_kinds
-      sigma
-      (f : Evd.evar_map -> 'a -> (string * bool) list)
-      (x : 'a)
-  : string list
-  =
-  List.filter_map (function y, true -> Some y | _, false -> None) (f sigma x)
-;;
-
-(* See the [.mli]. *)
 let get_decl_type_of_constr (x : constr_decl) : EConstr.t =
   Log.trace __FUNCTION__;
   Context.Rel.Declaration.get_type x |> EConstr.of_constr
-;;
-
-(* See the [.mli]. *)
-let get_decl_type_of_econstr (x : econstr_decl) : EConstr.t =
-  Log.trace __FUNCTION__;
-  Context.Rel.Declaration.get_type x
 ;;
 
 (* See the [.mli]. *)
@@ -225,14 +119,6 @@ let get_ind_ty
   =
   Log.trace __FUNCTION__;
   EConstr.mkIndU (ind, EConstr.EInstance.make mib.mind_univ_hyps)
-;;
-
-(* See the [.mli]. *)
-let type_of_econstr_rel ?(substl : EConstr.t list option) (t : econstr_decl)
-  : EConstr.t
-  =
-  let ty : EConstr.t = get_decl_type_of_econstr t in
-  match substl with None -> ty | Some substl -> EConstr.Vars.substl substl ty
 ;;
 
 (* See the [.mli]. *)
@@ -269,14 +155,6 @@ module Strfy = struct
     pp (Printer.pr_constr_env env sigma x)
   ;;
 
-  let constr_opt env sigma (x : Constr.t option) : string =
-    Utils.option_fstr (constr env sigma) x
-  ;;
-
-  let constr_rel_decl env sigma (x : constr_decl) : string =
-    pp (Printer.pr_rel_decl env sigma x)
-  ;;
-
   let constr_rel_context env sigma (x : Constr.rel_context) : string =
     pp (Printer.pr_rel_context env sigma x)
   ;;
@@ -287,14 +165,6 @@ module Strfy = struct
       "%s |- %s"
       (constr_rel_context env sigma ctx)
       (constr env sigma x)
-  ;;
-
-  (* See the [.mli]. *)
-  let ind_constrs env sigma (xs : ind_constr array) : string =
-    Array.to_list xs
-    |> List.map (ind_constr env sigma)
-    |> String.concat "; "
-    |> Printf.sprintf "[%s]"
   ;;
 
   (** [kind_name k] is the name of [k]'s constructor ([App], [Rel], ...).
@@ -348,13 +218,6 @@ module Strfy = struct
   ;;
 
   let concl env sigma : EConstr.constr -> string = econstr_types env sigma
-
-  let erel _env sigma : EConstr.ERelevance.t -> string =
-    fun (x : EConstr.ERelevance.t) ->
-    if EConstr.ERelevance.is_irrelevant sigma x
-    then "irrelevant"
-    else "relevant"
-  ;;
 
   let hyp_name (x : hyp) : string = name_id (Context.Named.Declaration.get_id x)
 
@@ -430,16 +293,6 @@ let get_next (env : Environ.env) (sigma : Evd.evar_map)
     let sigma, type_of_a_term = type_of_econstr env sigma a_term in
     get_next_evar env sigma type_of_a_term
   | OfType a_type -> get_next_evar env sigma a_type
-;;
-
-(* See the [.mli]. *)
-let get_fresh_evar
-      (env : Environ.env)
-      (sigma : Evd.evar_map)
-      (original : evar_source)
-  : Evd.evar_map * EConstr.t
-  =
-  get_next env sigma original
 ;;
 
 (* See the [.mli]. *)
@@ -548,18 +401,6 @@ let econstr_to_constr ?(abort_on_undefined_evars : bool = false) sigma
 (* See the [.mli]. *)
 let econstr_to_constr_opt sigma : EConstr.t -> Constr.t option =
   EConstr.to_constr_opt sigma
-;;
-
-(* See the [.mli]. *)
-let globref_to_econstr env : Names.GlobRef.t -> EConstr.t =
-  fun x -> EConstr.of_constr (UnivGen.constr_of_monomorphic_global env x)
-;;
-
-(* See the [.mli]. *)
-let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
-  match Constr.kind (econstr_to_constr sigma x) with
-  | App (x, _) -> Constr.equal x (econstr_to_constr sigma (c ()))
-  | _ -> false
 ;;
 
 (* See the [.mli]. *)

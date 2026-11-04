@@ -9008,6 +9008,178 @@ Tooling 0 · Refactor 0 · Optimization 0.
 
 ---
 
+## 2026-11-04 — building against Rocq 9.2 and 9.3
+
+Uncommitted, on `main`.
+
+**Tooling.** The plugin compiled only against Rocq 9.2 (`rocq-core < 9.3`).
+Under 9.3 the build stopped at five API changes, at ten call sites:
+- `Constr.hash` and `Constr.compare` moved to `Termops.ConstrData`.
+- `Retyping.get_sort_quality_of` was renamed `get_sort_quality_or_set_of`.
+  9.3's `get_sort_quality_of` returns a `Sorts.Quality.t`.
+- `Subproof.build_by_tactic_opt`'s result lost a component, five to four.
+- `Evd.from_ctx` is deprecated for `Evd.from_ustate`, an error under dune's
+  dev profile.
+
+The source now builds against both, and `dune-project` allows
+`rocq-core < 9.4`. The lockfile still pins 9.2.
+
+- The code that differs is under cppo's `#if ROCQ_VERSION >= (9, 3, 0)`, at
+  the call sites, in five files: `lib/rocq_tools/{bi_encoding, bindings,
+  premise_search, rocq_monad_utils}.ml` and `src/proof_solver_step.ml`.
+  Only these are preprocessed. dune does it through a `(preprocess
+  (per_module ...))` with `%{rocq:version.major}`/`.minor`, `make` through
+  target-specific `CAMLFLAGS`/`CAMLDEP` in `Makefile.rocq.local`, asking
+  `rocq -print-version`. `.ocamlformat-ignore` lists the five, since
+  ocamlformat cannot parse `#if`. Those three lists must agree, and nothing
+  checks that yet. `Evd.from_ctx` stays, with `[@alert "-deprecated"]`, as
+  9.2 has no `from_ustate`.
+- `cppo` is now a build dependency. It was already in the lockfile at 1.8.0,
+  as doc/dev tooling. Its filter there was edited by hand, not by
+  `scripts/relock.sh`, which needs the dev tooling installed. `opam install
+  . --locked --deps-only` reports nothing to do on the 9.2 switch.
+- The `#else` branches are the code as it was, so behaviour under 9.2 is
+  unchanged. In 9.3, `Termops.ConstrData.hash` is the same function as
+  9.2's `Constr.hash`, and `get_sort_quality_or_set_of` is line for line
+  9.2's `get_sort_quality_of` (both read in the two sources).
+- How it got here. `%{version:rocq-runtime}` was the first try and does not
+  work: Rocq installs its findlib packages with version `dev`. A pure-OCaml
+  shim then handled the renames, an `open` of the module that has the new
+  name shadowing a binding of the old one, but it could not handle the
+  tuple. Then came a `Rocq_compat` module with one interface and an
+  implementation per version, copied into place by the build. That was
+  committed, then undone at the user's request: he did not want the extra
+  module. It also went to a side branch in a scratch worktree, when the
+  user wanted changes made on `main` and left uncommitted.
+
+Verified, under 9.2 (the local switch, from the lockfile) and 9.3 (an opam
+switch with `rocq-core.9.3.0`, OCaml 5.4.1):
+- `dune build`, `tests.exe` (111/111), `make -j8` (the default example
+  subset, `CCS/LawProofs.v`'s least bounds included) and `make dune` all
+  pass.
+- Under 9.2, a second `make` recompiles nothing.
+
+Not run: the `PluginProofs.v` suite (`bench/proofs.sh`), under either
+version. Under 9.2 the solver runs the same code as before. Under 9.3 it
+is unmeasured beyond `LawProofs.v`. CI still builds 9.2 only.
+
+**Session tally (2026-11-04):** Tooling 1 · Bug fix 0 · Refactor 0 ·
+Optimization 0 · Docs 0 · New feature 0.
+
+## 2026-11-04 (cont.) — dead code, and the logger's cost
+
+Uncommitted, on `main`, with the entry above. Asked for "aggressive"
+simplification and optimisation.
+
+**Refactor.** About 1,970 lines removed, in 72 files, with no change in
+behaviour:
+- 156 `val`s left `.mli` files, each used only inside its own module or
+  not at all. A name-based search over `lib`, `src`, `test` and `bench`
+  found them. Where an `.ml` repeats the signature (`module type S`), the
+  `.ml` copy was narrowed too.
+- 41 functions deleted that nothing used. Warning 32 found them once the
+  interfaces were narrow. This project's flags leave it off, so it was
+  switched on for the check only (`OCAMLPARAM='_,w=+32+34+60'`), run
+  until it reported nothing.
+- 37 exceptions left the interfaces, being raised and caught only inside
+  their module. Two more, `FSM_HasNoSilentLabel` and
+  `FSM_HasNoVisibleLabel`, were deleted, because the dead functions above
+  were the only ones raising them.
+- `Logger.enable`, `disable`, `quiet` and `reset_sink` were unused, so
+  the global switch they set, always on, went too.
+- Commented-out code, 17 blocks, mostly disabled `Logger` calls.
+- A monadic `fold` over a list, added beside `iterate`, replaces the
+  six loops written as `iterate 0 (List.length xs - 1)` with
+  `List.nth xs i` (quadratic, and harder to read).
+
+**Optimization.** `Logger.is_enabled` looked up a `Hashtbl` on every
+message, enabled or not, and each kind built its closure before checking.
+It is now an array indexed by kind, checked first. Under callgrind, on
+`Proc/Test1`, disabled logging was 1.8% of all instructions, about half
+of the plugin's own 3.4%.
+
+**Tooling.** `.gitignore` gains `*.cm[oa]`: `make` leaves `.cmo` files
+that showed as untracked.
+
+Mistakes along the way, all caught before the build passed:
+- A zsh loop did not word-split, so the first narrowing pass touched only
+  files with a single name.
+- Narrowing exceptions with the `val` tool also deleted their definitions
+  in the `.ml` files, along with two functions that followed them
+  (`Graph.build_ltsmap` and `Wrapper.is_similar`).
+- A zero-context reverse patch then landed in the wrong place in
+  `rocq_monad_utils.ml`.
+
+Each affected file was rebuilt from `HEAD` by replaying only the
+intended steps. Each was diffed against the damaged one to check that
+the only differences were the damage. A `git checkout` of
+`rocq_monad_utils.ml` was refused at the time, rightly: it would have
+dropped the uncommitted cppo change.
+
+Verified (Rocq 9.2): `dune build`; `make -j8`, which catches warning 50;
+`tests.exe` (111/111); and `bench/proofs.sh -m auto,True,False` against
+a worktree of `HEAD`. **Every Solve identical**, under all three modes.
+Times: 328s against 340s in all, but the suite runs eight files at once
+and single files moved by up to 50% both ways. So no speed-up is
+claimed.
+
+Not done, recorded in `doc/future-work.md`:
+- the signatures written in both `.ml` and `.mli` (about 2,280 lines;
+  an `_intf` module each would remove them);
+- `econstr_eq` comparing by encoding, the plugin's largest own cost on
+  `Test1`, which is not a safe change without measuring;
+- the CADP profile, lost to a reboot.
+
+**Session tally (2026-11-04), cont.:** Refactor 1 · Optimization 1 ·
+Tooling 1 · Docs 1 · Bug fix 0 · New feature 0.
+
+## 2026-11-04 (cont.) — signatures written once; measured
+
+Asked to do the restructurings recorded above, then commit everything as
+"Cleanup and restructuring" and push upstream.
+
+**Refactor.** 13 modules declared the same `module type S` in both their
+`.ml` and `.mli`; `graph_type` also declared `Args`. About 1,120 lines
+were duplicated. Each signature now lives once, in an interface-only
+`foo_intf.mli`, and both files say `module type S = Foo_intf.S`. The 13
+are `rocq_monad_utils`, `product`, `proof_solver_tactics`, `wrapper`,
+`decoder`, `model`, `graph_type`, `rocq_monad`, `proof_solver_statem`,
+`bisimilarity`, `bindings`, `results` and `bi_encoding`, all with 40
+lines or more. The other 28 duplicate 6 to 31 lines each, and a new
+module (three list entries) costs about as much as it saves.
+- The earlier count of 2,280 lines was wrong: it included `module type`s
+  in files that have no `.mli` (`components.ml`, 531 of them). The real
+  figure is about 1,600 lines in 41 files.
+- First written as `foo_intf.ml`. `make -j` then failed with
+  "inconsistent assumptions over interface", because both compilers write
+  the `.cmi` of an `.ml` that has no `.mli`. An interface-only module, as
+  `lib/terms/base_.mli` already was, fixes that. `CLAUDE.md` now says so.
+
+**Optimization, measured.** `econstr_eq`, the plugin's largest own cost
+on `Proc/Test1`: when `eq_constr` finds the two terms already equal,
+encode only one. This keeps both the result and the encoding table.
+Under callgrind it cost **0.35% more** instructions, so it was reverted.
+The item stays in `doc/future-work.md`.
+
+Whole session, under callgrind on `Proc/Test1/PluginProofs.v` (Rocq 9.2,
+deterministic instruction counts): 15,987M at `HEAD`, 15,287M now,
+**4.4% fewer**, all 9 Solve counts the same. Most of that is the logger
+fix.
+
+Verified (Rocq 9.2):
+- `dune build`, `tests.exe` (111/111), `make -j6` (in a clean copy) and
+  `scripts/check_module_lists.py`;
+- `Test.v`'s 71 counts, identical to `HEAD` (`bench/testv-counts.sh`);
+- `bench/proofs.sh -m auto,True,False` against a worktree of `HEAD`:
+  every Solve identical.
+
+Also: `.gitignore` gains `_opam/`.
+
+**Session tally (2026-11-04), cont.:** Refactor 1 · Optimization 0
+(one tried, reverted) · Tooling 1 · Docs 1 · Bug fix 0 · New feature 0.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

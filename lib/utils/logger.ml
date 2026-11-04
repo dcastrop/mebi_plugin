@@ -25,43 +25,37 @@ let default_sink : sink =
 (** The installed sink. *)
 let the_sink : sink ref = ref default_sink
 
-(* See the [.mli] for these two. *)
+(* See the [.mli]. *)
 let set_sink (f : sink) : unit = the_sink := f
-let reset_sink () : unit = the_sink := default_sink
 
 (***********************************************************************)
 
-(** Global on/off, checked before the per-kind configuration. *)
-let the_enabled : bool ref = ref true
-
-(* See the [.mli] for these, through [is_enabled]. *)
-let enable () : unit = the_enabled := true
-let disable () : unit = the_enabled := false
-
-(** Per-kind overrides. Absent means [Output.Kind.default]. *)
-let the_config : (Output.Kind.t, bool) Hashtbl.t = Hashtbl.create 8
-
-let configure (k : Output.Kind.t) (b : bool) : unit =
-  Hashtbl.replace the_config k b
+(** [index k] is [k]'s slot in {!the_config}. *)
+let index : Output.Kind.t -> int = function
+  | Debug -> 0
+  | Info -> 1
+  | Notice -> 2
+  | Warning -> 3
+  | Error -> 4
+  | Trace -> 5
+  | Result -> 6
+  | Show -> 7
 ;;
 
-let reset_config () : unit = Hashtbl.reset the_config
+(** Whether each kind is on, by {!index}. An array, not a table: every
+    message checks it, disabled or not, including [trace] calls on hot
+    paths. *)
+let the_config : bool array = Array.make (List.length Output.Kind.all) false
 
-let is_enabled (k : Output.Kind.t) : bool =
-  !the_enabled
-  &&
-  match Hashtbl.find_opt the_config k with
-  | None -> Output.Kind.default k
-  | Some b -> b
+let reset_config () : unit =
+  List.iter
+    (fun k -> the_config.(index k) <- Output.Kind.default k)
+    Output.Kind.all
 ;;
 
-(* See the [.mli]. Replaces the old [Logger.ReMake], whose two uses were
-   both commented out. *)
-let quiet (f : unit -> 'a) : 'a =
-  let saved : bool = !the_enabled in
-  the_enabled := false;
-  Fun.protect ~finally:(fun () -> the_enabled := saved) f
-;;
+let () = reset_config ()
+let configure (k : Output.Kind.t) (b : bool) : unit = the_config.(index k) <- b
+let is_enabled (k : Output.Kind.t) : bool = the_config.(index k)
 
 (***********************************************************************)
 
@@ -130,35 +124,35 @@ module Body (E : sig
 
   (* See the [.mli] for the rest. *)
   let debug ?(__FUNCTION__ : string = "") (x : string) : unit =
-    out ~__FUNCTION__ Debug x
+    if E.is_enabled Debug then out ~__FUNCTION__ Debug x
   ;;
 
   let info ?(__FUNCTION__ : string = "") (x : string) : unit =
-    out ~__FUNCTION__ Info x
+    if E.is_enabled Info then out ~__FUNCTION__ Info x
   ;;
 
   let notice ?(__FUNCTION__ : string = "") (x : string) : unit =
-    out ~__FUNCTION__ Notice x
+    if E.is_enabled Notice then out ~__FUNCTION__ Notice x
   ;;
 
   let warning ?(__FUNCTION__ : string = "") (x : string) : unit =
-    out ~__FUNCTION__ Warning x
+    if E.is_enabled Warning then out ~__FUNCTION__ Warning x
   ;;
 
   let error ?(__FUNCTION__ : string = "") (x : string) : unit =
-    out ~__FUNCTION__ Error x
+    if E.is_enabled Error then out ~__FUNCTION__ Error x
   ;;
 
   let trace ?(__FUNCTION__ : string = "") (x : string) : unit =
-    out ~__FUNCTION__ Trace x
+    if E.is_enabled Trace then out ~__FUNCTION__ Trace x
   ;;
 
   let result ?(__FUNCTION__ : string = "") (x : string) : unit =
-    out ~__FUNCTION__ Result x
+    if E.is_enabled Result then out ~__FUNCTION__ Result x
   ;;
 
   let show ?(__FUNCTION__ : string = "") (x : string) : unit =
-    out ~__FUNCTION__ Show x
+    if E.is_enabled Show then out ~__FUNCTION__ Show x
   ;;
 
   let thing
@@ -218,8 +212,6 @@ module Scoped (X : sig
     val overrides : (Output.Kind.t * bool) list
   end) : S = Body (struct
     let is_enabled (k : Output.Kind.t) : bool =
-      !the_enabled
-      &&
       match List.assoc_opt k X.overrides with
       | Some b -> b
       | None -> is_enabled k

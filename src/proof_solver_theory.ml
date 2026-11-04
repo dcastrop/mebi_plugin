@@ -3,16 +3,6 @@ module type S = sig
 
   type fsm
 
-  exception FSM_HasNoSilentLabel of fsm
-
-  val is_fsm_silent_label : EConstr.t -> fsm -> bool
-
-  exception FSM_HasNoVisibleLabel of fsm
-
-  val is_fsm_visible_label : EConstr.t -> fsm -> bool
-
-  exception FSM_HasNoConstructors of fsm
-
   val is_fsm_constructor : EConstr.t -> fsm -> bool
 end
 
@@ -47,34 +37,6 @@ module Make
   include ThEnc
 
   type fsm = W.Model.FSM.t
-
-  exception FSM_HasNoSilentLabel of Model.FSM.t
-
-  (* See the [.mli]. *)
-  let is_fsm_silent_label (x : EConstr.t) (m : Model.FSM.t) : bool =
-    Logger.trace __FUNCTION__;
-    match
-      Model.Label.Set.filter Model.Label.is_silent m.info.weak_labels
-      |> Model.Label.Set.to_list
-    with
-    | [] -> raise (FSM_HasNoSilentLabel m)
-    | ys -> M.exists_eq x ys Decode.label |> M.run
-  ;;
-
-  exception FSM_HasNoVisibleLabel of Model.FSM.t
-
-  (* See the [.mli]. *)
-  let is_fsm_visible_label (x : EConstr.t) (m : Model.FSM.t) : bool =
-    Logger.trace __FUNCTION__;
-    match
-      Model.Label.Set.filter
-        (fun y -> Model.Label.is_silent y |> Bool.not)
-        m.info.weak_labels
-      |> Model.Label.Set.to_list
-    with
-    | [] -> raise (FSM_HasNoVisibleLabel m)
-    | ys -> M.exists_eq x ys Decode.label |> M.run
-  ;;
 
   exception FSM_HasNoConstructors of Model.FSM.t
 

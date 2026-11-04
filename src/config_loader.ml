@@ -2,9 +2,6 @@ module type S = sig
   type weak
   type 'a mm
 
-  val load_weak_arg : Api.weak_arg -> weak mm
-  val load_weak_arg_opt : Api.weak_arg option -> weak option mm
-
   type weak_args =
     { a : weak option
     ; b : weak option
@@ -12,7 +9,6 @@ module type S = sig
 
   val the_weak_args : weak_args ref option ref
   val load_weak_args : unit -> unit mm
-  val get_the_weak_args : unit -> weak_args option
   val get_the_weak_arg1 : unit -> weak option
   val get_the_weak_arg2 : unit -> weak option
   val get_weak : weak option -> weak option

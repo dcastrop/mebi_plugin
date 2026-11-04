@@ -8,9 +8,6 @@ module type S = sig
 
     and msg = Output.Kind.t * string
 
-    (** [to_string_opt t] is [t]'s message, if it has one and its kind is
-        enabled ({!Logger.is_enabled}). Raises nothing. *)
-    val to_string_opt : t -> string option
   end
 
   (** A non-empty chain of tactics, run in order. *)
@@ -28,9 +25,6 @@ module type S = sig
 
   (** [seq a b] is the chain [a] then [b]. Raises nothing. *)
   val seq : t -> t -> t
-
-  (** Raised by {!chain} on an empty list when asked to. *)
-  exception EmptyTacticChain
 
   (** [chain ?nonempty ts] is the tactics [ts] chained in order ({!seq}),
       or {!empty} if there are none.

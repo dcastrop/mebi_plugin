@@ -105,15 +105,6 @@ val enumerate
   -> EConstr.t
   -> Evd.evar_map list * bool
 
-(** [abstract_vars env sigma t] is [t] with each local variable it mentions
-    replaced by a fresh evar of the same type, and the evar map with them.
-    Raises nothing. *)
-val abstract_vars
-  :  Environ.env
-  -> Evd.evar_map
-  -> EConstr.t
-  -> Evd.evar_map * EConstr.t
-
 (** [dead env sigma t] is whether the proposition [t] holds for no value of
     the local variables it mentions: a complete search over
     {!abstract_vars} found no instance, so a hypothesis of type [t] is false

@@ -15,14 +15,6 @@ module type S = sig
       nothing. *)
   val get_hyp_names : unit -> Names.Id.Set.t
 
-  (** [next_name_of names x] is [x], or [x] renumbered, so it is none of
-      [names]. Raises nothing. *)
-  val next_name_of : Names.Id.Set.t -> Names.Id.t -> Names.Id.t
-
-  (** [new_name_of_string s] is a name from [s] that no hypothesis has.
-      Raises nothing. *)
-  val new_name_of_string : string -> Names.Id.t
-
   (** [new_cofix_name ()] is a fresh name for a coinduction hypothesis
       ([Cofix0], [Cofix1], ...). Raises nothing. *)
   val new_cofix_name : unit -> Names.Id.t

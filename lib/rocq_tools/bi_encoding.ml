@@ -1,59 +1,4 @@
-module type S = sig
-  type enc
-
-  module F : Hashtbl.S with type key = EConstr.t
-  module B : Hashtbl.S with type key = enc
-
-  type maps =
-    { fwd : enc F.t
-    ; bck : EConstr.t B.t
-    }
-
-  val the_maps : maps ref option ref
-  val reset : unit -> unit
-  val initialize : unit -> unit
-
-  exception MapsNotInitialised of unit
-
-  val get_the_maps : unit -> maps ref
-  val fwdmap : unit -> enc F.t
-  val bckmap : unit -> EConstr.t B.t
-
-  (** Counts undefined evars, non-empty universe instances and local-context
-      variables in a term -- the three things that can make a syntactic key
-      miss. A diagnostic for backlog item A1. *)
-  val classify_key : EConstr.t -> string
-
-  exception EncodingNotFound of EConstr.t
-
-  val get_encoding : EConstr.t -> enc
-  val encode : EConstr.t -> enc
-  val encoded : EConstr.t -> bool
-
-  exception DecodingNotFound of enc
-
-  val get_econstr : enc -> EConstr.t
-
-  exception CannotDecode of enc
-
-  val decode : enc -> EConstr.t
-  val decode_opt : enc -> EConstr.t option
-  val opt_decode : enc option -> EConstr.t option
-  val decode_map : 'a B.t -> 'a F.t
-  val encode_map : 'a F.t -> 'a B.t
-  val to_list : unit -> (enc * EConstr.t) list
-  val alias : enc -> enc
-  val aliases_of : enc -> enc list
-
-  (** The [EConstr.t] keys of [F] are compared and hashed under a [sigma], so
-      this instance's table has to know which context to read it from. Install
-      it once, when the instance is created; it defaults to
-      [Rocq_context.global]. *)
-  val set_ctx : Rocq_context.source -> unit
-
-  (** The [env]/[sigma] this instance was given, read now. *)
-  val current_ctx : unit -> Rocq_context.t
-end
+module type S = Bi_encoding_intf.S
 
 module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
   type enc = Enc.t
@@ -79,7 +24,11 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
 
       let hash (x : t) : int =
         Logger.trace __FUNCTION__;
+#if ROCQ_VERSION >= (9, 3, 0)
+        Termops.ConstrData.hash
+#else
         Constr.hash
+#endif
           (EConstr.to_constr ~abort_on_undefined_evars:false (sigma ()) x)
       ;;
     end)
@@ -181,13 +130,11 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     Logger.trace __FUNCTION__;
     try get_encoding x with
     | EncodingNotFound x ->
-      (* Logger.trace ~__FUNCTION__ "Err: EncodingNotFound"; *)
       (* NOTE: map to the next encoding and return *)
       let new_enc : Enc.t = Enc.incr () in
       F.add (fwdmap ()) x new_enc;
       B.add (bckmap ()) new_enc x;
       (* NOTE: make sure to update the maps (keep progress) *)
-      (* Logger.thing ~__FUNCTION__ Trace "new enc" new_enc ( Enc.to_string); *)
       new_enc
   ;;
 
@@ -232,30 +179,12 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     try B.find the_aliases x with Not_found -> []
   ;;
 
-  (* See the [.mli] for [decode_opt] and [opt_decode]. *)
-  let decode_opt (x : Enc.t) : EConstr.t option =
-    Logger.trace __FUNCTION__;
-    try Some (decode x) with CannotDecode _ -> None
-  ;;
-
-  let opt_decode : Enc.t option -> EConstr.t option = function
-    | None -> None
-    | Some x -> (try Some (decode x) with CannotDecode _ -> None)
-  ;;
-
   (* See the [.mli] for [decode_map] and [encode_map]. *)
   let decode_map (bmap : 'a B.t) : 'a F.t =
     Logger.trace __FUNCTION__;
     let fmap : 'a F.t = F.create (B.length bmap) in
     B.iter (fun (k : Enc.t) (v : 'a) -> F.add fmap (decode k) v) bmap;
     fmap
-  ;;
-
-  let encode_map (fmap : 'a F.t) : 'a B.t =
-    Logger.trace __FUNCTION__;
-    let bmap : 'a B.t = B.create (F.length fmap) in
-    F.iter (fun (k : EConstr.t) (v : 'a) -> B.add bmap (encode k) v) fmap;
-    bmap
   ;;
 
   (* See the [.mli]. *)

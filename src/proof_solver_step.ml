@@ -416,7 +416,11 @@ struct
         type t = Constr.t
 
         let equal = Constr.equal
+#if ROCQ_VERSION >= (9, 3, 0)
+        let hash = Termops.ConstrData.hash
+#else
         let hash = Constr.hash
+#endif
       end)
 
     (** {!closed_step_refuted}'s memo. *)
@@ -1017,18 +1021,17 @@ struct
       Logger.trace __FUNCTION__;
       let hyps : Hyp.t list = get_non_cofixes () in
       let open Syntax in
-      (* [grade_next i best] is [best] or the [i]th hypothesis, graded *)
-      let grade_next (i : int) (best : (int * Hyp.t) option)
+      (* [grade_next y best] is [best] or the hypothesis [y], graded *)
+      let grade_next (y : Hyp.t) (best : (int * Hyp.t) option)
         : (int * Hyp.t) option mm
         =
-        let y : Hyp.t = List.nth hyps i in
         let* grade : int = Hyp.invertibility y in
         Logger.debug
           ~__FUNCTION__
           (Printf.sprintf "grade %i : %s" grade (Hyp.name_to_string y));
         return (keep_highest best (grade, y))
       in
-      let* to_invert_opt = iterate 0 (List.length hyps - 1) None grade_next in
+      let* to_invert_opt = fold None hyps grade_next in
       match to_invert_opt with
       (* only hypotheses with a non-zero grade are inverted *)
       | None | Some (0, _) -> return None
@@ -1043,12 +1046,12 @@ struct
     let try_unfold_any () : Tactic.t option mm =
       let hyps = get_non_cofixes () in
       let open Syntax in
-      (* [unfold_hyp i acc] is [acc] then the [i]th hypothesis' unfolding *)
-      let unfold_hyp (i : int) (acc : Tactic.t option) : Tactic.t option mm =
-        let+ y = Hyp.try_unfold_any (List.nth hyps i) in
+      (* [unfold_hyp h acc] is [acc] then the hypothesis [h]'s unfolding *)
+      let unfold_hyp (h : Hyp.t) (acc : Tactic.t option) : Tactic.t option mm =
+        let+ y = Hyp.try_unfold_any h in
         seq_opt acc y
       in
-      iterate 0 (List.length hyps - 1) None unfold_hyp
+      fold None hyps unfold_hyp
     ;;
 
     (** [term_size sigma t] is the number of nodes in [t]: a smaller
@@ -1107,21 +1110,20 @@ struct
       Logger.trace __FUNCTION__;
       let hyps = get_non_cofixes () in
       let open Syntax in
-      (* [f i found] is [found], or else the [i]th hypothesis read as a
+      (* [f y found] is [found], or else the hypothesis [y] read as a
          transition of [m], if it reads as one *)
-      let f (i : int)
+      let f (y : Hyp.t)
         : Model.Transition.t option -> Model.Transition.t option mm
         = function
         | Some x -> return (Some x)
         | None ->
-          let y = List.nth hyps i in
           (try
              let y : Model.Transition.t = Hyp.get_transition ?lts y m |> run in
              return (Some y)
            with
            | Hyp.CouldNotGetTransition _ -> return None)
       in
-      let* x = iterate 0 (List.length hyps - 1) None f in
+      let* x = fold None hyps f in
       match x with None -> raise (CannotGetTransition m) | Some x -> return x
     ;;
   end

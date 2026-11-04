@@ -41,10 +41,11 @@
  (depends
   (ocaml
    (>= 4.14))
+  ; 9.2 and 9.3 differ in a few functions, under cppo's #if ROCQ_VERSION.
   (rocq-core
    (and
     (>= 9.2)
-    (< 9.3)))
+    (< 9.4)))
   ; theories/dune declares (theories Stdlib) and the .v files `From Stdlib Require`
   (rocq-stdlib
    (>= 9.1))
@@ -53,6 +54,12 @@
    (>= 3.0))
   (benchmark
    (>= 1.6))
+  ; Preprocesses the modules whose code differs by Rocq version: the
+  ; (preprocess ...) in lib/rocq_tools/dune and src/dune.
+  (cppo
+   (and
+    :build
+    (>= 1.6)))
   ; Documentation tooling (`dune build @doc`; `odig` browses it locally).
   (odoc
    (or :with-doc :with-dev-setup))

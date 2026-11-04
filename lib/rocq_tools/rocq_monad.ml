@@ -1,75 +1,8 @@
-module type S = sig
-  include Bi_encoding.S
-
-  val bienc_to_list : unit -> (enc * EConstr.t) list
-
-  type 'a mm = wrapper ref -> 'a in_wrapper
-
-  and wrapper =
-    { ctx : Rocq_context.t ref
-    ; maps : maps ref
-    }
-
-  and 'a in_wrapper =
-    { state : wrapper ref
-    ; value : 'a
-    }
-
-  val run : ?reset_encoding:bool -> 'a mm -> 'a
-  val return : 'a -> 'a mm
-  val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
-  val map : ('a -> 'b) -> 'a mm -> 'b mm
-  val product : 'a mm -> 'b mm -> ('a * 'b) mm
-  val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
-
-  val state
-    :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-    -> wrapper ref
-    -> 'a in_wrapper
-
-  val sandbox : ?sigma:Evd.evar_map -> 'a mm -> wrapper ref -> 'a in_wrapper
-
-  module type SYNTAX = sig
-    val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm
-    val ( let* ) : 'a mm -> ('a -> 'b mm) -> 'b mm
-
-    val ( let$ )
-      :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-      -> ('a -> 'b mm)
-      -> 'b mm
-
-    val ( let$* )
-      :  (Environ.env -> Evd.evar_map -> Evd.evar_map)
-      -> (unit -> 'b mm)
-      -> 'b mm
-
-    val ( let$+ )
-      :  (Environ.env -> Evd.evar_map -> 'a)
-      -> ('a -> 'b mm)
-      -> 'b mm
-
-    val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
-  end
-
-  module Syntax : SYNTAX
-
-  val econstr_normalize : EConstr.t -> EConstr.t mm
-  val encode : EConstr.t -> enc
-  val get_ctx : wrapper ref -> Rocq_context.t in_wrapper
-  val get_env : wrapper ref -> Environ.env in_wrapper
-  val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
-  val get_maps : wrapper ref -> maps in_wrapper
-  val get_fwdmap : wrapper ref -> enc F.t in_wrapper
-  val get_bckmap : wrapper ref -> EConstr.t B.t in_wrapper
-  val fstring : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
-end
+module type S = Rocq_monad_intf.S
 
 module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
   module BiEnc = Bi_encoding.Make (Enc)
   include BiEnc
-
-  (* See the [.mli]. *)
-  let bienc_to_list : unit -> (Enc.t * EConstr.t) list = to_list
 
   type 'a mm = wrapper ref -> 'a in_wrapper
 
@@ -93,7 +26,6 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
      would end up hashing some entries under one [sigma] and looking them up
      under another. See [Proof_solver_wrapper.Make]. *)
   let run ?(reset_encoding : bool = false) (x : 'a mm) : 'a =
-    (* Logger.trace __FUNCTION__; *)
     if reset_encoding then reset () else initialize ();
     let a : 'a in_wrapper =
       x (ref { ctx = ref (current_ctx ()); maps = get_the_maps () })
@@ -138,6 +70,13 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     if index > upper_bound
     then return acc
     else bind (f index acc) (fun acc' -> iterate (index + 1) upper_bound acc' f)
+  ;;
+
+  (* See the [.mli]. *)
+  let rec fold (acc : 'a) (xs : 'b list) (f : 'b -> 'a -> 'a mm) : 'a mm =
+    match xs with
+    | [] -> return acc
+    | x :: xs -> bind (f x acc) (fun acc' -> fold acc' xs f)
   ;;
 
   (* See the [.mli]. *)
@@ -211,11 +150,6 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
   (* See the [.mli]. *)
   let encode (x : EConstr.t) : Enc.t = run (econstr_normalize x) |> encode
 
-  (* See the [.mli] for every [get_*]. *)
-  let get_ctx (st : wrapper ref) : Rocq_context.t in_wrapper =
-    { state = st; value = !(!st.ctx) }
-  ;;
-
   let get_env (st : wrapper ref) : Environ.env in_wrapper =
     { state = st; value = !(!st.ctx).env }
   ;;
@@ -224,17 +158,8 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
     { state = st; value = !(!st.ctx).sigma }
   ;;
 
-  (* *)
-  let get_maps (st : wrapper ref) : maps in_wrapper =
-    { state = st; value = !(!st.maps) }
-  ;;
-
   let get_fwdmap (st : wrapper ref) : Enc.t F.t in_wrapper =
     { state = st; value = !(!st.maps).fwd }
-  ;;
-
-  let get_bckmap (st : wrapper ref) : EConstr.t B.t in_wrapper =
-    { state = st; value = !(!st.maps).bck }
   ;;
 
   (* See the [.mli]. *)

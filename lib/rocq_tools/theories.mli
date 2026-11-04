@@ -4,12 +4,6 @@
 module type S = sig
   type 'a im
 
-  (** [is_theory x y] is whether the head of [x], read as an atomic type,
-      is the theory term [y]; [false] if [x] is not an atomic type (a
-      product such as a negation, a sort, or not a type at all). Raises
-      nothing. *)
-  val is_theory : Evd.econstr -> Evd.econstr -> bool im
-
   (** [is_any_theory x] is whether [x] equals any of the terms
       {!Mebi_theories} loads. Raises nothing. *)
   val is_any_theory : Evd.econstr -> bool
@@ -34,12 +28,6 @@ module type S = sig
   (** [is_silent x] is whether [x]'s head is [silent]. *)
   val is_silent : Evd.econstr -> bool im
 
-  (** [is_silent1 x] is whether [x]'s head is [silent1]. *)
-  val is_silent1 : Evd.econstr -> bool im
-
-  (** [is_LTS x] is whether [x]'s head is [LTS]. *)
-  val is_LTS : Evd.econstr -> bool im
-
   (** [is_None x] is whether [x]'s head is [None]. *)
   val is_None : Evd.econstr -> bool im
 
@@ -48,15 +36,6 @@ module type S = sig
 
   (** [is_list x] is whether [x]'s head is [list]. *)
   val is_list : Evd.econstr -> bool im
-
-  (** [is_cons x] is whether [x]'s head is [cons]. *)
-  val is_cons : Evd.econstr -> bool im
-
-  (** [is_nil x] is whether [x]'s head is [nil]. *)
-  val is_nil : Evd.econstr -> bool im
-
-  (** Raised by {!ensure}: the check failed. *)
-  exception EnsureFail
 
   (** [ensure x f] checks that [f x] holds.
 

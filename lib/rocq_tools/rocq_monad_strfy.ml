@@ -34,28 +34,9 @@ module Make (M : Rocq_monad.S) : S = struct
 
   let hyp_value : Rocq_utils.hyp -> string = fstring Rocq_utils.Strfy.hyp_value
 
-  (* let rocq_ind (f : 'a -> string) : 'a Rocq_ind.t -> string =
-     fstring (Rocq_ind.to_string f)
-     ;; *)
-
   let econstr_bindings : EConstr.t Tactypes.bindings -> string = function
     | NoBindings -> "NoBindings"
-    | ImplicitBindings xs ->
-      (* Utils.Strfy.list econstr xs |> Printf.sprintf "ImplicitBindings: %s" *)
-      "TODO: implicit bindings"
-    | ExplicitBindings xs ->
-      (* Utils.Strfy.list
-        (Of
-           (fun ({ v = x, y; _ } :
-                  (Tactypes.quantified_hypothesis * EConstr.t) CAst.t) ->
-             Printf.sprintf
-               "%s : %s"
-               (match x with
-                | AnonHyp x -> Printf.sprintf "%i" x
-                | NamedHyp { v; _ } -> Names.Id.to_string v)
-               (econstr y)))
-        xs
-      |> Printf.sprintf "ExplicitBindings: %s" *)
-      "TODO: explicit bindings"
+    | ImplicitBindings _ -> "TODO: implicit bindings"
+    | ExplicitBindings _ -> "TODO: explicit bindings"
   ;;
 end

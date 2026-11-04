@@ -1,352 +1,4 @@
-module type S = sig
-  type tree
-
-  include Rocq_monad.S
-
-  val fresh_evar : Rocq_utils.evar_source -> EConstr.t mm
-  val econstr_eq : ?enc:bool -> EConstr.t -> EConstr.t -> bool mm
-  val econstr_compare : EConstr.t -> EConstr.t -> int
-  val get_encoding : EConstr.t -> enc
-  val econstr_kind : EConstr.t -> Rocq_utils.econstr_kind mm
-  val econstr_is_evar : EConstr.t -> bool mm
-
-  val econstr_to_constr
-    :  ?abort_on_undefined_evars:bool
-    -> EConstr.t
-    -> Constr.t mm
-
-  val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
-  val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
-  val to_atomic : EConstr.t -> EConstr.t Rocq_utils.kind_pair mm
-  val to_lambda : EConstr.t -> Rocq_utils.lambda_triple mm
-  val to_app : EConstr.t -> EConstr.t Rocq_utils.kind_pair mm
-  val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
-  val type_of_econstr : EConstr.t -> EConstr.t mm
-  val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
-
-  module Strfy : Rocq_monad_strfy.S
-
-  val log_econstr
-    :  ?__FUNCTION__:string
-    -> ?m:Output.Kind.t
-    -> ?s:string
-    -> EConstr.t
-    -> unit
-
-  val log_econstrs
-    :  ?__FUNCTION__:string
-    -> ?m:Output.Kind.t
-    -> ?s:string
-    -> EConstr.t list
-    -> unit
-
-  val log_constr
-    :  ?__FUNCTION__:string
-    -> ?m:Output.Kind.t
-    -> ?s:string
-    -> Constr.t
-    -> unit
-
-  val log_constrs
-    :  ?__FUNCTION__:string
-    -> ?m:Output.Kind.t
-    -> ?s:string
-    -> Constr.t list
-    -> unit
-
-  module type SErrors = sig
-    type t =
-      | LTS_Empty
-      | LTS_Incomplete of string
-      | Saturation_Too_Large of string
-      | Not_Bisimilar
-      | Invalid_Ind_Kind_Type of EConstr.t option
-      | Invalid_Sort_LTS of Sorts.Quality.t
-      | Invalid_Sort_Type of Sorts.Quality.t
-      | Invalid_Ref_LTS of Names.GlobRef.t
-      | Invalid_Ref_Type of Names.GlobRef.t
-      | LTS_Has_Parameters of string
-      | Invalid_Arity of (Environ.env * Evd.evar_map * Constr.t)
-      | InvalidCheckUpdatedCtx of
-          (Environ.env
-          * Evd.evar_map
-          * EConstr.t list
-          * EConstr.rel_declaration list)
-      | InvalidLTSArgsLength of int
-      | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
-
-    exception MEBI_exn of t
-
-    val lts_empty : unit -> exn
-    val lts_incomplete : string -> exn
-    val saturation_too_large : string -> exn
-    val not_bisimilar : unit -> exn
-    val invalid_ind_kind_type : EConstr.t option -> exn
-    val invalid_sort_lts : Sorts.Quality.t -> exn
-    val invalid_sort_type : Sorts.Quality.t -> exn
-    val invalid_ref_lts : Names.GlobRef.t -> exn
-    val invalid_ref_type : Names.GlobRef.t -> exn
-    val lts_has_parameters : string -> exn
-    val invalid_arity : Environ.env -> Evd.evar_map -> Constr.t -> exn
-
-    val invalid_check_updated_ctx
-      :  Environ.env
-      -> Evd.evar_map
-      -> EConstr.t list
-      -> EConstr.rel_declaration list
-      -> exn
-
-    val invalid_lts_args_length : int -> exn
-    val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
-  end
-
-  module Errors : SErrors
-
-  module type SErr = sig
-    val lts_empty : unit -> 'a
-    val lts_incomplete : string -> 'a
-    val saturation_too_large : string -> 'a
-    val not_bisimilar : unit -> 'a
-    val invalid_ind_kind_type : EConstr.t option -> 'a
-    val invalid_sort_lts : Sorts.Quality.t -> 'a
-    val invalid_sort_type : Sorts.Quality.t -> 'a
-    val invalid_ref_lts : Names.GlobRef.t -> 'a
-    val invalid_ref_type : Names.GlobRef.t -> 'a
-    val lts_has_parameters : string -> 'a
-    val invalid_arity : Constr.t -> 'a mm
-
-    val invalid_check_updated_ctx
-      :  EConstr.t list
-      -> EConstr.rel_declaration list
-      -> 'a mm
-
-    val invalid_lts_args_length : int -> 'a
-    val invalid_lts_term_kind : Constr.t -> 'a mm
-  end
-
-  module Err : SErr
-
-  module Ind : sig
-    module LTS : sig
-      type t =
-        { term_type : EConstr.t
-        ; label_type : EConstr.t
-        ; constructor_types : constructor array
-        }
-
-      and constructor =
-        { name : Names.Id.t
-        ; constructor : Rocq_utils.ind_constr
-        }
-
-      include Json.S with type k = t
-    end
-
-    type t =
-      { enc : enc
-      ; ind : EConstr.t
-      ; kind : kind
-      }
-
-    and kind =
-      | Type of EConstr.t option
-      | LTS of LTS.t
-
-    include Json.S with type k = t
-
-    val get_lts : t -> LTS.t
-    val get_lts_term_type : t -> EConstr.t
-    val get_lts_label_type : t -> EConstr.t
-    val get_lts_constructor_types : t -> LTS.constructor array
-    val lookup : Names.inductive -> Declarations.mind_specif mm
-    val get_lts_constructor_names : t -> Names.Id.t array
-    val get_lts_constructors : t -> Rocq_utils.ind_constr array
-
-    val assert_mip_arity_is_type_or_set
-      :  Declarations.one_inductive_body
-      -> unit mm
-
-    val assert_mip_arity_is_prop : Declarations.one_inductive_body -> unit mm
-
-    val lts_mind
-      :  Names.GlobRef.t
-      -> (Names.inductive * Declarations.mind_specif) mm
-
-    val lts_type_mind
-      :  Names.GlobRef.t
-      -> (Names.inductive * Declarations.mind_specif) mm
-
-    val lts_prop_mind
-      :  Names.GlobRef.t
-      -> (Names.inductive * Declarations.mind_specif) mm
-
-    val lts_labels_and_terms
-      :  Declarations.mind_specif
-      -> (Constr.rel_declaration * Constr.rel_declaration) mm
-
-    val lts : Names.GlobRef.t -> t mm
-  end
-
-  val mk_ctx_substl
-    :  EConstr.Vars.substl
-    -> ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list
-    -> EConstr.Vars.substl mm
-
-  val extract_args
-    :  ?substl:EConstr.Vars.substl
-    -> Constr.t
-    -> Rocq_utils.constructor_args mm
-
-  module Constructor : sig
-    type t = enc * enc * tree
-
-    include Json.S with type k = t
-
-    val encode : EConstr.t -> EConstr.t -> tree -> t
-  end
-
-  val make_state_tree_pair_set
-    :  unit
-    -> (module Set.S with type elt = enc * tree)
-
-  module Unification : sig
-    module Pair : sig
-      type t =
-        { to_check : EConstr.t
-        ; acc : EConstr.t
-        }
-
-      include Json.S with type k = t
-
-      val fresh : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * t
-
-      val make
-        :  Environ.env
-        -> Evd.evar_map
-        -> EConstr.t
-        -> EConstr.t
-        -> Evd.evar_map * t
-
-      val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
-      val unifies : EConstr.t -> EConstr.t -> bool mm
-    end
-
-    module Problem : sig
-      type t =
-        { act : Pair.t
-        ; goto : Pair.t
-        ; tree : tree
-        }
-
-      include Json.S with type k = t
-
-      val unify_pair_opt : Pair.t -> bool mm
-      val unify_opt : t -> tree option mm
-      val of_constructor : Rocq_utils.constructor_args -> Constructor.t -> t
-    end
-
-    module Problems : sig
-      (** An equation premise not decidable when its constructor was matched:
-          the LTS it belongs to, and its head and arguments. *)
-      type deferred = enc * EConstr.t * EConstr.t array
-
-      type t =
-        { sigma : Evd.evar_map
-        ; to_unify : Problem.t list
-        ; deferred : deferred list
-        }
-
-      include Json.S with type k = t
-
-      val empty : unit -> t mm
-      val is_empty : t -> bool
-      val unify_list_opt : Problem.t list -> tree list option mm
-
-      val sandbox_unify_all
-        :  enc
-        -> EConstr.t
-        -> EConstr.t
-        -> t
-        -> (EConstr.t * EConstr.t * tree list) list mm
-    end
-
-    module ListOfProblems : sig
-      type t = Problems.t list
-
-      include Json.S with type k = t
-
-      val is_empty : t -> bool
-      val cross_product : Problems.t -> t -> t
-    end
-
-    module Constructors : sig
-      type t = Constructor.t list
-
-      include Json.S with type k = t
-
-      val retrieve
-        :  int
-        -> t
-        -> EConstr.t
-        -> EConstr.t
-        -> enc * ListOfProblems.t
-        -> t mm
-
-      val to_problems : Rocq_utils.constructor_args -> t -> Problems.t mm
-      val axiom : EConstr.t -> EConstr.t -> enc * int -> t -> t mm
-    end
-
-    val check_constructor_args_unify
-      :  EConstr.t
-      -> EConstr.t
-      -> Rocq_utils.constructor_args
-      -> bool mm
-
-    val check_valid_constructors
-      :  Ind.LTS.constructor array
-      -> Ind.t F.t
-      -> EConstr.t
-      -> EConstr.t
-      -> enc
-      -> Constructors.t mm
-
-    val explore_valid_constructor
-      :  Ind.t F.t
-      -> EConstr.t
-      -> enc
-      -> Rocq_utils.constructor_args
-      -> int * Constructors.t
-      -> EConstr.Vars.substl * EConstr.rel_declaration list
-      -> Constructors.t mm
-
-    val check_updated_ctx
-      :  enc
-      -> ListOfProblems.t
-      -> Ind.t F.t
-      -> EConstr.Vars.substl * EConstr.rel_declaration list
-      -> (enc * ListOfProblems.t) option mm
-
-    val check_for_next_constructors
-      :  int
-      -> EConstr.t
-      -> EConstr.t
-      -> Constructors.t
-      -> (enc * ListOfProblems.t) option
-      -> Constructors.t mm
-
-    val collect_valid_constructors
-      :  Ind.LTS.constructor array
-      -> Ind.t F.t
-      -> EConstr.t
-      -> EConstr.t
-      -> enc
-      -> Constructors.t mm
-  end
-
-  val make_enc_hashtbl : unit -> (module Hashtbl.S with type key = enc)
-  val make_enc_set : unit -> (module Set.S with type elt = enc)
-  val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t)
-end
+module type S = Rocq_monad_utils_intf.S
 
 (** What made the LTS being extracted approximate: a premise left undecided
     (the LTS may contain transitions that do not exist), or one whose
@@ -422,12 +74,6 @@ module Make (Enc : Encoding.S) :
   ;;
 
   (* See the [.mli]. *)
-  let econstr_is_evar (x : EConstr.t) : bool mm =
-    Logger.trace __FUNCTION__;
-    state (fun env sigma -> sigma, EConstr.isEvar sigma x)
-  ;;
-
-  (* See the [.mli]. *)
   let econstr_to_constr
         ?(abort_on_undefined_evars : bool = false)
         (x : EConstr.t)
@@ -474,30 +120,19 @@ module Make (Enc : Encoding.S) :
     : bool mm
     =
     Logger.trace __FUNCTION__;
-    (* List.exists (fun y -> decoder y |> econstr_eq x) ys *)
     let open Syntax in
-    let f (i : int) (a : bool) =
-      let y : EConstr.t = List.nth ys i |> decoder in
-      let* b : bool = econstr_eq x y in
+    let f y (a : bool) =
+      let* b : bool = econstr_eq x (decoder y) in
       (a || b) |> return
     in
-    iterate 0 (List.length ys - 1) false f
+    fold false ys f
   ;;
 
   (* See the [.mli]. *)
   let type_of_econstr (x : EConstr.t) : EConstr.t mm =
-    (* Logger.trace __FUNCTION__; *)
     let open Syntax in
     let* t : EConstr.t = econstr_normalize x in
     state (fun env sigma -> Typing.type_of env sigma t)
-  ;;
-
-  (* See the [.mli]. *)
-  let type_of_constrexpr (x : Constrexpr.constr_expr) : EConstr.t mm =
-    (* Logger.trace __FUNCTION__; *)
-    let open Syntax in
-    let* t : EConstr.t = constrexpr_to_econstr x in
-    type_of_econstr t
   ;;
 
   (*********************************************************)
@@ -515,16 +150,6 @@ module Make (Enc : Encoding.S) :
     Logger.thing ~__FUNCTION__ m s x Strfy.econstr
   ;;
 
-  let log_econstrs
-        ?(__FUNCTION__ : string = "")
-        ?(m : Output.Kind.t = Output.Kind.Debug)
-        ?(s : string = "EConstrs")
-        (x : EConstr.t list)
-    : unit
-    =
-    Logger.things ~__FUNCTION__ m s x Strfy.econstr
-  ;;
-
   let log_constr
         ?(__FUNCTION__ : string = "")
         ?(m : Output.Kind.t = Output.Kind.Debug)
@@ -533,16 +158,6 @@ module Make (Enc : Encoding.S) :
     : unit
     =
     Logger.thing ~__FUNCTION__ m s x Strfy.constr
-  ;;
-
-  let log_constrs
-        ?(__FUNCTION__ : string = "")
-        ?(m : Output.Kind.t = Output.Kind.Debug)
-        ?(s : string = "Constrs")
-        (x : Constr.t list)
-    : unit
-    =
-    Logger.things ~__FUNCTION__ m s x Strfy.constr
   ;;
 
   module type SErrors = sig
@@ -572,8 +187,6 @@ module Make (Enc : Encoding.S) :
         (* NOTE: *)
       | InvalidLTSArgsLength of int
       | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
-
-    exception MEBI_exn of t
 
     (* NOTE: *)
     val lts_empty : unit -> exn
@@ -915,21 +528,8 @@ module Make (Enc : Encoding.S) :
       (get_lts x).constructor_types
     ;;
 
-    let get_lts_constructor_names (x : t) : Names.Id.t array =
-      Logger.trace __FUNCTION__;
-      get_lts_constructor_types x
-      |> Array.map (fun ({ name; _ } : LTS.constructor) -> name)
-    ;;
-
-    let get_lts_constructors (x : t) : Rocq_utils.ind_constr array =
-      Logger.trace __FUNCTION__;
-      get_lts_constructor_types x
-      |> Array.map (fun ({ constructor; _ } : LTS.constructor) -> constructor)
-    ;;
-
     (* See the [.mli]. *)
     let lookup (x : Names.inductive) : Declarations.mind_specif mm =
-      (* Logger.trace __FUNCTION__; *)
       let open Syntax in
       let* env = get_env in
       Inductive.lookup_mind_specif env x |> return
@@ -939,7 +539,6 @@ module Make (Enc : Encoding.S) :
     let assert_mip_arity_is_type_or_set (mip : Declarations.one_inductive_body)
       : unit mm
       =
-      (* Logger.trace __FUNCTION__; *)
       match mip.mind_sort with
       | Type _ -> return ()
       | Set -> return ()
@@ -950,7 +549,6 @@ module Make (Enc : Encoding.S) :
     let assert_mip_arity_is_prop (mip : Declarations.one_inductive_body)
       : unit mm
       =
-      (* Logger.trace __FUNCTION__; *)
       match mip.mind_sort with
       | Prop -> return ()
       | _ -> Err.invalid_sort_lts (Sorts.quality mip.mind_sort)
@@ -960,7 +558,6 @@ module Make (Enc : Encoding.S) :
     let lts_mind
       : Names.GlobRef.t -> (Names.inductive * Declarations.mind_specif) mm
       =
-      (* Logger.trace __FUNCTION__; *)
       function
       | Names.GlobRef.IndRef ind ->
         let open Syntax in
@@ -973,7 +570,6 @@ module Make (Enc : Encoding.S) :
     let lts_type_mind (x : Names.GlobRef.t)
       : (Names.inductive * Declarations.mind_specif) mm
       =
-      (* Logger.trace __FUNCTION__; *)
       let open Syntax in
       let* ind, (mib, mip) = lts_mind x in
       let* () = assert_mip_arity_is_type_or_set mip in
@@ -1015,7 +611,6 @@ module Make (Enc : Encoding.S) :
     let lts_prop_mind (x : Names.GlobRef.t)
       : (Names.inductive * Declarations.mind_specif) mm
       =
-      (* Logger.trace __FUNCTION__; *)
       let open Syntax in
       let* ind, (mib, mip) = lts_mind x in
       let* () = assert_mip_arity_is_prop mip in
@@ -1027,7 +622,6 @@ module Make (Enc : Encoding.S) :
     let lts_labels_and_terms ((mib, mip) : Declarations.mind_specif)
       : (Constr.rel_declaration * Constr.rel_declaration) mm
       =
-      (* Logger.trace __FUNCTION__; *)
       (* NOTE: get the type of [mip] from [mib]. *)
       let typ = Inductive.type_of_inductive (UVars.in_punivs (mib, mip)) in
       match mip.mind_arity_ctxt |> Utils.split_at mip.mind_nrealdecls with
@@ -1067,7 +661,6 @@ module Make (Enc : Encoding.S) :
 
     (* See the [.mli]. *)
     let lts (x : Names.GlobRef.t) : t mm =
-      (* Logger.trace __FUNCTION__; *)
       let open Syntax in
       let* ind, (mib, mip) = lts_prop_mind x in
       let* label, term = lts_labels_and_terms (mib, mip) in
@@ -1352,7 +945,13 @@ module Make (Enc : Encoding.S) :
         let premise : EConstr.t = EConstr.mkApp (name, args) in
         let is_prop : bool =
           try
-            match Retyping.get_sort_quality_of env sigma premise with
+            match
+#if ROCQ_VERSION >= (9, 3, 0)
+              Retyping.get_sort_quality_or_set_of env sigma premise
+#else
+              Retyping.get_sort_quality_of env sigma premise
+#endif
+            with
             | UnivGen.QualityOrSet.Qual q -> Sorts.Quality.is_qprop q
             | UnivGen.QualityOrSet.Set -> false
           with
@@ -2256,16 +1855,4 @@ module Make (Enc : Encoding.S) :
     (module Set.Make (Enc))
   ;;
 
-  let make_econstr_set () : (module Set.S with type elt = EConstr.t) =
-    Logger.trace __FUNCTION__;
-    (module Set.Make (struct
-         type t = EConstr.t
-
-         let compare (a : t) (b : t) : int =
-           let a = encode a in
-           let b = encode b in
-           Enc.compare a b
-         ;;
-       end))
-  ;;
 end

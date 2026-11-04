@@ -112,5 +112,7 @@ way.
   - the CADP/mCRL2 comparison (see above);
   - `examples/Bisimilarity/_nat_streams.v`, unfinished.
   - `bench/ocaml/fixtures/` is stale (from 2026-10-10).
+  - Rocq 9.3: builds, but CI and the proof suite run 9.2 only.
+  - `econstr_eq` compares by encoding: the solver's largest own cost.
 - **Set aside on purpose**, so they are not rediscovered as new: listed
   at the end of `doc/future-work.md`.

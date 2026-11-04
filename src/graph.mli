@@ -7,10 +7,6 @@ module type S = sig
   (** The table of the LTSs given in [Using], keyed by encoding. *)
   type indmap
 
-  (** Raised by {!build} when the LTS explored is not among those given in
-      [Using]; carries that table and the LTS's name. *)
-  exception LTSMapDoesNotContainPrimaryLTS of indmap * Libnames.qualid
-
   (** [build ?weak t lts using] is the graph of every state reachable from
       the term [t] by the LTS [lts], whose constructors may use the LTSs
       [using] in their premises, explored breadth first until the bounds

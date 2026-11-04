@@ -4,11 +4,8 @@ module type S = sig
 
   include Theories.S
 
-  val get_theory_enc : (Evd.econstr -> bool im) -> enc mm
-
   exception NotEqTheory
 
-  val get_theory_enc_if_eq : Evd.econstr -> (Evd.econstr -> bool im) -> enc mm
   val get_None_enc_if_eq : Evd.econstr -> enc mm
   val get_Some_enc_if_eq : Evd.econstr -> enc mm
 end

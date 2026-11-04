@@ -24,23 +24,36 @@
   rocq-mebi.model
   yojson
   benchmark)
+ ; cppo, as in lib/rocq_tools/dune: see the comment there.
+ (preprocess
+  (per_module
+   ((action
+     (run %{bin:cppo} -V ROCQ:%{rocq:version.major}.%{rocq:version.minor}.0 %{input-file}))
+    proof_solver_step)))
+ (modules_without_implementation decoder_intf graph_type_intf wrapper_intf results_intf proof_solver_statem_intf proof_solver_tactics_intf)
  (modules
   rocq_output ; installs the Rocq Feedback sink that lib/ emits through
+  decoder_intf
   decoder
   api ; stores modules created by [loader.v], used by commands
   weak
+  graph_type_intf
   graph_type
   graph_builder
   graph_extract_lts
   graph
   config_loader ; load configuration (of api)
   benchmarking
+  wrapper_intf
   wrapper ; basic plugin commands
+  results_intf
   results
+  proof_solver_statem_intf
   proof_solver_statem
   proof_solver_tactic
   proof_solver_theory
   proof_solver_wrapper
+  proof_solver_tactics_intf
   proof_solver_tactics
   proof_solver_step
   proof_solver ; 

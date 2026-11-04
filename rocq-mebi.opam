@@ -15,10 +15,11 @@ bug-reports: "https://github.com/dcastrop/mebi_plugin/issues"
 depends: [
   "dune" {>= "3.21"}
   "ocaml" {>= "4.14"}
-  "rocq-core" {>= "9.2" & < "9.3"}
+  "rocq-core" {>= "9.2" & < "9.4"}
   "rocq-stdlib" {>= "9.1"}
   "yojson" {>= "3.0"}
   "benchmark" {>= "1.6"}
+  "cppo" {build & >= "1.6"}
   "odoc" {with-doc | with-dev-setup}
   "odig" {with-dev-setup}
   "ocaml-lsp-server" {with-dev-setup}

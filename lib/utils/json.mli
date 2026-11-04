@@ -14,21 +14,6 @@ val option
     any depth. Raises nothing. *)
 val without : string list -> Yojson.t -> Yojson.t
 
-(** [write_file ?dir name ext f] calls [f] on a new file in [dir] (default
-    {!Utils.FileWriter.default_dir}) named after the session's timestamp,
-    the source location and [name], with extension [ext], creating [dir] if
-    needed, and closes it.
-
-    @raise Sys_error
-      if the directory or file cannot be created or written (propagated;
-      the file is closed first). Also raises whatever [f] raises. *)
-val write_file
-  :  ?dir:string
-  -> string
-  -> string
-  -> (out_channel -> unit)
-  -> unit
-
 (** Logging and dumping for one type, [k], in whatever form: {!S} gives
     them as JSON, {!Text} as plain text. *)
 module type Log = sig

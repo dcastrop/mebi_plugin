@@ -32,7 +32,13 @@ let max_depth : int ref = ref default_depth
 (* See the [.mli]. *)
 let is_prop (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t) : bool =
   try
-    match Retyping.get_sort_quality_of env sigma t with
+    match
+#if ROCQ_VERSION >= (9, 3, 0)
+      Retyping.get_sort_quality_or_set_of env sigma t
+#else
+      Retyping.get_sort_quality_of env sigma t
+#endif
+    with
     | UnivGen.QualityOrSet.Qual q -> Sorts.Quality.is_qprop q
     | UnivGen.QualityOrSet.Set -> false
   with
@@ -455,7 +461,11 @@ module ConstrTbl = Hashtbl.Make (struct
     type t = Constr.t
 
     let equal = Constr.equal
+#if ROCQ_VERSION >= (9, 3, 0)
+    let hash = Termops.ConstrData.hash
+#else
     let hash = Constr.hash
+#endif
   end)
 
 (** {!dead}'s verdicts, keyed by the proposition with its local variables
@@ -513,7 +523,11 @@ let by_tactic (env : Environ.env) (sigma : Evd.evar_map) (typ : EConstr.t)
            ~typ
            tac
        with
+#if ROCQ_VERSION >= (9, 3, 0)
+       | Some (c, _, _, _) -> Some (EConstr.of_constr c)
+#else
        | Some (c, _, _, _, _) -> Some (EConstr.of_constr c)
+#endif
        | None -> None
      with
      | e when CErrors.noncritical e -> None)
@@ -1161,7 +1175,11 @@ let subproof
       ~typ
       tac
   with
+#if ROCQ_VERSION >= (9, 3, 0)
+  | Some (c, _, _, _) -> Some (EConstr.of_constr c)
+#else
   | Some (c, _, _, _, _) -> Some (EConstr.of_constr c)
+#endif
   | None -> None
   | exception e when CErrors.noncritical e -> None
 ;;

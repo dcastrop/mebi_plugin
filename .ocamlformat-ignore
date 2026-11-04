@@ -1,0 +1,8 @@
+# Preprocessed by cppo (#if ROCQ_VERSION ...), so not valid OCaml until it
+# has run: ocamlformat cannot parse them. The same list as the
+# (preprocess (per_module ...)) in lib/rocq_tools/dune and src/dune.
+lib/rocq_tools/bi_encoding.ml
+lib/rocq_tools/bindings.ml
+lib/rocq_tools/premise_search.ml
+lib/rocq_tools/rocq_monad_utils.ml
+src/proof_solver_step.ml

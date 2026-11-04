@@ -29,7 +29,6 @@ module type S = sig
   module Step : (_ : Proof_solver_wrapper.Args) ->
     Proof_solver_step.S with type tactic = Tactic.t
 
-  val get_updated_pstate : unit Proofview.tactic -> Declare.Proof.t
   val step : Declare.Proof.t -> Declare.Proof.t
 end
 
@@ -853,7 +852,7 @@ let start
     Declare.Proof.start
       ~info:(Declare.Info.make ~kind:Decls.(IsDefinition Example) ())
       ~cinfo:(Declare.CInfo.make ~name ~typ ())
-      (Evd.from_ctx uctx)
+      ((Evd.from_ctx [@alert "-deprecated"]) uctx)
   in
   init pstate refs a b
 ;;

@@ -1298,10 +1298,10 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
          contains [x]" is not. With a non-monotonic predicate its binary search
          is unspecified, and it really does miss -- on a ten-block partition of
          twenty states it failed to find the block holding the second state.
-         Both callers ({!Mebi_plugin.Results.get_bisimilar_states} and
-         {!Product.S.successors}) turn [Not_found] into the empty set, so the
-         miss surfaced not as an error but as a state with nothing bisimilar
-         to it. Found 2026-09-29 while writing a {!Product.S.estimate} test. *)
+         Its callers (then [Mebi_plugin.Results.get_bisimilar_states], since
+         removed, and {!Product.S.successors}) turned [Not_found] into the
+         empty set, so the miss surfaced not as an error but as a state with
+         nothing bisimilar to it. Found 2026-09-29 while writing a {!Product.S.estimate} test. *)
       let get_bisimilar (x : State.t) (p : t) : States.t =
         let matching : t = filter (fun (ys : States.t) -> States.mem x ys) p in
         if is_empty matching then raise Not_found else choose matching

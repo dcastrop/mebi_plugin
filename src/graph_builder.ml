@@ -7,11 +7,7 @@ module type S = sig
   type constructor
   type states
 
-  val get_new_constrs : t -> enc -> constructor list mm
   val update_to_visit : t -> enc -> unit
-  val update_transitions : t -> enc -> enc * tree -> action -> unit
-  val get_action : t -> enc -> tree -> action mm
-  val get_new_states : t -> enc -> states mm
   val stop : t -> bool
   val build : ?stop:(t -> bool) -> t -> t mm
 end

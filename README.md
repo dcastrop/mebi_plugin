@@ -92,6 +92,8 @@ Versions are pinned in two places, and both are committed:
 - **`flake.nix` / `flake.lock`** — nix pins the system layer: `opam` itself, `pkg-config`, `gmp`, `zlib`, `git`, `make` and the C toolchain.
 - **`rocq-mebi.opam.locked`** — opam pins the OCaml/Rocq layer: every one of the ~100 packages at an exact version, including `rocq-core.9.2.0`, `rocq-stdlib.9.1.0` and `ocaml-base-compiler.5.4.0`.
 
+The source also compiles against **Rocq 9.3**. Code that differs between the two is under cppo's `#if ROCQ_VERSION >= (9, 3, 0)`, in the few files listed in three places: the `(preprocess (per_module ...))` in `lib/rocq_tools/dune` and `src/dune`, `CPPO_MODULES` in `Makefile.rocq.local`, and `.ocamlformat-ignore`. A file that gains an `#if` goes in all three.
+
 The ranges the source is *known* to compile in live in `dune-project`'s `(depends ...)`; the lockfile records one exact solution inside those ranges. `rocq-mebi.opam` is generated from `dune-project` by dune and is committed — it is the input to `opam switch create`, so a clone cannot bootstrap without it.
 
 ### First-time setup on a new machine

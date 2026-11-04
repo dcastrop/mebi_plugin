@@ -147,20 +147,24 @@ lib/rocq_tools/rocq_utils.mli
 lib/rocq_tools/rocq_context.ml
 lib/rocq_tools/rocq_context.mli
 
+lib/rocq_tools/bi_encoding_intf.mli
 lib/rocq_tools/bi_encoding.ml
 lib/rocq_tools/bi_encoding.mli
+lib/rocq_tools/rocq_monad_intf.mli
 lib/rocq_tools/rocq_monad.ml
 lib/rocq_tools/rocq_monad.mli
 lib/rocq_tools/rocq_monad_strfy.ml
 lib/rocq_tools/rocq_monad_strfy.mli
 lib/rocq_tools/premise_search.ml
 lib/rocq_tools/premise_search.mli
+lib/rocq_tools/rocq_monad_utils_intf.mli
 lib/rocq_tools/rocq_monad_utils.ml
 lib/rocq_tools/rocq_monad_utils.mli
 lib/rocq_tools/theories.ml
 lib/rocq_tools/theories.mli
 lib/rocq_tools/theories_enc.ml
 lib/rocq_tools/theories_enc.mli
+lib/rocq_tools/bindings_intf.mli
 lib/rocq_tools/bindings.ml
 lib/rocq_tools/bindings.mli
 lib/rocq_tools/constructor_bindings.ml
@@ -188,14 +192,18 @@ lib/model/algorithms/saturation_estimate.ml
 lib/model/algorithms/saturation_estimate.mli
 lib/model/algorithms/minimization.ml
 lib/model/algorithms/minimization.mli
+lib/model/algorithms/bisimilarity_intf.mli
 lib/model/algorithms/bisimilarity.ml
 lib/model/algorithms/bisimilarity.mli
+lib/model/algorithms/product_intf.mli
 lib/model/algorithms/product.ml
 lib/model/algorithms/product.mli
 
+lib/model/model_intf.mli
 lib/model/model.ml
 lib/model/model.mli
 
+src/decoder_intf.mli
 src/decoder.ml
 src/decoder.mli
 
@@ -205,6 +213,7 @@ src/api.mli
 src/weak.ml
 src/weak.mli
 
+src/graph_type_intf.mli
 src/graph_type.ml
 src/graph_type.mli
 src/graph_builder.ml
@@ -220,13 +229,16 @@ src/config_loader.mli
 src/benchmarking.ml
 src/benchmarking.mli
 
+src/wrapper_intf.mli
 src/wrapper.ml
 src/wrapper.mli
 # src/command.ml
 # src/command.mli
+src/results_intf.mli
 src/results.ml
 src/results.mli
 
+src/proof_solver_statem_intf.mli
 src/proof_solver_statem.ml
 src/proof_solver_statem.mli
 src/proof_solver_tactic.ml
@@ -235,6 +247,7 @@ src/proof_solver_theory.ml
 src/proof_solver_theory.mli
 src/proof_solver_wrapper.ml
 src/proof_solver_wrapper.mli
+src/proof_solver_tactics_intf.mli
 src/proof_solver_tactics.ml
 src/proof_solver_tactics.mli
 src/proof_solver_step.ml

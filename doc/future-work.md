@@ -58,6 +58,27 @@ answer) and see which one grows with term size. Then compare one
 glued `Size1` proof against its normalised counterpart, which has
 smaller states.
 
+**Profiled, 2026-11-04.** `perf` is blocked here too, but `valgrind
+--tool=callgrind` works on `rocq compile` (about 50 times slower; use
+self costs: OCaml's exceptions and effects make its inclusive costs
+meaningless). On `Proc/Test1` the plugin's own functions were 3.4% of
+all instructions, and 1.8% of the run was `Logger` handling messages that
+were switched off; that is fixed (a per-kind array, and each kind checked
+before formatting). Of the rest, almost all of the plugin's 127k
+`Bi_encoding.encode` calls came from `Rocq_monad_utils.econstr_eq`, which
+compares two terms by encoding both: two hashes (each normalising the
+whole term with `EConstr.to_constr`) and two table lookups, and a new
+table entry when a term was unseen (23.7k of them). Comparing with
+`EConstr.eq_constr` instead would be cheaper, but encoding normalises
+first, and a comparison that no longer inserts changes later encoding
+numbers, which can change answers and so proof lengths: measure on the
+proof suite before trusting it. One shortcut that keeps both the meaning
+and the encodings was tried and dropped: when `eq_constr` says the two
+are already equal, encode only one. On `Proc/Test1` it cost 0.35% more
+instructions than it saved (callgrind), so equal arguments are rare there.
+The CADP profile, where the share is
+40-80%, was not finished (about 50 minutes under callgrind).
+
 **Relation to other items.** Replaying a derivation tree in one step
 (below) would still make each decision, so this is the larger lever of
 the two.
@@ -253,6 +274,14 @@ minimal): nothing open. The last item, trace preservation, became
   names (CADP was restructured 2026-10-13) and several with new contents.
   Regenerating and committing them changes what the OCaml benchmarks
   measure, so it is a choice, not a fix. Found 2026-10-19.
+- **Rocq 9.3 is built, not measured.** Since 2026-11-04 the source
+  compiles against 9.2 and 9.3 (cppo's `#if ROCQ_VERSION`), and
+  `dune build`, `tests.exe` and `make`'s default subset pass under both.
+  Two checks remain. CI builds only the locked 9.2 switch, so a 9.3 job
+  would need its own, unlocked switch (`opam install . --deps-only` with
+  `rocq-core.9.3.0`). The `PluginProofs.v` suite (`bench/proofs.sh`) has
+  not run under 9.3, so its counts against `CLAUDE.md`'s baseline are
+  unknown there.
 
 **Examples**
 - `examples/Bisimilarity/_nat_streams.v`: unfinished, kept as real work,

@@ -17,13 +17,6 @@ type output_config =
         default ({!detail}) *)
   }
 
-(** [output_config_default ()]: a fresh default output configuration
-    (results decoded, as plain text, detail as the format has it, not
-    dumped to [./_dumps/]). A fresh record each time,
-    as its fields are mutable: the [MeBi Config Output] setters update the
-    current one in place. *)
-val output_config_default : unit -> output_config
-
 (** The output configuration now in force ({!output_config_default} until
     changed). *)
 val the_output_config : output_config ref
@@ -31,14 +24,6 @@ val the_output_config : output_config ref
 (** [reset_output_config ()] restores the default output configuration
     and {!Logger}'s per-kind settings. Raises nothing. *)
 val reset_output_config : unit -> unit
-
-(** [output_config_decode_results b] sets whether results are decoded
-    back to Rocq terms when printed. Raises nothing. *)
-val output_config_decode_results : bool -> unit
-
-(** [output_config_dump_results b] sets whether each FSM and result is
-    written as JSON into [./_dumps/]. Raises nothing. *)
-val output_config_dump_results : bool -> unit
 
 (** [set_output b k] sets the output option named [k] to [b]
     ([MeBi Config Output k b]): [DecodeResults], [DumpResults], [Detail], or a
@@ -61,10 +46,6 @@ val describe_output : unit -> string
     ([MeBi Config Output Format Text|JSON]), and says so. Raises nothing. *)
 val set_output_format : output_format -> unit
 
-(** [make_enc p] is the encoding module unpacked from [p]. Raises
-    nothing. *)
-val make_enc : (module Encoding.Packed.PackedS) -> (module Encoding.S)
-
 (** [make_enc_int ()] is the integer encoding, the one the plugin uses.
     Raises nothing. *)
 val make_enc_int : unit -> (module Encoding.S)
@@ -79,9 +60,6 @@ type fail_flags =
   ; mutable oversaturated : bool
     (** refuse to saturate past {!the_saturation_bound}, rather than warn *)
   }
-
-(** The default {!fail_flags}: all errors except an empty LTS. *)
-val the_fail_flags_default : fail_flags
 
 (** The {!fail_flags} now in force. *)
 val the_fail_flags : fail_flags ref
@@ -113,9 +91,6 @@ val set_solver_strategy : solver_strategy -> unit
 (** [set_mutual_cofix b] records what {!the_solver_strategy} resolved to
     for the proof now being solved. Raises nothing. *)
 val set_mutual_cofix : bool -> unit
-
-(** [reset_mutual_cofix ()] restores [Auto], unresolved. Raises nothing. *)
-val reset_mutual_cofix : unit -> unit
 
 (** How the proof solver chooses each answer (see
     [Model.Product.Policy]): [Default] as it always has; [Greedy] and

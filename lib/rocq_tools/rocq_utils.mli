@@ -115,49 +115,15 @@ type econstr_decl = EConstr.rel_declaration
 *)
 val get_econstr_decls : Constr.rel_context -> econstr_decl list
 
-(** [list_of_constr_kinds x] is each kind name ("App", "Prod", ...) with
-    whether [x] is of that kind; for debugging. Raises nothing. *)
-val list_of_constr_kinds : Constr.t -> (string * bool) list
-
-(** [list_of_econstr_kinds sigma x] is as {!list_of_constr_kinds}, for an
-    [EConstr]. Raises nothing. *)
-val list_of_econstr_kinds : Evd.evar_map -> Evd.econstr -> (string * bool) list
-
-(** [list_of_econstr_kinds_of_type sigma x] is each kind of type
-    ("SortType", "ProdType", ...) with whether [x] is one; [false] for all if
-    [x] is not a type. Raises nothing. *)
-val list_of_econstr_kinds_of_type
-  :  Evd.evar_map
-  -> Evd.econstr
-  -> (string * bool) list
-
-(** [list_of_kinds sigma f x] is the names of the kinds [f sigma x] says [x]
-    has. Raises nothing. *)
-val list_of_kinds
-  :  Evd.evar_map
-  -> (Evd.evar_map -> 'a -> (string * bool) list)
-  -> 'a
-  -> string list
-
 (** [get_decl_type_of_constr d] is [d]'s type, as an [EConstr]. Raises nothing.
 *)
 val get_decl_type_of_constr : constr_decl -> Evd.econstr
-
-(** [get_decl_type_of_econstr d] is [d]'s type. Raises nothing. *)
-val get_decl_type_of_econstr : econstr_decl -> Evd.econstr
 
 (** [get_ind_ty ind mib] is the inductive [ind] as a term, at the universe
     instance of its body [mib]. Raises nothing. *)
 val get_ind_ty
   :  Names.inductive
   -> Declarations.mutual_inductive_body
-  -> Evd.econstr
-
-(** [type_of_econstr_rel ?substl d] is [d]'s type, with [substl]
-    substituted if given. Raises nothing. *)
-val type_of_econstr_rel
-  :  ?substl:Evd.econstr list
-  -> econstr_decl
   -> Evd.econstr
 
 (** [type_of_econstr env sigma x] is [x]'s type ([Typing.type_of]) and the
@@ -194,26 +160,9 @@ module Strfy : sig
   (** [constr env sigma x] is [x] printed. *)
   val constr : Environ.env -> Evd.evar_map -> Constr.t -> string
 
-  (** [constr_opt env sigma x] is [x] printed, if any. *)
-  val constr_opt : Environ.env -> Evd.evar_map -> Constr.t option -> string
-
-  (** [constr_rel_decl env sigma d] is the declaration [d] printed. *)
-  val constr_rel_decl : Environ.env -> Evd.evar_map -> constr_decl -> string
-
-  (** [constr_rel_context env sigma c] is the context [c] printed. *)
-  val constr_rel_context
-    :  Environ.env
-    -> Evd.evar_map
-    -> Constr.rel_context
-    -> string
-
   (** [ind_constr env sigma (ctx, t)] is the constructor type [t] printed
       under its binders [ctx], as [ctx |- t]. Raises nothing. *)
   val ind_constr : Environ.env -> Evd.evar_map -> ind_constr -> string
-
-  (** [ind_constrs env sigma cs] is each of [cs] printed ({!val-ind_constr}),
-      as a list. Raises nothing. *)
-  val ind_constrs : Environ.env -> Evd.evar_map -> ind_constr array -> string
 
   (** [constr_kind env sigma x] is the name of [x]'s kind ([App], [Rel],
       ...) and [x] printed. Raises nothing. *)
@@ -225,10 +174,6 @@ module Strfy : sig
   (** [econstr_rel_decl env sigma d] is the declaration [d] printed. *)
   val econstr_rel_decl : Environ.env -> Evd.evar_map -> econstr_decl -> string
 
-  (** [econstr_types env sigma t] is the type [t] printed, as {!econstr}.
-      Raises nothing. *)
-  val econstr_types : Environ.env -> Evd.evar_map -> Evd.econstr -> string
-
   (** [econstr_kind env sigma x] is the name of [x]'s kind ([App], [Rel],
       ...) and [x] printed. Raises nothing. *)
   val econstr_kind : Environ.env -> Evd.evar_map -> Evd.econstr -> string
@@ -236,9 +181,6 @@ module Strfy : sig
   (** [concl env sigma c] is the conclusion [c] printed, as
       {!econstr_types}. Raises nothing. *)
   val concl : Environ.env -> Evd.evar_map -> Evd.econstr -> string
-
-  (** [erel env sigma r] is "relevant" or "irrelevant". *)
-  val erel : 'a -> Evd.evar_map -> Evd.erelevance -> string
 
   (** [hyp_name h] is the hypothesis' name. *)
   val hyp_name : hyp -> string
@@ -258,24 +200,6 @@ module Strfy : sig
   val goal : Proofview.Goal.t -> string
 end
 
-(** [the_next ()] is a fresh evar name, [UnifEvar0], [UnifEvar1], ...;
-    never the same one twice in a session. Raises nothing. *)
-val the_next : unit -> Names.variable
-
-(** Raised by {!get_next_evar} if Rocq gives no name. *)
-exception CouldNotGetNextFreshEvarName of unit
-
-(** [get_next_evar env sigma ty] is a new evar of type [ty], named by
-    {!the_next}, and the evar map with it.
-
-    @raise CouldNotGetNextFreshEvarName if Rocq gives no name (raised
-                                        here). *)
-val get_next_evar
-  :  Environ.env
-  -> Evd.evar_map
-  -> Evd.econstr
-  -> Evd.evar_map * Evd.econstr
-
 (** What a new evar's type is taken from: another term's type, or a given type.
 *)
 type evar_source =
@@ -292,30 +216,6 @@ val get_next
   :  Environ.env
   -> Evd.evar_map
   -> evar_source
-  -> Evd.evar_map * Evd.econstr
-
-(** [get_fresh_evar env sigma src] is {!get_next}, and raises as it does. *)
-val get_fresh_evar
-  :  Environ.env
-  -> Evd.evar_map
-  -> evar_source
-  -> Evd.evar_map * Evd.econstr
-
-(** [subst_of_decl substl d] is [d]'s type with [substl] substituted. Raises nothing.
-*)
-val subst_of_decl
-  :  EConstr.Vars.substl
-  -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt
-  -> Evd.econstr
-
-(** [mk_ctx_subst env sigma substl d] is a new evar for the binder [d], of
-    [d]'s type with [substl] (the evars for the binders before it)
-    substituted. Raises nothing. *)
-val mk_ctx_subst
-  :  Environ.env
-  -> Evd.evar_map
-  -> EConstr.Vars.substl
-  -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt
   -> Evd.evar_map * Evd.econstr
 
 (** [mk_ctx_substl env sigma acc ds] is a new evar for each binder of [ds]
@@ -339,9 +239,6 @@ val map_decl_evar_pairs
   :  econstr_decl list
   -> EConstr.Vars.substl
   -> (Evd.econstr * Names.Name.t) list
-
-(** Raised by {!val-constructor_args}: not three arguments. *)
-exception ConstructorArgsExpectsArraySize3 of unit
 
 (** An LTS step's source, label and target. *)
 type constructor_args =
@@ -375,9 +272,6 @@ exception Rocq_utils_InvalidLtsTermKind of Constr.t
       if [term] is not an application
       (raised here). *)
 val extract_args : ?substl:EConstr.Vars.substl -> Constr.t -> constructor_args
-
-(** Raised by {!unpack_constr_args}: fewer than three arguments. *)
-exception Rocq_utils_CouldNotExtractBinding of unit
 
 (** [unpack_constr_args (_, args)] is the first three of [args].
 
@@ -416,14 +310,6 @@ val econstr_to_constr
 (** [econstr_to_constr_opt sigma x] is [x] as a [Constr], or [None] if it has undefined evars. Raises nothing.
 *)
 val econstr_to_constr_opt : Evd.evar_map -> Evd.econstr -> Constr.t option
-
-(** [globref_to_econstr env r] is the term of the global reference [r]. Raises nothing for a monomorphic [r].
-*)
-val globref_to_econstr : Environ.env -> Names.GlobRef.t -> Evd.econstr
-
-(** [is_constant sigma x c] is whether [x] is an application headed by
-    [c ()]. Raises nothing. *)
-val is_constant : Evd.evar_map -> Evd.econstr -> (unit -> Evd.econstr) -> bool
 
 (** [libnames_to_globrefs qs] is the global reference each name in [qs]
     refers to.

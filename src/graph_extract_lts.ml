@@ -118,7 +118,7 @@ struct
   let constructor_info (g : G.t) : Model.Info.Meta.RocqLTS.t list M.mm =
     Logger.trace __FUNCTION__;
     let xs = M.B.to_seq g.ltsmap |> List.of_seq in
-    M.iterate 0 (List.length xs - 1) [] (fun i -> add_rocq_lts (List.nth xs i))
+    M.fold [] xs add_rocq_lts
   ;;
 
   (** [meta g] is [g]'s metadata: whether exploration finished (nothing left

@@ -5,8 +5,6 @@ module type S = sig
   type lts
   type indmap
 
-  exception LTSMapDoesNotContainPrimaryLTS of indmap * Libnames.qualid
-
   val build
     :  ?weak:weak option
     -> Constrexpr.constr_expr
@@ -89,9 +87,7 @@ struct
     Logger.trace __FUNCTION__;
     let ltsmap : G.indmap = M.B.create (List.length grefs) in
     let open M.Syntax in
-    (* [f i ()] adds the [i]th LTS of [grefs] to [ltsmap]. *)
-    let f (i : int) () = encode_indlts (List.nth grefs i) ltsmap in
-    let* () = M.iterate 0 (List.length grefs - 1) () f in
+    let* () = M.fold () grefs (fun gref () -> encode_indlts gref ltsmap) in
     M.return ltsmap
   ;;
 
