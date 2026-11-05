@@ -9230,7 +9230,27 @@ breakdown it starts from is unmeasured (its Phase 0).
   - Ran `git clean -fX theories test src examples`, as `CLAUDE.md`
     advises. Stale in-tree build files made dune refuse to build.
 
-**Session tally (2026-11-05):** Docs 3 · Refactor 0 · Optimization 0 ·
+### A plan for symbolic states and BDDs
+
+- **Docs.** `SYMBOLIC_PLAN.md`, written at @dcastrop's request after the
+  Phase 0 discussion. He judged the tool of limited use while explicit
+  state limits it. The plan:
+  - **Linearisation:** the Rocq step relation becomes a rule IR (state
+    schema; guards, updates, tags).
+  - **Engines:** one engine interface, with explicit (Zarith), BDD (CUDD
+    or native) and constraint engines.
+  - **Algorithms:** saturation and bisimilarity written once, as
+    fixpoints.
+  - **Queries:** initialised by properties, *for all `x`, `y` with `φ` and
+    `ψ`*.
+  - **Certificates:** the bisimulation relation plus per-rule obligations,
+    instead of per-pair proofs.
+
+  Phases S0 to S7. S0 is a prototype and S1 the bitboard plan's Phase A;
+  S3 onwards are flagged **New feature**. No code. It supersedes the
+  bitboard plan's symbolic section.
+
+**Session tally (2026-11-05):** Docs 4 · Refactor 0 · Optimization 0 ·
 Bug fix 0 · Tooling 0 · New feature 0.
 
 ---

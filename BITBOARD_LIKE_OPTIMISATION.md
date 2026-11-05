@@ -4,6 +4,10 @@ A plan, written 2026-11-05. Phase 0 (measure) is done, and the plan was
 revised after it, as Phase 0 requires: see "Revision after Phase 0" at the
 end. Read that section first. The rest is the plan as first written.
 
+Since 2026-11-05 `SYMBOLIC_PLAN.md` supersedes the symbolic extension
+below, and Phase A is that plan's Phase S1: the explicit engine behind its
+engine interface.
+
 ## Goal
 
 Store states, sets of states and transitions much more cheaply.

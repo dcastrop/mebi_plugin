@@ -105,6 +105,9 @@ way.
   - extraction's unindexed derivation search.
 - **Capability:** proofs split into separately checked lemmas
   (decision 3).
+- **Capability:** symbolic states and BDDs, requested by @dcastrop;
+  planned, not started (`SYMBOLIC_PLAN.md`; its decisions are listed
+  there).
 - **Smaller:**
   - replay a derivation tree in one solver step;
   - `Auto`'s mis-estimate on `LawProofs.tau1`;
