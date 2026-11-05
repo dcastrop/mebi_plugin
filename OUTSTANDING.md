@@ -114,7 +114,10 @@ way.
   - `bench/ocaml/fixtures/` is stale (from 2026-10-10).
   - Rocq 9.3: builds, but CI and the proof suite run 9.2 only.
   - `econstr_eq` compares by encoding: the solver's largest own cost.
-  - Bitboard-like storage for the model: planned, not started
-    (`BITBOARD_LIKE_OPTIMISATION.md`).
+  - Bitboard-like storage for the model: Phase 0 measured, plan
+    revised; Phase A (saturation by bit-rows) not started
+    (`BITBOARD_LIKE_OPTIMISATION.md`, end).
+  - `CCS/ABPProofs.v` exceeds its suite's 6G cap in `Qed` (~4.2GB
+    recorded); seen 2026-11-05 (`doc/measurements/bitboard-phase0.md`).
 - **Set aside on purpose**, so they are not rediscovered as new: listed
   at the end of `doc/future-work.md`.

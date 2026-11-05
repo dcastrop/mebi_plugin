@@ -9191,7 +9191,46 @@ is the hook for symbolic states later; that would be a new capability, and
 the plan leaves it out of scope. Nothing is implemented, and the cost
 breakdown it starts from is unmeasured (its Phase 0).
 
-**Session tally (2026-11-05):** Docs 1 · Refactor 0 · Optimization 0 ·
+### Phase 0 measured, and the plan revised
+
+- **Docs.** The plan's Phase 0, in
+  `doc/measurements/bitboard-phase0.md`. A census hook (`Obj.reachable_words`
+  and `Gc.stat`, run after the bisimilarity check under `MEBI_CENSUS`,
+  kept locally as `notes/tools/census.diff`, not committed) ran on CADP
+  MutualExclusion, ABP and Test4's `Run Bisim`. Findings:
+  - **The model is 0.2% (MutualExclusion) and 8% (ABP) of the live heap**
+    at `Sim Begin`. Proof files peak later, in `Solve` and `Qed`. The plan's
+    premise, that the model's containers are the memory cost, holds only
+    for large FSMs.
+  - **Inside a saturated FSM, witnesses are 73–75%.**
+  - **In Test4's strong FSM, derivation trees are 55%**, and the model is
+    89% of the heap.
+  - **Test4's whole saturation** (74.6M weak actions, estimated at
+    34–67GB) would be 23.6MB as bit-rows. That is the only measured place
+    where bitboards decide what is possible.
+- **Docs.** `BITBOARD_LIKE_OPTIMISATION.md` revised, as its Phase 0 rule
+  requires:
+  - **Phase A** is now the old Phase 4 alone: whole saturation by bit-rows,
+    witnesses on demand.
+  - **Phase B**, optional: derivation trees off the edges.
+  - **Dropped:** the model-wide rewrites of the old Phases 1–3. No memory
+    to gain in proofs, and they carry the determinism risk.
+  - **Bitsets from Zarith (GMP)**, already a dependency through Rocq,
+    instead of a hand-written module, at @dcastrop's suggestion to prefer
+    an existing library.
+  - **Libraries weighed and set aside:** BLAS, M4RI, GraphBLAS and CUDD.
+  - **A correction:** the plan's "quadratic in silent SCCs" limit is the
+    saturation estimate, already bitsets, which bitboards do not fix.
+- **Found on the way:** `CCS/ABPProofs.v` is OOM-killed at its suite's 6G
+  cap in `Qed` (`Solve` still 6,494), twice, once without the hook.
+  `CLAUDE.md` says ~4.2GB. Not investigated: added to `OUTSTANDING.md`.
+- **Environment, not committed.**
+  - Installed opam's `benchmark` (a declared dependency missing from the
+    switch, so `dune build` failed).
+  - Ran `git clean -fX theories test src examples`, as `CLAUDE.md`
+    advises. Stale in-tree build files made dune refuse to build.
+
+**Session tally (2026-11-05):** Docs 3 · Refactor 0 · Optimization 0 ·
 Bug fix 0 · Tooling 0 · New feature 0.
 
 ---

@@ -1,6 +1,8 @@
 # Bitboard-like storage for the model
 
-A plan, written 2026-11-05. Nothing in it is implemented.
+A plan, written 2026-11-05. Phase 0 (measure) is done, and the plan was
+revised after it, as Phase 0 requires: see "Revision after Phase 0" at the
+end. Read that section first. The rest is the plan as first written.
 
 ## Goal
 
@@ -205,3 +207,96 @@ Each phase ends with the same checks:
   saturation of `Test4` fits in memory.
 - **Phase 2:** whether `Set`'s ordered iteration is relied on anywhere
   that ascending id order would not reproduce.
+
+## Revision after Phase 0 (2026-11-05)
+
+The measurements are in
+[`doc/measurements/bitboard-phase0.md`](doc/measurements/bitboard-phase0.md).
+They contradict this plan's premise in one place and confirm it in another.
+
+### What Phase 0 found
+
+- **Proofs: the model is not the cost.**
+  - At `Sim Begin`, the model is 0.2% of the live heap on CADP
+    MutualExclusion and 8% on ABP.
+  - A proof file's peak (2.9GB, and over 6GB) comes later, in `Solve` and
+    `Qed`, when the model is a few MB of it.
+  - Phases 2 and 3 (sets and edges on bitsets) cannot move a proof's
+    memory. Their time effect is unmeasured, but the solver's own cost
+    is elsewhere (`doc/future-work.md`, "The solver's own per-step cost").
+- **Inside a saturated FSM, witnesses are 73–75% of the edges**, as
+  expected.
+- **In Test4's strong FSM, derivation trees are 55%**: 2.5M words of 4.5M,
+  29 words per edge.
+- **Whole saturation is the one place where the representation decides
+  what is possible.** Test4's 74.6M weak actions are estimated at 34–67GB
+  today; as bit-rows they would be 23.6MB.
+- **A correction to "Where the cost is today".** The "memory quadratic in
+  the number of silent SCCs" limit is the *saturation estimate*
+  (`saturation_estimate.ml`, `doc/future-work.md`). That code already uses
+  dense bitsets over SCCs; the memory is in their K² bits. Bitboards do
+  not fix it: only sparse rows or computing less would.
+
+### Library choice: Zarith, not a hand-written `Bits`
+
+- **What:** Zarith's `Z.t` is a GMP integer, with `logand`, `logor`,
+  `popcount`, `testbit` and `trailing_zeros`. GMP's low-level `mpn` layer
+  runs these in hand-tuned SIMD assembly.
+- **Why:** Rocq already depends on Zarith, so the plugin gains no
+  dependency, and the model libraries gain no Rocq dependency (Zarith is
+  not Rocq).
+- **Cost:** a `Z.t` is immutable, so a union allocates. For row building
+  this is acceptable; measure it in Phase A.
+- **Already in the code:** `saturation_estimate.ml` has a hand-written
+  `Bits` over `int array`. Keep it for now, and fold it into the Zarith
+  rows only if Phase A shows Zarith is no slower.
+- **Considered and not chosen:**
+  - **BLAS (Owl, Lacaml):** a float per entry, ~0.4–0.75GB per matrix at
+    Test4's size.
+  - **M4RI:** multiplies over GF(2), not the boolean semiring.
+  - **SuiteSparse:GraphBLAS:** fits exactly (the boolean semiring, and
+    sparse or dense chosen per matrix), but has no OCaml binding and would
+    add a C dependency. Keep it in reserve for Phase A, should Zarith rows
+    prove too slow.
+  - **CUDD (BDDs, `mlcuddidl`):** only pays off with structured state
+    encodings. It belongs to the symbolic extension, and is discussed there
+    with @dcastrop, not here.
+
+### Revised phases
+
+Every phase keeps the checks listed under "Phases".
+
+- **Phase A: whole saturation by bit-rows, witnesses on demand.** This is
+  the old Phase 4, now first and on its own.
+  - **Storage:** per FSM, ids for its states, then τ\* rows by closure
+    over silent SCCs, then one weak row per (state, visible label), all as
+    `Z.t`.
+  - **Witnesses:** built only when the solver or a dump asks, by the
+    existing breadth-first search with today's tie-breaking.
+  - **Containment:** behind `Saturation`'s interface. Where code needs an
+    `EdgeMap` (proof solver, dumps), it gets one built per state on
+    request, through the same `fill` hook that on-demand saturation
+    already uses.
+  - **Done when:** step counts are identical (`satdiff` and the proof
+    suite), and `Run Saturate` on Test4 fits under the 6G cap. That
+    needs `Bounds Saturation` to count rows' bytes, not weak actions:
+    a behaviour change to agree first.
+- **Phase B (optional): derivation trees off the edges.** For large strong
+  FSMs (55% on Test4). Only if Phase A leaves extraction-time memory as
+  the limit.
+- **Dropped:** the old Phases 1–3 as model-wide rewrites (ids everywhere,
+  `States` as bitsets, CSR edges). Phase 0 shows no memory to gain from
+  them in proofs, and they carry the determinism risk.
+- **Unchanged:** the symbolic extension remains future work, and a new
+  capability. If it comes, its first step is an engine interface (sets,
+  image, closure, fixpoints) with Zarith rows as the first engine, rather
+  than the arena of the old Phase 1.
+
+### Open after the revision
+
+- **`Bounds Saturation`:** whether it moves from counting weak actions
+  to estimated bytes (Phase A). That is a behaviour change: agree it
+  first.
+- **ABP at its cap:** `CCS/ABPProofs.v` was OOM-killed at its 6G cap
+  in `Qed` during Phase 0. It is recorded in `ASSISTED-CHANGES.md`
+  (2026-11-05).
