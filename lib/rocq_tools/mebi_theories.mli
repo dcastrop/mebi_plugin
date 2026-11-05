@@ -1,4 +1,3 @@
-
 (** [get_constants ()] is every theory term the plugin uses, by name
     ([weak_sim], [tau], [Some], ...), looked up once on first use and kept.
 

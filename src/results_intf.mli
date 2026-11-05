@@ -62,5 +62,4 @@ module type S = sig
 
       @raise NoResultFound if none is set (propagated). *)
   val get_bisimilar_partition : unit -> Model.Partition.t
-
 end

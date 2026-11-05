@@ -1,4 +1,5 @@
-(** The signatures of {!Rocq_monad_utils}, declared once for its [.ml] and [.mli]. *)
+(** The signatures of {!Rocq_monad_utils}, declared once for its [.ml] and [.mli].
+*)
 
 module type S = sig
   type tree
@@ -330,7 +331,6 @@ module type S = sig
           Raises Rocq's other unification errors, where it gives up rather
           than finds none (propagated). *)
       val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
-
     end
 
     module Problem : sig
@@ -341,7 +341,6 @@ module type S = sig
         }
 
       include Json.S with type k = t (** @closed *)
-
     end
 
     module Problems : sig
@@ -361,7 +360,6 @@ module type S = sig
 
       (** [is_empty p] is whether [p] has nothing to unify. Raises nothing. *)
       val is_empty : t -> bool
-
     end
 
     module ListOfProblems : sig
@@ -372,14 +370,12 @@ module type S = sig
       (** [is_empty ps] is whether [ps] is empty, or a single problem set
           with nothing to unify. Raises nothing. *)
       val is_empty : t -> bool
-
     end
 
     module Constructors : sig
       type t = Constructor.t list
 
       include Json.S with type k = t (** @closed *)
-
     end
 
     (** [collect_valid_constructors cs indmap from label_type lts_enc] is
@@ -401,5 +397,4 @@ module type S = sig
 
   (** [make_enc_set ()] is a set module over encodings. Raises nothing. *)
   val make_enc_set : unit -> (module Set.S with type elt = enc)
-
 end

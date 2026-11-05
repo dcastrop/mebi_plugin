@@ -82,7 +82,6 @@ module type S = sig
 
   (** The [MeBi Run] commands. *)
   module Command : sig
-
     (** A [MeBi Run] command: what to build or check, from which term and
         relation. *)
     type t =

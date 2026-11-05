@@ -7,7 +7,6 @@ module type S = sig
       }
 
     and msg = Output.Kind.t * string
-
   end
 
   (** A non-empty chain of tactics, run in order. *)

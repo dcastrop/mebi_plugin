@@ -1,4 +1,5 @@
-(** The signatures of {!Proof_solver_tactics}, declared once for its [.ml] and [.mli]. *)
+(** The signatures of {!Proof_solver_tactics}, declared once for its [.ml] and [.mli].
+*)
 
 module type S = sig
   type 'a mm

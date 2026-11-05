@@ -11,7 +11,6 @@ module type S = sig
   val is_None : Evd.econstr -> bool im
   val is_Some : Evd.econstr -> bool im
   val is_list : Evd.econstr -> bool im
-
   val ensure : Evd.econstr -> (Evd.econstr -> bool im) -> unit im
 end
 

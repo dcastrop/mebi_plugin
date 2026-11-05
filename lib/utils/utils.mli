@@ -44,7 +44,6 @@ val clean_string : string -> string
 
 (** Writing result dumps ([MeBi Config Output "DumpResults"]). *)
 module FileWriter : sig
-
   (** Where dumps go: [./_dumps/], relative to the compile directory. *)
   val default_dir : string
 

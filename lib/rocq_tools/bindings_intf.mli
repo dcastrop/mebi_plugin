@@ -44,7 +44,6 @@ module type S = sig
     (** [update m k (name, path)] records [(name, path)] for [k], unless [k]
         already has a path at least as short. Raises nothing. *)
     val update : t' -> Constr.t -> NamedInstructions.t -> unit
-
   end
 
   (** A constructor's binder paths: none at all, or per source, label and

@@ -1,4 +1,5 @@
-(** The signatures of {!Bisimilarity}, declared once for its [.ml] and [.mli]. *)
+(** The signatures of {!Bisimilarity}, declared once for its [.ml] and [.mli].
+*)
 
 module type S = sig
   type states

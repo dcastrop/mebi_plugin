@@ -1,5 +1,4 @@
 module type S = Graph_type_intf.S
-
 module type Args = Graph_type_intf.Args
 
 module Make

@@ -89,5 +89,4 @@ module Make (Enc : Encoding.S) :
   let get_bisimilar_partition () : Model.Partition.t =
     (get_the_result ()).result.bisim_states
   ;;
-
 end
