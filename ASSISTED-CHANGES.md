@@ -9180,6 +9180,22 @@ Also: `.gitignore` gains `_opam/`.
 
 ---
 
+## 2026-11-05 — plan: bitboard-like storage for the model
+
+`BITBOARD_LIKE_OPTIMISATION.md` (repo root) plans cheaper storage for the
+model, following an idea of @dcastrop's: dense state ids in an arena,
+bitsets for sets of states, sparse rows (CSR) for strong edges and dense
+bit-matrices for silent closure and weak steps. Witnesses are rebuilt on
+demand instead of stored with every weak edge. The arena's descriptor type
+is the hook for symbolic states later; that would be a new capability, and
+the plan leaves it out of scope. Nothing is implemented, and the cost
+breakdown it starts from is unmeasured (its Phase 0).
+
+**Session tally (2026-11-05):** Docs 1 · Refactor 0 · Optimization 0 ·
+Bug fix 0 · Tooling 0 · New feature 0.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.
