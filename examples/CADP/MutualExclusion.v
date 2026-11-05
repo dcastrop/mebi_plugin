@@ -52,17 +52,17 @@ Require Import Logic.
 (**************************************************)
 (* One process, layered. *)
 
-MeBi Config Bounds As Num States 100.
+Set MeBi MaxStates 100.
 
 MeBi Divider "Examples.CADP.MutualExclusion.Size1.lts".
+Set MeBi MaxSteps 258.
 Example wsim_lts_1 : weak_sim lts spec_lts c1 (make_spec 0).
-Proof. MeBi Sim Begin lts c1 And spec_lts (make_spec 0) Using step.
-  MeBi Sim Solve 258. Qed.
+Proof. sim. Qed.
 
 MeBi Divider "Examples.CADP.MutualExclusion.Size1.lts.spec_lts".
+Set MeBi MaxSteps 201.
 Example wsim_spec_lts_1 : weak_sim spec_lts lts (make_spec 0) c1.
-Proof. MeBi Sim Begin spec_lts (make_spec 0) And lts c1 Using step.
-  MeBi Sim Solve 201. Qed.
+Proof. sim. Qed.
 
 MeBi Divider "Examples.CADP.MutualExclusion.Size1.lts.mutual".
 (* Mutual similarity: the two [weak_sim]s above, one each way. *)
@@ -73,19 +73,21 @@ Proof. split; [exact wsim_lts_1 | exact wsim_spec_lts_1]. Qed.
 (**************************************************)
 (* One process, glued. *)
 
-MeBi Config Bounds As Num States 2000.
+Set MeBi MaxStates 2000.
 
 MeBi Divider "Examples.CADP.MutualExclusion.Size1.bigstep".
+Set MeBi MaxSteps 82.
 Example wsim_bigstep_1 : weak_sim bigstep spec_lts (composition_create 0 Protocol.P) (make_spec 0).
-Proof. MeBi Sim Begin bigstep (composition_create 0 Protocol.P) And spec_lts (make_spec 0) Using lts step.
+Proof. sim.
   (* Iteration History: 82 <- _ <- _ <- _ *)
-  MeBi Sim Solve 82. Qed.
+   Qed.
 
 MeBi Divider "Examples.CADP.MutualExclusion.Size1.bigstep.spec_lts".
+Set MeBi MaxSteps 64.
 Example wsim_spec_bigstep_1 : weak_sim spec_lts bigstep (make_spec 0) (composition_create 0 Protocol.P).
-Proof. MeBi Sim Begin spec_lts (make_spec 0) And bigstep (composition_create 0 Protocol.P) Using lts step.
+Proof. sim.
   (* Iteration History: 64 <- _ <- _ <- _ *)
-  MeBi Sim Solve 64. Qed.
+   Qed.
 
 MeBi Divider "Examples.CADP.MutualExclusion.Size1.bigstep.mutual".
 (* Mutual similarity: the two [weak_sim]s above, one each way. *)
@@ -98,16 +100,16 @@ Proof. split; [exact wsim_bigstep_1 | exact wsim_spec_bigstep_1]. Qed.
    ([weak_bisimilar]), one per semantics -- stronger than the [mutual_sim]s
    above. *)
 
-MeBi Config Bounds As Num States 100.
+Set MeBi MaxStates 100.
 
 MeBi Divider "Examples.CADP.MutualExclusion.Size1.lts.bisimilar".
+Set MeBi MaxSteps 1441.
 Example wbis_lts_1 : weak_bisimilar lts spec_lts c1 (make_spec 0).
-Proof. MeBi Sim Begin lts c1 And spec_lts (make_spec 0) Using step.
-  MeBi Sim Solve 1441. Qed.
+Proof. bisim. Qed.
 
-MeBi Config Bounds As Num States 2000.
+Set MeBi MaxStates 2000.
 
 MeBi Divider "Examples.CADP.MutualExclusion.Size1.bigstep.bisimilar".
+Set MeBi MaxSteps 184.
 Example wbis_bigstep_1 : weak_bisimilar bigstep spec_lts (composition_create 0 Protocol.P) (make_spec 0).
-Proof. MeBi Sim Begin bigstep (composition_create 0 Protocol.P) And spec_lts (make_spec 0) Using lts step.
-  MeBi Sim Solve 184. Qed.
+Proof. bisim. Qed.

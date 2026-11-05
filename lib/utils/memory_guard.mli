@@ -1,4 +1,4 @@
-(** A soft cap on the plugin's memory ([MeBi Config Bounds Memory]).
+(** A soft cap on the plugin's memory ([Set MeBi MaxMemoryMB]).
 
     The plugin's memory-heavy loops (extraction, saturation, the up-front
     game walks and estimates, the proof solver's steps) call {!check} once

@@ -67,7 +67,7 @@ MeBi Run Bisim c1 With bigstep And c1 With lts Using step.
 (* Two processes, glued. *)
 
 MeBi Divider "Examples.CADP.Explore.Size2".
-MeBi Config Bounds As Num States 5000.
+Set MeBi MaxStates 5000.
 
 MeBi Run Minimize (make_spec 1) Using spec_lts.
 
@@ -87,7 +87,7 @@ MeBi Config Output "Info" False.
 MeBi Config Output "DecodeResults" False.
 
 MeBi Divider "Examples.CADP.Explore.Size3".
-MeBi Config Bounds As Num States 1000.
+Set MeBi MaxStates 1000.
 
 (* Measured 2026-10-11: [bigstep_norm c3] has 644 states. [bigstep c3] has
    128044 (~19 min, ~4.7GB to extract, not done here), so erasing dead data

@@ -9250,8 +9250,196 @@ breakdown it starts from is unmeasured (its Phase 0).
   S3 onwards are flagged **New feature**. No code. It supersedes the
   bitboard plan's symbolic section.
 
-**Session tally (2026-11-05):** Docs 4 · Refactor 0 · Optimization 0 ·
-Bug fix 0 · Tooling 0 · New feature 0.
+### Symbolic plan, Phase S0: the prototype
+
+- **Tooling.** `bench/symbolic/`, a standalone prototype, not linked
+  into the plugin:
+  - **systems:** networks of finite-state components, with front ends
+    for `Proc`'s layered semantics and for CCS, normalised;
+  - **weak bisimilarity** as a greatest fixpoint over pairs, on BDDs,
+    using preimages only;
+  - **two BDD backends:** a native OCaml one, and CUDD through opam's
+    `mlcuddidl`, installed into the switch for this (that executable is
+    `optional` in dune);
+  - **checked against** the plugin's own `Model.Bisimilarity.fsm` on
+    every system small enough.
+- **Docs.** `doc/measurements/symbolic-s0.md`:
+  - **The encodings compress:** a chain of 32 buffers against a counter
+    (4.3×10⁹ states) is decided in 57s under a 2GB cap, with the
+    bisimulation relation under 600 nodes. The explicit model runs out of
+    memory at 12 buffers.
+  - **Test4,** normalised and generalised to 32 components, takes 6s.
+  - **ABP** agrees with its proof.
+  - **CUDD is recommended** over the native BDD: 9–13× faster, and it
+    collects dead nodes.
+  - **Not ported:** CADP glued `Size2`, which needs data, so it moves to
+    S2.
+- **A mistake, recorded as the point of this log.** That day my runs
+  froze @dcastrop's machine by pushing it into swap:
+  - the ABP proofs, capped at 6G each on a 14GB host with ~7GB free;
+  - and one uncapped prototype run.
+
+  Every later run was capped at 2G with swap off, sized against free
+  memory. The rule is now in his global Claude instructions.
+
+- **Reversal.** The native OCaml BDD was deleted at @dcastrop's
+  request: comparing it with CUDD was not worth the time, and CUDD is the
+  library (decision 1 of `SYMBOLIC_PLAN.md`, closed). The `proc` rows
+  were re-measured on CUDD (32 components: 0.9s, not 6.2s).
+
+### Phase U: the `bisim` and `sim` tactics, and `Set MeBi` options
+
+Asked for by @dcastrop: `Lemma ... : weak_bisimilar ... . Proof. bisim.
+Qed.`, with limits set once, early, as options.
+- **New feature.** `src/user_tactics.ml`: the tactics `bisim` and `sim`.
+  - **What they read from the goal:** the LTSs, the terms, the label type
+    (so no `MeBi Config Weak`; `None` is silent in every LTS of
+    `theories/Bisimilarity.v`), and the `Using` list (LTS-shaped
+    inductives in the constructors' premises, transitively).
+  - **How they prove it:** the existing search, run in a proof opened on
+    the side and unchanged, with its term then put in the goal. So the step
+    counts are the solver's own.
+- **New feature.** `src/api.ml`: `Set MeBi MaxStates`, `MaxTransitions`,
+  `MaxSteps` (default 1M), `MaxSaturation`, `MaxGame`, `MaxMemoryMB`,
+  `PremiseDepth` and `PremiseRange`, as Rocq options.
+  - **Shared state:** they write the same references as the `MeBi Config`
+    commands, which stay.
+  - **Also a bug fix:** as options they are restored on backtracking, which
+    those references were not.
+- **Tests.** `test/rocq/Test.v`, module `Tactics`. Each `Fail` was checked
+  for its reason by cutting the file there.
+- **Docs.** `README.md` ("Try it" now uses `bisim`), `MeBi Help Sim`,
+  `SYMBOLIC_PLAN.md` (U's result).
+- **Verification,** all one file at a time under a 3.5GB cap:
+  - **Baseline:** the default suite under `Auto`, `True` and `False`, and
+    `eval`, matched every count in `CLAUDE.md`.
+  - **Tactics:** the same files, rewritten to use the tactics, gave
+    identical counts, and every `Qed` passed.
+  - **Not finished either way:** `CADP/GluedLayered.v`'s last proof under
+    `Auto` was killed at the cap in both runs. It is listed in
+    `OUTSTANDING.md` as needing more memory.
+  - **Builds:** `make`, `dune build` and `tests.exe` (111/111) pass.
+- **Not done:** the checked-in examples were not rewritten; that waits on
+  @dcastrop.
+
+### The old proof commands removed; debug mode; the commands infer too
+
+At @dcastrop's request ("remove old tactics", a debug mode to run n steps,
+the remaining fixes).
+- **Refactor (breaking).** Removed:
+  - `MeBi Sim Begin`, `MeBi Sim Step` and `MeBi Sim Solve`;
+  - `MeBi Run Bisim|Sim ... As <name>`, and `Proof_solver.start` with
+    them;
+  - `MeBi Config Bounds ...` and `MeBi Config Premise Depth|Range`, now
+    the `Set MeBi` options.
+
+  Every user-facing message that named a removed command now names the
+  option or tactic (`src/`, `lib/`), as do `MeBi Help`, `README.md`,
+  `CLAUDE.md`, `bench/` and `doc/limitations.md`.
+- **New feature.** Debug mode, `Set MeBi DebugSteps <n>`
+  (`src/user_tactics.ml`), in place of `Sim Step`. The search stops after
+  `<n>` steps; if it has not found the proof, the tactic prints its open
+  goals (first with hypotheses, at most ten) and leaves the goal
+  unchanged.
+- **New feature.** The `MeBi Run` commands infer what the tactics infer
+  (`src/wrapper.ml`):
+  - **The silent label:** with no `MeBi Config Weak` setting at all, an
+    LTS of type `M -> option A -> M -> Prop` takes `None`. Before,
+    commands were strong without the setting. A setting for one side only
+    still leaves the other strong (`Test.v`'s `MixedSilence` relies on
+    that).
+  - **`Using`:** with no relations after the first, the premises' LTSs
+    are found. The finder moved to `Rocq_utils.lts_closure`.
+- **Refactor.** All 24 example and test files that used the old commands
+  were converted mechanically:
+  - each `MeBi Sim Solve N` became `Set MeBi MaxSteps N.` before its
+    statement, so the least bounds still fail the build if a count
+    rises;
+  - `Fail MeBi Sim Begin` became `Fail sim/bisim`;
+  - the `As` tests became explicit `Example`s.
+
+  By hand:
+  - `Test.v`'s `GoalShapes` lost its two tests of `Begin`'s arguments
+    matching the goal: the tactics take none;
+  - `w_cong` stays a known-wrong pin, as `Fail bisim`.
+
+  A `tau.` notation broke the conversion of `LawProofs.v` at first. It
+  was caught by checking every converted line, and redone.
+- **Tooling.** `bench/lib.sh` reads the tactic's time (the Begin column
+  is `-`). `bench/ocaml/fixtures.py` reads each pair from the proof's
+  statement.
+- **Verification:**
+  - **Builds:** `make`, `dune build` and `tests.exe` (111/111) pass, and
+    so does the module-list check.
+  - **`Fail` reasons:** every `Fail sim/bisim` (22 in `Test.v`, 6 in the
+    CCS examples) was checked for its reason through `rocq repl`, each
+    the intended refusal.
+  - **Counts:** the default suite under `Auto`, `True` and `False`, and
+    `eval`, against the baseline run before any of this. Every Solve
+    identical (`bench/compare.sh`).
+  - **Memory:** each run one file at a time under a 3GB cap, with
+    `CADP/MutualExclusion.v` rerun at 3.5GB, as its baseline was (at 3GB
+    the plugin's own memory guard stops it at 2.9GB).
+    `CADP/GluedLayered.v`'s last proof under `Auto` exceeded the cap in
+    both runs, as before.
+- **Resolved:** the "Using fallback loc" warning of `Run Bisim ... As`,
+  with the command.
+
+### Bounded and debug runs, as Rocq's `auto n` and `debug auto`
+
+At @dcastrop's request, to make the debug mode idiomatic: the option `Set
+MeBi DebugSteps <n>` (from the same day) is replaced by tactic forms.
+- **New feature** (`src/g_mebi.mlg`, `src/user_tactics.ml`):
+  - **`bisim n` / `sim n`:** at most `n` steps (`0`: the setup only);
+    without a proof they leave the goal unchanged, with a notice, as
+    `auto n` does. Plain `bisim`/`sim` still fail.
+  - **`debug bisim [n]` / `debug sim [n]`:** the same, and on stopping
+    without a proof they print the search's open goals.
+- **Refactor.** `Proof_solver.solve` gained `?explain` (default `true`), so
+  that a bound the user gave as `sim n` is not reported as `[Set MeBi
+  MaxSteps n-1]`.
+- **Tests:** `Test.v`, `Tactics.steps_n`: `sim 0`, `debug sim 2`, then
+  `sim 100` closes it. Its output was read through `rocq repl`.
+- **Builds:** `make`, `dune build` and `tests.exe` pass. Plain `bisim`/`sim`
+  are unchanged, so the suite counts above stand.
+
+### Dune only; `_RocqProject` for the IDE
+
+At @dcastrop's request: rename `_CoqProject` to `_RocqProject`, kept for
+the IDE only, and build exclusively with dune. He also untracked
+`.vscode/settings.json` (per-machine settings do not belong in a public
+repository); `README.md`, "Using VSCode", now says what to put in one's
+own for a global or a local switch.
+- **Tooling.** Removed:
+  - `Makefile`, `Makefile.rocq.local` (its cppo list), `_CoqProject`,
+    `src/mebi_plugin.mlpack`, `src/META.rocq-mebi`;
+  - CI's `make` step.
+- **Tooling.** `examples/dune`, new: the theory `MEBI.Examples`, with
+  `(modules ...)` naming the 22 fast files that `_CoqProject` enabled, so
+  `dune build` checks them now. The heavy proof files stay with
+  `bench/proofs.sh`.
+- **Tooling.** `_RocqProject`, new: only `-R` and `-I` flags pointing at
+  `_build/`. The plugin is found through `-I _build/install/default/lib`,
+  with no `OCAMLPATH` (tested).
+- **Tooling.** `scripts/check_module_lists.py` checks dune's lists only.
+- **Docs:** `README.md` (Building, Running tests, Using VSCode),
+  `CLAUDE.md` (the verification route is `bench/proofs.sh`; the `make`
+  gotchas go), `examples/README.md`, `bench/README.md`,
+  `doc/future-work.md`, and the headers of four example files.
+- **A correction.** Earlier today I said that `dune build` passed
+  "including the examples built by default". It did not build any: until
+  this change only `make` and the bench scripts compiled `examples/`.
+  Those examples had been checked, by the suite runs, but not by `dune
+  build`.
+- **Verified:**
+  - `dune clean` then `dune build -j 3` under a 3GB cap: 92s, every
+    target including `Test.v`, `DevTest.v` and the 22 examples;
+  - `tests.exe` 111/111, and the module-list check;
+  - the leftovers of today's `make` runs removed (`git clean -fX` on the
+    source directories, as `CLAUDE.md` advises).
+
+**Session tally (2026-11-05):** Tooling 6 · Docs 7 · Refactor 3 ·
+Optimization 0 · Bug fix 0 · New feature 5.
 
 ---
 

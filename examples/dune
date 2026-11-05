@@ -1,0 +1,47 @@
+; The examples, as the theory MEBI.Examples. Built by `dune build` and CI;
+; not part of the opam package (no (package ...)), like test/rocq.
+;
+; Only the files listed are built: the fast ones (~2 min together). The
+; heavy proof files (the Alternating Bit Protocol, Test4, the large CADP
+; and evaluation files, the Proc/Test1-3 and CADP proof suites) take
+; minutes and gigabytes each: bench/proofs.sh compiles them one at a time,
+; under a memory cap, against this build (bench/README.md). Until 2026-11-05
+; this list was the uncommented part of _CoqProject, built by make.
+
+(rocq.theory
+ (name MEBI.Examples)
+ (synopsis "MEBI plugin examples")
+ (plugins rocq-mebi.mebi)
+ (stdlib yes)
+ (theories Stdlib MEBI)
+ (modules
+  ; CCS (value-free, Milner 1989): textbook pairs and the Alternating Bit
+  ; Protocol, and instances of CTrees' CCS laws (~25s)
+  CCS
+  Bisimilarity.CCS.PluginProofs
+  Bisimilarity.CCS.LawProofs
+  ; the evaluation levers, small instances (~40s)
+  Evaluation.Base
+  Evaluation.Width
+  Evaluation.Layers
+  Evaluation.Depth
+  ; Proc, and Test4 under the normalised semantics (82 states)
+  Proc
+  ProcCongruence
+  Bisimilarity.Proc.Test1.Terms
+  Bisimilarity.Proc.Test2.Terms
+  Bisimilarity.Proc.Test3.Terms
+  Bisimilarity.Proc.Test4.Terms
+  Bisimilarity.Proc.Test4.NormTermTests
+  ; CADP: the models and specifications the proof files use (no plugin
+  ; proofs; Norm.v's hand proof ~35s)
+  CADP.Model
+  CADP.Glued
+  CADP.Norm
+  CADP.Obs
+  CADP.SpecMutex
+  CADP.SpecFifo
+  CADP.Hidden
+  CADP.Terms))
+
+(include_subdirs qualified)

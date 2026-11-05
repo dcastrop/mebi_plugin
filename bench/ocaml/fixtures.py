@@ -4,9 +4,12 @@
 Used by make-fixtures.sh, in two steps:
 
   fixtures.py prepare SRC.v OUT.v MANIFEST.json
-      Copy SRC.v to OUT.v with every proof that runs [MeBi Sim Begin]
+      Copy SRC.v to OUT.v with every proof that runs [sim] or [bisim]
       replaced by [Admitted.] and, in its place, the first time each pair of
       systems is met, a [MeBi Run Bisim] on that pair with result dumps on.
+      The pair is read from the proof's statement, [weak_sim R1 R2 x y] or
+      [weak_bisimilar R1 R2 x y] (until 2026-11-05, from [MeBi Sim Begin]'s
+      arguments); the command infers the [Using] list, as the tactics do.
       The command then runs with the settings and in the scope the proof
       had. MANIFEST.json records, per command, its line in OUT.v and the
       pair.
@@ -22,10 +25,32 @@ import sys
 from pathlib import Path
 
 PROOF = re.compile(r"Proof\.(.*?)(Qed|Defined|Abort|Admitted)\.", re.S)
-BEGIN = re.compile(
-    r"MeBi\s+Sim\s+Begin\s+(\S+)\s+(.+?)\s+And\s+(\S+)\s+(.+?)\s+Using\s+(.+?)\.(?=\s|$)",
+TACTIC = re.compile(r"(Fail\s+)?\b(bisim|sim)\.(?=\s|$)")
+STATEMENT = re.compile(
+    r"(?:Example|Lemma|Theorem|Corollary|Fact|Remark)\s+[\w']+\s*:\s*"
+    r"weak_(?:sim|bisimilar)\s+(.*?)\.\s*$",
     re.S,
 )
+
+
+def arguments(text):
+    """The top-level arguments of an application's text: atoms, and
+    parenthesised groups as they are written."""
+    args, depth, cur = [], 0, ""
+    for ch in text:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        if ch.isspace() and depth == 0:
+            if cur:
+                args.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    if cur:
+        args.append(cur)
+    return args
 
 
 def squash(s):
@@ -57,12 +82,19 @@ def prepare(src, out, manifest):
     for m in PROOF.finditer(text):
         if commented[m.start()]:
             continue
-        b = BEGIN.search(m.group(1))
-        # a proof expected to fail ([Fail MeBi Sim Begin ... Abort.]) is
-        # left as it is
-        if not b or m.group(2) == "Abort" or re.search(r"Fail\s+$", m.group(1)[: b.start()]):
+        t = TACTIC.search(m.group(1))
+        # a proof expected to fail ([Fail sim. Abort.]) is left as it is
+        if not t or t.group(1) or m.group(2) == "Abort":
             continue
-        r1, x, r2, y, using = (squash(g) for g in b.groups())
+        # the statement is the last sentence before [Proof.]
+        head = text[: m.start()]
+        k = max(head.rfind(w) for w in ("Example ", "Lemma ", "Theorem ", "Corollary ", "Fact ", "Remark "))
+        st = STATEMENT.match(head[k:]) if k >= 0 else None
+        args = arguments(squash(st.group(1))) if st else []
+        if len(args) != 4:
+            print(f"{src}: cannot read the pair before line {head.count(chr(10)) + 1}", file=sys.stderr)
+            continue
+        r1, r2, x, y = args
         pieces.append(text[last : m.start()])
         last = m.end()
         key = frozenset([(r1, x), (r2, y)])
@@ -70,7 +102,7 @@ def prepare(src, out, manifest):
             pieces.append("Admitted.")
             continue
         seen.add(key)
-        command = f"MeBi Run Bisim {x} With {r1} And {y} With {r2} Using {using}."
+        command = f"MeBi Run Bisim {x} With {r1} And {y} With {r2}."
         before = "".join(pieces) + "Admitted.\n"
         commands.append(
             {"line": before.count("\n") + 2, "x": x, "y": y, "r1": r1, "r2": r2,

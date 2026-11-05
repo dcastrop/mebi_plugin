@@ -149,7 +149,7 @@ module type S = sig
 
   (** [with_cap n f] is [f ()], run with every game walk capped at [n]
       pairs. For FSMs saturated on demand, whose walks saturate as they go
-      ([MeBi Config Bounds Game]). The previous cap is restored afterwards.
+      ([Set MeBi MaxGame]). The previous cap is restored afterwards.
 
       @raise Game_too_large
         if a walk inside [f] passes [n] pairs
@@ -196,7 +196,7 @@ module type S = sig
 
   (** Policies for choosing answers. [Default] is {!val:answer}'s choice,
       the solver's behaviour until 2026-10-15; [MeBi Config Solver Answers Auto], the default since, keeps whichever policy plans cheapest,
-      [Default] among them. Any other policy is turned, at [MeBi Sim Begin], into a
+      [Default] among them. Any other policy is turned, at [sim/bisim], into a
       {!type:Policy.plan}: the answer for every move the game can reach, and
       the pairs that makes. The solver then answers from the plan, and the
       mutual block and the cofix-strategy estimate read its pairs, so the

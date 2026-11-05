@@ -317,3 +317,19 @@ val econstr_to_constr_opt : Evd.evar_map -> Evd.econstr -> Constr.t option
     @raise Not_found if one refers to nothing (propagated from
                      [Nametab.global]). *)
 val libnames_to_globrefs : Libnames.qualid list -> Names.GlobRef.t list
+
+(** [lts_shaped env ind] is whether the inductive [ind] has the type of an
+    LTS, [M -> option A -> M -> Prop] ([theories/Bisimilarity.v]'s [LTS]),
+    without parameters. Raises nothing. *)
+val lts_shaped : Environ.env -> Names.inductive -> bool
+
+(** [lts_closure env roots] is what a [Using] list names for the LTSs
+    [roots]: [roots] and every LTS-shaped inductive ({!lts_shaped}) their
+    constructors' premises mention, transitively, first found first. The
+    [bisim] and [sim] tactics, and the [MeBi Run] commands given no
+    [Using], extract with it. Raises nothing. *)
+val lts_closure : Environ.env -> Names.inductive list -> Names.inductive list
+
+(** [qualid_of_ind ind] is a name for [ind] in the current scope.
+    @raise Not_found if it has none (propagated). *)
+val qualid_of_ind : Names.inductive -> Libnames.qualid

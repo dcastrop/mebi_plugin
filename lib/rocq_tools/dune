@@ -9,8 +9,8 @@
   yojson)
  ; Code that differs between Rocq versions is under cppo's
  ; #if ROCQ_VERSION >= (9, 3, 0). Only the modules listed here are
- ; preprocessed. Makefile.rocq.local lists the same ones for `make`, and
- ; .ocamlformat-ignore keeps `dune fmt` off them.
+ ; preprocessed. src/dune has its own list, and .ocamlformat-ignore keeps
+ ; `dune fmt` off all of them.
  (preprocess
   (per_module
    ((action

@@ -43,9 +43,9 @@ Require Import MEBI.Examples.CADP.Terms.
 Require Import MEBI.Examples.CADP.SpecFifo.
 
 MeBi Config Weak As Option label.
-MeBi Config Bounds As Num States 1000.
+Set MeBi MaxStates 1000.
 
 MeBi Divider "Examples.CADP.ThreeProcessesFifo".
+Set MeBi MaxSteps 1000000.
 Example wbis_norm_3 : weak_bisimilar bigstep_obs_norm spec_fifo c3 (make_fifo 2).
-Proof. MeBi Sim Begin bigstep_obs_norm c3 And spec_fifo (make_fifo 2) Using bigstep_obs.
-  MeBi Sim Solve 1000000. Qed.
+Proof. bisim. Qed.

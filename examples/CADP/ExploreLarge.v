@@ -32,7 +32,7 @@ MeBi Config Weak As Option label.
 (* Measured 2026-10-11: [lts step] on [c2] has 12027 states and extracts
    in ~32s (~0.65GB). Keep "Result"/"DecodeResults"/"DumpResults" off: they
    add ~0.65MB per state. *)
-MeBi Config Bounds As Num States 15000.
+Set MeBi MaxStates 15000.
 
 MeBi Divider "Examples.CADP.ExploreLarge.Size2.step".
 MeBi Run FSM c2 Using lts step.

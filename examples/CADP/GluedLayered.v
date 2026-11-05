@@ -31,7 +31,7 @@ Require Import MEBI.Examples.CADP.Terms.
 MeBi Divider "Examples.CADP.GluedLayered".
 
 MeBi Config Weak As Option label.
-MeBi Config Bounds As Num States 100.
+Set MeBi MaxStates 100.
 
 Require Import Logic.
 
@@ -40,17 +40,19 @@ Require Import Logic.
 (* One process. *)
 
 MeBi Divider "Examples.CADP.GluedLayered.Size1.bigstep".
+Set MeBi MaxSteps 245.
 Example wsim_bigstep_1 : weak_sim bigstep lts c1 c1. 
-Proof. MeBi Sim Begin bigstep c1 And lts c1 Using step.
-  (* Iteration History: 267 <- 300 <- _ <- _ *) 
-  MeBi Sim Solve 245. Qed.
+Proof. sim.
+  (* Iteration History: 267 <- 300 <- _ <- _ *)
+   Qed.
 
 
 MeBi Divider "Examples.CADP.GluedLayered.Size1.lts".
+Set MeBi MaxSteps 395.
 Example wsim_lts_1 : weak_sim lts bigstep c1 c1. 
-Proof. MeBi Sim Begin lts c1 And bigstep c1 Using step. 
-  (* Iteration History: 395 <- _ <- _ <- _  *) 
-  MeBi Sim Solve 395. Qed.
+Proof. sim.
+  (* Iteration History: 395 <- _ <- _ <- _ *)
+   Qed.
 
 MeBi Divider "Examples.CADP.GluedLayered.Size1.mutual".
 (* Mutual similarity: the two [weak_sim]s above, one each way. *)
@@ -64,9 +66,9 @@ Proof. split; [exact wsim_bigstep_1 | exact wsim_lts_1]. Qed.
    a run with the strategy forced still reaches every [weak_sim] above. *)
 
 MeBi Divider "Examples.CADP.GluedLayered.Size1.bisimilar".
+Set MeBi MaxSteps 2874.
 Example wbis_bigstep_1 : weak_bisimilar bigstep lts c1 c1.
-Proof. MeBi Sim Begin bigstep c1 And lts c1 Using step.
-  MeBi Sim Solve 2874. Qed.
+Proof. bisim. Qed.
 
 
 (**************************************************)
@@ -90,7 +92,7 @@ Proof. MeBi Sim Begin bigstep c1 And lts c1 Using step.
 
    Memory grew to each cap (0.3-0.47GB a minute for [wbis_bigstep_lts],
    falling slowly; the rate per step is unmeasured). With
-   [MeBi Config Bounds Game 100000000], [Auto] estimates instead (Begin
+   [Set MeBi MaxGame 100000000], [Auto] estimates instead (Begin
    ~90s) and picks the mutual cofix: 514,020 pairs and 2,056,080 moves,
    against over 10,280,400 goals nested. That run ([wbis_bigstep_lts],
    10GB cap, [Solve] in 2000-step chunks) did not finish its first chunk
@@ -113,20 +115,20 @@ Proof. MeBi Sim Begin bigstep c1 And lts c1 Using step.
    separately checked lemmas"). *)
 
 (*
-MeBi Config Bounds As Num States 15000.
+Set MeBi MaxStates 15000.
 
 MeBi Divider "Examples.CADP.GluedLayered.Size2.bigstep".
+Set MeBi MaxSteps 1000000.
 Example wsim_bigstep_lts : weak_sim bigstep lts c2 c2. 
-Proof. MeBi Sim Begin bigstep c2 And lts c2 Using step.
-  MeBi Sim Solve 1000000. Qed.
+Proof. sim. Qed.
 
 MeBi Divider "Examples.CADP.GluedLayered.Size2.lts".
+Set MeBi MaxSteps 1000000.
 Example wsim_lts_bigstep : weak_sim lts bigstep c2 c2. 
-Proof. MeBi Sim Begin lts c2 And bigstep c2 Using step. 
-  MeBi Sim Solve 1000000. Qed.
+Proof. sim. Qed.
 
 MeBi Divider "Examples.CADP.GluedLayered.Size2.bisimilar".
+Set MeBi MaxSteps 1000000.
 Example wbis_bigstep_lts : weak_bisimilar bigstep lts c2 c2.
-Proof. MeBi Sim Begin bigstep c2 And lts c2 Using step.
-  MeBi Sim Solve 1000000. Qed.
+Proof. bisim. Qed.
 *)

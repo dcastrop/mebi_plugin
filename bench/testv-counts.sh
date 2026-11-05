@@ -6,7 +6,7 @@
 #   this one). Use a `git worktree` of main to compare a branch against it.
 #
 # Compiles a copy of TREE's test/rocq/Test.v against TREE's build, with
-# Notice output switched on so every MeBi Sim Solve reports its count, and
+# Notice output switched on so every proof search (sim/bisim) reports its count, and
 # prints one line per Solve: the Test.v section it is in and the count.
 # Errors print as "ERROR <section>". Diff two outputs to compare trees.
 

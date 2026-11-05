@@ -5,7 +5,7 @@
    cover. Not built by default: ~30 seconds and ~0.7GB peak. (Until
    2026-10-15 the default answers were [Answers Default], and this proof took
    48,821 steps, ~7 minutes and ~3.8GB, so it had to run under a memory cap.)
-   The bound is the least that closes the proof: [MeBi Sim Solve N] permits
+   The bound is the least that closes the proof: [Set MeBi MaxSteps N] permits
    N + 1 steps, and it reports 6115.
 
    [weak_bisimilar] is in NormBisimProofs.v (with [Answers Minimal]). *)
@@ -32,10 +32,11 @@ Require Import MEBI.Examples.Bisimilarity.Proc.Test4.Terms.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.NormProofs".
 MeBi Config Weak As Option label.
-MeBi Config Bounds As Num States 200.
+Set MeBi MaxStates 200.
 
+Set MeBi MaxSteps 6114.
 Example wsim_pq_norm : weak_sim nLTS nLTS p q.
-Proof. MeBi Sim Begin nLTS p And nLTS q Using nLTS core termLTS. MeBi Sim Solve 6114. Qed.
+Proof. sim. Qed.
 
 (* Test4's simulation, in the semantics it was written in *)
 Example wsim_pq : weak_sim compLTS compLTS p q.

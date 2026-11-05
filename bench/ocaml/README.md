@@ -54,7 +54,7 @@ dune build && bench/ocaml/make-fixtures.sh
 ```
 
 The script compiles a copy of each source against the dune build. In the
-copy, every proof that runs `MeBi Sim Begin` is admitted, and the first
+copy, every proof that runs `sim` or `bisim` is admitted, and the first
 time each pair is met, a `MeBi Run Bisim` on it takes the proof's place,
 with dumps on. The command thus runs with the settings and scope the proof
 had. `fixtures.py` then converts the dumps into fixtures. The whole run

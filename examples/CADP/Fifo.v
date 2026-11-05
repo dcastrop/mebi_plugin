@@ -46,7 +46,7 @@ Require Import MEBI.Examples.CADP.Hidden.
 MeBi Divider "Examples.CADP.Fifo".
 
 MeBi Config Weak As Option label.
-MeBi Config Bounds As Num States 1000.
+Set MeBi MaxStates 1000.
 
 Require Import Logic.
 
@@ -60,9 +60,9 @@ Require Import Logic.
    forced [MutualCofix True], 23 under forced [False]. *)
 
 MeBi Divider "Examples.CADP.Fifo.Size1.bigstep_obs_norm".
+Set MeBi MaxSteps 118.
 Example wbis_norm_1 : weak_bisimilar bigstep_obs_norm spec_fifo c1 (make_fifo 0).
-Proof. MeBi Sim Begin bigstep_obs_norm c1 And spec_fifo (make_fifo 0) Using bigstep_obs.
-  MeBi Sim Solve 118. Qed.
+Proof. bisim. Qed.
 
 MeBi Divider "Examples.CADP.Fifo.Size1.transfer".
 Example wbis_obs_1 : weak_bisimilar bigstep_obs spec_fifo c1 (make_fifo 0).
@@ -74,9 +74,9 @@ MeBi Divider "Examples.CADP.Fifo.Size1.hidden".
 Example wbis_bigstep_hidden_1 : weak_bisimilar bigstep spec_fifo_hidden c1 (make_fifo 0).
 Proof. exact (wbis_hidden c1 (make_fifo 0) wbis_obs_1). Qed.
 
+Set MeBi MaxSteps 22.
 Example wsim_hidden_spec_1 : weak_sim spec_fifo_hidden spec_lts (make_fifo 0) (make_spec 0).
-Proof. MeBi Sim Begin spec_fifo_hidden (make_fifo 0) And spec_lts (make_spec 0) Using spec_fifo_hidden spec_lts.
-  MeBi Sim Solve 22. Qed.
+Proof. sim. Qed.
 
 Example wsim_mutex_1 : weak_sim bigstep spec_lts c1 (make_spec 0).
 Proof.
@@ -95,9 +95,9 @@ Qed.
    321 under forced [False]. *)
 
 MeBi Divider "Examples.CADP.Fifo.Size2.bigstep_obs_norm".
+Set MeBi MaxSteps 2227.
 Example wbis_norm_2 : weak_bisimilar bigstep_obs_norm spec_fifo c2 (make_fifo 1).
-Proof. MeBi Sim Begin bigstep_obs_norm c2 And spec_fifo (make_fifo 1) Using bigstep_obs.
-  MeBi Sim Solve 2227. Qed.
+Proof. bisim. Qed.
 
 MeBi Divider "Examples.CADP.Fifo.Size2.transfer".
 Example wbis_obs_2 : weak_bisimilar bigstep_obs spec_fifo c2 (make_fifo 1).
@@ -109,9 +109,9 @@ MeBi Divider "Examples.CADP.Fifo.Size2.hidden".
 Example wbis_bigstep_hidden_2 : weak_bisimilar bigstep spec_fifo_hidden c2 (make_fifo 1).
 Proof. exact (wbis_hidden c2 (make_fifo 1) wbis_obs_2). Qed.
 
+Set MeBi MaxSteps 97.
 Example wsim_hidden_spec_2 : weak_sim spec_fifo_hidden spec_lts (make_fifo 1) (make_spec 1).
-Proof. MeBi Sim Begin spec_fifo_hidden (make_fifo 1) And spec_lts (make_spec 1) Using spec_fifo_hidden spec_lts.
-  MeBi Sim Solve 97. Qed.
+Proof. sim. Qed.
 
 Example wsim_mutex_2 : weak_sim bigstep spec_lts c2 (make_spec 1).
 Proof.

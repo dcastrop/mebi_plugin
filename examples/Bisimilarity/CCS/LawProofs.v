@@ -46,40 +46,47 @@ Definition R := ? c . tau. ! b . pnil.
 
 (* 1. Choice: CTrees' [plsC], [plsA], [pls0p], [plsp0], [plsidem]. *)
 MeBi Divider "Examples.Bisimilarity.CCS.LawProofs.sum".
+Set MeBi MaxSteps 35.
 Example plsC : weak_bisimilar step step (sum P Q) (sum Q P).
-Proof. MeBi Sim Begin step (sum P Q) And step (sum Q P) Using step. MeBi Sim Solve 35. Qed.
+Proof. bisim. Qed.
+Set MeBi MaxSteps 57.
 Example plsA : weak_bisimilar step step (sum P (sum Q R)) (sum (sum P Q) R).
-Proof. MeBi Sim Begin step (sum P (sum Q R)) And step (sum (sum P Q) R) Using step. MeBi Sim Solve 57. Qed.
+Proof. bisim. Qed.
+Set MeBi MaxSteps 18.
 Example pls0p : weak_bisimilar step step (sum pnil P) P.
-Proof. MeBi Sim Begin step (sum pnil P) And step P Using step. MeBi Sim Solve 18. Qed.
+Proof. bisim. Qed.
+Set MeBi MaxSteps 18.
 Example plsp0 : weak_bisimilar step step (sum P pnil) P.
-Proof. MeBi Sim Begin step (sum P pnil) And step P Using step. MeBi Sim Solve 18. Qed.
+Proof. bisim. Qed.
+Set MeBi MaxSteps 55.
 Example plsidem : weak_bisimilar step step (sum (sum P Q) (sum P Q)) (sum P Q).
-Proof. MeBi Sim Begin step (sum (sum P Q) (sum P Q)) And step (sum P Q) Using step. MeBi Sim Solve 55. Qed.
+Proof. bisim. Qed.
 
 (* 2. Milner 1989, ch. 7: the three tau-laws and [tau.p ~ p], which hold
    weakly only; and the expansion law (strong too), whose right side has a
    tau the left reaches by a handshake. *)
 MeBi Divider "Examples.Bisimilarity.CCS.LawProofs.tau".
+Set MeBi MaxSteps 41.
 Example tau1 : weak_bisimilar step step (? a . tau. P) (? a . P).
-Proof. MeBi Sim Begin step (? a . tau. P) And step (? a . P) Using step. MeBi Sim Solve 41. Qed.
+Proof. bisim. Qed.
+Set MeBi MaxSteps 26.
 Example tau2 : weak_bisimilar step step (sum P (tau. P)) (tau. P).
-Proof. MeBi Sim Begin step (sum P (tau. P)) And step (tau. P) Using step. MeBi Sim Solve 26. Qed.
+Proof. bisim. Qed.
+Set MeBi MaxSteps 27.
 Example tau3 :
   weak_bisimilar step step (sum (? a . sum P (tau. Q)) (? a . Q)) (? a . sum P (tau. Q)).
 Proof.
-  MeBi Sim Begin step (sum (? a . sum P (tau. Q)) (? a . Q)) And step (? a . sum P (tau. Q)) Using step.
-  MeBi Sim Solve 27.
+  bisim.
 Qed.
+Set MeBi MaxSteps 14.
 Example tau0 : weak_bisimilar step step (tau. P) P.
-Proof. MeBi Sim Begin step (tau. P) And step P Using step. MeBi Sim Solve 14. Qed.
+Proof. bisim. Qed.
+Set MeBi MaxSteps 97.
 Example expansion :
   weak_bisimilar step step (par (? a . pnil) (! a . pnil))
     (sum (? a . ! a . pnil) (sum (! a . ? a . pnil) (tau. pnil))).
 Proof.
-  MeBi Sim Begin step (par (? a . pnil) (! a . pnil))
-    And step (sum (? a . ! a . pnil) (sum (! a . ? a . pnil) (tau. pnil))) Using step.
-  MeBi Sim Solve 97.
+  bisim.
 Qed.
 
 (* 3. Negative neighbours. Restriction's scope matters: [res a (P | Q) | R]
@@ -91,18 +98,16 @@ MeBi Divider "Examples.Bisimilarity.CCS.LawProofs.negative".
 Example scope_neg :
   weak_bisimilar step step (par (res (cons a nil) (par P Q)) R) (par P (res (cons a nil) (par Q R))).
 Proof.
-  Fail MeBi Sim Begin step (par (res (cons a nil) (par P Q)) R)
-    And step (par P (res (cons a nil) (par Q R))) Using step.
+  Fail bisim.
 Abort.
 Example expansion_neg :
   weak_bisimilar step step (par (? a . pnil) (! a . pnil))
     (sum (? a . ! a . pnil) (! a . ? a . pnil)).
 Proof.
-  Fail MeBi Sim Begin step (par (? a . pnil) (! a . pnil))
-    And step (sum (? a . ! a . pnil) (! a . ? a . pnil)) Using step.
+  Fail bisim.
 Abort.
 Example tau_choice_neg : weak_bisimilar step step (tau. sum P Q) (sum P (tau. Q)).
-Proof. Fail MeBi Sim Begin step (tau. sum P Q) And step (sum P (tau. Q)) Using step. Abort.
+Proof. Fail bisim. Abort.
 
 (* 4. Parallel composition: CTrees' [paraC], [para0p], [parap0], [paraA].
    Last because they depend most on the solver strategy: with [MutualCofix
@@ -110,13 +115,17 @@ Proof. Fail MeBi Sim Begin step (tau. sum P Q) And step (sum P (tau. Q)) Using s
    OOM-killed at 5GB after two minutes (ASSISTED-CHANGES.md, 2026-10-03).
    Under the default [Auto] the plugin picks mutual for all four. *)
 MeBi Divider "Examples.Bisimilarity.CCS.LawProofs.par".
+Set MeBi MaxSteps 277.
 Example paraC : weak_bisimilar step step (par P Q) (par Q P).
-Proof. MeBi Sim Begin step (par P Q) And step (par Q P) Using step. MeBi Sim Solve 277. Qed.
+Proof. bisim. Qed.
+Set MeBi MaxSteps 356.
 Example para0p : weak_bisimilar step step (par pnil (par P Q)) (par P Q).
-Proof. MeBi Sim Begin step (par pnil (par P Q)) And step (par P Q) Using step. MeBi Sim Solve 356. Qed.
+Proof. bisim. Qed.
+Set MeBi MaxSteps 324.
 Example parap0 : weak_bisimilar step step (par (par P Q) pnil) (par P Q).
-Proof. MeBi Sim Begin step (par (par P Q) pnil) And step (par P Q) Using step. MeBi Sim Solve 324. Qed.
+Proof. bisim. Qed.
+Set MeBi MaxSteps 2835.
 Example paraA : weak_bisimilar step step (par P (par Q R)) (par (par P Q) R).
-Proof. MeBi Sim Begin step (par P (par Q R)) And step (par (par P Q) R) Using step. MeBi Sim Solve 2835. Qed.
+Proof. bisim. Qed.
 
 MeBi Config Reset Weak.

@@ -72,7 +72,7 @@ module type S = sig
       weak simulation from FSM a to FSM b among the pairs reachable from
       their start states ({!Model.Product.simulation}), or [None] if either
       FSM has no start state. When an FSM is saturated on demand, that walk
-      saturates state after state, so it needs [MeBi Config Bounds Game <n>]
+      saturates state after state, so it needs [Set MeBi MaxGame <n>]
       and stays within it.
 
       @raise CErrors.UserError

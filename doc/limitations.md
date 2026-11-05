@@ -15,7 +15,7 @@ turns the pin into a positive test.
 - **Undecidable premises are assumed** (*limit*, pinned `KNOWN WRONG`:
   `UndecidedPremise`, `GeneralPremises`). Examples: an equation MeBi
   cannot decide, an opaque function or axiom with no user tactic, or a
-  proof search cut off by `MeBi Config Premise Depth` (default 16). The
+  proof search cut off by `Set MeBi PremiseDepth` (default 16). The
   constructor is then applied as if the premise held, with a warning. A
   `Run Bisim` verdict on such an LTS may be wrong; a proof cannot be,
   because `Qed` checks every premise. Seen 2026-10-10:
@@ -39,7 +39,7 @@ turns the pin into a positive test.
   one-constructor wrapper whose premise is the applied relation,
   `wrap3 n l m : countLTS 3 n l m -> wrapped3 n l m` (pinned
   `ParameterisedLTS.wrapped3`). Its premise is decided by the proof
-  search, so derivations deeper than `Premise Depth` need it raised.
+  search, so derivations deeper than `PremiseDepth` need it raised.
   Making this work would be a new
   *capability* (medium). Sketch:
   - accept a term (`constr`) where an LTS is named;
@@ -51,10 +51,10 @@ turns the pin into a positive test.
   tries each by unification (`future-work.md`, "Extraction's derivation
   search is unindexed"); on the ABP-with-data series total time is
   roughly quadratic in the data domain. Whole saturation is
-  refused above `Bounds Saturation` (default 1M weak actions;
-  `Saturation_Too_Large`). Above that, `Run Bisim` and `Sim Begin`
+  refused above `MaxSaturation` (default 1M weak actions;
+  `Saturation_Too_Large`). Above that, `Run Bisim` and the tactics
   saturate on demand and decide on the silent-SCC quotient.
-- **Many silent SCCs.** `Run Bisim` and `Sim Begin` need memory
+- **Many silent SCCs.** `Run Bisim` and the tactics need memory
   quadratic in an FSM's silent SCCs, whatever the saturation bound
   (~0.6GB at 50k SCCs, ~4GB at 128k; glued CADP `Size3` was OOM-killed
   at 9GB). `Run FSM` is not affected. Accepted as a limit for now
@@ -87,8 +87,8 @@ turns the pin into a positive test.
   ~1.5GB, but its proof runs out of memory at 10GB, and still at 24GiB on a
   31GB host (2026-10-15/16; `measurements/cadp-large.md`).
   `decide-vs-prove.md` has the full comparison.
-- **`Auto` goes nested on an FSM saturated on demand** unless `MeBi
-  Config Bounds Game` is set, because estimating would walk the whole
+- **`Auto` goes nested on an FSM saturated on demand** unless `Set MeBi
+  MaxGame` is set, because estimating would walk the whole
   game. It says so in a notice. For a `weak_bisimilar` goal the nested
   path is the one that does not finish on the checked-in proofs. At CADP
   `Size2` the estimate (~1 min) put nested at over 10.3M goals, against
@@ -104,7 +104,7 @@ turns the pin into a positive test.
   run in memory; why is unknown (`measurements/cadp-large.md`).
 - **Heavy proofs need a memory cap**, one per process. The ABP and
   `Test4` proofs peak at ~3.8-4.3GB; two such proofs in one file were
-  OOM-killed at 6GB. `MeBi Config Bounds Memory <mb>` (2026-10-16; on by
+  OOM-killed at 6GB. `Set MeBi MaxMemoryMB <mb>` (2026-10-16; on by
   default at 75% of RAM, or 90% of a cgroup cap) stops a command with an
   error before that, but softly: one solver step can
   overshoot it, and `Qed` is not checked at all. Keep the OS cap

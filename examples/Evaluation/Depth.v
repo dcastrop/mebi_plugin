@@ -54,46 +54,46 @@ MeBi Config Weak As Option action.
 
 Module K1 <: BOUND. Definition K := 1. End K1.
 Module G1 := Guarded K1.
-MeBi Config Bounds As Num States 3.
+Set MeBi MaxStates 3.
 MeBi Run LTS (tfix X) Using G1.termLTS.
-MeBi Config Bounds As Num States 2.
+Set MeBi MaxStates 2.
 Fail MeBi Run LTS (tfix X) Using G1.termLTS.
 MeBi Config Reset Bounds.
+Set MeBi MaxSteps 20.
 Example wbis_k1 : weak_bisimilar G1.termLTS G1.termLTS (tfix X) (tfix (tfix X)).
-Proof. MeBi Sim Begin G1.termLTS (tfix X) And G1.termLTS (tfix (tfix X)) Using G1.termLTS.
-  MeBi Sim Solve 20. Qed.
+Proof. bisim. Qed.
 
 Module K2 <: BOUND. Definition K := 2. End K2.
 Module G2 := Guarded K2.
-MeBi Config Bounds As Num States 5.
+Set MeBi MaxStates 5.
 MeBi Run LTS (tfix X) Using G2.termLTS.
-MeBi Config Bounds As Num States 4.
+Set MeBi MaxStates 4.
 Fail MeBi Run LTS (tfix X) Using G2.termLTS.
 MeBi Config Reset Bounds.
+Set MeBi MaxSteps 92.
 Example wbis_k2 : weak_bisimilar G2.termLTS G2.termLTS (tfix X) (tfix (tfix X)).
-Proof. MeBi Sim Begin G2.termLTS (tfix X) And G2.termLTS (tfix (tfix X)) Using G2.termLTS.
-  MeBi Sim Solve 92. Qed.
+Proof. bisim. Qed.
 
 Module K4 <: BOUND. Definition K := 4. End K4.
 Module G4 := Guarded K4.
-MeBi Config Bounds As Num States 9.
+Set MeBi MaxStates 9.
 MeBi Run LTS (tfix X) Using G4.termLTS.
-MeBi Config Bounds As Num States 8.
+Set MeBi MaxStates 8.
 Fail MeBi Run LTS (tfix X) Using G4.termLTS.
 MeBi Config Reset Bounds.
+Set MeBi MaxSteps 406.
 Example wbis_k4 : weak_bisimilar G4.termLTS G4.termLTS (tfix X) (tfix (tfix X)).
-Proof. MeBi Sim Begin G4.termLTS (tfix X) And G4.termLTS (tfix (tfix X)) Using G4.termLTS.
-  MeBi Sim Solve 406. Qed.
+Proof. bisim. Qed.
 
 Module K8 <: BOUND. Definition K := 8. End K8.
 Module G8 := Guarded K8.
-MeBi Config Bounds As Num States 17.
+Set MeBi MaxStates 17.
 MeBi Run LTS (tfix X) Using G8.termLTS.
-MeBi Config Bounds As Num States 16.
+Set MeBi MaxStates 16.
 Fail MeBi Run LTS (tfix X) Using G8.termLTS.
 MeBi Config Reset Bounds.
+Set MeBi MaxSteps 2170.
 Example wbis_k8 : weak_bisimilar G8.termLTS G8.termLTS (tfix X) (tfix (tfix X)).
-Proof. MeBi Sim Begin G8.termLTS (tfix X) And G8.termLTS (tfix (tfix X)) Using G8.termLTS.
-  MeBi Sim Solve 2170. Qed.
+Proof. bisim. Qed.
 
 MeBi Config Reset Weak.

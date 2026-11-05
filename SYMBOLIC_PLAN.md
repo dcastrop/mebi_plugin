@@ -1,7 +1,14 @@
 # Symbolic states and BDDs: a plan
 
-A plan, written 2026-11-05 at @dcastrop's request. Nothing in it is
-implemented.
+A plan, written 2026-11-05 at @dcastrop's request.
+
+**Status:**
+- **S0 (prototype) done:** the encodings compress; BDDs are CUDD
+  ([`doc/measurements/symbolic-s0.md`](doc/measurements/symbolic-s0.md),
+  [`bench/symbolic/`](bench/symbolic/)).
+- **U (`bisim.`, `sim.`, `Set MeBi ...`) done:** the old commands are
+  removed and every checked-in proof uses the tactics (see U, "Result").
+- **The rest not started.**
 
 **This is a new capability**, in the sense of `CLAUDE.md`'s working
 assumption: most phases let the plugin do things it cannot do today. Each
@@ -84,7 +91,7 @@ Rule IR: state schema + rules (guard, label, update, premises, tag)
         v
 Engine interface: sets, relations, image/preimage, closure, fixpoints
    |-- S1: explicit engine (Zarith bit-rows)      <- today's model, compacted
-   |-- S3: BDD engine (CUDD, or a native OCaml BDD)
+   |-- S3: BDD engine (CUDD)
    `-- S6: constraint engine (data, via SMT or Rocq-decidable theories)
         |
         v
@@ -217,6 +224,74 @@ Explicit and symbolic engines must agree on every verdict in the suite and
 in the fixtures (`bench/ocaml/fixtures/`) before a symbolic result is
 trusted anywhere.
 
+### U — the user's workflow: `bisim.` and `sim.` (New feature; independent of S1–S6)
+
+The interface @dcastrop wants, stated 2026-11-05:
+
+```coq
+Set MeBi MaxStates 2000000.          (* limits set once, early *)
+Lemma s1_s2 : weak_bisimilar lts lts s1 s2.
+Proof. bisim. Qed.
+Lemma s1_s2' : weak_sim lts lts s1 s2.
+Proof. sim. Qed.
+```
+
+- **Tactics.** `bisim.` and `sim.` read the goal and pick the route:
+  - which relation it states (`weak_bisimilar`, `weak_sim`);
+  - the LTSs and the terms;
+  - which LTSs their constructors' premises use. Today the `Using` list
+    names those; the tactic finds them by scanning the premises.
+
+  Then they run what `MeBi Sim Begin` and `MeBi Sim Solve` run today
+  (`src/g_mebi.mlg`, `MeBi_Sim`; `src/proof_solver.ml`, `init` and
+  `solve`), with the step bound taken from the settings instead of being
+  written in the proof. Once S3 and S4 exist, the same tactics take the
+  symbolic route when the system linearises, and the explicit one
+  otherwise.
+- **Settings as Rocq options.** `Set MeBi MaxStates 2000000.`, `Set MeBi
+  MaxSteps ...`, and so on, declared through Rocq's own option mechanism
+  (`Goptions`). They replace the `MeBi Config Bounds ...` commands
+  (`src/g_mebi.mlg`, `MeBi_Config_*`; values held in `src/api.ml`). As
+  options they follow sections and modules, and `Unset` restores the
+  default.
+- **When:** first. It needs none of the symbolic work, makes the tool
+  usable now on what it already proves, and fixes the interface the
+  symbolic route then plugs into.
+- **Done when:** every checked-in proof in the suite can be written as
+  `Proof. bisim. Qed.` or `Proof. sim. Qed.`, with the same `Solve`
+  counts, its bounds set by options at the top of the file.
+- **Result (2026-11-05):** done, in `src/user_tactics.ml`, with the
+  options in `src/api.ml`.
+  - **How it works:** the tactic opens a proof of its own goal on the side,
+    runs `Proof_solver.init` and `solve` on it unchanged, and closes the goal
+    with the term found. So the step counts are the solver's own.
+  - **The check:** every proof of the default suite and of `eval`, 75
+    Solves (74 reached), rewritten mechanically as `Proof. sim. Qed.` / `Proof. bisim.
+    Qed.` in a scratch copy (no `Weak`, no `Using`; `Fail` cases kept), all
+    one at a time under a 3.5GB cap. Every count is identical to the same
+    files run as written, and every `Qed` passes. The exception is
+    `CADP/GluedLayered.v`'s last proof: under `Auto` both runs were killed
+    at the cap, so that one stays a higher-memory, optional check.
+  - **Tests:** `test/rocq/Test.v`, module `Tactics`: a layered LTS (the
+    `Using` list is inferred), each tactic refusing the other's goal, open
+    goals refused, and `MaxSteps` set and unset.
+- **Then (2026-11-05, @dcastrop: "remove old tactics"):**
+  - **Removed:** `MeBi Sim Begin`, `MeBi Sim Step` and `MeBi Sim Solve`,
+    `MeBi Run Bisim|Sim ... As <name>`, and the `MeBi Config Bounds ...`
+    and `MeBi Config Premise Depth|Range` commands (now options).
+  - **Bounded and debug runs,** in place of `Sim Step`, after Rocq's
+    `auto n` and `debug auto`: `bisim n`/`sim n` take at most `n` steps
+    and, without a proof, leave the goal unchanged; `debug bisim n` also
+    prints the search's open goals. (Briefly an option, `Set MeBi
+    DebugSteps`, the same day.)
+  - **The commands infer what the tactics infer:** with no `MeBi Config
+    Weak` at all, the silent label is `None` of an `option` label type;
+    with no relations after the first in `Using`, the premises' LTSs are
+    found.
+  - **Every checked-in proof converted** mechanically (24 files), each
+    `MeBi Sim Solve N` becoming `Set MeBi MaxSteps N.` before its
+    statement, so the least bounds still fail the build if a count rises.
+
 ### S0 — prototype, outside the plugin (Tooling)
 
 - **What:** a standalone OCaml binary, not linked into the plugin.
@@ -233,6 +308,13 @@ trusted anywhere.
     a few hundred lines.
 - **Done when:** we know whether the encodings compress, by how much, and
   which BDD library to use. If they do not compress, stop here and revise.
+- **Result (2026-11-05):** they compress.
+  - **The relation:** under 600 nodes for 4.3×10⁹ pairs (`buffers-32`),
+    with a peak of 8.5M nodes and 57s.
+  - **Against the explicit route:** it runs out of memory at 4,096 states.
+  - **Library:** CUDD, through `mlcuddidl`, works on OCaml 5.4.
+  - **Not ported:** CADP glued `Size2`. It needs a data-carrying
+    component, so it moves to S2.
 
 ### S1 — the engine interface, and the explicit engine (Refactor + Optimization)
 
@@ -335,8 +417,7 @@ whole proof-suite baseline rests on that.
 
 ## Decisions for @dcastrop
 
-1. **BDD library:** `mlcuddidl` (CUDD, mature, C) or a native OCaml BDD
-   (deterministic, no C, slower). S0 measures both.
+1. ~~**BDD library**~~: decided 2026-11-05, CUDD through `mlcuddidl`.
 2. **Data theories for S6:**
    - an external SMT solver (fast, but outside Rocq's trust base:
      certificates then have to be re-checked in Rocq);

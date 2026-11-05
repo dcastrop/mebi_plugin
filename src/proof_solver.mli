@@ -1,5 +1,5 @@
-(** The proof solver's entry points: the [MeBi Sim] commands ([Begin],
-    [Step], [Solve]) and [MeBi Run Bisim ... As], over a solver for one
+(** The proof solver's entry points, which the [bisim] and [sim] tactics
+    run ({!User_tactics}): {!init}, then {!solve}, over a solver for one
     encoding built per proof ({!Make}) and kept in a cache ({!make}). A step
     hands the goal in focus to {!Proof_solver_step}, which chooses the
     tactic. *)
@@ -81,7 +81,7 @@ val make : (module Encoding.S) -> unit -> t ref
 val is_done : unit -> bool
 
 (** [init ?enc pstate refs (x, a) (y, b)] begins the proof search on [pstate]
-    ([MeBi Sim Begin]), whose goal is [weak_sim a b x y] or
+    ([sim/bisim]), whose goal is [weak_sim a b x y] or
     [weak_bisimilar a b x y], and is [pstate] unchanged. It builds a fresh
     solver for [enc ()] ({!make}) and checks the two systems
     ({!Results.S.check_bisimilarity}, extracting with the LTSs [refs]). Then,
@@ -95,7 +95,7 @@ val is_done : unit -> bool
     - starts the state machine at [NewProof] with [x] and [y].
 
     On an FSM saturated on demand, planning or estimating would walk the whole
-    game, so it is done only within [MeBi Config Bounds Game], and a setting
+    game, so it is done only within [Set MeBi MaxGame], and a setting
     made explicitly ([MutualCofix True], an answer policy other than [Default])
     is refused without that bound or past it.
 
@@ -113,31 +113,6 @@ val init
   -> Constrexpr.constr_expr * Libnames.qualid
   -> Declare.Proof.t
 
-(** Which goal {!start} states: [weak_bisimilar] ([Bisim], for
-    [MeBi Run Bisim ... As]) or [weak_sim] ([Sim]). *)
-type goal_kind =
-  | Bisim
-  | Sim
-
-(** [start ~kind ~name refs (x, a) (y, b)] is a new proof named [name] (an
-    [Example]) of [weak_bisimilar a b x y] ([Bisim]) or [weak_sim a b x y]
-    ([Sim]), with the proof search begun on it as
-    [MeBi Sim Begin a x And b y Using refs] would ({!init}), so [MeBi Sim Solve]
-    can follow at once.
-
-    @raise CErrors.UserError
-      if the statement does not typecheck (propagated
-      from Rocq's interpretation). Also raises as {!init} (propagated; it
-      refuses, and no proof is opened, if the two are not bisimilar, or not
-      similar). *)
-val start
-  :  kind:goal_kind
-  -> name:Names.Id.t
-  -> Libnames.qualid list
-  -> Constrexpr.constr_expr * Libnames.qualid
-  -> Constrexpr.constr_expr * Libnames.qualid
-  -> Declare.Proof.t
-
 (** [step pstate] is [pstate] after one step of the cached solver
     ({!S.step}; [MeBi Sim Step]).
 
@@ -147,18 +122,19 @@ val start
       whatever else the step raises (propagated). *)
 val step : Declare.Proof.t -> Declare.Proof.t
 
-(** [solve ?bound pstate] is [pstate] after the cached solver's steps
-    ([MeBi Sim Solve]), until the proof is finished, there is nothing to do,
-    or [bound + 1] steps have run ([bound] defaults to 10). It reports
+(** [solve ?bound ?explain pstate] is [pstate] after the cached solver's
+    steps, until the proof is finished, there is nothing to do, or
+    [bound + 1] steps have run ([bound] defaults to 10). It reports
     ["(Stopped) Solved after N iterations."] (or [Unsolved]), and, when it
-    stops on the bound unsolved, which cofix strategy was in force and how
-    to go on.
+    stops on the bound unsolved and [explain] (default), which cofix
+    strategy was in force and how to raise [MaxSteps]: not wanted when the
+    bound is the user's own [bisim n].
 
     @raise NoCachedModules
       if no solver has been built (propagated). Also
       raises whatever a step raises other than {!NothingToDo}
       (propagated). *)
-val solve : ?bound:int -> Declare.Proof.t -> Declare.Proof.t
+val solve : ?bound:int -> ?explain:bool -> Declare.Proof.t -> Declare.Proof.t
 
 (** [guard f] is [f ()], run as a [MeBi Sim] command: a plugin exception nothing
     handled, which Rocq would report as an Anomaly in Rocq itself, becomes a

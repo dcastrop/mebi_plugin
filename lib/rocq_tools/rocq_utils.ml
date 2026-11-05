@@ -23,8 +23,7 @@ let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t)
     | AtomicType (ty, tys) -> ty, tys
     | k -> raise (Rocq_utils_EConstrIsNot_Atomic (sigma, x, k))
   with
-  | Failure e ->
-    raise (Rocq_utils_EConstrIsNotA_Type (sigma, x, e))
+  | Failure e -> raise (Rocq_utils_EConstrIsNotA_Type (sigma, x, e))
 ;;
 
 type constr_kind =
@@ -218,7 +217,6 @@ module Strfy = struct
   ;;
 
   let concl env sigma : EConstr.constr -> string = econstr_types env sigma
-
   let hyp_name (x : hyp) : string = name_id (Context.Named.Declaration.get_id x)
 
   let hyp_value env sigma (x : hyp) : string =
@@ -406,4 +404,53 @@ let econstr_to_constr_opt sigma : EConstr.t -> Constr.t option =
 (* See the [.mli]. *)
 let libnames_to_globrefs (xs : Libnames.qualid list) : Names.GlobRef.t list =
   List.map Nametab.global xs
+;;
+
+(* See the [.mli]. *)
+let lts_shaped (env : Environ.env) (ind : Names.inductive) : bool =
+  let mib, mip = Inductive.lookup_mind_specif env ind in
+  let option_ref = Rocqlib.lib_ref "core.option.type" in
+  mib.mind_nparams = 0
+  &&
+  match Term.decompose_prod mip.mind_user_arity with
+  | [ _; (_, l); _ ], s ->
+    Constr.isSort s
+    && Sorts.is_prop (Constr.destSort s)
+    &&
+      (match Constr.kind (fst (Constr.decompose_app l)) with
+      | Constr.Ind (i, _) ->
+        Names.GlobRef.CanOrd.equal (Names.GlobRef.IndRef i) option_ref
+      | _ -> false)
+  | _ -> false
+;;
+
+(* See the [.mli]. *)
+let lts_closure (env : Environ.env) (roots : Names.inductive list)
+  : Names.inductive list
+  =
+  let seen = ref [] in
+  let rec visit (ind : Names.inductive) : unit =
+    if Bool.not (List.exists (Names.Ind.CanOrd.equal ind) !seen)
+    then (
+      seen := !seen @ [ ind ];
+      let _, mip = Inductive.lookup_mind_specif env ind in
+      Array.iter
+        (fun (c : Constr.types) ->
+          List.iter
+            (fun (_, (p : Constr.types)) ->
+              match Constr.kind (fst (Constr.decompose_app p)) with
+              | Constr.Ind (i, _) when lts_shaped env i -> visit i
+              | _ -> ())
+            (fst (Term.decompose_prod c)))
+        mip.mind_user_lc)
+  in
+  List.iter visit roots;
+  !seen
+;;
+
+(* See the [.mli]. *)
+let qualid_of_ind (ind : Names.inductive) : Libnames.qualid =
+  Nametab.shortest_qualid_of_global
+    Names.Id.Set.empty
+    (Names.GlobRef.IndRef ind)
 ;;

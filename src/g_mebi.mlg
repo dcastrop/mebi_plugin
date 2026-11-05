@@ -20,50 +20,34 @@ let () =
 
 DECLARE PLUGIN "rocq-mebi.mebi"
 
-(* ProofSolver - sim *)
-(* TODO: automatically handle from bisim. i guess by starting a proof inside? *)
-VERNAC COMMAND EXTEND MeBi_Sim CLASSIFIED AS QUERY
-|![ proof ] 
-  [ "MeBi" "Sim" "Solve" int(bound) ] ->
-  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.solve ~bound pstate) }
-
-|![ proof ] 
-  [ "MeBi" "Sim" "Step" ] ->
-  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.step pstate) }
-
-|![ proof ] 
-  [ "MeBi" "Sim" "Begin" reference(a) constr(x) "And" reference(b) constr(y) ] -> 
-  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.init pstate [] (x,a) (y,b)) }
-
-|![ proof ] 
-  [ "MeBi" "Sim" "Begin" reference(a) constr(x) "And" reference(b) constr(y)
-                 "Using" reference_list(rs) ] -> 
-  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.init pstate rs (x,a) (y,b)) }
+(* [bisim] and [sim]: a [weak_bisimilar] or [weak_sim] goal proved with no
+   setup, its LTSs, terms, [Using] list and silent label read from the goal
+   ([User_tactics]); limits come from [Set MeBi ...] options. *)
+TACTIC EXTEND MeBi_bisim
+| [ "bisim" nat_or_var_opt(n) ] ->
+  { User_tactics.prove ?steps:n User_tactics.Bisim }
 END
 
-(* Bisimilarity, opening the proof: [... As <name>] states
-   [weak_bisimilar] as the Example <name> and begins the proof search on it
-   ([Proof_solver.start]); [MeBi Sim Solve] follows. [As] comes before
-   [Using]: grammar words are not reserved, so a [reference_list] would read
-   [As <name>] as two more relations. *)
-VERNAC COMMAND EXTEND MeBi_Run_Bisim_As
-| ![ open_proof ] ["MeBi" "Run"
-   "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
-   "As" identref(n)]
-  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
-  -> { Proof_solver.guard (fun () ->
-         Proof_solver.start ~kind:Proof_solver.Bisim ~name:n.CAst.v [] (x, a) (y, b)) }
-| ![ open_proof ] ["MeBi" "Run"
-   "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
-   "As" identref(n) "Using" reference_list(rs)]
-  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
-  -> { Proof_solver.guard (fun () ->
-         Proof_solver.start ~kind:Proof_solver.Bisim ~name:n.CAst.v rs (x, a) (y, b)) }
+TACTIC EXTEND MeBi_sim
+| [ "sim" nat_or_var_opt(n) ] ->
+  { User_tactics.prove ?steps:n User_tactics.Sim }
+END
+
+(* as [debug auto]: the same, and on stopping without a proof, the search's
+   open goals are printed *)
+TACTIC EXTEND MeBi_debug_bisim
+| [ "debug" "bisim" nat_or_var_opt(n) ] ->
+  { User_tactics.prove ?steps:n ~debug:true User_tactics.Bisim }
+END
+
+TACTIC EXTEND MeBi_debug_sim
+| [ "debug" "sim" nat_or_var_opt(n) ] ->
+  { User_tactics.prove ?steps:n ~debug:true User_tactics.Sim }
 END
 
 (* Weak similarity: is <x> weakly simulated by <y>? ([Wrapper.similarity]:
    only pairs reachable from the two start states, and on demand within
-   [MeBi Config Bounds Game].) *)
+   [Set MeBi MaxGame].) *)
 VERNAC COMMAND EXTEND MeBi_Run_Sim CLASSIFIED AS QUERY
 | ["MeBi" "Run"
    "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] ->
@@ -86,24 +70,6 @@ VERNAC COMMAND EXTEND MeBi_Run_Sim CLASSIFIED AS QUERY
     Logger.info "(Finished Checking Similarity.)";
     ()
   }
-END
-
-(* Weak similarity, opening the proof: [... As <name>] states [weak_sim] as
-   the Example <name> and begins the proof search on it, as [MeBi Run Bisim
-   ... As] does for [weak_bisimilar]. *)
-VERNAC COMMAND EXTEND MeBi_Run_Sim_As
-| ![ open_proof ] ["MeBi" "Run"
-   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
-   "As" identref(n)]
-  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
-  -> { Proof_solver.guard (fun () ->
-         Proof_solver.start ~kind:Proof_solver.Sim ~name:n.CAst.v [] (x, a) (y, b)) }
-| ![ open_proof ] ["MeBi" "Run"
-   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
-   "As" identref(n) "Using" reference_list(rs)]
-  => { Vernacextend.VtStartProof (Vernacextend.GuaranteesOpacity, [ n.CAst.v ]) }
-  -> { Proof_solver.guard (fun () ->
-         Proof_solver.start ~kind:Proof_solver.Sim ~name:n.CAst.v rs (x, a) (y, b)) }
 END
 
 (* Bisimilarity *)
@@ -283,21 +249,10 @@ VERNAC COMMAND EXTEND MeBi_Config_Reset CLASSIFIED AS QUERY
 END
 
 (* Config -- graph bounds *)
-VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Bounds" "As" "Num" "States" int(x)] -> 
-  { Api.set_the_bounds_args (Api.States x) }
-| ["MeBi" "Config" "Bounds" "As" "Num" "Transitions" int(x)] -> 
-  { Api.set_the_bounds_args (Api.Transitions x) }
-| ["MeBi" "Config" "Bounds" "Saturation" int(x)] -> 
-  { Api.set_saturation_bound x }
-| ["MeBi" "Config" "Bounds" "Game" int(x)] -> 
-  { Api.set_game_bound x }
-| ["MeBi" "Config" "Bounds" "Memory" int(x)] -> 
-  { Api.set_memory_bound x }
-| ["MeBi" "Config" "Premise" "Depth" int(x)] -> 
-  { Api.set_premise_depth x }
-| ["MeBi" "Config" "Premise" "Range" int(x)] -> 
-  { Api.set_premise_range x }
+(* The bounds are Rocq options ([Set MeBi MaxStates <n>.], ...; see
+   [Api]); only the premise tactic, which an option cannot hold, is set
+   here. *)
+VERNAC COMMAND EXTEND MeBi_Config_Premise CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Premise" "Tactic" tactic(t)] -> 
   { Api.set_premise_tactic (Tacinterp.interp t) }
 | ["MeBi" "Config" "Reset" "Premise"] -> 

@@ -75,17 +75,17 @@ Require Import Logic.
    True] gives the same. Forced [False] (nested), [wsim_norm_2] was
    OOM-killed at 6GB, as the direct proof over [bigstep] is. *)
 
-MeBi Config Bounds As Num States 100.
+Set MeBi MaxStates 100.
 
 MeBi Divider "Examples.CADP.MutualExclusionLarge.Size2.bigstep_norm".
+Set MeBi MaxSteps 1037.
 Example wsim_norm_2 : weak_sim bigstep_norm spec_lts c2 (make_spec 1).
-Proof. MeBi Sim Begin bigstep_norm c2 And spec_lts (make_spec 1) Using bigstep.
-  MeBi Sim Solve 1037. Qed.
+Proof. sim. Qed.
 
 MeBi Divider "Examples.CADP.MutualExclusionLarge.Size2.bigstep_norm.spec_lts".
+Set MeBi MaxSteps 152.
 Example wsim_norm_r_2 : weak_sim spec_lts bigstep_norm (make_spec 1) c2.
-Proof. MeBi Sim Begin spec_lts (make_spec 1) And bigstep_norm c2 Using bigstep.
-  MeBi Sim Solve 152. Qed.
+Proof. sim. Qed.
 
 MeBi Divider "Examples.CADP.MutualExclusionLarge.Size2.transfer".
 (* The same statements over [bigstep], by [Norm]'s transfer theorems:
@@ -124,12 +124,12 @@ Proof. split; [exact wsim_bigstep_2 | exact wsim_spec_lts_2]. Qed.
 
    Measured 2026-10-11 (Auto, mutual cofix): [wsim_norm_r_3] 326 steps. *)
 
-MeBi Config Bounds As Num States 1000.
+Set MeBi MaxStates 1000.
 
 MeBi Divider "Examples.CADP.MutualExclusionLarge.Size3.spec_lts".
+Set MeBi MaxSteps 325.
 Example wsim_norm_r_3 : weak_sim spec_lts bigstep_norm (make_spec 2) c3.
-Proof. MeBi Sim Begin spec_lts (make_spec 2) And bigstep_norm c3 Using bigstep.
-  MeBi Sim Solve 325. Qed.
+Proof. sim. Qed.
 
 MeBi Divider "Examples.CADP.MutualExclusionLarge.Size3.transfer".
 Example wsim_spec_lts_3 : weak_sim spec_lts bigstep (make_spec 2) c3.
@@ -149,17 +149,17 @@ Qed.
    was OOM-killed at 6GB after ~13 min, so this file does not compile with
    the nested strategy forced. *)
 
-MeBi Config Bounds As Num States 2000.
+Set MeBi MaxStates 2000.
 
 MeBi Divider "Examples.CADP.MutualExclusionLarge.Size2.bigstep".
+Set MeBi MaxSteps 11127.
 Example wsim_bigstep_direct_2 : weak_sim bigstep spec_lts c2 (make_spec 1).
-Proof. MeBi Sim Begin bigstep c2 And spec_lts (make_spec 1) Using lts step.
-  MeBi Sim Solve 11127. Qed.
+Proof. sim. Qed.
 
 MeBi Divider "Examples.CADP.MutualExclusionLarge.Size2.bigstep.spec_lts".
+Set MeBi MaxSteps 404.
 Example wsim_spec_lts_direct_2 : weak_sim spec_lts bigstep (make_spec 1) c2.
-Proof. MeBi Sim Begin spec_lts (make_spec 1) And bigstep c2 Using lts step.
-  MeBi Sim Solve 404. Qed.
+Proof. sim. Qed.
 
 MeBi Divider "Examples.CADP.MutualExclusionLarge.Size2.bigstep.mutual".
 (* Mutual similarity: the two [weak_sim]s above, one each way. *)

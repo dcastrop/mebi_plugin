@@ -24,15 +24,16 @@ Require Import MEBI.Examples.CCS.
    all its inversions). It now refutes such a step outright (note 11,
    option D'; ASSISTED-CHANGES.md, 2026-10-02, third session).
 
-   The bound is the least that closes the proof: [MeBi Sim Solve N] permits
+   The bound is the least that closes the proof: [Set MeBi MaxSteps N] permits
    N + 1 steps, and the proof reports 9914. *)
 
 MeBi Divider "Examples.Bisimilarity.CCS.ABPBisimProofs".
 MeBi Config Weak As Option act.
-MeBi Config Bounds As Num States 1000.
+Set MeBi MaxStates 1000.
 
+Set MeBi MaxSteps 9913.
 Example wbis_abp_spec : weak_bisimilar step step abp (var 20).
-Proof. MeBi Sim Begin step abp And step (var 20) Using step. MeBi Sim Solve 9913. Qed.
+Proof. bisim. Qed.
 
 MeBi Config Reset Bounds.
 MeBi Config Reset Weak.

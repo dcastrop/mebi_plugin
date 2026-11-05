@@ -9,7 +9,7 @@
    28 min. [Begin] takes ~33s, saturating the layered side on demand
    (1,091,776 weak actions over 10,083 silent SCCs, above the 1M bound), and
    [Auto] then takes the nested cofix without estimating. With
-   [MeBi Config Bounds Game 100000000] it estimates instead and picks the
+   [Set MeBi MaxGame 100000000] it estimates instead and picks the
    mutual cofix (514,020 pairs, 2,056,080 moves); that run did not finish
    its first 2000-step chunk in 2h28m, with memory flat at ~2.2GB.
 
@@ -31,7 +31,7 @@
 
    Run it under a memory cap, as [bench/proofs.sh -s cadp-huge -f
    TwoProcessesGluedLayered.v -M <cap>]. To try the mutual cofix, put
-   [MeBi Config Bounds Game 100000000.] before the proof. See
+   [Set MeBi MaxGame 100000000.] before the proof. See
    [doc/future-work.md], "Re-running the large CADP proofs". *)
 
 Require Import MEBI.loader.
@@ -53,9 +53,9 @@ Require Import MEBI.Examples.CADP.Glued.
 Require Import MEBI.Examples.CADP.Terms.
 
 MeBi Config Weak As Option label.
-MeBi Config Bounds As Num States 15000.
+Set MeBi MaxStates 15000.
 
 MeBi Divider "Examples.CADP.TwoProcessesGluedLayered".
+Set MeBi MaxSteps 1000000.
 Example wbis_bigstep_lts : weak_bisimilar bigstep lts c2 c2.
-Proof. MeBi Sim Begin bigstep c2 And lts c2 Using step.
-  MeBi Sim Solve 1000000. Qed.
+Proof. bisim. Qed.

@@ -150,9 +150,9 @@ module Make (Enc : Encoding.S) :
     =
     Printf.sprintf
       "exploration stopped at the bound of %s, with %i states and %i \
-       transitions found and more still unexplored. Raise the bound with [MeBi \
-       Config Bounds As Num States <n>] (or [... Num Transitions <n>]). A \
-       large LTS can still be too big to saturate."
+       transitions found and more still unexplored. Raise the bound with [Set \
+       MeBi MaxStates <n>] (or [Set MeBi MaxTransitions <n>]). A large LTS can \
+       still be too big to saturate."
       (bound_to_string bounds)
       states
       transitions
@@ -279,9 +279,10 @@ module Make (Enc : Encoding.S) :
           Printf.sprintf
             "saturating %s would produce %s, above the bound of %i. That needs \
              about %s of memory (measured %i--%i bytes per weak action), and \
-             can take a long time. Raise the bound with [MeBi Config Bounds \
-             Saturation <n>] if your machine has the memory, or carry on with \
-             only a warning with [MeBi Config FailIf Oversaturated False].%s"
+             can take a long time. Raise the bound with [Set MeBi \
+             MaxSaturation <n>] if your machine has the memory, or carry on \
+             with only a warning with [MeBi Config FailIf Oversaturated \
+             False].%s"
             name
             (Model.SaturationEstimate.to_string e)
             bound
@@ -408,6 +409,16 @@ module Make (Enc : Encoding.S) :
     Logger.trace __FUNCTION__;
     let module G = G ((val make_graph_args ())) in
     let grefs = Rocq_utils.libnames_to_globrefs (primary_lts :: names) in
+    (* no [Using]: the LTSs the primary one's premises use, as the [bisim]
+       and [sim] tactics find them (since 2026-11-05) *)
+    let grefs : Names.GlobRef.t list =
+      match names, grefs with
+      | [], [ Names.GlobRef.IndRef ind ] ->
+        List.map
+          (fun i -> Names.GlobRef.IndRef i)
+          (Rocq_utils.lts_closure (Global.env ()) [ ind ])
+      | _ -> grefs
+    in
     let open M.Syntax in
     Rocq_monad_utils.Approximations.reset ();
     let* the_graph : G.t = G.build ~weak init primary_lts grefs in
@@ -461,19 +472,44 @@ module Make (Enc : Encoding.S) :
         match !Api.the_game_bound with
         | None ->
           refuse_walk
-            "Bound it with [MeBi Config Bounds Game <n>] (pairs) to allow it."
+            "Bound it with [Set MeBi MaxGame <n>] (pairs) to allow it."
         | Some n ->
           (try Some (Model.Product.with_cap n compute) with
            | Model.Product.Game_too_large n ->
              refuse_walk
                (Printf.sprintf
-                  "The game has more than %i pairs, the bound set with [MeBi \
-                   Config Bounds Game %i]: raise it to allow it."
+                  "The game has more than %i pairs, the bound set with [Set \
+                   MeBi MaxGame %i]: raise it to allow it."
                   n
                   n)))
   ;;
 
   module Command = struct
+    (** [inferred_weak lts] is the silent label of [lts] when there is no
+        [MeBi Config Weak] setting at all: [Option A] if [lts] has the type [M -> option A -> M -> Prop] of [theories/Bisimilarity.v]'s [LTS], whose [None] is the silent
+        step; [None] (every label visible) for any other label type, as
+        before 2026-11-05, when every command needed the setting.
+
+        Raises nothing directly. *)
+    let inferred_weak (lts : Libnames.qualid) : Weak.t option M.mm =
+      match Nametab.global lts with
+      | exception Not_found -> M.return None
+      | Names.GlobRef.IndRef ind ->
+        let _, mip = Inductive.lookup_mind_specif (Global.env ()) ind in
+        (match Term.decompose_prod mip.mind_user_arity with
+         | [ _; (_, l); _ ], _ ->
+           let h, args = Constr.decompose_app_list l in
+           (match Constr.kind h, args with
+            | Constr.Ind (i, _), [ a ]
+              when Names.GlobRef.CanOrd.equal
+                     (Names.GlobRef.IndRef i)
+                     (Rocqlib.lib_ref "core.option.type") ->
+              M.return (Some (Weak.Option (M.encode (EConstr.of_constr a))))
+            | _ -> M.return None)
+         | _ -> M.return None)
+      | _ -> M.return None
+    ;;
+
     (* See the [.mli]. *)
     let build_lts
           ?(weak : Weak.t option = None)
@@ -483,7 +519,16 @@ module Make (Enc : Encoding.S) :
       : LTS.t M.mm
       =
       Logger.trace __FUNCTION__;
-      Config.get_weak weak |> extract_lts primary_lts init names
+      let open M.Syntax in
+      let* weak : Weak.t option =
+        match Config.get_weak weak, !Api.the_weak_args with
+        | Some w, _ -> M.return (Some w)
+        (* a [MeBi Config Weak] setting for either side is the user's:
+           the side it leaves out is strong, as before *)
+        | None, Some _ -> M.return None
+        | None, None -> inferred_weak primary_lts
+      in
+      extract_lts primary_lts init names weak
     ;;
 
     (* See the [.mli]. *)

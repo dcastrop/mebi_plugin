@@ -302,8 +302,9 @@ reason in mind.
   sterile steps measured at zero after options A and D′.
 - **Divergence-sensitive equivalences**: out of scope for the current
   definitions.
-- **Module lists** (`_CoqProject`, `.mlpack`, dune) are still maintained
-  by hand. A drift is caught by `scripts/check_module_lists.py` (CI)
-  rather than prevented.
+- **Module lists** (dune's `(modules ...)`) are still maintained by
+  hand. A drift is caught by `scripts/check_module_lists.py` (CI) rather
+  than prevented. (`_CoqProject` and `.mlpack` went with the `make`
+  build, 2026-11-05.)
 - **odoc warnings**: 72 remain, all `@raise` tags naming stdlib or Rocq
   exceptions, which odoc cannot resolve. Accepted.

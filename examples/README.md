@@ -6,11 +6,11 @@ cite them. Plain tests (limits, refusals, regression pins) live in
 `test/rocq/Test.v` instead. Evaluation series, one lever each, live in
 `Evaluation/`.
 
-Most proof files are commented out of `_CoqProject`, because full proof
-search is slow. Each line there says how long its file takes and whether it
-needs a memory cap. To build one, uncomment it and run `make`; or use
-`bench/proofs.sh`, which compiles copies under a memory cap (see
-`bench/README.md`). Run anything heavy under `systemd-run --user --scope
+`dune build` builds only the fast examples, the ones `examples/dune`
+lists, because full proof search is slow; each file's header says how long
+it takes and whether it needs a memory cap. Run the others with
+`bench/proofs.sh`, which compiles copies under a memory cap, against the
+dune build (see `bench/README.md`). Run anything heavy under `systemd-run --user --scope
 -p MemoryMax=6G -p MemorySwapMax=0`.
 
 ## Layout
@@ -31,7 +31,7 @@ The same names recur in every directory:
 - `TermTests.v`: `MeBi Run` commands on them (extract, saturate, minimise,
   decide bisimilarity), with no proofs.
 - `PluginProofs.v`: `weak_sim`, `mutual_sim` and `weak_bisimilar` goals
-  proved by `MeBi Sim Begin`/`Solve`. These are the end-to-end test of the
+  proved by the `bisim`/`sim` tactics. These are the end-to-end test of the
   proof solver. `CLAUDE.md` lists their expected step counts.
 - `ManualProofs.v`, `LtacProofs.v` (`Proc/Test1`, `Test2`): the same goals
   proved by hand and by custom Ltac, for comparison.
@@ -134,7 +134,7 @@ step counts do not carry over.
 ### Files
 
 All in `examples/CADP/`. The files a claim's proofs need are built by
-default; the proofs are commented out of `_CoqProject`. A `*Large.v` file
+default; the proofs are not in `examples/dune`. A `*Large.v` file
 holds what is too heavy for `bench/proofs.sh`'s default suite and needs a
 memory cap.
 

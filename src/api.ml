@@ -233,7 +233,7 @@ let set_saturation_mode (x : saturation_mode) : unit =
 ;;
 
 (** The most pairs a proof's up-front game walk may visit when an FSM is
-    saturated on demand ([MeBi Config Bounds Game <n>]; unset by default).
+    saturated on demand ([Set MeBi MaxGame <n>]; unset by default).
     Such a walk -- [MutualCofix True]'s pair set, a planned answer policy,
     [Auto]'s estimate -- saturates states as it goes. Unset, the explicit
     settings are refused on demand; set, the walk runs under the bound
@@ -310,8 +310,8 @@ let set_memory_bound (mb : int) : unit =
 let walk_memory_note () : string =
   match !Memory_guard.limit with
   | None ->
-    "A larger walk holds more saturated states in memory; [MeBi Config Bounds \
-     Memory <mb>] stops it cleanly before the machine runs out."
+    "A larger walk holds more saturated states in memory; [Set MeBi \
+     MaxMemoryMB <mb>] stops it cleanly before the machine runs out."
   | Some _ ->
     Printf.sprintf
       "A larger walk holds more saturated states in memory; the memory bound, \
@@ -467,4 +467,97 @@ let reset_all () : unit =
   reset_the_fail_flags ();
   reset_output_config ();
   Logger.show "(MeBi: Reset Config.)"
+;;
+
+(* See the [.mli]. *)
+let default_max_steps : int = 1_000_000
+
+(* See the [.mli]. *)
+let the_max_steps : int ref = ref default_max_steps
+
+(** {1 Settings as Rocq options}
+
+    [Set MeBi <Name> <n>.] and [Unset MeBi <Name>.], declared through
+    [Goptions], each reading and writing the same reference as the
+    [MeBi Config ...] command it mirrors. [Goptions] keeps them in the
+    summary, so they follow sections and modules and are restored on
+    backtracking (Undo, stepping back in an IDE), which the [MeBi Config]
+    commands alone are not. [Unset] restores the default. Writes are
+    silent: the summary calls them on every restore. *)
+
+(** [int_option key ~read ~write] declares [Set MeBi <key> <n>]. *)
+let int_option
+      (key : string)
+      ~(read : unit -> int option)
+      ~(write : int option -> unit)
+  : unit
+  =
+  Goptions.declare_int_option
+    { optstage = Summary.Stage.Interp
+    ; optdepr = None
+    ; optkey = [ "MeBi"; key ]
+    ; optread = read
+    ; optwrite = write
+    }
+;;
+
+let () =
+  (* [MaxStates] and [MaxTransitions] share one setting, the extraction
+     bound: each reads [None] while the other holds it, and unsetting one
+     leaves the other alone, so restoring both in either order is right. *)
+  int_option
+    "MaxStates"
+    ~read:(fun () ->
+      match !the_bounds_args with States n -> Some n | Transitions _ -> None)
+    ~write:(function
+      | Some n -> the_bounds_args := States n
+      | None ->
+        (match !the_bounds_args with
+         | States _ -> the_bounds_args := default_bounds
+         | Transitions _ -> ()));
+  int_option
+    "MaxTransitions"
+    ~read:(fun () ->
+      match !the_bounds_args with Transitions n -> Some n | States _ -> None)
+    ~write:(function
+      | Some n -> the_bounds_args := Transitions n
+      | None ->
+        (match !the_bounds_args with
+         | Transitions _ -> the_bounds_args := default_bounds
+         | States _ -> ()));
+  int_option
+    "MaxSteps"
+    ~read:(fun () -> Some !the_max_steps)
+    ~write:(fun x ->
+      the_max_steps := Stdlib.Option.value x ~default:default_max_steps);
+  int_option
+    "MaxSaturation"
+    ~read:(fun () -> Some !the_saturation_bound)
+    ~write:(fun x ->
+      the_saturation_bound
+      := Stdlib.Option.value x ~default:default_saturation_bound);
+  int_option
+    "MaxGame"
+    ~read:(fun () -> !the_game_bound)
+    ~write:(fun x -> the_game_bound := x);
+  int_option
+    "MaxMemoryMB"
+    ~read:(fun () ->
+      Stdlib.Option.map (fun b -> b / 1_000_000) !Memory_guard.limit)
+    ~write:(function
+      | None -> Memory_guard.reset ()
+      | Some mb ->
+        Memory_guard.set_limit (if mb <= 0 then None else Some (mb * 1_000_000)));
+  int_option
+    "PremiseDepth"
+    ~read:(fun () -> Some !Premise_search.max_depth)
+    ~write:(fun x ->
+      Premise_search.max_depth
+      := Stdlib.Option.value x ~default:Premise_search.default_depth);
+  int_option
+    "PremiseRange"
+    ~read:(fun () -> Some !Premise_search.max_range)
+    ~write:(fun x ->
+      Premise_search.max_range
+      := Stdlib.Option.value x ~default:Premise_search.default_range)
 ;;

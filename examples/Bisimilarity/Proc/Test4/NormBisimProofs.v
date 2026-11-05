@@ -11,7 +11,7 @@
 
    Not built by default: ~4 minutes and ~2.8GB peak; run under a memory cap
    (systemd-run --user --scope -p MemoryMax=6G -p MemorySwapMax=0 ...). The
-   bound is the least that closes the proof: [MeBi Sim Solve N] permits
+   bound is the least that closes the proof: [Set MeBi MaxSteps N] permits
    N + 1 steps, and it reports 61161 (the plan predicted ~32k). *)
 
 Require Import MEBI.loader.
@@ -36,11 +36,12 @@ Require Import MEBI.Examples.Bisimilarity.Proc.Test4.Terms.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.NormBisimProofs".
 MeBi Config Weak As Option label.
-MeBi Config Bounds As Num States 200.
+Set MeBi MaxStates 200.
 MeBi Config Solver Answers Minimal.
 
+Set MeBi MaxSteps 61160.
 Example wbis_pq_norm : weak_bisimilar nLTS nLTS p q.
-Proof. MeBi Sim Begin nLTS p And nLTS q Using nLTS core termLTS. MeBi Sim Solve 61160. Qed.
+Proof. bisim. Qed.
 
 (* Test4's bisimilarity, in the semantics it was written in *)
 Example wbis_pq : weak_bisimilar compLTS compLTS p q.

@@ -9,7 +9,7 @@
      reorder the four parallel components at any depth. In general
      3^k * (2k-2)!/(k-1)! for k components: 18, 324, 9720, 408240.
    - At the default bound of 100 states, the first command fails with
-     LTS_Incomplete. With [MeBi Config Bounds As Num States 12000.] the full
+     LTS_Incomplete. With [Set MeBi MaxStates 12000.] the full
      LTS extracts in ~25s.
    - Saturation is the blocker. The 120 tree shapes of each local
      configuration form one silent strongly connected component (81 of
@@ -17,14 +17,14 @@
      in the plugin's representation. [MeBi Run Saturate p] exhausted a 15GB
      machine. Since 2026-10-01 the plugin computes that figure before
      saturating and refuses (Saturation_Too_Large: above the default
-     [MeBi Config Bounds Saturation] of 1,000,000), so the first saturation
+     [Set MeBi MaxSaturation] of 1,000,000), so the first saturation
      now fails in ~27s instead. Still never run this file without a memory
      cap, in case the guard is lifted: systemd-run --user
      --scope -p MemoryMax=6G -p MemorySwapMax=0 (ulimit -v does not work --
      OCaml 5 cannot then reserve its heaps).
 
    Since 2026-10-03 the bisimilarity check gets past it: above the bound,
-   [Run Bisim] and [Sim Begin] saturate on demand and decide on the
+   [Run Bisim] and the tactics saturate on demand and decide on the
    silent-SCC quotient (81 nodes), with a warning ([MeBi Help Config
    Saturation]). [Run Bisim p With compLTS And q With compLTS] takes ~45s.
    [Run Saturate] and [Run Minimize], below, still need the whole saturated

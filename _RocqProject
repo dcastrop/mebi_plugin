@@ -1,0 +1,9 @@
+# For the IDE only (VSRocq reads it): which logical names map to which
+# compiled files. It does not build anything, and lists no files: the
+# project is built by dune alone (`dune build`), and these are dune's
+# outputs, so build before stepping through a file. Until 2026-11-05 this
+# was _CoqProject, which also drove a second build through make.
+-R _build/default/theories MEBI
+-R _build/default/test/rocq MEBITests
+-R _build/default/examples MEBI.Examples
+-I _build/install/default/lib

@@ -7,7 +7,7 @@
 #           whose old fixtures are replaced.
 #
 # For each source below, compiles a copy (fixtures.py prepare) in which every
-# proof that runs MeBi Sim Begin is admitted and replaced by a MeBi Run Bisim
+# proof that runs sim or bisim is admitted and replaced by a MeBi Run Bisim
 # on the same pair, with result dumps on; then turns each command's dumps
 # into one fixture (fixtures.py convert). Needs a current `dune build`;
 # compiles against it from a copy of examples/, as bench/proofs.sh does.

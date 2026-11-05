@@ -988,7 +988,7 @@ module Make (Enc : Encoding.S) :
             Hashtbl.add skipped_premises key ();
             if Premise_search.above_range env sigma premise
             then
-              (* undecided only because of [MeBi Config Premise Range]:
+              (* undecided only because of [Set MeBi PremiseRange]:
                  say that, not the generic reasons below *)
               Logger.warning
                 (Printf.sprintf
@@ -1055,7 +1055,7 @@ module Make (Enc : Encoding.S) :
             (Printf.sprintf
                "A constructor of %s has a premise headed by [%s] (first met as \
                 [%s]) whose solutions MeBi may not have found all of (the \
-                search hit [MeBi Config Premise Depth], its solution cap, or \
+                search hit [Set MeBi PremiseDepth], its solution cap, or \
                 something opaque). The extracted LTS may be missing \
                 transitions. See [MeBi Help Premises]."
                (Rocq_utils.Strfy.econstr env sigma (decode lts_enc))

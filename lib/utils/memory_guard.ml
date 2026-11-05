@@ -147,7 +147,7 @@ let over_bound (bytes : int) : string option =
     Some
       (Printf.sprintf
          "That is more than the memory bound, %s, which would stop it first \
-          ([MeBi Config Bounds Memory <mb>])."
+          ([Set MeBi MaxMemoryMB <mb>])."
          (describe ()))
   | _ -> None
 ;;
@@ -156,8 +156,8 @@ let over_bound (bytes : int) : string option =
     nothing. *)
 let hint : string -> string = function
   | "extraction" ->
-    "Extraction holds every state it finds: a lower [MeBi Config Bounds As Num \
-     States <n>] stops it sooner."
+    "Extraction holds every state it finds: a lower [Set MeBi MaxStates <n>] \
+     stops it sooner."
   | "saturation" ->
     "Saturating whole holds every weak action: [MeBi Config Saturation \
      OnDemand True] saturates each state only when it is needed."
@@ -166,7 +166,7 @@ let hint : string -> string = function
      (doc/limitations.md, \"Many silent SCCs\")."
   | "a game walk" ->
     "The walk visits every pair of states reachable from the start; on an FSM \
-     saturated on demand, a lower [MeBi Config Bounds Game <n>] bounds it."
+     saturated on demand, a lower [Set MeBi MaxGame <n>] bounds it."
   | "planning answers" ->
     "[MeBi Config Solver Answers Default] answers move by move instead of \
      planning every answer up front."
@@ -183,7 +183,7 @@ let message (phase : string) (used : int) (limit : int) : string =
   Printf.sprintf
     "Memory_Bound_Exceeded: the process uses %s, over the memory bound of %s, \
      during %s. The command was stopped. %s If the machine has the memory, \
-     raise the bound with [MeBi Config Bounds Memory <mb>] (0 turns it off)."
+     raise the bound with [Set MeBi MaxMemoryMB <mb>] (0 turns it off)."
     (mb used)
     (describe_bound limit)
     phase

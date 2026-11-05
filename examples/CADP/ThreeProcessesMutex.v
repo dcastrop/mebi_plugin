@@ -41,9 +41,9 @@ Require Import MEBI.Examples.CADP.Terms.
 Require Import MEBI.Examples.CADP.SpecMutex.
 
 MeBi Config Weak As Option label.
-MeBi Config Bounds As Num States 1000.
+Set MeBi MaxStates 1000.
 
 MeBi Divider "Examples.CADP.ThreeProcessesMutex".
+Set MeBi MaxSteps 1000000.
 Example wsim_norm_3 : weak_sim bigstep_norm spec_lts c3 (make_spec 2).
-Proof. MeBi Sim Begin bigstep_norm c3 And spec_lts (make_spec 2) Using bigstep.
-  MeBi Sim Solve 1000000. Qed.
+Proof. sim. Qed.

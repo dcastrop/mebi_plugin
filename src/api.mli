@@ -94,10 +94,10 @@ val set_mutual_cofix : bool -> unit
 
 (** How the proof solver chooses each answer (see
     [Model.Product.Policy]): [Default] as it always has; [Greedy] and
-    [Minimal] from a plan built at [MeBi Sim Begin]; [Auto] the plan with
+    [Minimal] from a plan built at [sim/bisim]; [Auto] the plan with
     the lowest predicted cost. [Auto] by default (until 2026-10-15 it was
     [Default]). Like [MutualCofix Auto] it is the tool's own choice, so an
-    FSM saturated on demand does not refuse it: without a [Bounds Game] it
+    FSM saturated on demand does not refuse it: without a [MaxGame] it
     answers move by move, as [Default] does. *)
 type answer_policy =
   | Answers_default
@@ -153,7 +153,7 @@ type saturation_mode =
 val the_saturation_mode : saturation_mode ref
 
 (** The most pairs a proof's up-front game walk may visit on demand
-    ([MeBi Config Bounds Game <n>]); [None] (the default) refuses such walks.
+    ([Set MeBi MaxGame <n>]); [None] (the default) refuses such walks.
     Reset by [Reset Bounds]. *)
 val the_game_bound : int option ref
 
@@ -187,12 +187,12 @@ val the_saturation_bound : int ref
 val set_saturation_bound : int -> unit
 
 (** [walk_memory_note ()] is a sentence for the refusals that ask for a
-    larger [Bounds Game]: that a larger walk costs memory, and what the
+    larger [MaxGame]: that a larger walk costs memory, and what the
     memory bound does about it. Raises nothing. *)
 val walk_memory_note : unit -> string
 
 (** [set_memory_bound mb] caps the process's memory at [mb] megabytes, or
-    removes the cap if [mb] is [0] ([MeBi Config Bounds Memory <mb>];
+    removes the cap if [mb] is [0] ([Set MeBi MaxMemoryMB <mb>];
     {!Memory_guard}), and shows the change. On by default
     ({!Memory_guard.default}); [Reset Bounds] restores the default. Raises
     nothing. *)
@@ -265,3 +265,14 @@ val set_the_weak_arg2 : weak_arg -> unit
 (** [reset_all ()] restores every setting here to its default ([MeBi Reset Config]), and shows it. Raises nothing.
 *)
 val reset_all : unit -> unit
+
+(** The most solver steps the [bisim] and [sim] tactics take before giving
+    up ({!the_max_steps}'s default): one million. *)
+val default_max_steps : int
+
+(** The most solver steps the [bisim] and [sim] tactics take ([Set MeBi MaxSteps <n>]). The [Set MeBi MaxSteps <n>] command takes its bound as an
+    argument instead. *)
+val the_max_steps : int ref
+
+(* Loading this module also declares the plugin's Rocq options: [Set MeBi MaxStates], [MaxTransitions], [MaxSteps], [MaxSaturation], [MaxGame],
+   [MaxMemoryMB], [PremiseDepth] and [PremiseRange] (see the [.ml]). *)

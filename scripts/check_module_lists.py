@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""Check that the plugin's three module lists agree with the source tree.
+"""Check that dune's module lists agree with the source tree.
 
-The OCaml sources under lib/ and src/ are listed three times, by hand:
+The OCaml sources under lib/ and src/ are listed by hand in each dune
+file's (modules ...). dune builds only what is listed, so a source file
+missing from every list is silently left out of the build. This compares
+the lists against the files on disk and exits non-zero, naming every
+mismatch: a file no list claims, a listed module with no file, or a module
+claimed twice.
 
-  - _CoqProject           every .ml/.mli/.mlg, for the `make` build
-  - src/mebi_plugin.mlpack every module, for linking the plugin under `make`
-  - each dune (modules ...) every module, for the `dune` build
-
-Nothing kept them in sync, and they have drifted more than once: a module
-registered in dune but not in the other two passes `dune build` and fails
-`make` (backlog item C3). This compares all three against the files actually
-on disk and exits non-zero, naming every mismatch, if they disagree.
-
-Only set membership is checked. Link order in the .mlpack still matters, but
-`make` reports a misordering itself, loudly, at link time.
+Until 2026-11-05 two more lists existed for the `make` build (_CoqProject
+and src/mebi_plugin.mlpack), and drift between the three had broken one
+build or the other (backlog item C3). The project now builds with dune
+alone.
 
 Run from the repository root: python3 scripts/check_module_lists.py
 """
@@ -24,8 +22,6 @@ from pathlib import Path
 
 ROOTS = ("lib", "src")
 SOURCE_SUFFIXES = (".ml", ".mli", ".mlg")
-MLPACK = Path("src/mebi_plugin.mlpack")
-COQPROJECT = Path("_CoqProject")
 
 
 def module_name(path: Path) -> str:
@@ -39,23 +35,6 @@ def sources_on_disk() -> set[Path]:
         for root in ROOTS
         for p in Path(root).rglob("*")
         if p.suffix in SOURCE_SUFFIXES and "_build" not in p.parts
-    }
-
-
-def coqproject_entries() -> set[Path]:
-    entries = set()
-    for line in COQPROJECT.read_text().splitlines():
-        line = line.split("#", 1)[0].strip()
-        if line.startswith(ROOTS) and line.endswith(SOURCE_SUFFIXES):
-            entries.add(Path(line))
-    return entries
-
-
-def mlpack_modules() -> set[str]:
-    return {
-        line.strip()
-        for line in MLPACK.read_text().splitlines()
-        if line.strip() and not line.strip().startswith("#")
     }
 
 
@@ -83,18 +62,6 @@ def main() -> int:
     # modules such as lib/terms/base_.mli, which have no .ml at all.
     disk_modules = {module_name(p) for p in disk}
     problems: list[str] = []
-
-    listed = coqproject_entries()
-    for p in sorted(disk - listed):
-        problems.append(f"_CoqProject: missing {p}")
-    for p in sorted(listed - disk):
-        problems.append(f"_CoqProject: lists {p}, which does not exist")
-
-    packed = mlpack_modules()
-    for m in sorted(disk_modules - packed):
-        problems.append(f"{MLPACK}: missing module {m}")
-    for m in sorted(packed - disk_modules):
-        problems.append(f"{MLPACK}: lists module {m}, which has no source file")
 
     claims = dune_modules()
     for m in sorted(disk_modules - claims.keys()):

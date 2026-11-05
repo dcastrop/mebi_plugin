@@ -7,14 +7,14 @@ anywhere.
 
 All of them compile against the repository's **dune build**, so run
 `dune build` first. Examples are compiled from a fresh copy for each run,
-because the source tree may carry stale `.vo` files from an old `make`
+because the source tree may carry stale `.vo` files from the old `make`
 build. Each proof file is its own process, capped with `systemd-run --user
 --scope -p MemoryMax=...`. (`ulimit -v` does not work: OCaml 5 then cannot
 reserve its heaps.)
 
 | script | what it does |
 |---|---|
-| `proofs.sh` | runs a proof suite under one or more solver strategies, and writes one row per `MeBi Sim Solve` and one per file |
+| `proofs.sh` | runs a proof suite under one or more solver strategies, and writes one row per proof search (`sim`/`bisim`) and one per file |
 | `compare.sh` | diffs two `proofs.sh` runs: changed or missing Solves, plus time and memory side by side |
 | `testv-counts.sh` | lists `test/rocq/Test.v`'s solver counts, for diffing two trees |
 | `lib.sh` | shared helpers, sourced by the others |
@@ -54,7 +54,7 @@ bench/proofs.sh -s cadp-large -a Default -t old   # force an answer policy, to c
 
 | suite | files | cost |
 |---|---|---|
-| `default` | the six `PluginProofs.v` marked `### Success` in `_CoqProject`, plus `CCS/PluginProofs.v` and `CCS/LawProofs.v` | ~3 min a mode, run 8 at a time (`-j`) |
+| `default` | `Proc/Test1`-`3`'s `PluginProofs.v`, `CADP/MutualExclusion.v` and `CADP/GluedLayered.v`, plus `CCS/PluginProofs.v` and `CCS/LawProofs.v` | ~3 min a mode, run 8 at a time (`-j`) |
 | `abp` | `CCS/ABPProofs.v`, `CCS/ABPBisimProofs.v` | ~4 min and ~4.3GB each |
 | `test4` | `Proc/Test4/NormProofs.v`, `NormBisimProofs.v` | ~0.5 + ~4 min, ~2.8GB peak |
 | `eval` | `examples/Evaluation/{Width,Layers,Depth}.v` | ~40s |
@@ -86,7 +86,8 @@ holds:
 
 - `solves.tsv`: one row per Solve, in file order (suite, mode, file, index,
   `Solved`/`Unsolved`, iterations), then the proof's name and the seconds
-  its `MeBi Sim Begin`, `MeBi Sim Solve` and `Qed` took, from `rocq compile
+  its tactic and `Qed` took (the Begin column is `-` since 2026-11-05,
+  when one tactic replaced `MeBi Sim Begin` and `Solve`), from `rocq compile
   -time` (`?` where one did not finish). An evaluation file holds one size
   per proof, so these columns give a series' times;
 - `runs.tsv`: one row per file (suite, mode, file, exit status, seconds,

@@ -182,9 +182,9 @@ let stop_msg (x : int) : string =
 let exhausted_msg (bound : int) : string =
   let mutual : bool = !Api.the_mutual_cofix in
   Printf.sprintf
-    "(The bound was reached: [MeBi Sim Solve %i] permits %i steps. The solver \
-     is using a %s cofix%s. Raise the bound, or force the other strategy with \
-     [MeBi Config Solver MutualCofix %s].)"
+    "(The bound was reached: [Set MeBi MaxSteps %i] permits %i steps. The \
+     solver is using a %s cofix%s. Raise the bound, or force the other \
+     strategy with [MeBi Config Solver MutualCofix %s].)"
     bound
     (bound + 1)
     (if mutual then "mutual" else "nested")
@@ -206,10 +206,15 @@ let step (pstate : Declare.Proof.t) : Declare.Proof.t =
    that had already closed: with [bound] one below the number of productive
    steps the proof still closed and [Qed] succeeded, but the loop exited on
    the bound instead, so [statem] was never set to [Done] and this reported
-   "Unsolved". That is why every [MeBi Sim Solve N] in the examples needed
+   "Unsolved". That is why every [Set MeBi MaxSteps N] in the examples needed
    [N] to be one more than the work actually required. Existing bounds all
    still hold -- the requirement only ever got weaker. *)
-let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
+let solve
+      ?(bound : int = 10)
+      ?(explain : bool = true)
+      (pstate : Declare.Proof.t)
+  : Declare.Proof.t
+  =
   Logger.trace __FUNCTION__;
   let module Ps : S = (val !(get_the_proof_solver ())) in
   (* [finished p] is whether [p] has no goals left *)
@@ -247,7 +252,8 @@ let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
   in
   let num, pstate, exhausted = f 0 pstate in
   Logger.notice (stop_msg num);
-  if exhausted && Bool.not (is_done ()) then Logger.notice (exhausted_msg bound);
+  if explain && exhausted && Bool.not (is_done ())
+  then Logger.notice (exhausted_msg bound);
   pstate
 ;;
 
@@ -290,7 +296,7 @@ let explicit_whole_game_settings () : string list =
   @ Stdlib.Option.to_list (answer_policy_setting ())
 ;;
 
-(** [refuse_goal ()] refuses a goal [MeBi Sim Begin] cannot prove: one
+(** [refuse_goal ()] refuses a goal [sim/bisim] cannot prove: one
     that is neither [weak_sim] nor [weak_bisimilar]. Before 2026-10-10 such
     a goal was taken for [weak_bisimilar], and an existential one ([exists r, weak_sim lts lts p r]) stopped [Solve] on an internal error.
 
@@ -298,7 +304,7 @@ let explicit_whole_game_settings () : string list =
 let refuse_goal () : 'a =
   CErrors.user_err
     (Pp.str
-       "MeBi: [MeBi Sim Begin] proves a goal [weak_sim ...] or [weak_bisimilar \
+       "MeBi: [sim/bisim] proves a goal [weak_sim ...] or [weak_bisimilar \
         ...], and the goal in focus is neither. For an existential goal, give \
         the witness first ([exists t.]); for a conjunction such as \
         [mutual_sim], prove each [weak_sim] on its own; for a goal stated with \
@@ -306,7 +312,7 @@ let refuse_goal () : 'a =
 ;;
 
 (** [check_goal_arguments pstate (x, lts_x) (y, lts_y)] checks the LTSs
-    and terms given to [MeBi Sim Begin] are the goal's, up to conversion:
+    and terms given to [sim/bisim] are the goal's, up to conversion:
     [lts_x] and [lts_y] its two LTSs, [x] and [y] its two states (the
     goal's last four arguments, in that order). The proof search looks the
     goal's states up in the LTSs built from [x] and [y], and applies the
@@ -371,8 +377,8 @@ let check_goal_arguments
         CErrors.user_err
           Pp.(
             str
-              "MeBi: [MeBi Sim Begin <lts> <x> And <lts> <y>] needs the goal's \
-               two LTSs and two states, in order: "
+              "MeBi: [sim/bisim <lts> <x> And <lts> <y>] needs the goal's two \
+               LTSs and two states, in order: "
             ++ prlist_with_sep spc (fun e -> e) errs))
 ;;
 
@@ -403,7 +409,7 @@ let refuse_whole_game (setting : string) (why : string) : 'a =
 let refuse_unbounded (setting : string) : 'a =
   refuse_whole_game
     setting
-    "Bound it with [MeBi Config Bounds Game <n>] (pairs) to allow it."
+    "Bound it with [Set MeBi MaxGame <n>] (pairs) to allow it."
 ;;
 
 (** [refuse_exceeded setting n] is {!refuse_whole_game} for [setting], the
@@ -415,7 +421,7 @@ let refuse_exceeded (setting : string) (n : int) : 'a =
     setting
     (Printf.sprintf
        "The game has more than %i pairs, the bound set with [MeBi Config \
-        Bounds Game %i]: raise it to allow it."
+        MaxGame %i]: raise it to allow it."
        n
        n)
 ;;
@@ -462,7 +468,7 @@ module Init (Solver : S) = struct
       than bisimilarity: [a.b] is simulated by [a.(b + c)]. So it computes the
       greatest weak simulation ({!Wrapper.S.similarity}: only the pairs
       reachable from the two start states, and on demand only within
-      [MeBi Config Bounds Game]) and, if it relates the start states, gives the
+      [Set MeBi MaxGame]) and, if it relates the start states, gives the
       solver each state's simulators to fall back on ({!Results.S.simulators},
       read by {!Model.Product.answer}). If it does not, there is no proof to
       find.
@@ -576,7 +582,7 @@ module Init (Solver : S) = struct
            | None ->
              Logger.info
                (Printf.sprintf
-                  "(Answers: the whole game is past [Bounds Game] (%i pairs); \
+                  "(Answers: the whole game is past [MaxGame] (%i pairs); \
                    answering move by move.)"
                   n);
              None)
@@ -707,8 +713,8 @@ module Init (Solver : S) = struct
             Logger.notice
               (Printf.sprintf
                  "(Saturated on demand: the game has more than %i pairs, the \
-                  bound set with [MeBi Config Bounds Game %i]; Auto takes the \
-                  nested cofix.)"
+                  bound set with [Set MeBi MaxGame %i]; Auto takes the nested \
+                  cofix.)"
                  n
                  n)
           | Ok _ when strategy = Api.Mutual -> ()
@@ -761,7 +767,7 @@ let init
      or [Auto]'s estimate, saturate state after state as they walk
      ([Proc/Test4]: still running after 29 minutes). A setting the user made
      explicitly -- [MutualCofix True], an answer policy of [Greedy] or
-     [Minimal] -- needs [MeBi Config Bounds Game <n>] on demand, and is
+     [Minimal] -- needs [Set MeBi MaxGame <n>] on demand, and is
      refused, naming the bound, if the walk goes past it. [Auto] is the
      tool's own choice: without the bound it takes the nested cofix without
      estimating; with it, it estimates within the bound, and past it takes
@@ -783,16 +789,16 @@ let init
       then
         Logger.notice
           "(Saturated on demand: Auto takes the nested cofix without \
-           estimating, as estimating would walk the whole game up front. [MeBi \
-           Config Bounds Game <n>] lets it estimate within <n> pairs.)";
+           estimating, as estimating would walk the whole game up front. [Set \
+           MeBi MaxGame <n>] lets it estimate within <n> pairs.)";
       (* The answer policy's feedback is [Info], so that
          [MeBi Config Output "Info" False] silences it. *)
       if !Api.the_answer_policy = Api.Answers_auto
       then
         Logger.info
           "(Saturated on demand: Answers Auto answers move by move without \
-           planning, as planning would walk the whole game up front. [MeBi \
-           Config Bounds Game <n>] lets it plan within <n> pairs.)"));
+           planning, as planning would walk the whole game up front. [Set MeBi \
+           MaxGame <n>] lets it plan within <n> pairs.)"));
   (* The goal is not built yet, so compare the LTS names rather than the
      terms [Concl.is_weak_refl] will see. Two names for one LTS only lose
      the refl short-cut, which over-predicts -- cost, never a missing
@@ -805,56 +811,6 @@ let init
   I.choose_cofix_strategy ~on_demand ~goal_is_bisimilar ~refl bound;
   Solver.ProofState.init pstate (fst a, fst b);
   pstate
-;;
-
-(* See the [.mli]. *)
-type goal_kind =
-  | Bisim
-  | Sim
-
-(** [goal_statement kind (x, a) (y, b)] is the statement to prove, as an
-    expression still to interpret: [weak_bisimilar a b x y] ([Bisim]) or
-    [weak_sim a b x y] ([Sim]), [x] stepping by the relation [a] and [y] by
-    [b]. Raises nothing. *)
-let goal_statement
-      (kind : goal_kind)
-      ((x, a) : Constrexpr.constr_expr * Libnames.qualid)
-      ((y, b) : Constrexpr.constr_expr * Libnames.qualid)
-  : Constrexpr.constr_expr
-  =
-  let head : string =
-    match kind with
-    | Bisim -> "MEBI.Bisimilarity.weak_bisimilar"
-    | Sim -> "MEBI.Bisimilarity.weak_sim"
-  in
-  Constrexpr_ops.mkAppC
-    ( Constrexpr_ops.mkRefC (Libnames.qualid_of_string head)
-    , [ Constrexpr_ops.mkRefC a; Constrexpr_ops.mkRefC b; x; y ] )
-;;
-
-(* See the [.mli]. The check is the one [MeBi Sim Begin] would run, done
-   once: nothing is kept after the command. *)
-let start
-      ~(kind : goal_kind)
-      ~(name : Names.Id.t)
-      (refs : Libnames.qualid list)
-      (a : Constrexpr.constr_expr * Libnames.qualid)
-      (b : Constrexpr.constr_expr * Libnames.qualid)
-  : Declare.Proof.t
-  =
-  Logger.trace __FUNCTION__;
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let typ, uctx =
-    Constrintern.interp_type env sigma (goal_statement kind a b)
-  in
-  let pstate =
-    Declare.Proof.start
-      ~info:(Declare.Info.make ~kind:Decls.(IsDefinition Example) ())
-      ~cinfo:(Declare.CInfo.make ~name ~typ ())
-      ((Evd.from_ctx [@alert "-deprecated"]) uctx)
-  in
-  init pstate refs a b
 ;;
 
 (** [contains ~sub s] is whether [sub] occurs in [s]. Raises nothing. *)

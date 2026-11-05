@@ -106,8 +106,8 @@ way.
 - **Capability:** proofs split into separately checked lemmas
   (decision 3).
 - **Capability:** symbolic states and BDDs, requested by @dcastrop;
-  planned, not started (`SYMBOLIC_PLAN.md`; its decisions are listed
-  there).
+  S0 (prototype) done, S1 onwards not started
+  (`SYMBOLIC_PLAN.md`; its decisions are listed there).
 - **Smaller:**
   - replay a derivation tree in one solver step;
   - `Auto`'s mis-estimate on `LawProofs.tau1`;
@@ -120,6 +120,9 @@ way.
   - Bitboard-like storage for the model: Phase 0 measured, plan
     revised; Phase A (saturation by bit-rows) not started
     (`BITBOARD_LIKE_OPTIMISATION.md`, end).
+  - `CADP/GluedLayered.v` under `Auto` exceeds 3.5GB in its last proof
+    (forced `True` needs 0.6GB): the default suite needs its 5G cap;
+    seen 2026-11-05.
   - `CCS/ABPProofs.v` exceeds its suite's 6G cap in `Qed` (~4.2GB
     recorded); seen 2026-11-05 (`doc/measurements/bitboard-phase0.md`).
 - **Set aside on purpose**, so they are not rediscovered as new: listed

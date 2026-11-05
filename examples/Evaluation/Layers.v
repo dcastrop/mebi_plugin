@@ -30,24 +30,24 @@ Module Nested.
   Definition r (n : nat) := wrapn n (base (wr 0)).
 
   (* 6 states at every depth. *)
-  MeBi Config Bounds As Num States 6.
+  Set MeBi MaxStates 6.
   MeBi Run LTS (l 8) Using layLTS procLTS.
-  MeBi Config Bounds As Num States 5.
+  Set MeBi MaxStates 5.
   Fail MeBi Run LTS (l 8) Using layLTS procLTS.
   MeBi Config Reset Bounds.
 
+  Set MeBi MaxSteps 91.
   Example wbis_n0 : weak_bisimilar layLTS layLTS (l 0) (r 0).
-  Proof. MeBi Sim Begin layLTS (l 0) And layLTS (r 0) Using layLTS procLTS.
-    MeBi Sim Solve 91. Qed.
+  Proof. bisim. Qed.
+  Set MeBi MaxSteps 119.
   Example wbis_n2 : weak_bisimilar layLTS layLTS (l 2) (r 2).
-  Proof. MeBi Sim Begin layLTS (l 2) And layLTS (r 2) Using layLTS procLTS.
-    MeBi Sim Solve 119. Qed.
+  Proof. bisim. Qed.
+  Set MeBi MaxSteps 147.
   Example wbis_n4 : weak_bisimilar layLTS layLTS (l 4) (r 4).
-  Proof. MeBi Sim Begin layLTS (l 4) And layLTS (r 4) Using layLTS procLTS.
-    MeBi Sim Solve 147. Qed.
+  Proof. bisim. Qed.
+  Set MeBi MaxSteps 203.
   Example wbis_n8 : weak_bisimilar layLTS layLTS (l 8) (r 8).
-  Proof. MeBi Sim Begin layLTS (l 8) And layLTS (r 8) Using layLTS procLTS.
-    MeBi Sim Solve 203. Qed.
+  Proof. bisim. Qed.
 End Nested.
 
 Module Stacked.
@@ -61,21 +61,17 @@ Module Stacked.
   Inductive l3LTS : sys3 -> option act -> sys3 -> Prop :=
   | l3 x a x' : l2LTS x a x' -> l3LTS (s3 x) a (s3 x').
 
+  Set MeBi MaxSteps 90.
   Example wbis_s1 : weak_bisimilar l1LTS l1LTS (s1 (wl 0)) (s1 (wr 0)).
-  Proof. MeBi Sim Begin l1LTS (s1 (wl 0)) And l1LTS (s1 (wr 0))
-           Using l1LTS procLTS.
-    MeBi Sim Solve 90. Qed.
+  Proof. bisim. Qed.
+  Set MeBi MaxSteps 104.
   Example wbis_s2 :
     weak_bisimilar l2LTS l2LTS (s2 (s1 (wl 0))) (s2 (s1 (wr 0))).
-  Proof. MeBi Sim Begin l2LTS (s2 (s1 (wl 0))) And l2LTS (s2 (s1 (wr 0)))
-           Using l2LTS l1LTS procLTS.
-    MeBi Sim Solve 104. Qed.
+  Proof. bisim. Qed.
+  Set MeBi MaxSteps 118.
   Example wbis_s3 :
     weak_bisimilar l3LTS l3LTS (s3 (s2 (s1 (wl 0)))) (s3 (s2 (s1 (wr 0)))).
-  Proof. MeBi Sim Begin l3LTS (s3 (s2 (s1 (wl 0))))
-           And l3LTS (s3 (s2 (s1 (wr 0))))
-           Using l3LTS l2LTS l1LTS procLTS.
-    MeBi Sim Solve 118. Qed.
+  Proof. bisim. Qed.
 End Stacked.
 
 MeBi Config Reset Weak.

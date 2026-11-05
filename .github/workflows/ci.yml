@@ -11,10 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The OCaml sources are listed by hand in three places (_CoqProject,
-      # src/mebi_plugin.mlpack, each dune file's (modules ...)), and drift
-      # between them passes one build and breaks the other. Needs only the
-      # runner's python3, so it runs first and fails in seconds.
+      # The OCaml sources are listed by hand in each dune file's
+      # (modules ...), and dune silently leaves out a file no list claims.
+      # Needs only the runner's python3, so it runs first and fails in
+      # seconds.
       - name: Check module lists agree
         run: python3 scripts/check_module_lists.py
 
@@ -61,6 +61,9 @@ jobs:
             fi
           '
 
+      # Builds the plugin, its theories, test/rocq (Test.v, DevTest.v) and
+      # the fast examples (examples/dune lists them; the heavy proof files
+      # are run by bench/proofs.sh, by hand, under a memory cap).
       - name: dune build
         run: |
           nix develop --command bash -euc '
@@ -101,14 +104,4 @@ jobs:
           nix develop --command bash -euc '
             eval "$(opam env --switch=$(pwd) --set-switch)"
             dune exec bench/ocaml/mebi_bench.exe -- --check
-          '
-
-      # Also exercise the make path and the examples/ subset _CoqProject
-      # enables by default (the expensive PluginProofs.v proof-search suite
-      # stays commented out -- see CLAUDE.md for running that by hand).
-      - name: make
-        run: |
-          nix develop --command bash -euc '
-            eval "$(opam env --switch=$(pwd) --set-switch)"
-            make -j$(nproc)
           '

@@ -501,7 +501,7 @@ Module Collapsing.
     | do_collapse : forall t, termLTS (tfix (tfix t)) Collapse (tfix t).
 
     (* Without recursion it is finite: 2 states. *)
-    MeBi Config Bounds As Num States 2.
+    Set MeBi MaxStates 2.
     MeBi Run LTS (tfix (tact TheAction1 tend)) Using termLTS.
 
     (* Cannot be finite. [tfix X --A1--> tfix (tact A2 (tfix X)) --A2-->
@@ -510,7 +510,7 @@ Module Collapsing.
        [Collapse]s in a row, so no two depths are bisimilar: there is no
        finite LTS to find. Refused with [LTS_Incomplete] at the bound
        (checked by cutting the file here). *)
-    MeBi Config Bounds As Num States 40.
+    Set MeBi MaxStates 40.
     Fail MeBi Run LTS (tfix X) Using termLTS.
 
     (* KNOWN LIMIT: with [Collapse] silent, every level can fall back to
@@ -551,24 +551,24 @@ Module Collapsing.
 
   (* [tfix X] has [2K + 1] states. At [K = 2]: [tfix X], [tfix (tact A2
      (tfix X))], [tfix^2 X], [tfix^2 (tact A2 (tfix X))], [tfix^3 X]. *)
-  MeBi Config Bounds As Num States 3.
+  Set MeBi MaxStates 3.
   MeBi Run LTS (tfix X) Using G1.termLTS.
-  MeBi Config Bounds As Num States 2.
+  Set MeBi MaxStates 2.
   Fail MeBi Run LTS (tfix X) Using G1.termLTS.
-  MeBi Config Bounds As Num States 5.
+  Set MeBi MaxStates 5.
   MeBi Run LTS (tfix X) Using G2.termLTS.
-  MeBi Config Bounds As Num States 4.
+  Set MeBi MaxStates 4.
   Fail MeBi Run LTS (tfix X) Using G2.termLTS.
-  MeBi Config Bounds As Num States 7.
+  Set MeBi MaxStates 7.
   MeBi Run LTS (tfix X) Using G3.termLTS.
-  MeBi Config Bounds As Num States 6.
+  Set MeBi MaxStates 6.
   Fail MeBi Run LTS (tfix X) Using G3.termLTS.
 
   (* Deeper than [K] at the start, a term only collapses down: [tfix^3 X]
      at [K = 1] reaches [tfix^2 X] and then [K = 1]'s three states. *)
-  MeBi Config Bounds As Num States 4.
+  Set MeBi MaxStates 4.
   MeBi Run LTS (tfix (tfix (tfix X))) Using G1.termLTS.
-  MeBi Config Bounds As Num States 3.
+  Set MeBi MaxStates 3.
   Fail MeBi Run LTS (tfix (tfix (tfix X))) Using G1.termLTS.
   MeBi Config Reset Bounds.
 
@@ -725,9 +725,9 @@ Module MultipleDerivations.
   Example p : term := tfix (tpar A A trec).
   Example q : term := tfix (tact A (tact A trec)).
 
+  Set MeBi MaxSteps 1000.
   Example wsim_pq : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
-    MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
 End MultipleDerivations.
 
 (* Regression tests for the size check before saturation (backlog item H2)
@@ -743,7 +743,7 @@ Module SaturationGuard.
   (* [p] saturates to a handful of weak actions: over a bound of 1.
      [Run Saturate] and [Run Minimize] need the whole saturated FSM, so they
      are refused. *)
-  MeBi Config Bounds Saturation 1.
+  Set MeBi MaxSaturation 1.
   Fail MeBi Run Saturate p Using termLTS.
   Fail MeBi Run Minimize p Using termLTS.
 
@@ -752,15 +752,18 @@ Module SaturationGuard.
      silent-SCC quotient. The proof is the same proof, step for step: the
      count is pinned below the bound, saturated whole, and at bound 1. *)
   MeBi Run Bisim p With termLTS And q With termLTS Using termLTS.
+  Set MeBi MaxSteps 1000.
   Example wsim_on_demand : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Bounds.
   MeBi Config Saturation OnDemand True.
+  Set MeBi MaxSteps 1000.
   Example wsim_forced : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
   MeBi Config Saturation OnDemand False.
+  Set MeBi MaxSteps 1000.
   Example wsim_whole : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
 
   (* On demand, settings the user chose that plan the whole proof up front
      are refused (they would walk every reachable pair, saturating as they
@@ -772,53 +775,59 @@ Module SaturationGuard.
   MeBi Config Saturation OnDemand True.
   MeBi Config Solver MutualCofix True.
   Example wsim_mutual : weak_sim termLTS termLTS p q.
-  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  Proof. Fail sim. Abort.
   MeBi Config Solver MutualCofix Auto.
   MeBi Config Solver Answers Greedy.
   Example wsim_greedy : weak_sim termLTS termLTS p q.
-  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  Proof. Fail sim. Abort.
   MeBi Config Solver Answers Minimal.
   Example wsim_minimal : weak_sim termLTS termLTS p q.
-  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  Proof. Fail sim. Abort.
   MeBi Config Solver Answers Default.
+  Set MeBi MaxSteps 1000.
   Example wsim_default : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
   MeBi Config Solver Answers Auto.
+  Set MeBi MaxSteps 1000.
   Example wsim_answers_auto : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
 
   (* With [Bounds Game <n>] they are allowed, the walk run within <n> pairs;
      past it they are refused, and the two Autos take the cheap way. *)
-  MeBi Config Bounds Game 1000.
+  Set MeBi MaxGame 1000.
   MeBi Config Solver MutualCofix True.
+  Set MeBi MaxSteps 1000.
   Example wsim_mutual_bounded : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
   MeBi Config Solver MutualCofix Auto.
   MeBi Config Solver Answers Greedy.
+  Set MeBi MaxSteps 1000.
   Example wsim_greedy_bounded : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
   MeBi Config Solver Answers Auto.
+  Set MeBi MaxSteps 1000.
   Example wsim_auto_bounded : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
-  MeBi Config Bounds Game 1.
+  Proof. sim. Qed.
+  Set MeBi MaxGame 1.
   MeBi Config Solver MutualCofix True.
   Example wsim_mutual_over : weak_sim termLTS termLTS p q.
-  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  Proof. Fail sim. Abort.
   MeBi Config Solver MutualCofix Auto.
   MeBi Config Solver Answers Greedy.
   Example wsim_greedy_over : weak_sim termLTS termLTS p q.
-  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  Proof. Fail sim. Abort.
   MeBi Config Solver Answers Auto.
+  Set MeBi MaxSteps 1000.
   Example wsim_auto_over : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Bounds.
   MeBi Config Saturation OnDemand False.
 
   (* [Saturation OnDemand False]: refused above the bound, as before. *)
-  MeBi Config Bounds Saturation 1.
+  Set MeBi MaxSaturation 1.
   Fail MeBi Run Bisim p With termLTS And q With termLTS Using termLTS.
   Example wsim_refused : weak_sim termLTS termLTS p q.
-  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  Proof. Fail sim. Abort.
   MeBi Config Saturation OnDemand Auto.
 
   (* [FailIf Oversaturated False]: warn and carry on. *)
@@ -842,11 +851,11 @@ Module DecidedPremise.
      was skipped and this was [0 -> 1 -> 2 -> ...], unbounded.) *)
   Inductive st : nat -> bool -> nat -> Prop :=
   | go (n : nat) : n = 0 -> st n true (S n).
-  MeBi Config Bounds As Num States 2.
+  Set MeBi MaxStates 2.
   MeBi Run LTS 0 Using st.
-  MeBi Config Bounds As Num States 1.
+  Set MeBi MaxStates 1.
   Fail MeBi Run LTS 0 Using st.
-  MeBi Config Bounds As Num Transitions 1.
+  Set MeBi MaxTransitions 1.
   MeBi Run LTS 0 Using st.
   MeBi Config Reset Bounds.
 End DecidedPremise.
@@ -861,7 +870,7 @@ Module UndecidedPremise.
   Parameter f : nat -> nat.
   Inductive st : nat -> bool -> nat -> Prop :=
   | go (n : nat) : f n = 0 -> st n true (S n).
-  MeBi Config Bounds As Num States 20.
+  Set MeBi MaxStates 20.
   Fail MeBi Run LTS 0 Using st.
   MeBi Config Reset Bounds.
 End UndecidedPremise.
@@ -906,55 +915,55 @@ Module ExtractionSizes.
   MeBi Config Reset Weak.
 
   (* p1: 8 states, 10 transitions. *)
-  MeBi Config Bounds As Num States 8.
+  Set MeBi MaxStates 8.
   MeBi Run LTS p1 Using procLTS.
-  MeBi Config Bounds As Num States 7.
+  Set MeBi MaxStates 7.
   Fail MeBi Run LTS p1 Using procLTS.
-  MeBi Config Bounds As Num Transitions 10.
+  Set MeBi MaxTransitions 10.
   MeBi Run LTS p1 Using procLTS.
-  MeBi Config Bounds As Num Transitions 9.
+  Set MeBi MaxTransitions 9.
   Fail MeBi Run LTS p1 Using procLTS.
 
   (* p2: 21 states, 38 transitions. *)
-  MeBi Config Bounds As Num States 21.
+  Set MeBi MaxStates 21.
   MeBi Run LTS p2 Using procLTS.
-  MeBi Config Bounds As Num States 20.
+  Set MeBi MaxStates 20.
   Fail MeBi Run LTS p2 Using procLTS.
-  MeBi Config Bounds As Num Transitions 38.
+  Set MeBi MaxTransitions 38.
   MeBi Run LTS p2 Using procLTS.
-  MeBi Config Bounds As Num Transitions 37.
+  Set MeBi MaxTransitions 37.
   Fail MeBi Run LTS p2 Using procLTS.
 
   (* Layered: run p1 is p1's LTS plus [done]: 9 states, 11 transitions. *)
-  MeBi Config Bounds As Num States 9.
+  Set MeBi MaxStates 9.
   MeBi Run LTS (run p1) Using sysLTS procLTS.
-  MeBi Config Bounds As Num States 8.
+  Set MeBi MaxStates 8.
   Fail MeBi Run LTS (run p1) Using sysLTS procLTS.
-  MeBi Config Bounds As Num Transitions 11.
+  Set MeBi MaxTransitions 11.
   MeBi Run LTS (run p1) Using sysLTS procLTS.
-  MeBi Config Bounds As Num Transitions 10.
+  Set MeBi MaxTransitions 10.
   Fail MeBi Run LTS (run p1) Using sysLTS procLTS.
 
   (* Layered: run p2, 22 states, 39 transitions. *)
-  MeBi Config Bounds As Num States 22.
+  Set MeBi MaxStates 22.
   MeBi Run LTS (run p2) Using sysLTS procLTS.
-  MeBi Config Bounds As Num States 21.
+  Set MeBi MaxStates 21.
   Fail MeBi Run LTS (run p2) Using sysLTS procLTS.
-  MeBi Config Bounds As Num Transitions 39.
+  Set MeBi MaxTransitions 39.
   MeBi Run LTS (run p2) Using sysLTS procLTS.
-  MeBi Config Bounds As Num Transitions 38.
+  Set MeBi MaxTransitions 38.
   Fail MeBi Run LTS (run p2) Using sysLTS procLTS.
   MeBi Config Reset Bounds.
 
   (* Saturation sizes, with [None] silent: p1 11 weak actions, run p2 61. *)
   MeBi Config Weak As Option act.
-  MeBi Config Bounds Saturation 11.
+  Set MeBi MaxSaturation 11.
   MeBi Run Saturate p1 Using procLTS.
-  MeBi Config Bounds Saturation 10.
+  Set MeBi MaxSaturation 10.
   Fail MeBi Run Saturate p1 Using procLTS.
-  MeBi Config Bounds Saturation 61.
+  Set MeBi MaxSaturation 61.
   MeBi Run Saturate (run p2) Using sysLTS procLTS.
-  MeBi Config Bounds Saturation 60.
+  Set MeBi MaxSaturation 60.
   Fail MeBi Run Saturate (run p2) Using sysLTS procLTS.
   MeBi Config Reset Bounds.
   MeBi Config Reset Weak.
@@ -993,9 +1002,9 @@ Module TwoPremises.
   | same' p p' q q' a : leftLTS p (Some a) p' -> leftLTS q (Some a) q' ->
                         sameLTS' (ppar p q) (Some a) (ppar p' q').
   Definition x2 : proc := ppar (pact A (pact B pnil)) (pact A (pact B pnil)).
+  Set MeBi MaxSteps 100.
   Example wsim_same : weak_sim sameLTS sameLTS' x2 x2.
-  Proof. MeBi Sim Begin sameLTS x2 And sameLTS' x2 Using leftLTS.
-    MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
 
   (* Two different LTSs. *)
   Inductive syncLTS : proc -> option act -> proc -> Prop :=
@@ -1004,9 +1013,9 @@ Module TwoPremises.
   Inductive syncLTS' : proc -> option act -> proc -> Prop :=
   | sync' p p' q q' a : leftLTS p (Some a) p' -> rightLTS q (Some a) q' ->
                         syncLTS' (ppar p q) (Some a) (ppar p' q').
+  Set MeBi MaxSteps 100.
   Example wsim_sync : weak_sim syncLTS syncLTS' x2 x2.
-  Proof. MeBi Sim Begin syncLTS x2 And syncLTS' x2 Using leftLTS rightLTS.
-    MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
 
   (* Three LTSs, constructor indices 0/1/2: catches a rotated order. *)
   Inductive tripleLTS : proc -> option act -> proc -> Prop :=
@@ -1018,10 +1027,9 @@ Module TwoPremises.
       leftLTS p (Some a) p' -> rightLTS q (Some a) q' -> thirdLTS r (Some a) r' ->
       tripleLTS' (ppar p (ppar q r)) (Some a) (ppar p' (ppar q' r')).
   Definition x3 : proc := ppar (pact A pnil) (ppar (pact A pnil) (pact A pnil)).
+  Set MeBi MaxSteps 100.
   Example wsim_triple : weak_sim tripleLTS tripleLTS' x3 x3.
-  Proof. MeBi Sim Begin tripleLTS x3 And tripleLTS' x3
-           Using leftLTS rightLTS thirdLTS.
-    MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
 
   (* Nested: a two-premise LTS as a premise of a two-premise LTS. *)
   Inductive outerLTS : proc -> option act -> proc -> Prop :=
@@ -1031,10 +1039,9 @@ Module TwoPremises.
   | outer' p p' q q' a : syncLTS p (Some a) p' -> thirdLTS q (Some a) q' ->
                          outerLTS' (ppar p q) (Some a) (ppar p' q').
   Definition x4 : proc := ppar (ppar (pact A pnil) (pact A pnil)) (pact A pnil).
+  Set MeBi MaxSteps 100.
   Example wsim_nested : weak_sim outerLTS outerLTS' x4 x4.
-  Proof. MeBi Sim Begin outerLTS x4 And outerLTS' x4
-           Using syncLTS leftLTS rightLTS thirdLTS.
-    MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
 
   (* Equation premises, after or before the LTS one (backlog item I2,
      2026-10-01): extraction decides them, the solver closes them by
@@ -1048,18 +1055,18 @@ Module TwoPremises.
   | with_eq' p p' q a : leftLTS p (Some a) p' -> a = a ->
                         eqLTS' (ppar p q) (Some a) (ppar p' q).
   Definition x5 : proc := ppar (pact A (pact B pnil)) pnil.
+  Set MeBi MaxSteps 100.
   Example wsim_eq : weak_sim eqLTS eqLTS' x5 x5.
-  Proof. MeBi Sim Begin eqLTS x5 And eqLTS' x5 Using leftLTS.
-    MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   Inductive eqfirstLTS : proc -> option act -> proc -> Prop :=
   | eq_first p p' q a : a = a -> leftLTS p (Some a) p' ->
                         eqfirstLTS (ppar p q) (Some a) (ppar p' q).
   Inductive eqfirstLTS' : proc -> option act -> proc -> Prop :=
   | eq_first' p p' q a : a = a -> leftLTS p (Some a) p' ->
                          eqfirstLTS' (ppar p q) (Some a) (ppar p' q).
+  Set MeBi MaxSteps 100.
   Example wsim_eqfirst : weak_sim eqfirstLTS eqfirstLTS' x5 x5.
-  Proof. MeBi Sim Begin eqfirstLTS x5 And eqfirstLTS' x5 Using leftLTS.
-    MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
 
   (* A false equation premise blocks a step inside a proof: [guard] lets
      [A] through and not [B], so from [x5] only the [A]-step exists. *)
@@ -1068,12 +1075,12 @@ Module TwoPremises.
   Inductive guardLTS' : proc -> option act -> proc -> Prop :=
   | guard' p p' a : a = A -> leftLTS p (Some a) p' -> guardLTS' p (Some a) p'.
   Definition x6 : proc := pact A (pact B pnil).
-  MeBi Config Bounds As Num States 2.
+  Set MeBi MaxStates 2.
   MeBi Run LTS x6 Using guardLTS leftLTS.
   MeBi Config Reset Bounds.
+  Set MeBi MaxSteps 100.
   Example wsim_guard : weak_sim guardLTS guardLTS' x6 x6.
-  Proof. MeBi Sim Begin guardLTS x6 And guardLTS' x6 Using leftLTS.
-    MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Weak.
 End TwoPremises.
 
@@ -1113,39 +1120,43 @@ Module GeneralPremises.
   Inductive or_c' : nat -> option bool -> nat -> Prop :=
   | or_go' n : n = 0 \/ n = 1 -> or_c' n (Some true) (S n).
 
-  MeBi Config Bounds As Num States 4.
+  Set MeBi MaxStates 4.
   MeBi Run LTS 0 Using le_c.
-  MeBi Config Bounds As Num States 3.
+  Set MeBi MaxStates 3.
   Fail MeBi Run LTS 0 Using le_c.
   MeBi Run LTS 0 Using lt_c.
   MeBi Run LTS 0 Using in_c.
   MeBi Run LTS 0 Using fa_c.
   MeBi Run LTS 0 Using or_c.
-  MeBi Config Bounds As Num States 2.
+  Set MeBi MaxStates 2.
   Fail MeBi Run LTS 0 Using lt_c.
   Fail MeBi Run LTS 0 Using in_c.
   Fail MeBi Run LTS 0 Using fa_c.
   Fail MeBi Run LTS 0 Using or_c.
-  MeBi Config Bounds As Num States 5.
+  Set MeBi MaxStates 5.
   MeBi Run LTS 0 Using and_c.
-  MeBi Config Bounds As Num States 4.
+  Set MeBi MaxStates 4.
   Fail MeBi Run LTS 0 Using and_c.
 
   (* The depth bound: [le 0 2] needs 3 constructor applications. *)
-  MeBi Config Premise Depth 2.
-  MeBi Config Bounds As Num States 20.
+  Set MeBi PremiseDepth 2.
+  Set MeBi MaxStates 20.
   Fail MeBi Run LTS 0 Using le_c.
   MeBi Config Reset Bounds.
 
   MeBi Config Weak As Option bool.
+  Set MeBi MaxSteps 100.
   Example w_le : weak_sim le_c le_c' 0 0.
-  Proof. MeBi Sim Begin le_c 0 And le_c' 0 Using le_c. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
+  Set MeBi MaxSteps 100.
   Example w_in : weak_sim in_c in_c' 0 0.
-  Proof. MeBi Sim Begin in_c 0 And in_c' 0 Using in_c. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
+  Set MeBi MaxSteps 100.
   Example w_fa : weak_sim fa_c fa_c' 0 0.
-  Proof. MeBi Sim Begin fa_c 0 And fa_c' 0 Using fa_c. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
+  Set MeBi MaxSteps 100.
   Example w_or : weak_sim or_c or_c' 0 0.
-  Proof. MeBi Sim Begin or_c 0 And or_c' 0 Using or_c. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Weak.
 
   (* A negation [~ P] holds iff [P] is refuted by a complete search; the
@@ -1155,14 +1166,15 @@ Module GeneralPremises.
   | not_go n : ~ (3 <= n) -> not_c n (Some true) (S n).
   Inductive not_c' : nat -> option bool -> nat -> Prop :=
   | not_go' n : ~ (3 <= n) -> not_c' n (Some true) (S n).
-  MeBi Config Bounds As Num States 4.
+  Set MeBi MaxStates 4.
   MeBi Run LTS 0 Using not_c.
-  MeBi Config Bounds As Num States 3.
+  Set MeBi MaxStates 3.
   Fail MeBi Run LTS 0 Using not_c.
   MeBi Config Reset Bounds.
   MeBi Config Weak As Option bool.
+  Set MeBi MaxSteps 100.
   Example w_not : weak_sim not_c not_c' 0 0.
-  Proof. MeBi Sim Begin not_c 0 And not_c' 0 Using not_c. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Weak.
 
   (* KNOWN WRONG: an opaque function cannot be decided, so the LTS
@@ -1171,7 +1183,7 @@ Module GeneralPremises.
   Parameter f : nat -> nat.
   Inductive op_c : nat -> option bool -> nat -> Prop :=
   | op_go n : f n <= 2 -> op_c n (Some true) (S n).
-  MeBi Config Bounds As Num States 20.
+  Set MeBi MaxStates 20.
   Fail MeBi Run LTS 0 Using op_c.
   MeBi Config Reset Bounds.
 
@@ -1183,14 +1195,15 @@ Module GeneralPremises.
   Inductive op_c' : nat -> option bool -> nat -> Prop :=
   | op_go' n : f n <= 2 -> op_c' n (Some true) (S n).
   MeBi Config Premise Tactic (rewrite f_def; lia).
-  MeBi Config Bounds As Num States 4.
+  Set MeBi MaxStates 4.
   MeBi Run LTS 0 Using op_c.
-  MeBi Config Bounds As Num States 3.
+  Set MeBi MaxStates 3.
   Fail MeBi Run LTS 0 Using op_c.
   MeBi Config Reset Bounds.
   MeBi Config Weak As Option bool.
+  Set MeBi MaxSteps 100.
   Example w_op : weak_sim op_c op_c' 0 0.
-  Proof. MeBi Sim Begin op_c 0 And op_c' 0 Using op_c. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Weak.
   MeBi Config Reset Premise.
 End GeneralPremises.
@@ -1235,41 +1248,44 @@ Module OutputPremises.
   Inductive via_c' : nat -> option bool -> nat -> Prop :=
   | via' q n a q' : In q [n; S n] -> base q a q' -> via_c' n a q'.
 
-  MeBi Config Bounds As Num States 4.
+  Set MeBi MaxStates 4.
   MeBi Run LTS 0 Using eq_c.
   MeBi Run LTS 0 Using rel_c.
   MeBi Run LTS 0 Using two_c.
-  MeBi Config Bounds As Num States 3.
+  Set MeBi MaxStates 3.
   Fail MeBi Run LTS 0 Using eq_c.
   Fail MeBi Run LTS 0 Using rel_c.
   Fail MeBi Run LTS 0 Using two_c.
   MeBi Run LTS 0 Using in_c.
   MeBi Run LTS 0 Using via_c base.
-  MeBi Config Bounds As Num Transitions 3.
+  Set MeBi MaxTransitions 3.
   MeBi Run LTS 0 Using eq_c.
-  MeBi Config Bounds As Num Transitions 2.
+  Set MeBi MaxTransitions 2.
   Fail MeBi Run LTS 0 Using eq_c.
   (* least transition bound 2 for 3 transitions: see the note on bounds in
      [ExtractionSizes] *)
   MeBi Run LTS 0 Using via_c base.
-  MeBi Config Bounds As Num Transitions 1.
+  Set MeBi MaxTransitions 1.
   Fail MeBi Run LTS 0 Using via_c base.
-  MeBi Config Bounds As Num Transitions 4.
+  Set MeBi MaxTransitions 4.
   MeBi Run LTS 0 Using two_c.
-  MeBi Config Bounds As Num Transitions 3.
+  Set MeBi MaxTransitions 3.
   Fail MeBi Run LTS 0 Using two_c.
-  MeBi Config Bounds As Num States 2.
+  Set MeBi MaxStates 2.
   Fail MeBi Run LTS 0 Using in_c.
   Fail MeBi Run LTS 0 Using via_c base.
   MeBi Config Reset Bounds.
 
   MeBi Config Weak As Option bool.
+  Set MeBi MaxSteps 100.
   Example w_rel : weak_sim rel_c rel_c' 0 0.
-  Proof. MeBi Sim Begin rel_c 0 And rel_c' 0 Using rel_c. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
+  Set MeBi MaxSteps 100.
   Example w_two : weak_sim two_c two_c' 0 0.
-  Proof. MeBi Sim Begin two_c 0 And two_c' 0 Using two_c. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
+  Set MeBi MaxSteps 100.
   Example w_via : weak_sim via_c via_c' 0 0.
-  Proof. MeBi Sim Begin via_c 0 And via_c' 0 Using base. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Weak.
 
   (* An LTS premise whose source nothing determines: [q] below. Its sources
@@ -1296,28 +1312,30 @@ Module OutputPremises.
   Inductive open_rec' : nat -> option bool -> nat -> Prop :=
   | open_rec_go' q a q' : rb q a q' -> open_rec' 0 a q'.
 
-  MeBi Config Bounds As Num States 3.
+  Set MeBi MaxStates 3.
   MeBi Run LTS 0 Using open_c base.
   MeBi Run LTS 0 Using open_sw base_sw.
-  MeBi Config Bounds As Num States 2.
+  Set MeBi MaxStates 2.
   Fail MeBi Run LTS 0 Using open_c base.
   Fail MeBi Run LTS 0 Using open_sw base_sw.
-  MeBi Config Bounds As Num States 5.
+  Set MeBi MaxStates 5.
   MeBi Run LTS 0 Using open_rec rb.
-  MeBi Config Bounds As Num States 4.
+  Set MeBi MaxStates 4.
   Fail MeBi Run LTS 0 Using open_rec rb.
   MeBi Config Reset Bounds.
 
   MeBi Config Weak As Option bool.
+  Set MeBi MaxSteps 100.
   Example w_open : weak_sim open_c open_c' 0 0.
-  Proof. MeBi Sim Begin open_c 0 And open_c' 0 Using base. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   (* Until 2026-10-03 the solver stopped here on an internal [Not_found]:
      reading the hypotheses for the transition to answer, it took [rb 2 a
      3], a premise's step left by inverting [open_rec 0 a 3], for a step of
      [open_rec] (its states are numbers too), and state 2 has no edges. It
      now reads only steps of the relation being simulated. *)
+  Set MeBi MaxSteps 100.
   Example w_open_rec : weak_sim open_rec open_rec' 0 0.
-  Proof. MeBi Sim Begin open_rec 0 And open_rec' 0 Using rb. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
 
   (* [base] as a plain premise (not in [Using]): applying [open_go] leaves
      [q] an evar that no LTS premise's replay fixes, in [base ?q a 1]. The
@@ -1329,10 +1347,12 @@ Module OutputPremises.
   | tp q n a q' : In q [0; 1] -> base q a q' -> n <= 0 -> two_p n a q'.
   Inductive two_p' : nat -> option bool -> nat -> Prop :=
   | tp' q n a q' : In q [0; 1] -> base q a q' -> n <= 0 -> two_p' n a q'.
+  Set MeBi MaxSteps 100.
   Example w_open_plain : weak_sim open_c open_c' 0 0.
-  Proof. MeBi Sim Begin open_c 0 And open_c' 0. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
+  Set MeBi MaxSteps 100.
   Example w_two_plain : weak_sim two_p two_p' 0 0.
-  Proof. MeBi Sim Begin two_p 0 And two_p' 0. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Weak.
 
   (* KNOWN LIMIT, warned: transitions MeBi cannot determine. [u n] is a
@@ -1350,7 +1370,7 @@ Module OutputPremises.
   | u2 n : ung2 (S n) None (S (S n)).
   Inductive open_u2 : nat -> option bool -> nat -> Prop :=
   | open_u2_go q a q' : ung2 q a q' -> open_u2 0 a q'.
-  MeBi Config Bounds As Num States 1.
+  Set MeBi MaxStates 1.
   Fail MeBi Run LTS 0 Using open_u ung.      (* [ung] explored as an LTS *)
   Fail MeBi Run LTS 0 Using open_u.          (* [ung] as a plain premise *)
   Fail MeBi Run LTS 0 Using open_u2 ung2.
@@ -1371,7 +1391,7 @@ Module OutputPremises.
   | urs q a q' : ur q a q' -> ur (S q) a (S q').
   Inductive open_ur : nat -> option bool -> nat -> Prop :=
   | open_ur_go q a q' : ur q a q' -> open_ur 0 a q'.
-  MeBi Config Bounds As Num States 100.
+  Set MeBi MaxStates 100.
   Fail MeBi Run LTS 0 Using open_ur ur.
   MeBi Config FailIf Incomplete False.
   MeBi Run LTS 0 Using open_ur ur.
@@ -1394,8 +1414,9 @@ Module SilentResponse.
   | p_tau : step p None p1 | p_b : step p (Some b) z | p1_a : step p1 (Some a) z
   | q_tau : step q None q1 | q_b : step q (Some b) z | q1_a : step q1 (Some a) z.
   MeBi Config Weak As Option lab.
+  Set MeBi MaxSteps 100.
   Example sim_p_q : weak_sim step step p q.
-  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
 
   (* The LTS of rocq-sims' [examples/SimExample.v] (Nicolas Chappe,
      https://github.com/rocq-sims/rocq-sims, LGPL-3.0-or-later), re-encoded
@@ -1411,10 +1432,12 @@ Module SilentResponse.
   | u0u3 : strans u0 (Some sb) u3 | u1u1 : strans u1 None u1
   | u1u2 : strans u1 (Some sa) u2.
   MeBi Config Weak As Option sobs.
+  Set MeBi MaxSteps 100.
   Example sims_t0_u0 : weak_sim strans strans t0 u0.
-  Proof. MeBi Sim Begin strans t0 And strans u0 Using strans. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
+  Set MeBi MaxSteps 100.
   Example sims_u0_t0 : weak_sim strans strans u0 t0.
-  Proof. MeBi Sim Begin strans u0 And strans t0 Using strans. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
 
   (* Divergence is invisible to [weak_sim]: a tau-loop and a stuck state
      simulate each other, and are weakly bisimilar. A divergence-sensitive
@@ -1423,8 +1446,9 @@ Module SilentResponse.
   Inductive dstep : dst -> option sobs -> dst -> Prop :=
   | dloop : dstep loop None loop.
   MeBi Run Bisim loop With dstep And stop With dstep.
+  Set MeBi MaxSteps 100.
   Example div_loop_stop : weak_sim dstep dstep loop stop.
-  Proof. MeBi Sim Begin dstep loop And dstep stop Using dstep. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Weak.
 End SilentResponse.
 
@@ -1493,15 +1517,15 @@ Module ParameterisedLTS.
   Fail MeBi Run LTS 0 Using count3.
   (* The proof side refuses the same way. *)
   Example wsim_count : weak_sim (countLTS 3) (countLTS 3) 0 0.
-  Proof. Fail MeBi Sim Begin countLTS 0 And countLTS 0 Using countLTS. Abort.
+  Proof. Fail sim. Abort.
 
   (* The workaround: fix the value in a module. *)
   Module Count3.
     Inductive countLTS : nat -> option unit -> nat -> Prop :=
     | up n : n < 3 -> countLTS n (Some tt) (S n).
-    MeBi Config Bounds As Num States 4.
+    Set MeBi MaxStates 4.
     MeBi Run LTS 0 Using countLTS.
-    MeBi Config Bounds As Num States 3.
+    Set MeBi MaxStates 3.
     Fail MeBi Run LTS 0 Using countLTS.
     MeBi Config Reset Bounds.
   End Count3.
@@ -1516,11 +1540,12 @@ Module ParameterisedLTS.
   Inductive wrapped3 : nat -> option unit -> nat -> Prop :=
   | wrap3 n l m : countLTS 3 n l m -> wrapped3 n l m.
   MeBi Config Weak As Option unit.
-  MeBi Config Bounds As Num States 4.
+  Set MeBi MaxStates 4.
   MeBi Run LTS 0 Using wrapped3.
   MeBi Config Reset Bounds.
-  MeBi Run Bisim 0 With wrapped3 And 0 With Count3.countLTS As wbis_wrapped3.
-  MeBi Sim Solve 100. Qed.
+  Set MeBi MaxSteps 100.
+  Example wbis_wrapped3 : weak_bisimilar wrapped3 Count3.countLTS (0) (0).
+  Proof. bisim. Qed.
   MeBi Config Reset Weak.
   (* A result about the wrapper carries back to [countLTS 3]: the two take
      the same steps, so [Transfer.stutter_bisimilar] at [eq] relates them,
@@ -1557,51 +1582,43 @@ End ParameterisedLTS.
 
 MeBi Divider "Theories.Test.GoalShapes".
 Module GoalShapes.
-  (* What [MeBi Sim Begin] accepts as a goal (2026-10-10). Every example in
-     the repository states a closed [weak_sim] or [weak_bisimilar] goal and
-     gives [Begin] its two states, so the cases below were never exercised.
-     Before, the refused ones stopped [Solve] on an internal error. *)
+  (* What [sim] and [bisim] accept as a goal (2026-10-10, for the [MeBi
+     Sim Begin] they replaced on 2026-11-05). Every example in the
+     repository states a closed [weak_sim] or [weak_bisimilar] goal, so the
+     cases below were never exercised. Before, the refused ones stopped the
+     search on an internal error. (Until 2026-11-05 [Begin] was also given
+     the goal's states and LTSs, and two tests here checked that they had to
+     agree with the goal's; the tactics read them from the goal.) *)
   Import MultipleDerivations.
   MeBi Config Reset Weak.
   MeBi Config Weak As Option action.
 
   (* The same states written differently are fine (conversion). *)
+  Set MeBi MaxSteps 1000.
   Example unfolded : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS (tfix (tpar A A trec)) And termLTS q Using termLTS.
-    MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
 
-  (* [Begin]'s terms must be the goal's two states, in order. *)
-  Example mismatch : weak_sim termLTS termLTS p q.
-  Proof. Fail MeBi Sim Begin termLTS p And termLTS p Using termLTS.
-    Fail MeBi Sim Begin termLTS q And termLTS p Using termLTS. Abort.
-
-  (* So must [Begin]'s LTSs be the goal's (2026-10-11). Before, a sub-LTS
-     stopped [Solve] on an internal error, a super-LTS was refused as "not
-     weakly simulated", and swapped LTSs failed in Rocq. *)
+  (* Two different LTSs, one on each side. *)
   Inductive seqLTS : term -> option action -> term -> Prop :=
   | s_act : forall a t, seqLTS (tact a t) (Some a) t
   | s_fix : forall t, seqLTS (tfix t) None (subst (tfix t) t).
-  Example lts_mismatch : weak_sim termLTS termLTS p q.
-  Proof. Fail MeBi Sim Begin seqLTS p And termLTS q Using termLTS seqLTS.
-    Fail MeBi Sim Begin seqLTS p And seqLTS q Using seqLTS. Abort.
+  Set MeBi MaxSteps 1000.
   Example lts_swapped : weak_sim termLTS seqLTS q q.
-  Proof. Fail MeBi Sim Begin seqLTS q And termLTS q Using termLTS seqLTS.
-    MeBi Sim Begin termLTS q And seqLTS q Using termLTS seqLTS.
-    MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
 
   (* An existential goal: give the witness first. *)
+  Set MeBi MaxSteps 1000.
   Example exists_hand : exists r, weak_sim termLTS termLTS p r.
-  Proof. exists q. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
-    MeBi Sim Solve 1000. Qed.
+  Proof. exists q. sim. Qed.
   Example exists_plugin : exists r, weak_sim termLTS termLTS p r.
-  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  Proof. Fail sim. Abort.
 
   (* A goal behind a definition of one's own: unfold it first. *)
   Definition my_sim x y := weak_sim termLTS termLTS x y.
+  Set MeBi MaxSteps 1000.
   Example wrapped : my_sim p q.
-  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS.
-    unfold my_sim. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
-    MeBi Sim Solve 1000. Qed.
+  Proof. Fail sim.
+    unfold my_sim. sim. Qed.
 
   (* KNOWN LIMIT: open terms. A law for every [t] (as CTrees proves CCS's
      laws, where [examples/Bisimilarity/CCS/LawProofs.v] proves closed
@@ -1609,22 +1626,21 @@ Module GoalShapes.
      an LTS cannot be built from a variable, whose steps are unknown. *)
   Example open_law : forall t, weak_sim termLTS termLTS (tact A t) (tact A t).
   Proof. intros t.
-    Fail MeBi Sim Begin termLTS (tact A t) And termLTS (tact A t) Using termLTS.
-  Abort.
+    Fail sim. Abort.
 
   (* KNOWN LIMIT: a local name, even for a closed term, is not found;
      substituting it away works. *)
+  Set MeBi MaxSteps 1000.
   Example local_name : forall r, r = q -> weak_sim termLTS termLTS p r.
   Proof. intros r H.
-    Fail MeBi Sim Begin termLTS p And termLTS r Using termLTS.
-    subst r. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
-    MeBi Sim Solve 1000. Qed.
+    Fail sim.
+    subst r. sim. Qed.
   MeBi Config Reset Weak.
 End GoalShapes.
 
 MeBi Divider "Theories.Test.MemoryBound".
 Module MemoryBound.
-  (* [MeBi Config Bounds Memory <mb>] (2026-10-16) stops a command once the
+  (* [Set MeBi MaxMemoryMB <mb>] (2026-10-16) stops a command once the
      whole process uses more than <mb> megabytes; by default 75% of RAM (or
      90% of a cgroup cap), which no test here comes near. Rocq alone uses
      more than 1MB, so each command below fails at its first check,
@@ -1633,21 +1649,21 @@ Module MemoryBound.
   Import MultipleDerivations.
   MeBi Config Reset Weak.
   MeBi Config Weak As Option action.
-  MeBi Config Bounds Memory 1.
+  Set MeBi MaxMemoryMB 1.
   Fail MeBi Run LTS p Using termLTS.
   Example capped : weak_sim termLTS termLTS p q.
-  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+  Proof. Fail sim. Abort.
   (* [Reset Bounds] restores the default; [0] turns the bound off; a
      generous bound changes nothing. *)
   MeBi Config Reset Bounds.
   MeBi Run LTS p Using termLTS.
-  MeBi Config Bounds Memory 1.
-  MeBi Config Bounds Memory 0.
+  Set MeBi MaxMemoryMB 1.
+  Set MeBi MaxMemoryMB 0.
   MeBi Run LTS p Using termLTS.
-  MeBi Config Bounds Memory 100000.
+  Set MeBi MaxMemoryMB 100000.
+  Set MeBi MaxSteps 1000.
   Example uncapped : weak_sim termLTS termLTS p q.
-  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
-    MeBi Sim Solve 1000. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Bounds.
   MeBi Config Reset Weak.
 End MemoryBound.
@@ -1756,16 +1772,19 @@ Module WeakBisimilarProofs.
   Import SilentResponse.
   MeBi Config Weak As Option lab.
   (* [tau.a + b] against a renamed copy: a silent answer on each side. *)
+  Set MeBi MaxSteps 100.
   Example bis_p_q : weak_bisimilar step step p q.
-  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 100. Qed.
+  Proof. bisim. Qed.
+  Set MeBi MaxSteps 100.
   Example bis_p_p : weak_bisimilar step step p p.
-  Proof. MeBi Sim Begin step p And step p Using step. MeBi Sim Solve 100. Qed.
+  Proof. bisim. Qed.
   MeBi Config Reset Weak.
 
   MeBi Config Weak As Option sobs.
   (* rocq-sims' [SimExample] pair (see [SilentResponse]). *)
+  Set MeBi MaxSteps 200.
   Example bis_t0_u0 : weak_bisimilar strans strans t0 u0.
-  Proof. MeBi Sim Begin strans t0 And strans u0 Using strans. MeBi Sim Solve 200. Qed.
+  Proof. bisim. Qed.
   MeBi Config Reset Weak.
 
   (* [a.b + a] and [a.b] are mutually similar but not bisimilar, so [Begin]
@@ -1773,11 +1792,11 @@ Module WeakBisimilarProofs.
   Import WeakBisimilarVsMutualSim.
   MeBi Config Weak As Option lab.
   Example bis_P_Q : weak_bisimilar step step P Q.
-  Proof. Fail MeBi Sim Begin step P And step Q Using step. Abort.
+  Proof. Fail bisim. Abort.
   MeBi Config Reset Weak.
 End WeakBisimilarProofs.
 
-(* [weak_sim] asks for similarity, not bisimilarity: [MeBi Sim Begin] accepts
+(* [weak_sim] asks for similarity, not bisimilarity: [sim] accepts
    states that are similar but not bisimilar, and the search falls back on the
    weak simulation preorder for answers (it used to refuse, Not_Bisimilar). *)
 MeBi Divider "Theories.Test.SimilarNotBisimilar".
@@ -1793,24 +1812,27 @@ Module SimilarNotBisimilar.
   MeBi Config Weak As Option lab.
 
   (* [a.b <= a.(b + c)]: after [a], [b] is simulated by [b + c]. *)
+  Set MeBi MaxSteps 100.
   Example sim_p_q : weak_sim step step p q.
-  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
 
   (* The converse is false, and [Begin] says so before searching. *)
   Example sim_q_p : weak_sim step step q p.
-  Proof. Fail MeBi Sim Begin step q And step p Using step. Abort.
+  Proof. Fail sim. Abort.
 
   (* Milner's [tau.a + b] and [a + b]: mutually similar, not bisimilar. Each
      direction proves, [mutual_sim] is their conjunction, and
      [weak_bisimilar] is refused. *)
+  Set MeBi MaxSteps 100.
   Example sim_m_r : weak_sim step step m r.
-  Proof. MeBi Sim Begin step m And step r Using step. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
+  Set MeBi MaxSteps 100.
   Example sim_r_m : weak_sim step step r m.
-  Proof. MeBi Sim Begin step r And step m Using step. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   Example msim_m_r : mutual_sim step step m r.
   Proof. split; [exact sim_m_r | exact sim_r_m]. Qed.
   Example bis_m_r : weak_bisimilar step step m r.
-  Proof. Fail MeBi Sim Begin step m And step r Using step. Abort.
+  Proof. Fail bisim. Abort.
   MeBi Config Reset Weak.
 End SimilarNotBisimilar.
 
@@ -1821,27 +1843,32 @@ Module AnswerPolicies.
   Import SilentResponse.
   MeBi Config Weak As Option lab.
   MeBi Config Solver Answers Greedy.
+  Set MeBi MaxSteps 200.
   Example g_p_q : weak_bisimilar step step p q.
-  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 200. Qed.
+  Proof. bisim. Qed.
   MeBi Config Solver Answers Minimal.
+  Set MeBi MaxSteps 200.
   Example m_p_q : weak_bisimilar step step p q.
-  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 200. Qed.
+  Proof. bisim. Qed.
+  Set MeBi MaxSteps 200.
   Example m_sim_p_q : weak_sim step step p q.
-  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 200. Qed.
+  Proof. sim. Qed.
   MeBi Config Solver Answers Auto.
+  Set MeBi MaxSteps 200.
   Example a_p_q : weak_bisimilar step step p q.
-  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 200. Qed.
+  Proof. bisim. Qed.
   MeBi Config Solver Answers Default.
+  Set MeBi MaxSteps 200.
   Example d_p_q : weak_bisimilar step step p q.
-  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 200. Qed.
+  Proof. bisim. Qed.
   MeBi Config Solver Answers Auto.
   MeBi Config Reset Weak.
 End AnswerPolicies.
 
-(* [MeBi Run Bisim ... As <name>] states [weak_bisimilar], opens its proof
-   and begins the proof search, as [Example ... Proof. MeBi Sim Begin ...]
-   would: the same count (43, measured 2026-10-04). It refuses, opening
-   nothing, if the two are not bisimilar. *)
+(* Until 2026-11-05, [MeBi Run Bisim ... As <name>] stated [weak_bisimilar],
+   opened its proof and began the proof search; it refused, opening
+   nothing, if the two were not bisimilar. The command is gone: these are
+   its tests, stated as [Example]s and proved with [bisim]. *)
 MeBi Divider "Theories.Test.RunBisimAs".
 Module RunBisimAs.
   Inductive st : nat -> option bool -> nat -> Prop :=
@@ -1850,13 +1877,15 @@ Module RunBisimAs.
   | q2 : st 12 (Some true) 11
   | r0 : st 20 (Some true) 21.
   MeBi Config Weak As Option bool.
-  MeBi Run Bisim 0 With st And 10 With st As pq_bis Using st.
-  MeBi Sim Solve 100. Qed.
+  Example pq_bis : weak_bisimilar st st (0) (10).
+  Proof. bisim. Qed.
   Check pq_bis : weak_bisimilar st st 0 10.
-  MeBi Run Bisim 0 With st And 10 With st As pq_bis2.
-  MeBi Sim Solve 100. Qed.
+  Set MeBi MaxSteps 100.
+  Example pq_bis2 : weak_bisimilar st st (0) (10).
+  Proof. bisim. Qed.
   (* [20] is simulated by [0] but not bisimilar to it (Not_Bisimilar) *)
-  Fail MeBi Run Bisim 20 With st And 0 With st As rp_bis Using st.
+  Example rp_bis : weak_bisimilar st st (20) (0).
+  Proof. Fail bisim. Abort.
   Fail Check rp_bis.
   MeBi Config Reset Weak.
 End RunBisimAs.
@@ -1865,10 +1894,10 @@ End RunBisimAs.
    Bisimilar states are similar outright; otherwise the greatest weak
    simulation among the pairs reachable from the two start states decides
    (until 2026-10-04 computed over all pairs). Not similar is an error under
-   [FailIf NotBisimilar] (default), else a warning. [... As <name>] states
-   [weak_sim] and opens its proof, as [Sim Begin] would (same count, 9).
-   When an FSM is saturated on demand, the walk needs [Bounds Game] and
-   stays within it. *)
+   [FailIf NotBisimilar] (default), else a warning. (Until 2026-11-05,
+   [... As <name>] stated [weak_sim] and opened its proof; those tests
+   now state it and use [sim], with the same count, 9.) When an FSM is
+   saturated on demand, the walk needs [MaxGame] and stays within it. *)
 MeBi Divider "Theories.Test.RunSim".
 Module RunSim.
   Inductive st : nat -> option bool -> nat -> Prop :=
@@ -1885,20 +1914,23 @@ Module RunSim.
   MeBi Config FailIf NotBisimilar False.
   MeBi Run Sim 0 With st And 20 With st Using st.
   MeBi Config FailIf NotBisimilar True.
-  MeBi Run Sim 20 With st And 0 With st As rp_sim Using st.
-  MeBi Sim Solve 100. Qed.
+  Set MeBi MaxSteps 100.
+  Example rp_sim : weak_sim st st (20) (0).
+  Proof. sim. Qed.
   Check rp_sim : weak_sim st st 20 0.
-  Fail MeBi Run Sim 0 With st And 20 With st As pr_sim.
+  Example pr_sim : weak_sim st st (0) (20).
+  Proof. Fail sim. Abort.
   Fail Check pr_sim.
   (* on demand ([30] has a silent step): refused without [Bounds Game],
      allowed within it, refused past it *)
   MeBi Config Saturation OnDemand True.
   Fail MeBi Run Sim 30 With st And 0 With st Using st.
-  MeBi Config Bounds Game 1000.
+  Set MeBi MaxGame 1000.
   MeBi Run Sim 30 With st And 0 With st Using st.
+  Set MeBi MaxSteps 100.
   Example tp_od : weak_sim st st 30 0.
-  Proof. MeBi Sim Begin st 30 And st 0 Using st. MeBi Sim Solve 100. Qed.
-  MeBi Config Bounds Game 1.
+  Proof. sim. Qed.
+  Set MeBi MaxGame 1.
   Fail MeBi Run Sim 30 With st And 0 With st Using st.
   MeBi Config Reset Bounds.
   MeBi Config Reset Weak.
@@ -1914,9 +1946,9 @@ Module ProductPremises.
      the bound of 4 below). *)
   Inductive impl : nat -> bool -> nat -> Prop :=
   | i_go n : (n = 3 -> False) -> n < 5 -> impl n true (S n).
-  MeBi Config Bounds As Num States 4.
+  Set MeBi MaxStates 4.
   MeBi Run LTS 0 Using impl.
-  MeBi Config Bounds As Num States 3.
+  Set MeBi MaxStates 3.
   Fail MeBi Run LTS 0 Using impl.
 
   (* A bounded universal, [forall k, k < n -> P k] with [n] a numeral once
@@ -1933,26 +1965,26 @@ Module ProductPremises.
   (* negated: holds from 3 on, so from 3, states 3..5 *)
   Inductive univ_neg : nat -> bool -> nat -> Prop :=
   | un_go n : ~ (forall k, k < n -> k <> 2) -> n < 5 -> univ_neg n true (S n).
-  MeBi Config Bounds As Num States 4.
+  Set MeBi MaxStates 4.
   MeBi Run LTS 0 Using univ.
   MeBi Run LTS 0 Using univ_le.
   MeBi Run LTS 0 Using univ_gt.
-  MeBi Config Bounds As Num States 3.
+  Set MeBi MaxStates 3.
   Fail MeBi Run LTS 0 Using univ.
   Fail MeBi Run LTS 0 Using univ_le.
   Fail MeBi Run LTS 0 Using univ_gt.
   MeBi Run LTS 3 Using univ_neg.
-  MeBi Config Bounds As Num States 2.
+  Set MeBi MaxStates 2.
   Fail MeBi Run LTS 3 Using univ_neg.
   MeBi Config Reset Bounds.
   (* [MeBi Config Premise Range]: [univ] at state 3 ranges over 3 values
      ([k < 3]). Within a range of 3 it is decided (4 states, as above); with
      2 it is left undecided, with a warning naming the range, so the LTS is
      incomplete and refused. *)
-  MeBi Config Premise Range 3.
-  MeBi Config Bounds As Num States 4.
+  Set MeBi PremiseRange 3.
+  Set MeBi MaxStates 4.
   MeBi Run LTS 0 Using univ.
-  MeBi Config Premise Range 2.
+  Set MeBi PremiseRange 2.
   Fail MeBi Run LTS 0 Using univ.
   MeBi Config Reset Premise.
   MeBi Config Reset Bounds.
@@ -1969,10 +2001,12 @@ Module ProductPremises.
   Inductive univ_n' : nat -> option bool -> nat -> Prop :=
   | unn_go' n : ~ (forall k, k < n -> k <> 2) -> n < 5 -> univ_n' n (Some true) (S n).
   MeBi Config Weak As Option bool.
+  Set MeBi MaxSteps 100.
   Example w_univ : weak_sim univ_s univ_s' 0 0.
-  Proof. MeBi Sim Begin univ_s 0 And univ_s' 0 Using univ_s. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
+  Set MeBi MaxSteps 100.
   Example w_univ_neg : weak_sim univ_n univ_n' 3 3.
-  Proof. MeBi Sim Begin univ_n 3 And univ_n' 3 Using univ_n. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Weak.
 End ProductPremises.
 
@@ -1988,9 +2022,9 @@ Module ComputedIndex.
   Inductive ev : nat -> nat -> Prop := e k : ev k (dbl k).
   Inductive st : nat -> bool -> nat -> Prop :=
   | go n : ev 2 4 -> n < 2 -> st n true (S n).
-  MeBi Config Bounds As Num States 3.
+  Set MeBi MaxStates 3.
   MeBi Run LTS 0 Using st.
-  MeBi Config Bounds As Num States 2.
+  Set MeBi MaxStates 2.
   Fail MeBi Run LTS 0 Using st.
   MeBi Config Reset Bounds.
 End ComputedIndex.
@@ -2030,17 +2064,17 @@ Module InversionShapes.
     Inductive sys' : st * st -> option lab -> st * st -> Prop :=
     | sync' p q a p' q' : comp p a p' -> comp q a q' -> sys' (p, q) a (p', q').
     MeBi Config Weak As Option lab.
+    Set MeBi MaxSteps 500.
     Example sync_sim : weak_sim sys sys' (s0, t0) (s0, t0).
-    Proof. MeBi Sim Begin sys (s0, t0) And sys' (s0, t0) Using sys sys' comp.
-      MeBi Sim Solve 500. Qed.
+    Proof. sim. Qed.
     (* A pin: [Solve 80] permits 81 steps, the least that closes it. The
        pair [(s2, t0)] has no move ([s2] has none), so each obligation from
        it starts from a step that cannot happen, [sys (s2, t0) a m2];
        refuting that at once, rather than inverting it down to [comp], is
        what brings 105 down to 81, so without it this runs out of steps. *)
+    Set MeBi MaxSteps 80.
     Example sync_bis : weak_bisimilar sys sys' (s0, t0) (s0, t0).
-    Proof. MeBi Sim Begin sys (s0, t0) And sys' (s0, t0) Using sys sys' comp.
-      MeBi Sim Solve 80. Qed.
+    Proof. bisim. Qed.
     MeBi Config Reset Weak.
   End Sync.
 
@@ -2053,9 +2087,9 @@ Module InversionShapes.
     Inductive pick' : list nat -> option bool -> list nat -> Prop :=
     | p_go' q l a q' : In q l -> base q a q' -> pick' l a (q' :: nil).
     MeBi Config Weak As Option bool.
+    Set MeBi MaxSteps 500.
     Example source_sim : weak_sim pick pick' (0 :: 1 :: nil) (0 :: 1 :: nil).
-    Proof. MeBi Sim Begin pick (0 :: 1 :: nil) And pick' (0 :: 1 :: nil) Using pick pick' base.
-      MeBi Sim Solve 500. Qed.
+    Proof. sim. Qed.
     MeBi Config Reset Weak.
   End Source.
 
@@ -2078,9 +2112,9 @@ Module InversionShapes.
     Definition l1 := par (sum (pre (Some x) nil0) (pre None nil0)) (pre (Some y) nil0).
     Definition r1 := par (pre (Some y) nil0) (sum (pre (Some x) nil0) (pre None nil0)).
     MeBi Config Weak As Option name.
+    Set MeBi MaxSteps 2000.
     Example deep_bis : weak_bisimilar step step l1 r1.
-    Proof. MeBi Sim Begin step l1 And step r1 Using step.
-      MeBi Sim Solve 2000. Qed.
+    Proof. bisim. Qed.
     MeBi Config Reset Weak.
   End Deep.
 
@@ -2099,12 +2133,12 @@ Module InversionShapes.
        judged it by its head, [lt], a constant) and applied [rt1n_refl] to
        it ("Unable to unify clos_refl_trans_1n ... with 0 < 3"), as
        [weak_sim] and [weak_bisimilar], in every cofix mode. *)
+    Set MeBi MaxSteps 500.
     Example computed_sim : weak_sim st st' 0 0.
-    Proof. MeBi Sim Begin st 0 And st' 0 Using st st'.
-      MeBi Sim Solve 500. Qed.
+    Proof. sim. Qed.
+    Set MeBi MaxSteps 500.
     Example computed_bis : weak_bisimilar st st' 0 0.
-    Proof. MeBi Sim Begin st 0 And st' 0 Using st st'.
-      MeBi Sim Solve 500. Qed.
+    Proof. bisim. Qed.
     MeBi Config Reset Weak.
   End Computed.
 End InversionShapes.
@@ -2123,12 +2157,15 @@ Module SilentTransfer.
   Inductive lin : nat -> option bool -> nat -> Prop :=
   | l01 : lin 10 (Some true) 11.
   MeBi Config Weak As Option bool.
+  Set MeBi MaxSteps 100.
   Example sim_0 : weak_sim cyc lin 0 10.
-  Proof. MeBi Sim Begin cyc 0 And lin 10 Using cyc. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
+  Set MeBi MaxSteps 100.
   Example bis_0 : weak_bisimilar cyc lin 0 10.
-  Proof. MeBi Sim Begin cyc 0 And lin 10 Using cyc. MeBi Sim Solve 100. Qed.
+  Proof. bisim. Qed.
+  Set MeBi MaxSteps 100.
   Example sim_rev_0 : weak_sim lin cyc 10 0.
-  Proof. MeBi Sim Begin lin 10 And cyc 0 Using lin. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Weak.
 
   Lemma s01 : silent cyc 0 1.
@@ -2177,16 +2214,20 @@ Module OverlappingStates.
   Fail MeBi Run Bisim 0 With lin And 0 With other Using lin other.
   (* bisimilar, with states 0 and 1 shared but moving differently *)
   MeBi Run Bisim 0 With cyc And 0 With lin Using cyc lin.
+  Set MeBi MaxSteps 100.
   Example sim : weak_sim cyc lin 0 0.
-  Proof. MeBi Sim Begin cyc 0 And lin 0 Using cyc. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
+  Set MeBi MaxSteps 100.
   Example bis : weak_bisimilar cyc lin 0 0.
-  Proof. MeBi Sim Begin cyc 0 And lin 0 Using cyc. MeBi Sim Solve 100. Qed.
+  Proof. bisim. Qed.
+  Set MeBi MaxSteps 100.
   Example sim_rev : weak_sim lin cyc 0 0.
-  Proof. MeBi Sim Begin lin 0 And cyc 0 Using lin. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   (* the same moves on both sides: one state, nothing renamed *)
   MeBi Run Bisim 0 With lin And 0 With lin' Using lin lin'.
+  Set MeBi MaxSteps 100.
   Example sim_copy : weak_sim cyc cyc' 0 0.
-  Proof. MeBi Sim Begin cyc 0 And cyc' 0 Using cyc. MeBi Sim Solve 100. Qed.
+  Proof. sim. Qed.
   MeBi Config Reset Weak.
 End OverlappingStates.
 
@@ -2206,7 +2247,7 @@ Module CircularTransfer.
   MeBi Config Weak As Option bool.
   (* the plugin refuses the goal: not similar *)
   Example refused : weak_sim cx nx 0 10.
-  Proof. Fail MeBi Sim Begin cx 0 And nx 10 Using cx. Abort.
+  Proof. Fail sim. Abort.
   MeBi Config Reset Weak.
 
   Lemma s_rm : silent cx 0 1.
@@ -2319,10 +2360,9 @@ Module ExternalFeedback.
      ill-typed term", under either cofix strategy. The feedback saw a
      related shape loop without closing instead. When this is fixed, drop
      the [Fail] and replace [Abort] with [Qed]. *)
-  MeBi Run Bisim loop With step And (par loop done) With step As w_cong
-    Using base.
-  Fail MeBi Sim Solve 300.
-  Abort.
+  Set MeBi MaxSteps 300.
+  Example w_cong : weak_bisimilar step step (loop) ((par loop done)).
+  Proof. Fail bisim. Abort.
   MeBi Config Reset Weak.
 
   (* Item 3. A premise defined by a [match] on an argument nothing fixes
@@ -2385,3 +2425,53 @@ Module OutputFormat.
   MeBi Config Output "DecodeResults" False.
   MeBi Config Reset Weak.
 End OutputFormat.
+
+(* [bisim] and [sim] (2026-11-05, SYMBOLIC_PLAN.md Phase U): a goal proved
+   with no [MeBi Config Weak] and no [Using]. The tactics read both from the
+   goal: the label type of [M -> option A -> M -> Prop], and the LTSs the
+   constructors' premises use ([sstep]'s premises are [step]s). Limits come
+   from [Set MeBi ...] options, which [Unset] restores; [sim n] and [debug
+   sim n] bound one run, as [auto n] and [debug auto] do. *)
+MeBi Divider "Theories.Test.Tactics".
+Module Tactics.
+  MeBi Config Reset Weak.
+  Inductive act := a | b.
+  Inductive tm := done | pre (x : act) (k : tm) | tau (k : tm).
+  Inductive step : tm -> option act -> tm -> Prop :=
+  | s_pre x k : step (pre x k) (Some x) k
+  | s_tau k : step (tau k) None k.
+  Inductive sys := one (t : tm) | two (t u : tm).
+  Inductive sstep : sys -> option act -> sys -> Prop :=
+  | s_one t t' x : step t x t' -> sstep (one t) x (one t')
+  | s_left t t' u x : step t x t' -> sstep (two t u) x (two t' u)
+  | s_right t u u' x : step u x u' -> sstep (two t u) x (two t u').
+
+  Lemma layered : weak_bisimilar sstep sstep
+    (one (pre a (tau (pre b done)))) (one (pre a (pre b done))).
+  Proof. bisim. Qed.
+
+  Lemma silent_prefix : weak_sim step step (pre a done) (tau (pre a done)).
+  Proof. sim. Qed.
+
+  (* each tactic refuses the other's goal, naming it *)
+  Lemma wrong_kind : weak_sim step step (pre a done) (pre a done).
+  Proof. Fail bisim. sim. Qed.
+
+  (* open terms are refused (a known limit: doc/limitations.md) *)
+  Lemma open_goal (t : tm) : weak_sim step step t t.
+  Proof. Fail sim. Abort.
+
+  (* the step bound: no proof within 0 steps; [Unset] restores it *)
+  Set MeBi MaxSteps 0.
+  Lemma bounded : weak_sim step step (pre a done) (tau (pre a done)).
+  Proof. Fail sim. Abort.
+  Unset MeBi MaxSteps.
+  Lemma unbounded : weak_sim step step (pre a done) (tau (pre a done)).
+  Proof. sim. Qed.
+
+  (* as [auto n]: [sim n] takes at most [n] steps, and without a proof
+     leaves the goal unchanged (this one needs 10); [debug] also prints the
+     search's open goals *)
+  Lemma steps_n : weak_sim step step (pre a done) (tau (pre a done)).
+  Proof. sim 0. debug sim 2. sim 100. Qed.
+End Tactics.

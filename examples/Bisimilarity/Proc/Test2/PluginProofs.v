@@ -31,16 +31,18 @@ MeBi Config Weak As Option label.
 Require Import Logic.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pq".
+Set MeBi MaxSteps 446.
 Example wsim_pq : weak_sim termLTS termLTS p q. 
-Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. 
-  (* Iteration History: 446 <- 446 <- 465 <- _ *) 
-  MeBi Sim Solve 446. Qed.
+Proof. sim.
+  (* Iteration History: 446 <- 446 <- 465 <- _ *)
+   Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.qp".
+Set MeBi MaxSteps 278.
 Example wsim_qp : weak_sim termLTS termLTS q p. 
-Proof. MeBi Sim Begin termLTS q And termLTS p Using termLTS. 
-  (* Iteration History: 278 <- 278 <- 297 <- _ *) 
-  MeBi Sim Solve 278. Qed.
+Proof. sim.
+  (* Iteration History: 278 <- 278 <- 297 <- _ *)
+   Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pq.mutual".
 (* Mutual similarity: the two [weak_sim]s above, one each way. *)
@@ -49,16 +51,18 @@ Proof. split; [exact wsim_pq | exact wsim_qp]. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.qr".
+Set MeBi MaxSteps 299.
 Example wsim_qr : weak_sim termLTS termLTS q r. 
-Proof. MeBi Sim Begin termLTS q And termLTS r Using termLTS. 
-  (* Iteration History: 299 <- 299 <- 322 <- _ *) 
-  MeBi Sim Solve 299. Qed.
+Proof. sim.
+  (* Iteration History: 299 <- 299 <- 322 <- _ *)
+   Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.rq".
+Set MeBi MaxSteps 194.
 Example wsim_rq : weak_sim termLTS termLTS r q. 
-Proof. MeBi Sim Begin termLTS r And termLTS q Using termLTS. 
-  (* Iteration History: 194 <- 194 <- 195 <- _ *) 
-  MeBi Sim Solve 194. Qed.
+Proof. sim.
+  (* Iteration History: 194 <- 194 <- 195 <- _ *)
+   Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.qr.mutual".
 (* Mutual similarity: the two [weak_sim]s above, one each way. *)
@@ -67,16 +71,18 @@ Proof. split; [exact wsim_qr | exact wsim_rq]. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pr".
+Set MeBi MaxSteps 446.
 Example wsim_pr : weak_sim termLTS termLTS p r. 
-Proof. MeBi Sim Begin termLTS p And termLTS r Using termLTS. 
-  (* Iteration History: 446 <- 446 <- 497 <- _ *) 
-  MeBi Sim Solve 446. Qed.
+Proof. sim.
+  (* Iteration History: 446 <- 446 <- 497 <- _ *)
+   Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.rp".
+Set MeBi MaxSteps 182.
 Example wsim_rp : weak_sim termLTS termLTS r p. 
-Proof. MeBi Sim Begin termLTS r And termLTS p Using termLTS. 
-  (* Iteration History: 182 <- 182 <- 191 <- _ *) 
-  MeBi Sim Solve 182. Qed.
+Proof. sim.
+  (* Iteration History: 182 <- 182 <- 191 <- _ *)
+   Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pr.mutual".
 (* Mutual similarity: the two [weak_sim]s above, one each way. *)
@@ -93,16 +99,16 @@ Proof. split; [exact wsim_pr | exact wsim_rp]. Qed.
    measured count minus one ([Solve N] permits N + 1 steps). *)
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pq.bisimilar".
+Set MeBi MaxSteps 424.
 Example wbis_pq : weak_bisimilar termLTS termLTS p q.
-Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
-  MeBi Sim Solve 424. Qed.
+Proof. bisim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.qr.bisimilar".
+Set MeBi MaxSteps 374.
 Example wbis_qr : weak_bisimilar termLTS termLTS q r.
-Proof. MeBi Sim Begin termLTS q And termLTS r Using termLTS.
-  MeBi Sim Solve 374. Qed.
+Proof. bisim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pr.bisimilar".
+Set MeBi MaxSteps 408.
 Example wbis_pr : weak_bisimilar termLTS termLTS p r.
-Proof. MeBi Sim Begin termLTS p And termLTS r Using termLTS.
-  MeBi Sim Solve 408. Qed.
+Proof. bisim. Qed.

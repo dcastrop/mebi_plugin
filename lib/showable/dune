@@ -1,9 +1,8 @@
 ; Named to match its sole module (Type_): this is what makes dune collapse
-; the wrapper to a bare [Type_], matching how `make`'s flat, unwrapped build
-; (_CoqProject has no library concept at all) sees it from
-; set_.ml/showable.ml -- if the names didn't match,
-; dune would require the cross-library reference `Showable_.Type_`, which
-; `make` has no equivalent of.
+; the wrapper to a bare [Type_], so that set_.ml/showable.ml see it as
+; [Type_] -- if the names didn't match, dune would require the cross-library
+; reference `Showable_.Type_`. (The bare name dates from the `make` build,
+; with no library concept, removed on 2026-11-05.)
 (library
  (name type_)
  (public_name rocq-mebi.showable.type)

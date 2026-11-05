@@ -6,7 +6,7 @@
 #   solves.tsv and runs.tsv), e.g. one built from main and one from a
 #   branch.
 #
-# Prints every MeBi Sim Solve whose status or iteration count differs (a
+# Prints every proof search (sim/bisim; formerly MeBi Sim Solve) whose status or iteration count differs (a
 # change of status is a regression; a change of count needs explaining, see
 # CLAUDE.md), every Solve present in only one run, and each file's time and
 # peak memory side by side. Exits 1 if any Solve differs, else 0.

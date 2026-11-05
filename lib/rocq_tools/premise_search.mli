@@ -28,7 +28,7 @@ val default_depth : int
 val is_prop : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 
 (** The most nested constructor applications a search may try; set by
-    [MeBi Config Premise Depth]. *)
+    [Set MeBi PremiseDepth]. *)
 val max_depth : int ref
 
 (** [prove env sigma goal] is what a bounded proof search concludes about
@@ -69,7 +69,7 @@ val negation_tac : unit Proofview.tactic
 val default_range : int
 
 (** The most values of [k] a bounded universal may range over to be
-    decided ([MeBi Config Premise Range]). *)
+    decided ([Set MeBi PremiseRange]). *)
 val max_range : int ref
 
 (** [is_bounded_universal env sigma t] is whether [t] is

@@ -30,14 +30,14 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test4.NormTermTests".
 MeBi Config Weak As Option label.
 
 (* 82 states from each of p, q, r: the least bound that completes *)
-MeBi Config Bounds As Num States 82.
+Set MeBi MaxStates 82.
 MeBi Run LTS p Using nLTS core termLTS.
 MeBi Run LTS q Using nLTS core termLTS.
 MeBi Run LTS r Using nLTS core termLTS.
-MeBi Config Bounds As Num States 81.
+Set MeBi MaxStates 81.
 Fail MeBi Run LTS p Using nLTS core termLTS.
 
-MeBi Config Bounds As Num States 200.
+Set MeBi MaxStates 200.
 MeBi Run Bisim p With nLTS And q With nLTS Using nLTS core termLTS.
 MeBi Run Bisim q With nLTS And r With nLTS Using nLTS core termLTS.
 MeBi Run Bisim p With nLTS And r With nLTS Using nLTS core termLTS.

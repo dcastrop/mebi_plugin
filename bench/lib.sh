@@ -120,25 +120,25 @@ bench_capped() {
 }
 
 # bench_rows SUITE MODE NAME LOG SOLVES RUNS: from one proof file's LOG,
-# append a row per [MeBi Sim Solve] to SOLVES (suite, mode, file, index,
-# Solved/Unsolved, iterations, then from [rocq compile -time]'s lines: the
-# proof's name and the seconds its Begin, Solve and Qed took, "?" for any
-# missing) and one row for the file to RUNS (suite, mode, file, exit,
+# append a row per proof search (each [sim]/[bisim], formerly each [MeBi
+# Sim Solve]) to SOLVES (suite, mode, file, index, Solved/Unsolved,
+# iterations, then from [rocq compile -time]'s lines: the proof's name and
+# the seconds its search and Qed took, "?" for any missing; the Begin column
+# is "-" since 2026-11-05, as the tactic times setup and search together) and one row for the file to RUNS (suite, mode, file, exit,
 # seconds, peak MB, errors).
 bench_rows() {
   local suite=$1 mode=$2 name=$3 log=$4 solves=$5 runs=$6
-  # A proof's lines come in the order: its statement, Begin's time, the
-  # "Solved after" message, Solve's time, Qed's time.
+  # A proof's lines come in the order: its statement, the "Solved after"
+  # message, the tactic's time, Qed's time.
   awk -v s="$suite" -v m="$mode" -v f="$name" '
     function secs(line) {
       sub(/ secs.*/, "", line); sub(/.*\] /, "", line); return line
     }
     /^Chars .* \[(Example|Lemma|Theorem|Corollary|Fact|Remark|Proposition)~/ {
       p = $0; sub(/.*\[[A-Za-z]+~/, "", p); sub(/[~.:(].*/, "", p)
-      proof = p; begun = "?"; open = 0; next
+      proof = p; begun = "-"; open = 0; next
     }
-    /^Chars .* \[MeBi~Sim~Begin~/ { begun = secs($0); next }
-    /^Chars .* \[MeBi~Sim~Solve~/ { if (n) solve[n] = secs($0); open = n; next }
+    /^Chars .* \[(Fail~)?(bi)?sim\.\]/ { if (n) solve[n] = secs($0); open = n; next }
     /^Chars .* \[(Qed|Defined)\.\]/ { if (open) qed[open] = secs($0); open = 0; next }
     /(Uns|S)olved after [0-9]+/ {
       match($0, /(Uns|S)olved after [0-9]+/)
