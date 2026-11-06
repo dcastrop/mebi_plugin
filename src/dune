@@ -22,6 +22,7 @@
   rocq-mebi.terms
   rocq-mebi.rocq_tools
   rocq-mebi.model
+  rocq-mebi.rules ; S2: an LTS's constructors read as rules
   yojson
   benchmark)
  ; cppo, as in lib/rocq_tools/dune: see the comment there.

@@ -9443,6 +9443,64 @@ Optimization 0 · Bug fix 0 · New feature 5.
 
 ---
 
+## 2026-11-06 — S2: an LTS's constructors read as rules
+
+Decided with @dcastrop one question at a time, in
+`doc/s2-linearisation.md`.
+- **A restart.** The first attempt (2026-11-05) assumed a parallel
+  structure (a "skeleton" with "components") that is specific to one kind
+  of term language. @dcastrop's counter, `state0{n} -[n]-> state0{n+1}`,
+  showed it does not generalise. I also explained the decisions poorly,
+  and the answers were withdrawn.
+- **The design as restarted:**
+  - **A rule is one constructor:** its variables, its premises, and its
+    conclusion, `source --label--> target`.
+  - **A premise is either** a step of an LTS, or a proposition with an
+    instance of stdlib's `Decidable` class, whose boolean witness is kept
+    for the symbolic side.
+  - **Terms become bits** by serialising the term tree into a fixed
+    format, with functions compiled to BDD operations. The format's depth
+    is given by the user, or grown from a heuristic start.
+  - **Infinite-state systems** (`P = a.(P | P)`) are left to S4 and S6.
+- **New feature (debug).** `Print MeBi Rules <lts>`
+  (`src/g_mebi.mlg`): prints the rules of an LTS and of every LTS its
+  premises step by.
+- **Tooling.** A new library, `lib/rules/` (`rocq-mebi.rules`):
+  `Rules.of_lts` and `Rules.pr`. It reuses `Rocq_utils.lts_shaped` and
+  `Premise_search.is_prop`; no existing logic changed.
+- **`theories/loader.v`** Requires `Stdlib.Classes.DecidableClass` (a
+  Require, not an Import).
+- **Tests:** `Test.v`, `PrintRules`: the counter, a decidable premise,
+  and two refusals, each checked for its reason through `rocq repl`.
+- **Tried on:** CCS, `Proc` and CADP, where it also reads targets computed
+  by functions (`do_act`, `take_branch`, `unfold`).
+- **Builds:** `dune build` (capped, `-j 3`) passes, `tests.exe` is
+  111/111, and the module-list check passes.
+
+### CI fixed: the S0 prototype without CUDD
+
+- **Bug fix (my mistake).** CI had failed since the commit that added
+  `bench/symbolic/`. `dune build` stopped at "Library `cudd` not found":
+  CI has no `mlcuddidl`, and marking the executable `(optional)` does not
+  stop dune from reporting the missing library. I had only built where
+  CUDD is installed.
+- **Fix:** the executable picks its BDD module with dune's `select`:
+  - `bdd_cudd.real.ml` (the old `bdd_cudd.ml`) where `cudd` is
+    installed;
+  - otherwise `bdd_cudd.stub.ml`, which fails at run time naming what to
+    install.
+- **Checked both ways** locally, the stub by naming a library that does
+  not exist.
+- **Every CI step passes locally:** the module check, `dune build`,
+  `tests.exe`, `satdiff`, `mebi_bench --check`. CI runs Rocq 9.2 and
+  this machine 9.3. Every Rocq API the new code (`lib/rules`,
+  `user_tactics.ml`) uses was checked against the 9.2 sources.
+
+**Session tally (2026-11-06):** New feature 1 · Tooling 1 · Docs 1 ·
+Refactor 0 · Optimization 0 · Bug fix 1.
+
+---
+
 ## Outstanding
 
 **Superseded 2026-10-10 by [`OUTSTANDING.md`](OUTSTANDING.md)**, which tracks every open item. The list below is kept as history.

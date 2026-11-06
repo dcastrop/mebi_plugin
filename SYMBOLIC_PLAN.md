@@ -8,6 +8,10 @@ A plan, written 2026-11-05 at @dcastrop's request.
   [`bench/symbolic/`](bench/symbolic/)).
 - **U (`bisim.`, `sim.`, `Set MeBi ...`) done:** the old commands are
   removed and every checked-in proof uses the tactics (see U, "Result").
+- **S2 begun:** reading an LTS's constructors as rules
+  (`lib/rules/`, `Print MeBi Rules`), decided step by step in
+  [`doc/s2-linearisation.md`](doc/s2-linearisation.md). The bit format
+  is next.
 - **The rest not started.**
 
 **This is a new capability**, in the sense of `CLAUDE.md`'s working

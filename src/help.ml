@@ -78,8 +78,10 @@ let text : string list -> string option = function
        second (a preorder, so the order matters). It walks the pairs of states \
        reachable from the two terms; when an FSM is saturated on demand that \
        walk needs Set MeBi MaxGame <n>. To prove what these decide, state the \
-       goal and use the bisim or sim tactic. See: MeBi Help Premises, MeBi \
-       Help Sim."
+       goal and use the bisim or sim tactic. Print MeBi Rules <lts> shows the \
+       rules read from an LTS's constructors (for debugging the symbolic \
+       route, doc/s2-linearisation.md). See: MeBi Help Premises, MeBi Help \
+       Sim."
   | [ "Sim" ] ->
     Some
       "bisim [<n>].  sim [<n>].  debug bisim [<n>].  debug sim [<n>].\n\

@@ -9,9 +9,16 @@
  (wrapped false)
  (libraries rocq-mebi.model yojson unix))
 
-; Only where mlcuddidl is installed; skipped elsewhere (CI does not have it).
+; Where opam's mlcuddidl (CUDD) is not installed, as on CI, bdd_cudd.ml is
+; a stub that fails at run time, so `dune build` still succeeds. (An
+; (optional) executable is not enough: dune reports the missing library.)
 (executable
  (name main)
  (modules bdd_cudd main)
- (optional)
- (libraries symbolic_core cudd))
+ (libraries
+  symbolic_core
+  (select
+   bdd_cudd.ml
+   from
+   (cudd -> bdd_cudd.real.ml)
+   (-> bdd_cudd.stub.ml))))

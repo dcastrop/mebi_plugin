@@ -20,6 +20,31 @@ let () =
 
 DECLARE PLUGIN "rocq-mebi.mebi"
 
+(* S2 (doc/s2-linearisation.md): the rules read from an LTS's
+   constructors, for debugging. *)
+VERNAC COMMAND EXTEND MeBi_Print_Rules CLASSIFIED AS QUERY
+| [ "Print" "MeBi" "Rules" reference(r) ] ->
+  { let env = Global.env () in
+    let sigma = Evd.from_env env in
+    match Nametab.global r with
+    | Names.GlobRef.IndRef ind ->
+      (match Rules.of_lts env sigma ind with
+       | ltss -> Feedback.msg_notice (Rules.pr env sigma ltss)
+       | exception Rules.Not_an_lts i ->
+         CErrors.user_err
+           Pp.(Printer.pr_global (Names.GlobRef.IndRef i)
+               ++ str " is not an LTS: an inductive [M -> option A -> M -> Prop] without parameters.")
+       | exception Rules.Not_decidable (c, ctx, p) ->
+         CErrors.user_err
+           Pp.(str "In " ++ Names.Id.print c ++ str ", the premise "
+               ++ Printer.pr_constr_env (Environ.push_rel_context ctx env) sigma p
+               ++ str " is neither a step of an LTS nor a proposition with a [Decidable] instance (Stdlib.Classes.DecidableClass).")
+       | exception Rules.Decidable_not_loaded ->
+         CErrors.user_err
+           (Pp.str "Stdlib's Decidable class is not loaded: [Require MEBI.loader.] loads it."))
+    | _ -> CErrors.user_err Pp.(Libnames.pr_qualid r ++ str " is not an inductive.") }
+END
+
 (* [bisim] and [sim]: a [weak_bisimilar] or [weak_sim] goal proved with no
    setup, its LTSs, terms, [Using] list and silent label read from the goal
    ([User_tactics]); limits come from [Set MeBi ...] options. *)

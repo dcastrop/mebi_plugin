@@ -3,6 +3,11 @@ From MEBI Require Export Bisimilarity.
 From MEBI Require Export Premises.
 Declare ML Module "rocq-mebi.mebi".
 
+(* The decidable premises of [Print MeBi Rules] (S2,
+   doc/s2-linearisation.md, decision 9): a Require, not an Import, so no
+   names enter scope; stdlib's instances are #[global]. *)
+From Stdlib Require Classes.DecidableClass.
+
 (* MeBi API Initialize. *)
 
 (* Print Registered. *)

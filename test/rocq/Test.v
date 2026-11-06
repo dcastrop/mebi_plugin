@@ -2475,3 +2475,30 @@ Module Tactics.
   Lemma steps_n : weak_sim step step (pre a done) (tau (pre a done)).
   Proof. sim 0. debug sim 2. sim 100. Qed.
 End Tactics.
+
+(* S2 (doc/s2-linearisation.md): [Print MeBi Rules] reads an LTS's
+   constructors as rules: variables, premises (steps, and decidable
+   propositions, marked [Decidable]), and conclusion; and the LTSs its
+   premises step by, transitively. A premise that is neither a step nor
+   decidable is refused. *)
+MeBi Divider "Theories.Test.PrintRules".
+Module PrintRules.
+  Inductive st := state0 (n : nat).
+  Inductive counter : st -> option nat -> st -> Prop :=
+  | tick : forall n, counter (state0 n) (Some n) (state0 (S n)).
+  Print MeBi Rules counter.
+
+  Inductive act := a | b.
+  Inductive tm := done | pre (x : act) (k : tm) | hide (k : tm).
+  Definition visible (x : option act) : bool :=
+    match x with Some b => false | _ => true end.
+  Inductive step : tm -> option act -> tm -> Prop :=
+  | s_pre x k : step (pre x k) (Some x) k
+  | s_hide k l k' : step k l k' -> visible l = true -> step (hide k) l (hide k').
+  Print MeBi Rules step.
+
+  Inductive opaque : nat -> option nat -> nat -> Prop :=
+  | q : forall n m, (exists k, k = n) -> opaque n None m.
+  Fail Print MeBi Rules opaque.
+  Fail Print MeBi Rules act.
+End PrintRules.
