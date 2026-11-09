@@ -1,49 +1,15 @@
 Set Debug "backtrace".
 From MEBI Require Export Bisimilarity.
-From MEBI Require Export Premises.
 Declare ML Module "rocq-mebi.mebi".
 
-(* The decidable premises of [Print MeBi Rules] (S2,
-   doc/s2-linearisation.md, decision 9): a Require, not an Import, so no
-   names enter scope; stdlib's instances are #[global]. *)
+(* The decidable premises of a rule ([Print MeBi Rules]): a Require, not
+   an Import, so no names enter scope; stdlib's instances are #[global]. *)
 From Stdlib Require Classes.DecidableClass.
 
-(* MeBi API Initialize. *)
-
-(* Print Registered. *)
-(* Print ex. *)
-(* Print ex_intro. *)
-(* Print exist. *)
-(* Print existT. *)
-
+(* The lemmas a certificate's facts apply (theories/DdTree.v,
+   doc/certificate.md): required, not imported. *)
+From MEBI Require DdTree.
+(* the theorems from the certificate (theories/DdGame.v) *)
+From MEBI Require DdGame DdEnc.
 MeBi Divider "Loading MeBi Plugin".
-(* MeBi Config Reset. *)
 MeBi Divider.
-
-(* Inductive printout_mode : Set :=
-| RunCheck : printout_mode (* only warning printouts *)
-| ShowInfo : printout_mode (* show more printouts *)
-| Verbose  : printout_mode (* show more detailed printouts *)
-.
-Definition DefaultPrintoutMode := RunCheck.
-
-Require Export String.
-Inductive output_mode : Set := 
-| OutputMode : option string -> printout_mode -> output_mode.
-Definition DefaultOutputMode := OutputMode None DefaultPrintoutMode.
-
-(** debugging commands *)
-Inductive single_model_commands (A B : Type) : Type :=
-| MakeLTS : A -> B -> B -> option nat -> output_mode -> single_model_commands A B 
-| MakeFSM : A -> B -> B -> option nat -> output_mode -> single_model_commands A B 
-| CheckSaturation : A -> B -> B -> option nat -> output_mode -> single_model_commands A B 
-.
-
-Inductive plugin_command (A B C D : Type) : Type :=
-| CheckBisimilarity : A -> B -> B -> option nat -> 
-                      C -> D -> D -> option nat -> 
-                      output_mode -> plugin_command A B C D. *)
-
-
-(* Check (MakeLTS nat bool 0 false true None DefaultOutputMode). *)
-(* Check (MakeLTS nat (option bool) 0 None (Some _) None DefaultOutputMode). *)

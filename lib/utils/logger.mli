@@ -18,6 +18,13 @@ val set_sink : sink -> unit
     {!Output.Kind.default}. Raises nothing. *)
 val configure : Output.Kind.t -> bool -> unit
 
+(** [set_enabled_test f] makes [f k] decide whether kind [k] is emitted,
+    instead of {!configure}'s table. The plugin installs one at load, so
+    that inside Rocq a kind is on exactly when Rocq's own setting says so
+    ([Set Debug "mebi"], ...: [src/rocq_output.ml]).
+    Raises nothing. *)
+val set_enabled_test : (Output.Kind.t -> bool) -> unit
+
 (** [reset_config ()] drops every per-kind setting: each kind is back to
     its default. Raises nothing. *)
 val reset_config : unit -> unit

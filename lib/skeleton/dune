@@ -1,0 +1,9 @@
+; doc/skeleton.md: from the user's rules to a
+; vector, for one start term. Uses rocq-runtime; only the plugin (src/) uses
+; it.
+(library
+ (name skeleton)
+ (public_name rocq-mebi.skeleton)
+ (libraries rocq-runtime.vernac rocq-mebi.rules)
+ (modules container skeleton)
+ (wrapped false))

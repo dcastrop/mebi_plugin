@@ -1,10 +1,12 @@
 (* Moving weak (bi)similarity results between two semantics of one system
    (added 2026-10-11).
 
-   A model often has a faithful semantics, and a smaller one on which the
-   plugin can decide and prove things: congruent states identified
-   ([examples/ProcCongruence.v]), or dead data erased ([examples/CADP/Norm.v],
-   [examples/CADP/Obs.v]). Each example used to prove by hand, with its own
+   A model may have a faithful semantics, and a smaller one on which the
+   plugin can decide and prove things: congruent states identified, or
+   dead data erased. (The examples that did this, Proc's normalised
+   semantics and CADP's, were removed on 2026-11-09, when the examples were
+   cut to proving the faithful semantics directly; test/rocq/Test.v still
+   uses this file.) An example would prove by hand, with its own
    coinduction, that the two are weakly bisimilar, and then derive transfer
    theorems from it. This file holds the generic parts, so an example only
    discharges its model-specific obligations:

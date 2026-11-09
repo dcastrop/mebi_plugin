@@ -1,0 +1,99 @@
+% Shared preamble for the mebi_plugin technical report.
+% keep spaces inside \code (url drops them by default), and break there
+\PassOptionsToPackage{obeyspaces,spaces}{url}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{mathpartir}
+\usepackage{booktabs,longtable,tabularx,array}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes,fit,calc,automata,backgrounds}
+\usepackage{enumitem}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\usepackage[nameinlink,capitalise]{cleveref}
+
+\setlength{\parskip}{0.4em}
+\setlength{\parindent}{0pt}
+\setlength{\emergencystretch}{3em}
+\setlist{nosep,leftmargin=*}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{example}[definition]{Example}
+\theoremstyle{plain}
+\newtheorem{theorem}[definition]{Theorem}
+\newtheorem{lemma}[definition]{Lemma}
+\newtheorem{proposition}[definition]{Proposition}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+
+% ---- pointers into the code -------------------------------------------
+% \loc{path}{line}      -> path:line         (one line)
+% \locr{path}{from}{to} -> path:from--to     (a range)
+% \file{path}           -> path              (a whole file)
+% \code{text}           -> inline code (identifiers, commands)
+% paths break at any character (xurl), so long ones do not overflow
+\DeclareRobustCommand{\file}[1]{\nolinkurl{#1}}
+\DeclareRobustCommand{\loc}[2]{\nolinkurl{#1:#2}}
+\DeclareRobustCommand{\locr}[3]{\nolinkurl{#1:#2}\texttt{--#3}}
+\DeclareRobustCommand{\code}[1]{\ifmmode\texttt{\detokenize{#1}}\else\nolinkurl{#1}\fi}
+
+% ---- notation -----------------------------------------------------------
+\newcommand{\tr}[1]{\xrightarrow{#1}}           % strong step
+\newcommand{\wtr}[1]{\stackrel{#1}{\Longrightarrow}} % weak step
+\newcommand{\silent}{\tau}
+\newcommand{\Opt}{\mathsf{option}}
+\newcommand{\Some}{\mathsf{Some}}
+\newcommand{\None}{\mathsf{None}}
+\newcommand{\wsim}{\precsim}                     % weak simulation
+\newcommand{\wbis}{\approx}                      % weak bisimilarity
+\newcommand{\pow}{\mathcal{P}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\States}{\mathcal{S}}
+\newcommand{\Labels}{\mathcal{A}}
+
+% ---- listings -----------------------------------------------------------
+\definecolor{kw}{RGB}{0,60,140}
+\definecolor{cm}{RGB}{100,100,100}
+\definecolor{bgc}{RGB}{247,247,247}
+\lstdefinelanguage{Rocq}{
+  morekeywords={Inductive,CoInductive,Definition,Fixpoint,CoFixpoint,Lemma,
+    Theorem,Proof,Qed,Defined,Class,Instance,Section,End,Variable,Variables,
+    Context,match,with,end,fun,forall,exists,let,in,if,then,else,Require,
+    Import,From,Export,Module,Ltac,Record,Arguments,Hint,Set,Unset,Notation},
+  sensitive=true,
+  morecomment=[s]{(*}{*)},
+  morestring=[b]",
+}
+\lstdefinelanguage{OCamlx}[Objective]{Caml}{morekeywords={;;}}
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cm}\itshape,
+  backgroundcolor=\color{bgc},
+  frame=single, framerule=0pt,
+  columns=fullflexible, keepspaces=true,
+  breaklines=true, breakatwhitespace=true,
+  showstringspaces=false,
+  upquote=true,
+  literate={→}{{$\to$}}1 {⇒}{{$\Rightarrow$}}1 {τ}{{$\tau$}}1 {≤}{{$\le$}}1
+           {≥}{{$\ge$}}1 {×}{{$\times$}}1 {·}{{$\cdot$}}1 {—}{{---}}1 {–}{{--}}1
+           {’}{{'}}1 {‘}{{`}}1,
+}
+\lstnewenvironment{rocq}[1][]{\lstset{language=Rocq,#1}}{}
+\lstnewenvironment{ocaml}[1][]{\lstset{language=OCamlx,#1}}{}
+\lstnewenvironment{shell}[1][]{\lstset{language={},#1}}{}
+
+% ---- tikz styles -------------------------------------------------------
+\tikzset{
+  box/.style={draw,rounded corners=2pt,align=center,font=\small,inner sep=4pt},
+  st/.style={circle,draw,minimum size=6mm,inner sep=1pt,font=\small},
+  dep/.style={-{Stealth[length=2mm]}},
+  lbl/.style={font=\scriptsize,fill=white,inner sep=1pt},
+}

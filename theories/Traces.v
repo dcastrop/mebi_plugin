@@ -6,8 +6,8 @@
    about their behaviour: which sequences of visible actions they can do
    (their weak traces, [weak_trace]), and which visible action each can do
    next once silent steps are ignored ([weak_can]). This file says which
-   of them each relation preserves, so a result proved for one semantics
-   (glued, normalised) can be read off for another (layered).
+   of them each relation preserves, so a result proved against a
+   specification can be read off as a property of the system's behaviour.
 
    - [weak_sim m n]: every weak trace of [m] is one of [n]
      ([weak_sim_traces]). So a safety property, one every trace of [n]
@@ -18,18 +18,19 @@
      same next actions ([weak_bisimilar_ready]), so in particular the same
      deadlocks ([weak_bisimilar_deadlock]). Mutual similarity does not give
      this: [a.b + a] and [a.b] have the same traces, but only the first can
-     be stuck after [a] (Test.v, [WeakBisimilarVsMutualSim]).
+     be stuck after [a].
 
    What does NOT carry over: divergence (weak bisimilarity ignores silent
    loops, so "eventually" properties are not preserved; [examples/README.md],
    "No starvation"), internal states and labels hidden as silent, and the
    number of steps taken.
 
-   As for [MEBI.Transfer] and [MEBI.Hiding], these are generic theorems.
-   An example links them to its own property by a characterisation lemma:
+   As for [MEBI.Transfer], these are generic theorems. An example links
+   them to its own property by a characterisation lemma:
    [examples/CADP/SpecMutex.v]'s [spec_lts_mutex] says every trace of the
-   lock server is mutually exclusive, and [examples/CADP/LayeredTransfer.v]
-   carries that to the layered model. *)
+   lock server is mutually exclusive, so with [weak_sim_safe] a proof that
+   the lock server simulates the processes ([examples/CADP/MutualExclusion.v])
+   makes their traces mutually exclusive. *)
 
 From Corelib Require Import Relations.Relation_Definitions.
 From Stdlib Require Import Relations.Relation_Operators.

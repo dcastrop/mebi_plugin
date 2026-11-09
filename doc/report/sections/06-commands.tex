@@ -1,0 +1,63 @@
+\section{Commands and options}\label{sec:commands}
+
+\file{theories/loader.v} loads the plugin (\code{Require Import MEBI.loader.}).
+The grammar is \file{src/g_mebi.mlg}; \code{MeBi Help.} lists the topics
+(\file{src/help.ml}).
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+command & what it does\\
+\midrule
+\code{sim.} \code{bisim.} \code{weak_sim.} \code{weak_bisim.} &
+  tactics: decide a \code{strong_sim}, \code{strong_bisimilar},
+  \code{weak_sim} or \code{weak_bisimilar} goal between closed terms
+  (\file{src/user_tactics.ml}); a negative verdict is an error; on a
+  positive one the goal is closed by the proof built from the certificate
+  (\cref{sec:qed}), checked by the kernel at \code{Qed}\\
+\code{debug} \emph{tactic}\code{.} & the same, and first the engine's
+  report (states, pairs, summands, projections, iterations, time)\\
+\code{MeBi Check Log "<file>".} & the log's records as facts, each chunk a
+  constant the kernel checks (\cref{sec:prooflog:facts}); a relative path is
+  taken from the file's directory\\
+\code{Print MeBi Rules <lts>.} & the rules the engine reads from the LTS's
+  constructors\\
+\code{Print MeBi Skeleton <term> Using <lts>.} & the start term's shapes,
+  slots and summands, and the reorderings found in the rules\\
+\code{MeBi Congruence <lts> <rule> ...} & the rules to take as the LTS's
+  structural congruence, by hand\\
+\code{MeBi Message}, \code{MeBi Debug}, \code{MeBi Divider} & print a line\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Options}\label{sec:commands:options}
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+option & default & what it does\\
+\midrule
+\code{Set MeBi Log Mode "off"|"keep".} & \code{"off"} &
+  the log, kept in memory while the tactic proves the lemma and freed
+  once the proof is built; or written to a file and kept, for
+  \code{MeBi Check Log}. Any other value is refused\\
+\code{Set MeBi Log Directory "<dir>".} & next to the file &
+  the plugin's files for a file \code{F.v} go in the directory
+  \file{.F.v.mebi} next to it: the kept log of a lemma \code{L} is
+  \file{.F.v.mebi/L.log}, with a log's facts while \code{MeBi Check Log}
+  checks them (deleted once read). With this option, \file{.F.v.mebi} goes in
+  \file{<dir>} instead (relative to \code{F.v}'s directory); \code{Unset}
+  goes back\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Environment variables, for measuring (\file{CLAUDE.md}):
+\code{MEBI_CERT_STATS=1} prints each phase with the process's memory and
+each game iteration; \code{MEBI_CERT_STOP=decided} stops the process once
+the engine has decided; \code{MEBI_CERT_KEEP=1} keeps a log's facts file;
+\code{MEBI_LOG_FACTS=<file>} makes \code{MeBi Check Log} read a facts file
+instead of translating the log.

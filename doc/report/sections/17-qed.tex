@@ -1,0 +1,472 @@
+\section{The proof of a goal}\label{sec:qed}
+
+\Cref{sec:prooflog} turned Sylvan's log into \emph{facts} about decision
+diagrams. This section shows how the tactic turns those facts into a
+proof of the goal itself, so that a file ends with \code{Qed}:
+\begin{verbatim}
+Example s1 : strong_sim step step (par A B) (par B A).
+Proof. sim. Qed.
+\end{verbatim}
+The tactic decides the goal, Sylvan logs the decision (the
+\emph{certificate}), and the tactic builds from it a proof that Rocq's
+kernel checks at \code{Qed}. The proof uses no axiom: \code{Print
+Assumptions s1} says ``Closed under the global context''
+(\file{test/rocq/LogTest.v}). The section first defines what it needs
+from Rocq (\cref{sec:qed:rocq}), then the example
+(\cref{sec:qed:example}), the theorem the proof applies
+(\cref{sec:qed:theorem}) and how each of its hypotheses is proved
+(\cref{sec:qed:parts}); then how the pieces are put together
+(\cref{sec:qed:assembly}), what Rocq computes (\cref{sec:qed:computes}),
+how large goals were made to fit (\cref{sec:qed:fit}), the cost
+(\cref{sec:qed:cost}) and how to try it (\cref{sec:qed:try}).
+
+\subsection{What this section needs from earlier sections}\label{sec:qed:terms}
+
+Each term below is defined, with an example, where the cross-reference
+points; here is what each means for this section.
+\begin{itemize}
+\item A \emph{diagram} is a set of vectors of numbers, stored as a tree of
+  \emph{nodes}: a node holds a value, a child \emph{down} (the rest of the
+  vectors with that value) and a child \emph{right} (the vectors with a
+  larger value there); the nodes reached by following right children
+  from a node are its \emph{siblings} (\cref{sec:prooflog:background}).
+\item A \emph{relation} is a diagram of \emph{tuples}: per position of a
+  vector, a code says whether the step copies the value, reads it, or
+  reads it and writes a new one, and the tuple holds the values read and
+  written (\cref{sec:prooflog:images}).
+\item The \emph{mover} is the system whose moves must be answered, the
+  \emph{answerer} the one that answers them
+  (\cref{sec:prooflog:background}).
+\item A \emph{summand} is one way a state of a given shape can step: a
+  chain of rules from the shape to a step of one of its slots
+  (\cref{sec:containers}).
+\item A \emph{fact} is one lemma of \file{theories/DdTree.v} applied to
+  nodes and to other facts; it states what one of Sylvan's computations
+  produced (a union, a difference, an image), and the kernel accepts it
+  by typechecking (\cref{sec:prooflog:facts}). A \emph{chunk} is a batch
+  of facts with the nodes they name, translated from the log together.
+\end{itemize}
+
+\subsection{What this section needs from Rocq}\label{sec:qed:rocq}
+
+\paragraph{Terms, types, the kernel.} In Rocq a proof is a \emph{term}
+whose \emph{type} is the statement it proves: a function taking a proof
+of $A$ to a proof of $B$ proves $A \to B$. The \emph{kernel} is the small
+part of Rocq that checks a term against its type (it \emph{typechecks}
+it); nothing else is trusted. A \emph{tactic} is a program that builds
+a term while a proof is in progress; \code{Qed} hands the finished term
+to the kernel. The plugin's tactic builds the whole term at once and
+gives it to Rocq without checking it (\code{exact_no_check}): the
+kernel's check at \code{Qed} is the only one that counts.
+
+\paragraph{Conversion.} While typechecking, the kernel may need two types
+to be equal that are written differently, and it accepts them when one
+\emph{computes} to the other: unfolding a definition, applying a function
+to its argument, taking the matching branch of a \code{match}. This is
+\emph{conversion}. \emph{Example:} if \code{val} looks a number up in a
+table of values, a proof about \code{val 3} serves for the value stored
+at 3, because \code{val 3} computes to it. Conversion is the only
+computation the plugin's proofs rely on (\cref{sec:qed:computes}).
+
+\paragraph{Definitions and \code{let}.} A \emph{constant} is a named
+global definition: a body and its type. It is \emph{transparent} when
+conversion may unfold it (a datum, such as a table of values, must be:
+its contents matter), and \emph{opaque} when it may not (a proof: only its
+statement matters, so nothing ever needs to look inside it). Inside a
+term, \code{let x := b : T in c} names \code{b} as \code{x} within
+\code{c}; the kernel checks \code{b} once, however many times \code{c}
+uses \code{x}.
+
+\paragraph{Constants made by a tactic.} Rocq's tactic \code{abstract}
+proves a sub-goal and declares the proof as an opaque constant of its own,
+a \emph{side effect} of the proof in progress: the kernel checks it at
+once, the proof's term only names it, and at \code{Qed} it is kept as a
+global constant (\code{s1_subproof}). The plugin declares its pieces the
+same way, named after the lemma (\code{s1_mb_case3} and so on).
+
+\paragraph{Elaboration.} Rocq's \emph{elaborator} turns text written in
+Gallina (Rocq's language) into a term, inferring what the text leaves
+out: the types of the arguments marked \code{_}, the type of a
+\code{match}'s result. The plugin writes the parts of a proof that are
+specific to a goal as such text and has Rocq elaborate it.
+
+\subsection{The running example}\label{sec:qed:example}
+
+\file{test/rocq/LogTest.v} defines processes \code{pr} (\code{nil},
+\code{pre x k}: the action \code{x} then \code{k}, and \code{par p q})
+and their steps \code{step}:
+\begin{itemize}
+\item \code{s_pre}: \code{pre x k} steps to \code{k} with label \code{x};
+\item \code{s_parl}: if \code{p} steps to \code{p'}, then \code{par p q}
+  steps to \code{par p' q};
+\item \code{s_parr}: the same on the right.
+\end{itemize}
+With \code{A = pre (Some a) (pre None (pre (Some a) nil))} and
+\code{B = pre (Some b) nil}, the goal says that \code{par B A} can match
+every step of \code{par A B} (\code{strong_sim}). The engine numbers the
+values it meets (1 is \code{A}, 2 is \code{B}, 3 is \code{pre None
+(pre (Some a) nil)}, 4 is \code{nil}, 5 is \code{pre (Some a) nil}) and
+the shapes (shape 1 is \code{par} with two slots). A state is then a
+\emph{vector}: \code{par A B} is $[1; 1; 2; 0; \dots]$ (shape 1, slot 0
+holds value 1, slot 1 holds value 2, unused positions 0). A pair of
+states is one vector, the answering system's positions first
+(\cref{sec:prooflog:fit}).
+
+\subsection{The theorem}\label{sec:qed:theorem}
+
+\file{theories/DdGame.v} proves once, for any systems, this theorem
+(\code{cert_strong_sim}; the weak and bisimilarity versions are alike):
+if
+\begin{enumerate}
+\item the \emph{game on vectors} holds: every move from a pair of the
+  diagram $z$ by a relation of the mover is answered into $z$ by a
+  relation of the answerer (\code{VSSim}; \code{VWSim} for weak);
+\item each system's states are \emph{encoded} as vectors (\code{EL},
+  \code{ER}), and the left system's vectors all have its width
+  (\code{LenL});
+\item the mover's relations are \emph{complete}: every step of an encoded
+  state of $z$ is a step of one of its relations (\code{CompleteR});
+\item the answerer's relations are \emph{sound}: every step of one of its
+  relations is a step of its states (\code{SoundL}),
+\end{enumerate}
+then any two states whose vectors form a pair of $z$ are related. The
+tactic proves the four hypotheses for its goal, and that the start pair
+is in $z$. Here $z$ is the diagram of pairs the engine's game ended with
+(\cref{sec:prooflog:background}); a \emph{relation} is a diagram of
+tuples, each a step of one rule with one label
+(\cref{sec:prooflog:images}).
+
+\subsection{The four hypotheses}\label{sec:qed:parts}
+
+\paragraph{1. The game} comes from the log's facts (\cref{sec:prooflog}):
+\file{src/game_proof.ml} applies the lemmas of \file{theories/DdGame.v}
+to the facts in the order the logged check ran. A sub-proof used twice
+(an image's property, a round of the silent closure) is a \code{let}:
+written out each time, the closure's rounds make the term grow
+exponentially.
+
+\paragraph{2. The encoding} (\code{DdEnc.enc}). Each shape has a
+predicate: for shape 1,
+\begin{verbatim}
+fun x rest => exists u0 u1, rest = [u0; u1; 0; ...]
+                         /\ x = par (val u0) (val u1)
+\end{verbatim}
+where \code{val} looks a value's number up in a binary tree of the values
+(\code{DdEnc.val}; the kernel follows one branch per binary digit). A
+vector \code{s :: rest} encodes \code{x} when the predicate of shape
+\code{s} holds of \code{x} and \code{rest}; the predicates are kept in a
+tree too, so the first number picks the shape. \code{par A B} and
+$[1; 1; 2; 0; \dots]$: take $u_0 = 1$, $u_1 = 2$; both equations hold by
+conversion (computing \code{val}).
+
+\paragraph{3. Soundness.} The answerer's relations are logged backwards
+(\cref{sec:prooflog:images}); each tuple, read forwards, must be a real
+step. For the relation of \code{s_parr} with label \code{Some a} of the
+system \code{par B A}, a tuple says ``slot 1 holds 1 and becomes 3''.
+One lemma per relation and pair of shapes says: for any numbers $c$, $w$,
+\emph{if} \code{par (val u0) (val c)} steps with \code{Some a} to
+\code{par (val u0) (val w)} for every $u_0$, \emph{then} the tuple
+$(c, w)$ is sound. Its proof takes the vector apart (the shape, then the
+template) and rewrites the slot it reads. Each tuple then applies the
+lemma to its numbers and to a \emph{derivation}, the rules applied:
+\begin{verbatim}
+fun u0 => s_parr (val u0) A (Some a) (pre None (pre (Some a) nil))
+                 (s_pre (Some a) (pre None (pre (Some a) nil)))
+\end{verbatim}
+The engine's rule interpreter knows the derivation
+(\code{Learn.derive_chain}): it is the same interpretation that found the
+step. \code{AllT} (\file{theories/DdEnc.v}) walks the relation's diagram,
+one tuple per leaf: \code{AllT d Q} says that \code{Q} holds of every
+tuple of the diagram \code{d}, and is proved node by node (\code{allt_0},
+\code{allt_1}, \code{allt_nd}).
+
+\paragraph{4. Completeness} is the hard direction: every step of the
+mover's state is a tuple. Take a state of shape 1,
+\code{par (val u0) (val u1)}, and a step \code{T} from it.
+\begin{itemize}
+\item \emph{The case lemma}, one per LTS, says which rule made a step:
+  it is a match on the step (no tactic), one disjunct per rule, each with
+  the rule's variables, its premises, and equations ``the source is the
+  rule's source'', ``the label is the rule's label'', ``the target is
+  the rule's target''.
+\item \emph{Small inversion} \citep{monin-shi13} removes the equations. For \code{s_pre}, the
+  equation \code{par (val u0) (val u1) = pre x k} is impossible: a match
+  on it, with \code{par} giving \code{True} and anything else
+  \code{False}, proves \code{False} from \code{I}. For \code{s_parl},
+  the equation \code{par (val u0) (val u1) = par p q} replaces \code{p}
+  and \code{q} by the slots' values in every remaining hypothesis.
+\item \emph{Coverage.} The premise is now a step of \code{val u0}, a
+  value we know nothing about. The engine learned the steps of slot 0
+  for every value slot 0 takes in $z$ (its \emph{projections}: 1, 3, 4
+  and 5), and logged that $z$ has no other: the image of $z$ by the
+  shape's filter (complete) lies within its image by the projections
+  (sound), \code{DdEnc.cov_of}. So the proof splits on $u_0 \in \{1, 3,
+  4, 5\}$, one case (a \emph{leaf}) per projection, \code{AllT} over the
+  projections' diagram. When the remaining hypotheses inspect only some
+  of the slots (in CADP, a process's program point, not its variables),
+  the projections that agree on those slots share one lemma over the
+  other slots' numbers, and each projection is that lemma applied to its
+  numbers and to its steps' \emph{witnesses}, terms built without
+  elaboration.
+\item \emph{Step lemmas.} In the case $u_0 = 1$, the premise is a step of
+  the closed term \code{A}. Its step lemma, proved the same way, says
+  that \code{A}'s only step is \code{Some a} to \code{pre None (pre (Some
+  a) nil)}. A step lemma is per \emph{skeleton}: positions no rule
+  inspects are holes. The rule \code{s_pre} inspects neither argument of
+  \code{pre}, so one lemma serves every \code{pre x k}: its only step is
+  \code{x} to \code{k}. In CADP the processes' state is never inspected
+  by the rules' patterns, so one lemma per program point serves every
+  state and resource.
+\item \emph{The witness.} The proof's goal is then a step of a known
+  label and target, and the relation's tuple $(1, 3)$ for label
+  \code{Some a} matches it. The witness says so: the tuple is in the
+  relation's diagram (its \emph{membership}, \code{In_t r t}), what it
+  reads agrees with the state (\code{Reads}, each equation by
+  \code{eq_refl} on numbers), and the target is encoded by the vector
+  after the step (\code{post}). Memberships come from the log
+  (\cref{sec:qed:packs}).
+\end{itemize}
+Some cases are impossible and are refuted from the encoding: a
+projection of another shape (by the shape's number); a rule needing a
+slot to start with a constructor no value of its type starts with (in
+Proc, a reassociation needs \code{tpar} inside a slot;
+\code{DdEnc.val_all} proves no value has it); a shape no summand has
+($z$ holds none: an empty image, logged).
+
+\subsection{How the proof is put together}\label{sec:qed:assembly}
+
+In the order the tactic works (\file{src/user_tactics.ml},
+\code{prove}; \file{src/lts_proof.ml}, \code{qed_term}):
+\begin{enumerate}
+\item \textbf{Decide and log.} The engine decides the goal and repeats
+  the game's last check with Sylvan's log on (\cref{sec:prooflog:log}).
+  The log stays in Sylvan's memory: no file is written.
+\item \textbf{The plan.} The engine records what it logged and what the
+  proof needs from it: the shapes and values, each relation's label,
+  codes, diagram and rules, each summand's projections
+  (\code{Learn.Plan}).
+\item \textbf{The pieces.} The tactic builds the encodings, the case
+  and step lemmas, the coverages and the soundness of each relation
+  (\cref{sec:qed:parts}). Each piece is a constant, declared as
+  \code{abstract} declares a sub-proof (\cref{sec:qed:rocq}): a proof
+  opaque, a datum transparent, or written in place when it is a dozen
+  nodes or fewer. When a later piece's text is elaborated, a proof it uses
+  is visible as its statement only (it is never unfolded), a datum with
+  its body. A piece that mentions a fact of the certificate (a relation's
+  diagram, the list of relations) cannot know the fact yet, since the log
+  is read last: it takes the fact as an argument, and is used applied to
+  it.
+\item \textbf{The facts.} The tactic asks the log's translator for what
+  the pieces and the game need: an image's property, a union, a
+  difference, a node, a tuple's membership (each a \emph{request}). The
+  translator answers in \emph{chunks}, each a list of nodes and facts
+  with nodes of its own (\cref{sec:prooflog:facts}): the main chunk, then
+  one chunk per relation diagram the coverages name, then one chunk per
+  coverage's memberships (\cref{sec:qed:packs}). The lines go from the
+  translator to the chunk's reader as they are written: no file.
+\item \textbf{The memberships} of each coverage become one constant
+  (\cref{sec:qed:packs}), checked by the kernel at once.
+\item \textbf{The term.} The main chunk's nodes and facts become
+  \code{let}s; inside them, the game proved from the facts, the coverage
+  of each summand (its logged facts), and the theorem applied to the
+  pieces, each piece named by its constant applied to its facts. The
+  tactic closes the goal with that term; the kernel checks it at
+  \code{Qed}, with the constants it names already checked.
+\end{enumerate}
+
+\subsubsection{Memberships, packed}\label{sec:qed:packs}
+
+A coverage of three-process CADP has 21,903 leaves, each with a witness
+whose tuple must be in its relation: thousands of distinct memberships
+\code{In_t r t}, one fact each in the log. Two things make that costly.
+\begin{itemize}
+\item \emph{An application's cost.} A constant over $k$ facts is used
+  applied to $k$ arguments, and the kernel types such an application in
+  time proportional to $k^2$: for each argument it rebuilds the
+  argument's expected type under the substitution of all the arguments
+  before it (\code{Typeops.type_of_apply}). With $k$ in the thousands, a
+  single application took minutes.
+\item \emph{The memberships' size.} Proved one by one, every membership
+  walks its relation's diagram from the top
+  (\cref{sec:qed:fit:members}).
+\end{itemize}
+So a coverage's memberships are \emph{packed} into one fact. Their
+statements are numbered $1, \dots, k$ and kept in a binary tree by
+number, a \emph{trie} (\code{DdEnc.trie}): a datum, \code{MT}. One fact,
+\code{TAll MT}, says that every statement in the trie holds. A leaf takes
+its membership by its number $i$ with the lemma \code{DdEnc.tall_get}:
+from \code{TAll MT}, the entry of \code{MT} at $i$. The kernel finds that
+entry by conversion, following one branch per binary digit of $i$, as it
+finds a value by \code{val}. The coverage then takes one argument for
+all its memberships.
+
+\emph{Example.} Three memberships, numbered 1 to 3:
+\code{In_t r [1;3]}, \code{In_t r [2;3]}, \code{In_t r [5;4]}. The trie
+holds the first at its root (1), the second down the left (binary 10),
+the third down the right (11). The leaf that needs the third uses
+\code{tall_get MT 3 H}, of type ``the entry at 3'', which converts to
+\code{In_t r [5;4]}.
+
+The pack itself is proved apart from the main term, so that the kernel
+checks it while the proof is built, not inside the term it checks at
+\code{Qed}. The translator writes a chunk for each relation diagram the
+packs mention: its nodes only; the diagram becomes a transparent
+constant, \code{RR}, its nodes as \code{let}s. Then a chunk for each
+pack: the membership facts and the relations' nodes, its own. The pack
+becomes an opaque constant: the chunk's nodes and facts as \code{let}s,
+then the proof of \code{TAll MT} over the chunk's own diagrams, given the
+statement \code{TAll MT} over the \code{RR} constants. The two statements
+differ only in which copy of each diagram they name, and the kernel
+compares them once, diagram against diagram, not entry by entry. In the
+main term, the coverage's pack argument is the pack's constant.
+
+\subsection{What Rocq computes}\label{sec:qed:computes}
+
+Only conversions, while typing the term: a value's number to its term
+(\code{val}); a coverage's membership by its number in the trie of the
+coverage's memberships (\code{tall_get}, the same lookup; accepted on 11
+November 2026 as of the same kind as \code{val}); a vector after a
+tuple, and a projection of it, on lists of known length (\code{post},
+\code{Reads}, \code{projv}); the user's own functions in a rule (CADP's
+\code{do_act}, CCS's \code{def}); a decidable side condition's boolean
+(CCS's \code{allowed}), through its \code{Decidable} instance; and a
+diagram of the log against the same diagram built from its tuples (a
+coverage's projections, a relation's tuples), compared node by node
+where the two meet. No boolean about the certificate is proved by
+\code{eq_refl}: properties of code lists are inductive predicates proved
+by their constructors (\code{NoWO}, \code{Within}, \code{Shifted},
+\code{RoOnly}).
+
+\subsection{Making large goals fit}\label{sec:qed:fit}
+
+Each measure below answers a cost that was measured: with timestamps
+the plugin prints (\code{MEBI_CERT_STATS=1}), and once with a stack
+sample of the running process under \code{gdb}. Two-process CADP has
+12,027 pairs, three-process CADP 7.9 million.
+
+\paragraph{The pieces as constants.} With the pieces as \code{let}s of
+one term, the kernel checks everything at \code{Qed}, and the elaborator
+can unfold a proof while it elaborates the texts that use it. As opaque
+constants, each piece is checked once when declared, and never unfolded.
+One-process CADP: \code{Qed} 0.11\,s instead of 0.29\,s.
+
+\paragraph{Subterms written once.} A term is a tree in which a subterm
+written twice is checked twice. Three places repeated subterms:
+\begin{itemize}
+\item \code{allt_nd v d r Q pd pr}, the step of \code{AllT} at a node,
+  names the node's two subdiagrams \code{d} and \code{r} in full. Along a
+  list of 1,000 siblings, the last sibling is named a thousand times. Each
+  subdiagram is now a \code{let}, named once. A \code{let} has its own
+  cost: the kernel types \code{let x := b in c} by substituting \code{b}
+  into the type of \code{c}, and if that type names \code{x}, every
+  \code{let} enlarges it (448\,s for one coverage of three processes). So
+  the proof is given its statement (\code{AllT D Q}, with \code{D} the
+  diagram's constant) inside the \code{let}s, by an identity function of
+  that type, and the substitutions stay small.
+\item Lists of numbers (the rest of a vector, at each level of a
+  membership) share their tails, and each variable bound by a \code{let}
+  is one term, however many times it is used (two processes: the facts
+  18\,MB down to 4\,MB).
+\item Substituting a large term under binders copies it, and so does
+  shifting it to be used under more binders: a pack, substituted where
+  the coverage takes it, was copied whole. A pack is now a constant,
+  named where it is used.
+\end{itemize}
+
+\paragraph{Long applications.} As \cref{sec:qed:packs} explains, the
+kernel types an application of $k$ arguments in time proportional to
+$k^2$. Before packs, the proof of the shapes (which applies each coverage
+to its facts) took 2.5\,s of the kernel's time on two processes, and
+did not finish in 20 minutes on three; with packs, it takes under
+0.01\,s on two processes.
+
+\paragraph{Memberships, one fact per level.}\label{sec:qed:fit:members}
+A membership \code{In_t x w} was proved by following \code{x}: a step
+right (\code{in_r}) for each sibling whose value is not $w$'s next, a step
+down (\code{in_d}) for the sibling that is. \emph{Example:} in the
+diagram of $\{(1,5), (2,5), (3,5)\}$, the vector $(3,5)$ takes two steps
+right (past 1 and 2), one down, one down. Each step's fact names the rest
+of the vector, so two vectors scanning the same siblings share nothing.
+Three processes: 9.4M of the proof's 11.1M facts were such steps right.
+Now the scan is its own fact, \code{Sib x y} (\code{y} is \code{x} or a
+sibling to its right: \code{sib_refl}, \code{sib_step},
+\file{theories/DdTree.v}), which names no vector: every vector scanning
+from \code{x} shares it, each step made once. A level is then one fact,
+\code{in_sib_d x v d r w} (from \code{Sib x (Nd v d r)} and \code{In_t d
+w}, \code{In_t x (v :: w)}). And the steps from a node depend on the node
+and the rest of the vector only, so vectors meeting at the same node
+(Sylvan shares equal subdiagrams) share the rest. Three processes: 11.1M
+facts down to 1.1M.
+
+\paragraph{The engine's own lookups.} Building a leaf looked a tuple's
+membership up in a list of all memberships so far: 107\,s for one
+coverage of three processes, now a hash table (under a second). The
+labels' normal forms are remembered; a target is compared with a tuple's
+by conversion, which stops at the first difference, instead of computing
+both normal forms.
+
+\paragraph{Memory at \code{Qed}.} The kernel's check of the main term
+needs memory in proportion to its facts, about 6\,KB each: the types it
+computes, the \code{let}s' types, and \emph{hash-consing} (the kernel
+rebuilds a term so that equal subterms are stored once, with a table of
+them). Before \code{Qed}, the tactic gives
+back what it no longer needs: the engine's sets, Sylvan's tables (grown
+to their maximum for the log), and the garbage of building the proof.
+OCaml's garbage collector lets the heap grow to a multiple of the live
+data (Rocq sets that margin, \code{space_overhead}, to 200\%); the tactic
+lowers it to 80\% while it builds a proof, and after a decision of more
+than a million pairs to 60\% until the next tactic, so that \code{Qed}
+and writing the compiled file need less.
+
+\subsection{Cost}\label{sec:qed:cost}
+
+Measured on 11 November 2026 (the proof built by the tactic, then
+\code{Qed}; memory at most, for the whole file):
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+goal & built in & \code{Qed} & memory \\
+\midrule
+\file{LogTest.v}, each & 0.1\,s & -- & -- \\
+Proc Test1--3, each & 0.1--0.4\,s & -- & -- \\
+CADP, one process, each & 0.8\,s & 0.2\,s & 0.5\,GB \\
+CADP, two processes (12,027 pairs) & 3.3\,s & 1.7\,s & 0.83\,GB \\
+CADP, three processes (7.9M pairs) & 124\,s & 144\,s & 6.6\,GB \\
+\bottomrule
+\end{tabular}
+\end{center}
+Two processes took 104\,s, then 10\,s at \code{Qed}, 2.1\,GB, before the
+measures of \cref{sec:qed:fit}; three processes did not fit in 7\,GB.
+Now the three-process proof's main term holds 828,865 facts, and the
+packs' memberships, about 280,000 facts in all, are checked as constants
+while the proof is built (59\,s of the 124\,s). The whole file,
+\file{examples/CADP/ThreeProcesses.v}, compiles in 293\,s, with 6.6\,GB
+at most, the compiled file written (113\,MB). Every example therefore
+ends with \code{Qed}. What the cost grows with is the certificate itself:
+the facts the kernel checks, about 6\,KB of its memory each, which only
+the optimisations of \cref{sec:optimisations} can reduce.
+
+\subsection{Trying it}\label{sec:qed:try}
+
+Any example in \file{examples/} or \file{test/rocq/LogTest.v}: each goal
+ends with \code{Qed}. To see the phases, set \code{MEBI_CERT_STATS=1}:
+lines on standard error, each with the time since the start and the
+process's memory, now and at most:
+\begin{itemize}
+\item \code{[qed] coverage of shape \dots: N projections}, then
+  \code{coverage: N leaves built (\dots)}, then \code{coverage: declared}:
+  a coverage's leaves, and its constant checked;
+\item \code{chunk N written: F facts in all (lemma count, \dots)}: the
+  translator's chunks (the counts add up), with the facts per lemma;
+\item \code{[qed] kernel, per kind of constant: \dots}: the kernel's time
+  per kind of piece (\code{case}, \code{as} for step lemmas, \code{lf} for
+  groups of cases, \code{all} for coverages, \code{pack}, \code{snd} for
+  soundness, \dots);
+\item \code{[qed] before Qed}: the memory left for the kernel's check.
+\end{itemize}
+\code{MEBI_PLAN_DUMP=1} prints what the engine recorded (shapes, values,
+relations and their tuples, summands and their projections);
+\code{MEBI_QED_TEXT=<file>} appends every text the proof elaborates to
+\code{<file>}; \code{MEBI_QED_LETS=1} makes the pieces \code{let}s of the
+term instead of constants (to compare). Run large examples under a
+memory cap (\file{CLAUDE.md}).

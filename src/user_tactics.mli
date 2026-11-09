@@ -1,39 +1,37 @@
-(** The [bisim] and [sim] tactics: prove a [weak_bisimilar] or [weak_sim]
-    goal between closed terms, with no setup.
-
+(** The tactics [sim], [bisim], [weak_sim] and [weak_bisim], on a
+    [strong_sim], [strong_bisimilar], [weak_sim] or [weak_bisimilar] goal
+    between closed terms, and [MeBi Check Log].
     {[
-      Set MeBi MaxStates 2000.
-      Lemma pq : weak_bisimilar compLTS compLTS p q.
-      Proof. bisim. Qed.
+      Example pq : weak_bisimilar compLTS compLTS p q.
+      Proof. weak_bisim. Qed.
     ]}
-
-    Each reads from its goal what [MeBi Sim Begin] is told by hand: the two
-    LTSs, the two terms, the LTSs their constructors' premises use (the
-    [Using] list), and the label type, whose [None] is the silent step.
-    Then it runs the same proof search as [MeBi Sim Begin] followed by
-    [MeBi Sim Solve], with the step bound [Set MeBi MaxSteps] gives
-    ({!Api.the_max_steps}), and closes the goal with the proof found.
-    Weak labels set with [MeBi Config Weak] are respected.
-
-    Forms, after Rocq's [auto n] and [debug auto]:
-    - [bisim], [sim]: at most [MaxSteps + 1] steps; no proof is an error;
-    - [bisim n], [sim n]: at most [n] steps ([0]: none, only the setup);
-      no proof leaves the goal unchanged, with a notice, as [auto n] does;
-    - [debug bisim [n]], [debug sim [n]]: as above, and on stopping without
-      a proof the search's open goals are printed. *)
+    Each tactic reads from its goal the two LTSs and the two terms (weak:
+    [None] is the silent step, as in [theories/Bisimilarity.v]; strong: no
+    label is silent), and the engine (lib/learn, doc/learn.md) decides it on
+    Sylvan's diagrams. Sylvan logs the decision's last checks, the
+    certificate (doc/certificate.md), in [.File.v.mebi/<lemma>.log] next
+    to the file, and the tactic closes the goal with the proof built from
+    it ([Lts_proof.qed_term]), which the kernel checks at [Qed]. The log
+    is then deleted, unless [Set MeBi Log Mode "keep"]. [debug] before any
+    of them: the engine's report is printed too. *)
 
 type kind =
-  | Bisim (** [bisim]: a [weak_bisimilar] goal *)
-  | Sim (** [sim]: a [weak_sim] goal *)
+  | Bisim (** a bisimilarity goal *)
+  | Sim (** a simulation goal *)
 
-(** [prove ?steps ?debug kind] is the tactic [bisim] or [sim], with [n]
-    ([steps]) and the [debug] prefix as above.
-
+(** [prove ?debug ~weak kind] is the tactic [bisim] or [sim], or with
+    [weak] [weak_bisim] or [weak_sim] ([debug ...] with [debug]).
     @raise CErrors.UserError
       when run, if the goal is not of its kind (naming the other tactic if
       it is of that one), not between closed terms, or over an LTS that is
-      not an inductive [M -> option A -> M -> Prop] without parameters;
-      and if no proof is found within [MaxSteps] when [steps] is not given
-      (raised here); and
-      whatever [MeBi Sim Begin] and [MeBi Sim Solve] raise (propagated). *)
-val prove : ?steps:int -> ?debug:bool -> kind -> unit Proofview.tactic
+      not an inductive [M -> option A -> M -> Prop] without parameters; if a
+      step cannot be followed from the rules; if the verdict is negative;
+      or if the proof cannot be built from the certificate. *)
+val prove : ?debug:bool -> weak:bool -> kind -> unit Proofview.tactic
+
+(** [check_log file] ([MeBi Check Log]): the records of Sylvan's proof log
+    [file] (left by [Set MeBi Log Mode "keep"]; relative to the checked
+    file's directory) as facts of theories/DdTree.v, each chunk its own
+    constant [mebi_log<n>_c<i>], checked by the kernel when declared.
+    @raise CErrors.UserError if the log does not translate *)
+val check_log : string -> unit

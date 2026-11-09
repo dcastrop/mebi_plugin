@@ -7,7 +7,7 @@ From Stdlib Require Operators_Properties.
 
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.Proc.
-Import Layered.
+Import Stacked.
 
 (* Example s1 : term := tfix (tseq (tact (send A) tend) trec).
 Example s2 : term := tfix (tseq (tact (send A) tend) 

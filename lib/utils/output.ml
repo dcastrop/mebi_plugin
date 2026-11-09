@@ -3,8 +3,7 @@
     This module deliberately contains no reference to the Rocq API. Routing a
     message to Rocq's [Feedback] is the job of a {i sink} installed at plugin
     load (see [Logger.set_sink] and [Mebi_plugin.Rocq_output]); when no sink is
-    installed, [Logger] prints to [stdout]. That is what lets [lib/utils],
-    [lib/terms] and [lib/model] build and be tested as plain OCaml libraries. *)
+    installed, [Logger] prints to [stdout]. *)
 
 module Kind = struct
   (** [Debug] .. [Error] mirror Rocq's [Feedback.level]; [Trace], [Result] and

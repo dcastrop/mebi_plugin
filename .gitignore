@@ -48,5 +48,35 @@ RocqMakefile*
 
 # ignore dumps
 **/_dumps
+# bench/verdicts.py
+/_verdicts
+/_certify
+/_optionb
 src/_dump
 .lia.cache
+
+# LaTeX build outputs (doc/*.tex, e.g. built in place by LaTeX Workshop)
+doc/*.pdf
+doc/*.log
+doc/*.fls
+doc/*.fdb_latexmk
+doc/*.synctex.gz
+
+# LaTeX build files of doc/report (the .tex sources are tracked)
+doc/report/*.fdb_latexmk
+doc/report/*.fls
+doc/report/*.log
+doc/report/*.out
+doc/report/*.toc
+doc/report/*.synctex.gz
+doc/report/main.pdf
+
+# the report's bibliography outputs (the report itself, doc/report/main.pdf,
+# is tracked: rebuild it with pdflatex main; bibtex main; pdflatex main;
+# pdflatex main, and commit it with the sources)
+doc/report/main.bbl
+doc/report/main.blg
+
+# the plugin's files for a file F.v, next to it: Sylvan's proof logs (Set
+# MeBi Log Mode; doc/certificate.md) and a proof's temporary files
+.*.v.mebi/

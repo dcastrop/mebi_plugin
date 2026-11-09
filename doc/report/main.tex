@@ -1,0 +1,44 @@
+\documentclass[11pt,a4paper]{article}
+\input{preamble}
+
+\title{\texttt{mebi\_plugin}: a technical report on its current state}
+\author{The repository as of 10 November 2026\\ (Rocq 9.3.0, OCaml 5.4.1)}
+\date{10 November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+  \texttt{mebi\_plugin} (MEBI, \emph{Mechanised Bisimilarities}) is a
+  Rocq plugin for strong and weak simulations and bisimilarities between
+  states of labelled transition systems given as Rocq inductive
+  predicates. A goal is decided by a symbolic engine on Sylvan's list
+  decision diagrams, learned from the user's rules; Sylvan records each
+  operation's result as it computes, and that log is the certificate. The
+  plugin turns the log into lemma applications, a fact per operation,
+  which Rocq's kernel typechecks: nothing is recomputed in Rocq. This
+  report describes the engine, the reading of terms as containers that
+  connects states to the diagrams' vectors, the certificate and its
+  translation, the optimisations and how they fit the certificate, the
+  commands, the tests and what remains. Each claim points at the code as
+  \texttt{file:line}.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+\input{sections/01-overview}
+\input{sections/07-symbolic}
+\input{sections/14-containers}
+\input{sections/15-prooflog}
+\input{sections/17-qed}
+\input{sections/13-optimisations}
+\input{sections/06-commands}
+\input{sections/09-tests}
+\input{sections/16-vscode}
+\input{sections/10-status}
+\clearpage
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\end{document}

@@ -115,19 +115,16 @@ Proof.
 Qed.
 Hint Resolve weak_sim_trans : rel_db.
 
-(* Transfer along silent steps (added 2026-10-03, nothing above changed). A
-   state silently reachable from [r] is simulated by whatever simulates [r]:
-   each of its moves is a weak move of [r]. And a state that silently
-   reaches [n'] simulates whatever [n'] simulates: it answers as [n'] does,
-   after the silent steps.
+(* Transfer along silent steps. A state silently reachable from [r] is
+   simulated by whatever simulates [r]: each of its moves is a weak move of
+   [r]. And a state that silently reaches [n'] simulates whatever [n']
+   simulates: it answers as [n'] does, after the silent steps.
 
-   Use them on facts already proved: one pair proved, the others obtained
-   (Test.v, [SilentTransfer]). NOT inside a coinduction, on the hypothesis
-   being proved: that is circular and unsound (a state's silent move to a
-   member of its own SCC would be "answered" by the pair itself), and Rocq's
-   guard check rejects it (Test.v, [CircularTransfer]). They were meant to
-   let the plugin prove one state per silent SCC (notes/13, stage 3); that
-   plan was abandoned for this reason. *)
+   Use them on facts already proved: one pair proved, the others obtained.
+   NOT inside a coinduction, on the hypothesis being proved: that is
+   circular and unsound (a state's silent move to a member of its own SCC
+   would be "answered" by the pair itself), and Rocq's guard check rejects
+   it. *)
 
 (* A silent prefix extends a weak move. *)
 Lemma weak_silent_prefix {M A} {lts : LTS M A} : forall x y z a,
@@ -204,8 +201,7 @@ Proof. intros ??? [] []; split; eauto with rel_db. Qed.
    [a + b]. [weak_bisimilar] implies [mutual_sim]
    ([weak_bisimilar_mutual_sim]), not conversely.
 
-   Added 2026-10-02. It is what [MeBi Sim] and [MeBi Run Bisim ... As]
-   prove. *)
+   Added 2026-10-02. It is what [weak_bisim] proves. *)
 Section WeakBisimilar.
   Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
 
@@ -324,3 +320,113 @@ Proof.
   exact (weak_bisimilar_sym _ _
            (weak_bisimilar_silent_l n' n m Sn'n Snn' (weak_bisimilar_sym _ _ H))).
 Qed.
+
+(* Coinduction principles: a relation closed under the step condition is
+   included in [weak_sim] / [weak_bisimilar]. A certificate's relation is
+   such a relation; with these, what is left to prove of one is its
+   closure, once, instead of a cofix that walks its pairs. *)
+Lemma weak_sim_coind {M N A} {ltsM : LTS M A} {ltsN : LTS N A}
+  (R : M -> N -> Prop) :
+  (forall m n, R m n -> simF ltsM ltsN R m n) ->
+  forall m n, R m n -> weak_sim ltsM ltsN m n.
+Proof.
+  intros C; cofix CH; intros m n H; constructor; constructor; intros m2 a T.
+  destruct (sim_weak (C m n H) T) as [n2 [W H2]].
+  exists n2; split; [exact W | exact (CH _ _ H2)].
+Qed.
+
+Lemma weak_bisimilar_coind {M N A} {ltsM : LTS M A} {ltsN : LTS N A}
+  (R : M -> N -> Prop) :
+  (forall m n, R m n -> bisimF ltsM ltsN R m n) ->
+  forall m n, R m n -> weak_bisimilar ltsM ltsN m n.
+Proof.
+  intros C; cofix CH; intros m n H; constructor; constructor.
+  - intros m2 a T; destruct (bisim_l (C m n H) T) as [n2 [W H2]].
+    exists n2; split; [exact W | exact (CH _ _ H2)].
+  - intros n2 a T; destruct (bisim_r (C m n H) T) as [m2 [W H2]].
+    exists m2; split; [exact W | exact (CH _ _ H2)].
+Qed.
+
+(* Strong simulation and bisimilarity: a step, [None] included, is
+   answered by one step with the same label. No label is silent. [sim] and
+   [bisim] decide them as they decide the weak ones. *)
+Section Strong.
+  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
+
+  Record ssimF G m1 n1 :=
+    Pack_ssim
+      { ssim_step : forall {m2 a},
+          ltsM m1 a m2 -> exists n2, ltsN n1 a n2 /\ G m2 n2
+      }.
+
+  CoInductive strong_sim (s : M) (t : N) : Prop
+    := In_ssim { out_ssim : ssimF strong_sim s t }.
+
+  Record sbisimF G m1 n1 :=
+    Pack_sbisim
+      { sbisim_l : forall {m2 a},
+          ltsM m1 a m2 -> exists n2, ltsN n1 a n2 /\ G m2 n2
+      ; sbisim_r : forall {n2 a},
+          ltsN n1 a n2 -> exists m2, ltsM m1 a m2 /\ G m2 n2
+      }.
+
+  CoInductive strong_bisimilar (s : M) (t : N) : Prop
+    := In_sbisim { out_sbisim : sbisimF strong_bisimilar s t }.
+End Strong.
+Arguments Pack_ssim {M N A ltsM ltsN G m1 n1} _.
+Arguments ssim_step {M N A ltsM ltsN G m1 n1} _ {m2 a} _.
+Arguments out_ssim {M N A ltsM ltsN s t} _.
+Arguments Pack_sbisim {M N A ltsM ltsN G m1 n1} _ _.
+Arguments sbisim_l {M N A ltsM ltsN G m1 n1} _ {m2 a} _.
+Arguments sbisim_r {M N A ltsM ltsN G m1 n1} _ {n2 a} _.
+Arguments out_sbisim {M N A ltsM ltsN s t} _.
+Hint Constructors strong_sim ssimF strong_bisimilar sbisimF : rel_db.
+
+Lemma strong_sim_coind {M N A} {ltsM : LTS M A} {ltsN : LTS N A}
+  (R : M -> N -> Prop) :
+  (forall m n, R m n -> ssimF ltsM ltsN R m n) ->
+  forall m n, R m n -> strong_sim ltsM ltsN m n.
+Proof.
+  intros C; cofix CH; intros m n H; constructor; constructor; intros m2 a T.
+  destruct (ssim_step (C m n H) T) as [n2 [T2 H2]].
+  exists n2; split; [exact T2 | exact (CH _ _ H2)].
+Qed.
+
+Lemma strong_bisimilar_coind {M N A} {ltsM : LTS M A} {ltsN : LTS N A}
+  (R : M -> N -> Prop) :
+  (forall m n, R m n -> sbisimF ltsM ltsN R m n) ->
+  forall m n, R m n -> strong_bisimilar ltsM ltsN m n.
+Proof.
+  intros C; cofix CH; intros m n H; constructor; constructor.
+  - intros m2 a T; destruct (sbisim_l (C m n H) T) as [n2 [T2 H2]].
+    exists n2; split; [exact T2 | exact (CH _ _ H2)].
+  - intros n2 a T; destruct (sbisim_r (C m n H) T) as [m2 [T2 H2]].
+    exists m2; split; [exact T2 | exact (CH _ _ H2)].
+Qed.
+
+(* Strong implies weak: a step is a weak step. *)
+Lemma strong_sim_weak {M N A} {ltsM : LTS M A} {ltsN : LTS N A} :
+  forall s t, strong_sim ltsM ltsN s t -> weak_sim ltsM ltsN s t.
+Proof.
+  apply (weak_sim_coind (strong_sim ltsM ltsN)); intros m n [[S]]; constructor.
+  intros m2 a T; destruct (S m2 a T) as [n2 [T2 H2]].
+  exists n2; split; [exact (inject_weak _ _ _ T2) | exact H2].
+Qed.
+
+Lemma strong_bisimilar_weak {M N A} {ltsM : LTS M A} {ltsN : LTS N A} :
+  forall s t, strong_bisimilar ltsM ltsN s t -> weak_bisimilar ltsM ltsN s t.
+Proof.
+  apply (weak_bisimilar_coind (strong_bisimilar ltsM ltsN)); intros m n [[L R]];
+    constructor.
+  - intros m2 a T; destruct (L m2 a T) as [n2 [T2 H2]].
+    exists n2; split; [exact (inject_weak _ _ _ T2) | exact H2].
+  - intros n2 a T; destruct (R n2 a T) as [m2 [T2 H2]].
+    exists m2; split; [exact (inject_weak _ _ _ T2) | exact H2].
+Qed.
+
+(* The four goals the plugin's tactics prove, by the names it looks them up
+   with ([Rocqlib.lib_ref], src/user_tactics.ml). *)
+Register weak_sim as mebi.bisimilarity.weak_sim.
+Register weak_bisimilar as mebi.bisimilarity.weak_bisimilar.
+Register strong_sim as mebi.bisimilarity.strong_sim.
+Register strong_bisimilar as mebi.bisimilarity.strong_bisimilar.

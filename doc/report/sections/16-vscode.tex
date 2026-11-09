@@ -1,0 +1,90 @@
+\section{Testing from VSCode}\label{sec:vscode}
+
+This section is a step-by-step guide to running the plugin and checking its
+certificates by hand in VSCode. It assumes nothing beyond a working opam
+switch with Rocq 9 and the plugin's dependencies (\file{README.md},
+``Installation'').
+
+\paragraph{1. The editor and its extension.} Install VSCode and the
+\emph{VsRocq} extension (the extensions panel, search ``VsRocq''). VsRocq
+runs a Rocq server, \code{vsrocqtop}, which must be on your \code{PATH}:
+\code{which vsrocqtop} in a terminal prints its path (for a local switch,
+\file{README.md}, ``Using VSCode'', gives the setting that names it).
+
+\paragraph{2. Build first, under a memory cap.} VsRocq does not build the
+project: it reads \file{_RocqProject}, which maps the logical names
+\code{MEBI} (\file{theories/}), \code{MEBI.Examples} and \code{MEBITests}
+to dune's compiled files in \file{_build/}, and loads the plugin from
+\file{_build/install/default/lib}. So, from the repository's root:
+\begin{verbatim}
+systemd-run --user --scope -p MemoryMax=1750M -p MemorySwapMax=0 \
+  dune build -j 2
+\end{verbatim}
+(\code{systemd-run} caps the build's memory: a build that needs more is
+stopped instead of pushing the machine into swap.) After any change to
+the plugin, build again, then run the command \emph{VsRocq: Restart} (the
+command palette, \code{Ctrl+Shift+P}).
+
+\paragraph{3. Open the folder, then a file.} \emph{File, Open Folder}, the
+repository's root: VsRocq finds \file{_RocqProject} there. Open
+\file{test/rocq/LogTest.v}. VsRocq checks a file up to a point you choose:
+\emph{Interpret to point} (\code{Alt+Right}) up to the cursor,
+\emph{Step forward} (\code{Alt+Down}) one command, \emph{Interpret to end}
+(\code{Alt+End}). The goals appear in the \emph{goal panel}, the plugin's
+messages under the goals (and in \emph{View, Output}, channel
+\emph{VsRocq}).
+
+\paragraph{4. What to expect in \file{LogTest.v}.} Step through it command
+by command:
+\begin{itemize}
+\item \code{Proof. weak_bisim. Qed.} The tactic decides the goal,
+  builds the proof from the certificate and prints \code{weak_bisim:
+  decided (12 pairs); the proof from Sylvan's certificate built in
+  \ldots}; \code{Qed} has the kernel check it. With \code{Set MeBi Log
+  Mode "keep"} before it, the log stays in
+  \file{test/rocq/.LogTest.v.mebi/logged.log}, next to the file you opened
+  (git ignores these directories).
+\item \code{MeBi Check Log ".LogTest.v.mebi/logged.log".} The log's records
+  become facts and the kernel checks them; the message gives the chunks,
+  the facts, the nodes and the times, and the last chunk's constant,
+  \code{mebi_log1_c1}.
+\item \code{Print Assumptions mebi_log1_c1.} Must print \emph{Closed under
+  the global context}: the facts use no axiom.
+\end{itemize}
+
+\paragraph{5. The theorems proved once.} In a scratch file (in
+\file{_certify/}, which git ignores, so that nothing is left in the source
+tree), check the transfer of \cref{sec:status}:
+\begin{verbatim}
+Require Import MEBI.DdGame.
+Check cert_weak_sim.
+Print Assumptions cert_weak_sim.
+Print Assumptions cert_weak_bisim.
+\end{verbatim}
+\code{Check} shows the statement (the game on vectors, completeness for
+the mover, soundness for the answerer, then \code{weak_sim}); each
+\code{Print Assumptions} must print \emph{Closed under the global
+context}.
+
+\paragraph{6. Measuring from the editor.} The plugin's measurements go to
+standard error, controlled by environment variables
+(\code{MEBI_CERT_STATS=1}, \file{CLAUDE.md}). The Rocq server inherits
+VSCode's environment, so close VSCode, then start it from a terminal with
+them set, and capped (a running VSCode would be reused, without them):
+\begin{verbatim}
+MEBI_CERT_STATS=1 systemd-run --user --scope \
+  -p MemoryMax=4G -p MemorySwapMax=0 code .
+\end{verbatim}
+The lines appear in the extension's channel of \emph{View, Output}. The cap
+covers everything VSCode starts, the Rocq server included.
+
+\paragraph{7. What not to step through.} The editor runs Rocq with no cap
+of its own (unless started as above): step through small files only
+(\file{test/rocq/}, the CCS and Proc examples). The CADP examples with
+two and three processes are for \file{bench/prooflog.py}, which caps each
+step.
+
+\paragraph{8. Goals close.} A tactic ends its goal with the proof from
+the certificate (\cref{sec:qed}): the test of a lemma \code{L} is
+\code{Proof. weak_sim. Qed.} then \code{Print Assumptions L.}, which must
+print \emph{Closed under the global context}.

@@ -1,25 +1,7 @@
-(** [MeBi Help] (backlog item F). Topics are paths, e.g.
-    [["Config"; "Bounds"; "Saturation"]] for [MeBi Help Config Bounds Saturation]. The figures quoted are computed from the same constants the
-    plugin's errors and notices use ({!Api.bytes_per_weak_action},
-    {!Api.mb_per_extracted_state}, {!Api.default_saturation_bound}), so the
-    help cannot drift from what the plugin actually reports. *)
+(** [MeBi Help]. Topics are paths, e.g. [["Sim"]] for [MeBi Help Sim]. *)
 
 (* See the [.mli]. *)
-let topics : string list list =
-  [ [ "Run" ]
-  ; [ "Sim" ]
-  ; [ "Benchmark" ]
-  ; [ "Premises" ]
-  ; [ "Config" ]
-  ; [ "Config"; "Bounds" ]
-  ; [ "Config"; "Bounds"; "Saturation" ]
-  ; [ "Config"; "Saturation" ]
-  ; [ "Config"; "Weak" ]
-  ; [ "Config"; "FailIf" ]
-  ; [ "Config"; "Solver" ]
-  ; [ "Config"; "Output" ]
-  ]
-;;
+let topics : string list list = [ [ "Sim" ]; [ "Debug" ]; [ "Output" ] ]
 
 (** [name p] is the command that shows the topic [p]. Raises nothing. *)
 let name (path : string list) : string = String.concat " " ("MeBi Help" :: path)
@@ -29,9 +11,10 @@ let name (path : string list) : string = String.concat " " ("MeBi Help" :: path)
 let overview () : string =
   String.concat
     "\n"
-    ([ "MeBi: build the LTS of a Rocq term from an inductive relation, check \
-        (weak) bisimilarity, and search for weak_sim and weak_bisimilar \
-        proofs."
+    ([ "MeBi: (bi)simulation goals between Rocq terms of inductive LTSs, weak \
+        or strong (sim, bisim, weak_sim, weak_bisim): decided on Sylvan's \
+        decision diagrams; Sylvan's own computation, logged, is the \
+        certificate, whose facts Rocq's kernel typechecks."
      ; ""
      ; "Help topics:"
      ]
@@ -39,308 +22,58 @@ let overview () : string =
      @ [ ""; "See also README.md." ])
 ;;
 
-(** [saturation_table ()] is the memory saturation needs at a few bounds,
-    from {!Api.bytes_per_weak_action}, the default marked. Raises nothing. *)
-let saturation_table () : string =
-  let lo, hi = Api.bytes_per_weak_action in
-  (* [row n] is the table's line for a bound of [n] weak actions. *)
-  let row (n : int) : string =
-    Printf.sprintf
-      "  %12i weak actions   %s - %s%s"
-      n
-      (Api.human_bytes (n * lo))
-      (Api.human_bytes (n * hi))
-      (if Int.equal n Api.default_saturation_bound then "   (default)" else "")
-  in
-  String.concat
-    "\n"
-    (List.map row [ 1_000_000; 5_000_000; 10_000_000; 20_000_000 ])
-;;
-
 (* See the [.mli]. *)
 let text : string list -> string option = function
   | [] -> Some (overview ())
-  | [ "Run" ] ->
-    Some
-      "MeBi Run LTS <term> Using <lts> [<lts>...].\n\
-       MeBi Run FSM | Saturate | Minimize <term> Using <lts> [<lts>...].\n\
-       MeBi Run Bisim <term> With <lts> And <term> With <lts> [Using <lts>...]\n\
-       MeBi Run Sim <term> With <lts> And <term> With <lts> [Using <lts>...]\n\
-       MeBi Run Merge <term> With <lts> And <term> With <lts> [Using <lts>...]\n\n\
-       Build the LTS reachable from <term>, then optionally saturate it (weak \
-       transitions across silent steps), minimize it, or check two for (weak) \
-       bisimilarity. The relation after With (or the first after Using) is the \
-       one <term> steps by; any more after Using are the relations its \
-       constructors' premises mention (layered LTSs). When none are given, \
-       those are found from the premises themselves. Without MeBi Config Weak, \
-       an LTS of type [M -> option A -> M -> Prop] has None as its silent \
-       label. Run Sim asks whether the first term is weakly simulated by the \
-       second (a preorder, so the order matters). It walks the pairs of states \
-       reachable from the two terms; when an FSM is saturated on demand that \
-       walk needs Set MeBi MaxGame <n>. To prove what these decide, state the \
-       goal and use the bisim or sim tactic. Print MeBi Rules <lts> shows the \
-       rules read from an LTS's constructors (for debugging the symbolic \
-       route, doc/s2-linearisation.md). See: MeBi Help Premises, MeBi Help \
-       Sim."
   | [ "Sim" ] ->
     Some
-      "bisim [<n>].  sim [<n>].  debug bisim [<n>].  debug sim [<n>].\n\
-       Set MeBi MaxSteps <n>.\n\n\
-       The tactic bisim proves [weak_bisimilar lts1 lts2 t1 t2] (weak \
-       bisimilarity, both directions in one proof), and sim proves [weak_sim \
-       lts1 lts2 t1 t2] (one direction), between closed terms. They need no \
-       setup: they read the LTSs, the terms, the label type (whose None is the \
-       silent step) and the relations the constructors' premises use from the \
-       goal. Each builds both LTSs, checks them, and runs the proof search, at \
-       most MaxSteps + 1 steps (default 1000000); it reports \"Solved after \
-       <n> iterations\". If it runs out it says which cofix strategy was used; \
-       see MeBi Help Config Solver. For weak_bisimilar, Auto usually picks the \
-       mutual cofix; if a proof does not close, try the other strategy. For \
-       weak_sim, the two states need only be similar: if they are not \
-       bisimilar, the tactic checks the weak simulation preorder instead and \
-       refuses only if they are not similar.\n\n\
-       As with auto <n> and debug auto: bisim <n> and sim <n> take at most <n> \
-       steps (0: only the setup), and leave the goal as it was, with a notice, \
-       if they find no proof; plain bisim and sim fail instead. The debug \
-       prefix also prints the search's open goals when it stops without a \
-       proof, so that debug bisim 10 shows where the search is after 10 \
-       steps.\n\n\
-       Limits are Rocq options, best set once near the top of a file: Set MeBi \
-       MaxStates <n> (or MaxTransitions), MaxSteps, MaxSaturation, MaxGame, \
-       MaxMemoryMB, PremiseDepth, PremiseRange (see MeBi Help Config Bounds). \
-       Unset restores the default."
-  | [ "Benchmark" ] ->
+      "sim.  bisim.  weak_sim.  weak_bisim.   (each with debug in front)\n\n\
+       Each reads its goal: strong_sim, strong_bisimilar, weak_sim or \
+       weak_bisimilar between two closed terms of inductive LTSs (relations M \
+       -> option A -> M -> Prop, without parameters; for the weak ones, None \
+       is the silent step). The engine learns each rule's steps on the \
+       positions it reads, explores both systems on Sylvan's decision \
+       diagrams, and plays the (weak or strong) game to its greatest fixpoint. \
+       A negative verdict is an error. On a positive one, Sylvan logs the \
+       decision's last checks, the certificate, and the tactic closes the goal \
+       with the proof built from it (doc/certificate.md); end with Qed, where \
+       the kernel checks that proof. With Set MeBi Log Mode \"keep\" the log \
+       stays in .<File>.v.mebi/<lemma>.log next to the file, for MeBi Check \
+       Log."
+  | [ "Debug" ] ->
     Some
-      "MeBi Benchmark LTS <min> <max> <term> Using <lts> [<lts>...].\n\n\
-       Times repeated LTS construction over a range of sizes."
-  | [ "Premises" ] ->
+      "debug sim | bisim | weak_sim | weak_bisim.\n\
+       Print MeBi Rules <lts>.  Print MeBi Skeleton <term> Using <lts>.\n\
+       MeBi Congruence <lts> <rule> ...\n\
+       Set MeBi Log Mode \"off\" | \"keep\".  Set MeBi Log Directory \
+       \"<dir>\".  MeBi Check Log \"<file>\".\n\
+       MeBi Message \"<s>\".  MeBi Debug \"<s>\".  MeBi Divider [\"<s>\"].\n\n\
+       debug <tactic> does as the tactic does, and first prints the engine's \
+       report: states, pairs, summands, learned projections, game iterations, \
+       time. Rules and Skeleton show the engine's view (doc/learn.md): an \
+       LTS's constructors read as rules, and a start term's shapes, slots and \
+       summands (doc/skeleton.md), and the rules taken as its structural \
+       congruence: the reorderings found in the rules (no premise, silent, the \
+       pattern's variables only reordered, each with its inverse: commutation, \
+       associativity, a swap), or those MeBi Congruence names by hand \
+       (doc/upto.md). MeBi Log Mode: the decision's last checks, as Sylvan \
+       computes them, are kept in memory (off) or (keep) written to \
+       .<File>.v.mebi/<Lemma>.log next to the file (Log Directory: where \
+       .<File>.v.mebi goes instead). MeBi Check Log \"<file>\" (relative to \
+       the file) turns a kept log's records (unions, differences, images, \
+       images, each the one way the game's proof uses it) into facts, each \
+       chunk a constant the kernel checks. Message, Debug and Divider print a \
+       line (Debug's only under Set Debug \"mebi\")."
+  | [ "Output" ] ->
     Some
-      (Printf.sprintf
-         "Which constructor shapes are supported. An LTS is an inductive \
-          relation [term -> label -> term -> Prop]. For each constructor, the \
-          source term is matched, then its premises are handled:\n\
-         \  - premises over an LTS given in Using (the same one, or another: \
-          layered LTSs) are explored; several are allowed;\n\
-         \  - any other premise is decided once it is closed (immediately, or \
-          after the LTS premises fix what it mentions): an equation by \
-          comparing its sides, any other inductive proposition (<=, <, In, \
-          Forall, /\\, \\/, ...) by a proof search over its constructors, at \
-          most %i deep (Set MeBi PremiseDepth <n>). A false premise drops the \
-          transition; in a proof, a true one is closed with the proof found, \
-          and a false one in a hypothesis is refuted. A binder only such \
-          premises mention ([In q l -> P q -> ...], no LTS step on [q]) is \
-          chosen in the proof by solving those premises together;\n\
-         \  - a premise that computes something -- the target, or what an LTS \
-          premise needs ([In q l -> lts q a q']) -- is enumerated, each \
-          solution a transition of its own; MeBi warns if the solutions may be \
-          incomplete. An LTS premise whose source nothing determines ([lts q a \
-          q'] with [q] free) is enumerated the same way, and each source found \
-          explored;\n\
-         \  - a transition with a binder nothing determines ([lts (S n) a n], \
-          [n] free) may stand for infinitely many: it is left out, with a \
-          warning, so the LTS may be missing transitions;\n\
-         \  - an LTS with any such warning is incomplete: an error, as when \
-          exploration hits the bound, unless [MeBi Config FailIf Incomplete \
-          False];\n\
-         \  - a negation [~ P] holds iff P is refuted by a complete search, \
-          and is proved by refuting P;\n\
-         \  - a bounded universal over nat, [forall k, k < n -> P k] or [k <= \
-          n] (also [n > k]), [n] a number once the premise is closed, holds \
-          iff every [P i] does: each is decided as above, and the proof is \
-          assembled from theirs with the lemmas in MEBI.Premises; a false one \
-          is refuted at a false [P i]. Only up to %i values of [k] (MeBi \
-          Config Premise Range <n>): each costs a search, and the proof grows \
-          with the square of the range; a wider one is left undecided, with a \
-          warning saying so;\n\
-         \  - with [MeBi Config Premise Tactic <tactic>], a premise the search \
-          leaves undecided is tried with that tactic (proving it, or its \
-          negation);\n\
-         \  - anything else cannot be decided -- opaque functions or axioms, a \
-          search cut off by the depth: the constructor is applied as if the \
-          premise held, with a warning, so the LTS may contain transitions \
-          that do not exist. A Run Bisim verdict on it may be wrong; a proof \
-          cannot be, since Qed checks the premise."
-         !Premise_search.max_depth
-         !Premise_search.max_range)
-  | [ "Config" ] ->
-    Some
-      "MeBi Config Reset [Bounds | Weak | FailIf | Output].\n\n\
-       Settings, each with its own topic:\n\
-      \  MeBi Help Config Bounds.     how big an LTS (and its saturation) may \
-       get\n\
-      \  MeBi Help Config Saturation. saturating whole, or on demand\n\
-      \  MeBi Help Config Weak.       which label is silent (weak bisimilarity)\n\
-      \  MeBi Help Config FailIf.     which outcomes are errors, not warnings\n\
-      \  MeBi Help Config Solver.     the proof search's cofix strategy\n\
-      \  MeBi Help Config Output.     which messages are shown, and the \
-       results' format (plain text by default)"
-  | [ "Config"; "Bounds" ] ->
-    let lo, hi = Api.mb_per_extracted_state in
-    Some
-      (Printf.sprintf
-         "Set MeBi MaxStates <n>.\n\
-          Set MeBi MaxTransitions <n>.\n\
-          Set MeBi MaxSaturation <n>.\n\
-          Set MeBi MaxGame <n>.\n\
-          Set MeBi MaxMemoryMB <mb>.\n\
-          Set MeBi PremiseDepth <n>.\n\
-          Set MeBi PremiseRange <n>.\n\
-          MeBi Config Reset Bounds.\n\n\
-          Exploration stops after <n> states (default %s) or transitions; an \
-          LTS cut short is an error unless [MeBi Config FailIf Incomplete \
-          False]. Extraction has measured %.2f-%.2fMB per state on top of a \
-          fixed 0.1-0.3GB, so a state bound past ~%i prints a memory notice. \
-          Logging the result (Output \"Result\" / \"DecodeResults\" / \
-          \"DumpResults\") costs far more, ~0.65MB per state. For the \
-          saturation bound see MeBi Help Config Bounds Saturation; for the \
-          premise search depth and range, MeBi Help Premises.\n\n\
-          MaxMemoryMB stops a command, with an error, once the whole Rocq \
-          process uses more than <mb> megabytes (its resident memory on \
-          Linux). Now: %s. The default is 75%% of the machine's RAM, or 90%% \
-          of a cgroup memory cap the process runs under (systemd-run -p \
-          MemoryMax=...) if that is smaller; there is none where neither can \
-          be read. 0 turns it off. It is checked during extraction, \
-          saturation, the up-front game walks and estimates, and between Solve \
-          steps, so one step can overshoot it, and Qed is not checked at all: \
-          keep an OS-level cap as a backstop. Reset Bounds restores the \
-          default."
-         (match Api.default_bounds with
-          | Api.States n -> Printf.sprintf "%i states" n
-          | Api.Transitions n -> Printf.sprintf "%i transitions" n)
-         lo
-         hi
-         (int_of_float (1000. /. hi))
-         (Memory_guard.describe ()))
-  | [ "Config"; "Bounds"; "Saturation" ] ->
-    let lo, hi = Api.bytes_per_weak_action in
-    Some
-      (Printf.sprintf
-         "Set MeBi MaxSaturation <n>.   (default %i)\n\n\
-          The most weak actions saturation may produce. Saturation (used by \
-          Run Saturate, Minimize, Bisim and Sim Begin when a label is silent) \
-          can be orders of magnitude larger than the LTS: one weak action per \
-          (state, label, state reachable by tau* label tau*). Before \
-          saturating, MeBi computes that number exactly and cheaply. Above the \
-          bound, Run Bisim and Sim Begin saturate on demand instead, with a \
-          warning (MeBi Help Config Saturation), holding at most <n> weak \
-          actions; Run Saturate and Minimize refuse with Saturation_Too_Large \
-          (or warn, with MeBi Config FailIf Oversaturated False). Run [MeBi \
-          Config Output \"Info\" True.] to see each estimate.\n\n\
-          Measured memory is %i-%i bytes per weak action (the higher for \
-          larger LTSs: each keeps its shortest witness path). Choose a bound \
-          your machine can hold:\n\
-          %s\n\n\
-          Time grows faster than the count: a partial Proc/Test4 LTS with 400k \
-          weak actions takes ~13s. Proc/Test4 itself (9720 states) would \
-          saturate to 74.6M."
-         Api.default_saturation_bound
-         lo
-         hi
-         (saturation_table ()))
-  | [ "Config"; "Saturation" ] ->
-    Some
-      "MeBi Config Saturation OnDemand True | False | Auto.   (default Auto)\n\
-       MeBi Config Reset Bounds.   (restores Auto)\n\n\
-       How Run Bisim and Sim Begin saturate each FSM. Whole: every weak action \
-       up front, which for an LTS with large silent cycles can take far more \
-       memory than the machine has (Proc/Test4: 74.6M weak actions, 34-67GB). \
-       On demand: each state when the check or the proof needs it, from the \
-       same code, so with the same weak actions and witnesses, holding at most \
-       MaxSaturation of them (the oldest dropped and saturated again if \
-       needed); bisimilarity is decided on the quotient by silent strongly \
-       connected components instead (states in one silent SCC have the same \
-       weak moves; Proc/Test4's 9720 states make 81), with the same verdict. A \
-       proof is the same proof, step for step; it may take longer, as dropped \
-       states are saturated again.\n\n\
-       Auto saturates on demand exactly the FSMs whose saturation would exceed \
-       MaxSaturation, and warns when it does; True does so for every FSM; \
-       False refuses those FSMs (Saturation_Too_Large), or with FailIf \
-       Oversaturated False saturates them whole anyway. Run Saturate and \
-       Minimize always saturate whole.\n\n\
-       On demand, planning the whole proof up front walks every pair the proof \
-       can reach, saturating as it goes. So Solver MutualCofix True, Answers \
-       Greedy and Answers Minimal are refused unless Set MeBi MaxGame <n> is \
-       set (unset by default); with it, the walk runs within <n> pairs and \
-       past it they are refused. The two Autos estimate or plan within the \
-       bound, and otherwise (or past it) take the nested cofix and answer move \
-       by move."
-  | [ "Config"; "Weak" ] ->
-    Some
-      "MeBi Config Weak As Option <type>.\n\
-       MeBi Config Weak As <term> Of <type>.\n\
-       MeBi Config Weak1 / Weak2 ...   (one side of Bisim/Merge/Sim only)\n\
-       MeBi Config Reset Weak.\n\n\
-       Mark the silent label: [As Option T] makes [None] silent in an [option \
-       T]-labelled LTS; [As c Of T] makes constructor c of T silent. With a \
-       silent label set, bisimilarity is weak and FSMs are saturated first."
-  | [ "Config"; "FailIf" ] ->
-    Some
-      "MeBi Config FailIf Empty | Incomplete | NotBisimilar | Oversaturated \
-       True | False.\n\
-       MeBi Config Reset FailIf.\n\n\
-       Whether an empty LTS (default False), an incomplete one (True), a \
-       negative bisimilarity result (True), or a saturation above Bounds \
-       Saturation (True) is an error rather than a warning. An LTS is \
-       incomplete if exploration was cut short by the bound, or if it is only \
-       an approximation: a premise MeBi could not decide (it may contain \
-       transitions that do not exist), or a premise search or transition it \
-       could not complete (it may be missing some). See MeBi Help Premises."
-  | [ "Config"; "Solver" ] ->
-    Some
-      "MeBi Config Solver MutualCofix True | False | Auto.\n\n\
-       How the proof search introduces coinduction hypotheses: False mints a \
-       nested cofix per new pair; True opens the proof with one mutual cofix \
-       over every pair it will reach; Auto (default) measures both on the \
-       model before the proof starts and picks, announcing it when it takes \
-       the mutual path.\n\n\
-       MeBi Config Solver Answers Default | Greedy | Minimal | Auto.\n\n\
-       How the proof search chooses each answer. Every step of a weak_sim or \
-       weak_bisimilar proof has one system make a move (x -a-> x') and the \
-       other answer it with a weak move to some y' such that (x', y') can be \
-       proved related in turn. Usually several answers would do; which one is \
-       taken decides the proof's next goals, and so its length.\n\n\
-       Default -- the policy the solver used until 2026-10-15 -- chooses each \
-       answer on its own, with no look-ahead: stand still if the move was \
-       silent and the answering state is already bisimilar to x'; otherwise \
-       take the weak transition with the shortest witness (fewest steps to \
-       justify) into the bisimilarity class of x', ending at its \
-       lowest-numbered state (the one extraction discovered first). For a \
-       weak_sim goal between states that are similar but not bisimilar, the \
-       same two tries against the states that simulate x'. Because no choice \
-       takes the others into account, a proof can visit many more pairs than \
-       it needs -- weak_bisimilar proofs especially, whose two directions each \
-       pick answers the other never uses.\n\n\
-       Greedy, Minimal and Auto plan every answer at Begin, before the first \
-       step, and Begin announces the plan and its predicted cost. Greedy \
-       prefers an answer whose pair has already been reached. Minimal answers \
-       within a relation that no pair can be removed from. Auto plans all \
-       three and keeps the cheapest predicted. Auto is the default; on an FSM \
-       saturated on demand it answers move by move, as Default does, unless \
-       MaxGame is set. Measured on the checked-in examples (2026-10-02), Auto \
-       was never slower than Default and cut weak_sim proofs by 17% and \
-       weak_bisimilar proofs by 60%; Minimal alone was slower on many weak_sim \
-       proofs. Every answer is still checked by Qed, so a policy can only \
-       change how long a proof is, never whether it is correct."
-  | [ "Config"; "Output" ] ->
-    Some
-      "MeBi Config Output \"<Kind>\" True | False.\n\
-       MeBi Config Output Format Text | JSON.\n\
-       MeBi Config Reset Output.\n\n\
-       Results (the FSMs, LTSs and verdicts shown with Output \"Result\" True, \
-       and dumps) are plain text by default: the states and labels numbered \
-       with their terms, then the moves as from -label-> to. Format JSON \
-       prints them as JSON instead. Output \"Detail\" adds the relations' \
-       constructors and each move's derivation tree (in JSON, the \
-       constructors' bindings and the annotations of weak actions too); it is \
-       off for plain text and on for JSON unless set, and once set holds for \
-       both. Reset Output restores plain text, detail as the format has it.\n\n\
-       Toggle one message kind: Debug, Info, Notice, Warning, Error, Trace, \
-       Result, Show, DecodeResults, DumpResults, Detail. Info, Notice, \
-       Warning, Error and Show are on by default; Debug, Trace and Result are \
-       off. Info is the routine kind: MeBi Config Output \"Info\" False hides \
-       it and keeps the rest. DumpResults (off by default) writes each FSM and \
-       result, in the format set, into ./_dumps/, for debugging: on a large \
-       FSM that is hundreds of MB and many seconds a command."
+      "Set Debug \"mebi\" | \"mebi-trace\" | \"mebi-info\".   (Set Debug \
+       \"-mebi\" ... off)\n\
+       Set Warnings \"-mebi\".   (hide MeBi's warnings; \"+mebi\" makes them \
+       errors)\n\n\
+       Notices and errors are always shown. Debug output is off unless a debug \
+       flag is set: mebi (internal debugging), mebi-trace (every function \
+       entered), mebi-info (routine progress). MeBi's warnings are the Rocq \
+       warning mebi."
   | _ -> None
 ;;
 

@@ -1,9 +1,8 @@
 (** Routes plugin output through Rocq.
 
-    [lib/utils], [lib/terms] and [lib/model] link no Rocq runtime and emit
-    through {!Logger}, which prints to [stdout] by default. This module installs
-    the Rocq half: a sink rendering messages with [Pp] onto [Feedback], and the
-    source-location provider used to name dump files.
+    [lib/utils] links no Rocq runtime, and the libraries emit through its
+    {!Logger}, which prints to [stdout] by default. This module installs the
+    Rocq half: a sink rendering messages with [Pp] onto [Feedback].
 
     {!install} runs on module initialisation, so nothing normally needs to call
     it; [g_mebi.mlg] calls it explicitly to make the dependency visible. *)
@@ -13,6 +12,5 @@
     [Error] as debug: it does not raise). Raises nothing. *)
 val sink : Logger.sink
 
-(** [install ()] makes {!Logger} print through {!sink} and name dumps with
-    {!loc_provider}. Raises nothing. *)
+(** [install ()] makes {!Logger} print through {!sink}. Raises nothing. *)
 val install : unit -> unit

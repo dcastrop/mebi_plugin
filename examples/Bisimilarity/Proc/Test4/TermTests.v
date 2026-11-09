@@ -1,52 +1,16 @@
-(* KNOWN TECHNICAL LIMIT (backlog item B3, recorded 2026-10-01).
+(* KNOWN LIMIT: the direct proofs of Test4, under its own semantics
+   [compLTS]. Not in any build.
 
-   This file does not compile, and Test4 has no PluginProofs.v, on purpose:
-   it is the example that marks where the plugin currently stops scaling.
-
-   - The reachable LTS of p (and of q and r -- it is the same set) has 9720
-     states and 87,480 transitions, 85% silent: 3^4 local configurations x
-     120 tree shapes, because do_comm/do_assocl/do_assocr can rebracket and
-     reorder the four parallel components at any depth. In general
-     3^k * (2k-2)!/(k-1)! for k components: 18, 324, 9720, 408240.
-   - At the default bound of 100 states, the first command fails with
-     LTS_Incomplete. With [Set MeBi MaxStates 12000.] the full
-     LTS extracts in ~25s.
-   - Saturation is the blocker. The 120 tree shapes of each local
-     configuration form one silent strongly connected component (81 of
-     them), so the saturated LTS has 74,649,600 weak actions -- 34--67GB
-     in the plugin's representation. [MeBi Run Saturate p] exhausted a 15GB
-     machine. Since 2026-10-01 the plugin computes that figure before
-     saturating and refuses (Saturation_Too_Large: above the default
-     [Set MeBi MaxSaturation] of 1,000,000), so the first saturation
-     now fails in ~27s instead. Still never run this file without a memory
-     cap, in case the guard is lifted: systemd-run --user
-     --scope -p MemoryMax=6G -p MemorySwapMax=0 (ulimit -v does not work --
-     OCaml 5 cannot then reserve its heaps).
-
-   Since 2026-10-03 the bisimilarity check gets past it: above the bound,
-   [Run Bisim] and the tactics saturate on demand and decide on the
-   silent-SCC quotient (81 nodes), with a warning ([MeBi Help Config
-   Saturation]). [Run Bisim p With compLTS And q With compLTS] takes ~45s.
-   [Run Saturate] and [Run Minimize], below, still need the whole saturated
-   FSM and are still refused. A direct proof under [compLTS] is out of reach
-   (~525k steps; proving one state per silent SCC is unsound inside a
-   coinduction, notes/13). Test4 is proved instead through a normalised
-   semantics, structural congruence made explicit: [ProcCongruence.v],
-   [NormTermTests.v] (82 states), [NormProofs.v] ([weak_sim compLTS compLTS
-   p q]). See ASSISTED-CHANGES.md, 2026-10-01 and 2026-10-03. *)
+   - p, q and r each reach the same 9,720 states (87,480 steps, 85% silent):
+     3^4 local configurations x 120 tree shapes, because do_comm/do_assocl/
+     do_assocr rebracket and reorder the four parallel components at any
+     depth. In general 3^k * (2k-2)!/(k-1)! for k components: 18, 324,
+     9720, 408240.
+   - All 9,720^2 pairs are weakly bisimilar. The way on is to prove up
+     to that reordering (doc/optimisations.md, 5; doc/upto.md). *)
 
 Require Import MEBI.loader.
 
-MeBi Config Output "Debug" False.
-MeBi Config Output "Info" False.
-MeBi Config Output "Notice" True.
-MeBi Config Output "Warning" True.
-MeBi Config Output "Error" True.
-MeBi Config Output "Trace" False.
-MeBi Config Output "Result" False.
-MeBi Config Output "Show" False.
-MeBi Config Output "DecodeResults" False.
-MeBi Config Output "DumpResults" False.
 
 Require Stdlib.Program.Tactics.
 
@@ -56,38 +20,44 @@ From Stdlib Require Operators_Properties.
 
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.Proc.
-Import Layered.
+Import Stacked.
 
 Require Import MEBI.Examples.Bisimilarity.Proc.Test4.Terms.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.TermTests".
-MeBi Config Weak As Option label.
+Set MeBi Log Mode "keep".
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.TermTests.p".
-MeBi Run FSM p Using compLTS termLTS. 
-MeBi Run Saturate p Using compLTS termLTS.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.TermTests.q".
-MeBi Run FSM q Using compLTS termLTS. 
-MeBi Run Saturate q Using compLTS termLTS.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.TermTests.r".
-MeBi Run FSM r Using compLTS termLTS. 
-MeBi Run Saturate r Using compLTS termLTS.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.TermTests.Bisim.pq".
-MeBi Run Bisim p With compLTS And q With compLTS Using compLTS termLTS.
+Example wbis_pq : weak_bisimilar compLTS compLTS p q.
+Proof. weak_bisim. Abort.
+MeBi Check Log ".TermTests.v.mebi/wbis_pq.log".
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.TermTests.Bisim.qp".
-MeBi Run Bisim q With compLTS And p With compLTS Using compLTS termLTS.
+Example wbis_qp : weak_bisimilar compLTS compLTS q p.
+Proof. weak_bisim. Abort.
+MeBi Check Log ".TermTests.v.mebi/wbis_qp.log".
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.TermTests.Bisim.qr".
-MeBi Run Bisim q With compLTS And r With compLTS Using compLTS termLTS.
+Example wbis_qr : weak_bisimilar compLTS compLTS q r.
+Proof. weak_bisim. Abort.
+MeBi Check Log ".TermTests.v.mebi/wbis_qr.log".
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.TermTests.Bisim.rq".
-MeBi Run Bisim r With compLTS And q With compLTS Using compLTS termLTS.
+Example wbis_rq : weak_bisimilar compLTS compLTS r q.
+Proof. weak_bisim. Abort.
+MeBi Check Log ".TermTests.v.mebi/wbis_rq.log".
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.TermTests.Bisim.pr".
-MeBi Run Bisim p With compLTS And r With compLTS Using compLTS termLTS.
+Example wbis_pr : weak_bisimilar compLTS compLTS p r.
+Proof. weak_bisim. Abort.
+MeBi Check Log ".TermTests.v.mebi/wbis_pr.log".
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.TermTests.Bisim.rp".
-MeBi Run Bisim r With compLTS And p With compLTS Using compLTS termLTS.
+Example wbis_rp : weak_bisimilar compLTS compLTS r p.
+Proof. weak_bisim. Abort.
+MeBi Check Log ".TermTests.v.mebi/wbis_rp.log".

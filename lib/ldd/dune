@@ -1,0 +1,57 @@
+; an OCaml binding to Sylvan's List Decision
+; Diagrams. No Rocq: tested by test/ldd_tests.exe.
+;
+; Sylvan and Lace are git submodules (vendor/sylvan, vendor/lace: forks of
+; trolando/sylvan and trolando/lace, at the commits lib/ldd/README.md
+; gives). Their C files are compiled into this library, not into one of
+; their own: Rocq loads the plugin's libraries as .cmxs files with Dynlink,
+; and a C archive's objects are only linked into a .cmxs when something in
+; the same link refers to them (as ldd_stubs does). The two configuration
+; headers CMake would generate are ours, in config/.
+
+(copy_files#
+ (files
+  ../../vendor/sylvan/src/{sha2,sylvan_bdd,sylvan_cache,sylvan_common,sylvan_hash,sylvan_ldd,sylvan_mt,sylvan_mtbdd,sylvan_platform,sylvan_refs,sylvan_sl,sylvan_stats,sylvan_table,sylvan_zdd}.c))
+
+(copy_files#
+ (files ../../vendor/lace/src/lace.c))
+
+(library
+ (name ldd)
+ (public_name rocq-mebi.ldd)
+ (modules ldd proof_log)
+ (wrapped false)
+ (foreign_stubs
+  (language c)
+  (names
+   lace
+   sha2
+   sylvan_bdd
+   sylvan_cache
+   sylvan_common
+   sylvan_hash
+   sylvan_ldd
+   sylvan_mt
+   sylvan_mtbdd
+   sylvan_platform
+   sylvan_refs
+   sylvan_sl
+   sylvan_stats
+   sylvan_table
+   sylvan_zdd)
+  (include_dirs config ../../vendor/sylvan/src ../../vendor/lace/src)
+  (extra_deps
+   (glob_files config/*.h)
+   (glob_files ../../vendor/sylvan/src/*.h)
+   (glob_files ../../vendor/lace/src/*.h))
+  (flags :standard -O2 -std=gnu11 -D_GNU_SOURCE -w))
+ (foreign_stubs
+  (language c)
+  (names ldd_stubs)
+  (include_dirs config ../../vendor/sylvan/src ../../vendor/lace/src)
+  (extra_deps
+   (glob_files config/*.h)
+   (glob_files ../../vendor/sylvan/src/*.h)
+   (glob_files ../../vendor/lace/src/*.h))
+  (flags :standard -std=gnu11 -D_GNU_SOURCE))
+ (c_library_flags -lpthread -lm))

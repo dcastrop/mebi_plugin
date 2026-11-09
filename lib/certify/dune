@@ -1,0 +1,9 @@
+; Certificates from Sylvan's proof log (doc/certificate.md): the log's
+; records as facts of theories/DdTree.v (dd_cert), and a facts file read
+; back as Rocq terms (dd_read). Only the plugin (src/) uses it.
+(library
+ (name certify)
+ (public_name rocq-mebi.certify)
+ (libraries rocq-runtime.vernac rocq-mebi.ldd unix)
+ (modules dd_cert dd_read)
+ (wrapped false))

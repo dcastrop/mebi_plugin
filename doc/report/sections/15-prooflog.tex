@@ -1,0 +1,498 @@
+\section{The certificate: Sylvan's computation, typechecked}\label{sec:prooflog}
+
+This section is the guide to how a goal's certificate is made and
+checked. It assumes nothing from the rest of the report: every term is
+defined here, with a small example, and every step can be reproduced from
+the commands at the end (\cref{sec:prooflog:try}). The plan it follows is
+\file{doc/certificate.md}.
+
+\subsection{Why a certificate}\label{sec:prooflog:why}
+
+\paragraph{Two ways to prove a fact.} Take the fact $2 + 2 = 4$ about the
+natural numbers of Rocq. One way is to write a function that decides it,
+for instance \code{Nat.eqb (2 + 2) 4}, which evaluates to \code{true}, and
+let Rocq evaluate it: the proof is \code{eq_refl}, and Rocq's kernel accepts
+it only after it has run the function itself. That is a \emph{proof by
+computation} (or by reflection~\cite{boutin97}): the evidence is a
+computation that the kernel repeats. The other way is to give the steps:
+apply the lemma that $2 + 2 = 2 + (1 + 1)$, then the one that \dots, each
+step a lemma applied to arguments, and the kernel only checks that each
+application has the right type. That is a \emph{proof by certificate}: the
+evidence is written down, and checking it is reading it.
+
+\paragraph{Why it matters here.} The plugin's goals are about systems with
+up to millions of states (three-process CADP: 7.9 million). The plugin
+\emph{decides} a goal with a symbolic engine (\cref{sec:symbolic}), a
+program in OCaml and C that is fast but not trusted. The certificate is
+that program's own computation: the decision diagram library, Sylvan,
+records each result it computes, the \emph{proof log}, and the plugin
+writes each record as a lemma applied to its nodes. Rocq recomputes
+nothing (CLAUDE.md, ``Hard rules''); \file{scripts/check_no_computation.py},
+first in CI, fails on any use of \code{vm_compute}, a VM cast or the like.
+
+\subsection{What the engine computes, from scratch}\label{sec:prooflog:background}
+
+\paragraph{States as vectors.} The engine turns every state of a system
+into a vector of natural numbers of fixed length (\cref{sec:containers}).
+A pair of states, one from each system, is the two vectors put end to
+end.
+
+\paragraph{List decision diagrams.} A set of such vectors is stored as a
+\emph{list decision diagram} (LDD)~\cite{blom-vdpol08}: a node holds a
+value $v$, a child \emph{down} (the rest of the vectors that have $v$ at
+this position) and a child \emph{right} (the vectors that have a larger
+value here). Two leaves end the diagram: \code{D0}, the empty set, and
+\code{D1}, the set holding only the empty vector. In Rocq
+(\loc{theories/DdTree.v}{22}):
+\begin{verbatim}
+Inductive dd := D0 | D1 | Nd (v : N) (d r : dd).
+\end{verbatim}
+and \code{In_t x w} (\loc{theories/DdTree.v}{24}) says that the vector
+\code{w} is in the set \code{x}: in \code{Nd v d r}, either \code{w} starts
+with \code{v} and its rest is in \code{d}, or \code{w} is in \code{r}.
+\emph{Example:} the set of vectors of length 1 $\{(1), (3)\}$ is
+\code{Nd 1 D1 (Nd 3 D1 D0)}: a node with value 1 whose rest is the empty
+vector, and to its right a node with value 3. In a node, the values along
+a right chain always increase. Sylvan~\cite{vandijk-vdpol15} is the C
+library that stores these nodes, each once (two equal nodes are the same
+node, named by its index in Sylvan's table).
+
+\paragraph{Operations on diagrams.} Sylvan computes with sets through a
+few recursive operations: \emph{union}, \emph{minus} (difference),
+\emph{intersect}, and the \emph{image} and \emph{pre-image} through a
+relation (\code{lddmc_relprod}: the states one step after a set;
+\code{lddmc_relprev}: the states one step before it). Each works node by
+node, on the first values of its two arguments. Union, for instance
+(\loc{vendor/sylvan/src/sylvan_ldd.c}{690}): if $a$ is empty, the result is
+$b$ (and the other way round); if $a = b$, it is $a$; otherwise compare the
+first values $v_a$ and $v_b$:
+\begin{itemize}
+\item $v_a < v_b$: the result is a node $v_a$, with $a$'s down, and to its
+  right the union of $a$'s right with $b$;
+\item $v_a > v_b$: the same with the roles swapped;
+\item $v_a = v_b$: a node $v_a$ whose down is the union of the two downs
+  and whose right is the union of the two rights (if the downs' union is
+  empty, just the rights' union).
+\end{itemize}
+Sylvan remembers each result it computes in a \emph{cache}, keyed by the
+operation and its arguments, so that a sub-computation met twice is done
+once. (Before using the cache, its union swaps the arguments so that the
+first has the larger index.)
+
+\paragraph{The game.} To decide whether one system simulates another, the
+engine solves a \emph{game} on pairs of states as a \emph{greatest
+fixpoint} (\code{gfp}, \file{lib/learn/learn.ml}): start with $z$ = every
+pair the engine explored (called \code{uni}); compute $\mathit{bad}(z)$,
+the pairs of $z$ where the first system has a move the second cannot
+answer (by silent steps, the same label, silent steps) into a pair of $z$;
+remove them, $z := z \setminus \mathit{bad}(z)$; repeat until $z$ no longer
+changes. The last iteration is the one where $z \setminus \mathit{bad}(z) =
+z$: no pair of $z$ is bad, which is exactly what a simulation is. So
+\emph{the last iteration is the proof}, if it can be written down. The
+game takes 1 to 3 iterations on most goals, and up to 23 on
+three-process CADP, of 6 to 97\,ms each.
+
+The certificate does not log the game's iterations as they run: the
+game's check is \emph{backward} (through the pairs from which an answer
+exists, within the explored pairs \code{uni}), and a proof of it would
+need \code{uni}, each system's exploration closed, and more. It logs the
+same fact read \emph{forward}, as \emph{images}, which is the definition
+of a simulation on $z$. For each relation $r$ of the \emph{mover} (the
+system whose moves must be answered), with label $l$: every pair one
+move after a pair of $z$ (the \emph{image} of $z$ by $r$) is a pair the
+\emph{answerer} can answer. Those pairs, $\mathit{ok}_l$, come from $z$ by
+the answerer's relations taken backwards (their \emph{inverses}: each
+tuple's old and new values swapped): the pairs from which, after silent
+steps, the label $l$ and silent steps, the answerer reaches $z$. The
+inclusion is a difference that comes out empty. \emph{Example:}
+$z = \{(p, s)\}$, the mover steps $p \xrightarrow{a} p'$ and the answerer
+$s \xrightarrow{a} s'$, and $(p', s') \in z$. The image of $z$ by the
+mover's $a$-relation is $\{(p', s)\}$; the image of $z$ by the answerer's
+$a$-relation backwards is $\{(p', s)\}$ ($s$ steps to $s'$); and
+$\{(p', s)\} \setminus \{(p', s)\}$ is empty. This check needs no
+universe, no closure of the exploration, no intersection and no preimage
+within a set. For a bisimilarity, each side in turn is the mover.
+
+\subsection{The proof log}\label{sec:prooflog:log}
+
+\paragraph{What is recorded.} While the log is open, each of the five
+operations above writes one \emph{record} for each result it computes, at
+the point where it offers the result to its cache
+(\loc{vendor/sylvan/src/sylvan_ldd.c}{752} for union; 801, 925, 1167, 1738
+for the others): which operation, which case it took (for union: whether
+$v_a$ was below, equal to or above $v_b$; for the images, the kind of
+position), its arguments and its result, all as node indices; 48 bytes.
+Each worker thread of Sylvan writes its own buffer, so recording takes no
+lock. By default the log stays in memory: each worker keeps its full
+buffers in a list of its own, and the plugin reads the nodes the records
+name from Sylvan's table itself. When the log is kept in a file instead,
+closing it (\code{lddmc_log_close}) also writes every node reachable from
+a recorded index (its value, down and right; 32 bytes), so the file can
+be read without Sylvan. This is in the plugin's fork of Sylvan, on the
+local branch \code{proof-log} of \file{vendor/sylvan} (three commits, on
+10 and 11 November 2026; not pushed).
+
+\paragraph{When.} The last iteration cannot be known in advance, so it is
+repeated: once the fixpoint has finished, the engine clears Sylvan's cache
+(else the repeated run would find every result there and record nothing),
+turns Sylvan's garbage collection off (a collection would free nodes and
+reuse their indices, which name the nodes in the log), grows Sylvan's
+tables to their maximum first (Sylvan grows them only when it collects),
+and runs, with the log open, the check as images
+(\loc{lib/learn/learn.ml}{1459}). Logging every
+iteration instead was rejected: the cache survives between iterations, so
+every fact of every iteration would have to be kept, and CADP's 17 to 23
+iterations would write many times what the proof needs.
+
+\paragraph{Where, and whether.} Two options of the plugin
+(\loc{src/user_tactics.ml}{186}) decide it:
+\begin{itemize}
+\item \code{Set MeBi Log Mode "off".} (the default) or \code{"keep"}:
+  the log stays in memory while the tactic proves the lemma and is freed
+  once the proof is built (\cref{sec:qed}), or it is written to a file and
+  kept, for \code{MeBi Check Log}.
+\item \code{Set MeBi Log Directory "<dir>".}: where the directory of
+  the plugin's files goes; by default, next to the file being checked.
+\end{itemize}
+In memory, each of Sylvan's workers keeps its full buffers of records
+in a list; after the log is closed, the plugin takes the records a
+buffer at a time (\code{lddmc_log_take}), each buffer freed once taken,
+and reads the nodes from Sylvan's own table, which collection leaves
+alone until the facts are written. Nothing is written to disk. For a
+file \code{F.v}, the plugin's files go in the directory \file{.F.v.mebi}
+next to it (under dune, next to the copy dune checks, in
+\file{_build/default}). A kept log of a lemma \code{L} is the one file
+\file{.F.v.mebi/L.log}: the word \code{MEBILOG1}, the number of records,
+the records, the number of nodes, the nodes. (A tactic is not told the
+name of the lemma it proves; the plugin takes it from Rocq's internal
+proof state, \loc{src/user_tactics.ml}{224}, and writes \code{goal} when
+there is none.) \file{lib/ldd/proof_log.ml} reads such a file back.
+
+\paragraph{Measured} (10 November 2026):
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & records & nodes & logged check & memory \\
+\midrule
+two-process CADP & 10,533 & 6,234 & 0.17\,s & 0.51\,GB \\
+three-process CADP & 488,067 & 233,068 & 0.82\,s & 1.33\,GB \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For three processes the file is 31\,MB, and the memory is the same as
+without the log (the logged check's time includes growing Sylvan's
+tables). Records by operation: image 270K, union 164K, minus 54K; no copy
+nodes (a Sylvan feature the plugin does not use), and only the position
+kinds copy, read, write and only-read. Those are the cases that need
+lemmas.
+
+\subsection{From records to facts}\label{sec:prooflog:facts}
+
+\paragraph{What a fact is.} A \emph{fact} is one lemma applied to its
+arguments, whose type the kernel checks. The lemmas about union and minus
+are in \file{theories/DdTree.v}:
+\begin{itemize}
+\item \code{U a b c} (\loc{theories/DdTree.v}{131}): \code{c} holds exactly
+  the vectors of \code{a} and those of \code{b};
+\item \code{Mi a b R} (\loc{theories/DdTree.v}{183}): \code{R} is within
+  \code{a}, and every vector of \code{a} is in \code{b} or in \code{R};
+\end{itemize}
+and there is one lemma for each case of Sylvan's operations:
+\code{u_a0}, \code{u_b0}, \code{u_same} for the cases with an empty or an
+equal argument, \code{u_lt}, \code{u_gt}, \code{u_eq}, \code{u_eq0} for the
+three comparisons (the last when the downs' union is empty), and
+\code{u_lt0}, \code{u_gt0}, \code{u_eq_d}, \code{u_eq_r} for a last step
+folded into one fact (\cref{sec:prooflog:fit}); likewise \code{mi_*} for
+minus. None of these lemmas needs to know that
+$v_a < v_b$: they are about sets, not about order. So the facts of union
+and minus need no comparison of numbers at all.
+
+\paragraph{A worked example.} Take $a = \{(1), (3)\}$ =
+\code{Nd 1 D1 (Nd 3 D1 D0)} and $b = \{(2)\}$ = \code{Nd 2 D1 D0}. Sylvan's
+union compares 1 with 2: $1 < 2$, so the result is \code{Nd 1 D1 R} where
+\code{R} is the union of \code{Nd 3 D1 D0} with $b$. That union compares 3
+with 2: $3 > 2$, so it is \code{Nd 2 D1 R'} with \code{R'} the union of
+\code{Nd 3 D1 D0} with \code{D0}, which is \code{Nd 3 D1 D0} (an empty
+argument). The log holds two records (the two compared cases) and the
+nodes; the facts, innermost first, are
+\begin{verbatim}
+f0 := u_b0 (Nd 3 D1 D0)
+      : U (Nd 3 D1 D0) D0 (Nd 3 D1 D0)
+f1 := u_gt (Nd 3 D1 D0) 2 D1 D0 (Nd 3 D1 D0) f0
+      : U (Nd 3 D1 D0) (Nd 2 D1 D0) (Nd 2 D1 (Nd 3 D1 D0))
+f2 := u_lt 1 D1 (Nd 3 D1 D0) (Nd 2 D1 D0) (Nd 2 D1 (Nd 3 D1 D0)) f1
+      : U a b (Nd 1 D1 (Nd 2 D1 (Nd 3 D1 D0)))
+\end{verbatim}
+and the last says that the result, $\{(1), (2), (3)\}$, is the union.
+(Sylvan stores a union under its own order of the two arguments; the
+facts follow the order the caller asked for, each case having its mirror
+image, so no fact is needed to turn one around.)
+
+\paragraph{The translation} (\code{Dd_cert.write_log},
+\loc{lib/certify/dd_cert.ml}{281}). For each union or minus record, the
+translator finds the calls it made from the nodes' contents (which case
+applies), and their facts from their own records; it checks that each
+record's result is what its case says it must be (an error otherwise:
+nothing is trusted), and writes the fact. It computes no set: every
+result comes from the log.
+
+\paragraph{Chunks.} A proof of three-process CADP has about 670,000
+facts. Built as one term, the whole proof would sit in memory at once
+before the kernel checks it. Instead, \code{MeBi Check Log} writes
+the facts to a temporary file in pieces called \emph{chunks}, and reads
+them back one chunk at a time (\file{lib/certify/dd_read.ml}); a proof's
+facts, one chunk, go from the writer to the reader a line at a time,
+with no file; each chunk is declared as its own
+constant, which the kernel checks when it is declared. Here a chunk holds
+up to 20,000 facts and the diagram nodes they mention, as local
+definitions of its own proof; its statement is \code{True}, proved by
+putting all its facts in a chain (\code{chk_u}, \code{chk_mi},
+\code{chk_nil}, \loc{theories/DdTree.v}{264}), so that the kernel checks
+every one. (A first design made each node a global constant: for three
+processes, about 550,000 node constants took 1.8\,GB before the first chunk
+was read, and the memory cap stopped it.)
+
+\paragraph{The command and its numbers.} \code{MeBi Check Log "<file>".}
+(\loc{src/user_tactics.ml}{289}) runs the translation and the reading on a
+kept log, for testing; it proves no goal. Measured (10 November 2026):
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & chunks & facts & nodes & written & read, checked & memory \\
+\midrule
+two-process CADP & 1 & 15,200 & 6,183 & 0.01\,s & 0.4\,s & 0.34\,GB \\
+three-process CADP & 8 & 668,460 & 581,960 & 1.8\,s & 26.5\,s & 0.83\,GB \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For three processes, nodes are made again in each chunk that needs them
+(233K distinct); the memory grows with each chunk, because Rocq keeps each
+declared chunk until it writes the \file{.vo} file. One chunk instead of
+eight (\code{MEBI_CHUNK_FACTS}) makes each node once and takes the same
+time, but needs 1.42\,GB.
+
+\subsection{Images, complete and sound}\label{sec:prooflog:images}
+
+\paragraph{What they are.} A system's steps are stored as a
+\emph{relation}: a diagram of \emph{tuples}, each saying how a step
+changes a vector. For each position of the vector, a \emph{code} says what
+the relation does there: \emph{copy} (the value stays, and the tuple holds
+nothing for it), \emph{only-read} (the value stays and must equal the
+tuple's), or \emph{read-write} (the tuple holds the old value, then the new
+one). \emph{Example:} with codes (read-write, copy) and the tuple
+$(1, 2)$, the vector $(1, 7)$ steps to $(2, 7)$: position 1 must hold 1 and
+becomes 2, position 2 is copied. The \emph{image} of a set $x$ through a
+relation is every vector one step after a vector of $x$: the image of
+$\{(1,7), (3,7)\}$ is $\{(2,7)\}$ ($(3,7)$ has no step: no tuple reads
+3). The \emph{inverse} relation swaps each tuple's old and new values:
+$(2, 1)$; the image of $\{(2,7)\}$ through it is $\{(1,7)\}$, the vectors
+one step \emph{before}. In Rocq the codes are \code{Copy}, \code{RO},
+\code{RW} (\file{theories/DdTree.v}, \code{rstep},
+\loc{theories/DdTree.v}{65}); Sylvan writes them as numbers per level of
+the relation (0, 3, and 1 then 2), and the translator turns one into the
+other.
+
+\paragraph{Complete and sound.} A fact about a computed set can say two
+things. \emph{Complete}: everything that belongs there is in the result
+(the image of every vector of $x$ is in it: \code{PostC},
+\loc{theories/DdTree.v}{281}). \emph{Sound}: everything in the result
+belongs there (every vector of it is the image of a vector of $x$:
+\code{PostS}, \loc{theories/DdTree.v}{526}). The proof needs the mover's
+images complete (every move from $z$ is caught) and the answerer's sound
+(whatever is in $\mathit{ok}_l$ really can be answered); \code{WlC} and
+\code{WlS} are the same for the written part of a read-write position.
+
+\paragraph{Why completeness needs comparisons.} Like union, Sylvan's image
+walks the set's and the relation's right chains in parallel and skips a
+node whose value cannot match. \emph{Example:} at a read-write position,
+the set's first value is 1 and the relation's is 4. Every tuple reads a
+value of at least 4 (values increase along a right chain), so no vector
+starting with 1 has a step: Sylvan skips the set's node 1. For a sound
+fact, skipping only drops candidates, so nothing needs to be shown
+(\code{posts_x}, \code{posts_r}). For a complete fact, it must be shown
+that what was dropped could not have had a step: that needs $1 < 4$, and
+that the chains are sorted (the facts assume the sets sorted, \code{Srt}).
+Each skip lemma of the complete direction takes the comparison Sylvan
+made as a premise (\code{post_rw_lt}: $v_x < v_r$).
+
+\paragraph{Comparisons as evidence.} A comparison such as $5 < 12$ is not
+left for the kernel to compute: it is proved from the two numbers' binary
+digits, one lemma per digit (\code{plt_*}, \code{nlt_pos}). In Rocq a
+positive number is a list of binary digits read from the last:
+$5 = $ \code{xI (xO xH)} (101), $12 = $ \code{xO (xO (xI xH))} (1100).
+The proof of $5 < 12$ compares the last digits first: \code{plt_xI_xO}
+says $2p+1 < 2q$ when $p < q$, so it needs $2 < 6$; \code{plt_xO_xO} says
+$2p < 2q$ when $p < q$, so it needs $1 < 3$; and \code{plt_1_xI} says
+$1 < 2q+1$. Three lemma applications; a number of $n$ binary digits needs
+at most $n$.
+
+\paragraph{When the relation ends early.} A relation of one system
+leaves the other system's positions alone, and a relation touches only
+some of its own. Its codes stop at its last touched position, and
+\code{rstep} carries the positions after the last code unchanged, as
+Sylvan does past the end of its meta. So an image at that point is the set
+itself, in one fact (\code{post_end}, \code{posts_end},
+\loc{theories/DdTree.v}{298}), with no step per node below it.
+
+\paragraph{Related work.} Producing proof steps from a decision-diagram
+package as it computes is the idea of Sinz and Biere~\cite{sinz-biere06},
+and of Bryant and Heule~\cite{bryant-heule21}, where each BDD operation
+emits clauses of an extended-resolution proof. Here each LDD operation's
+case becomes the application of a lemma about sets, checked by Rocq's
+kernel.
+
+\subsection{Making three-process CADP fit}\label{sec:prooflog:fit}
+
+Three-process CADP (7.9 million states) is the largest example. Each
+change below was measured with \file{test/cert_tool.exe --log}, which runs
+the translator alone and counts the facts of each lemma.
+
+\paragraph{1. The check as images.} The game's own check, logged, needed
+the explored pairs as a universe, each system's exploration closed,
+intersections with the universe and complete preimages: 1.38M records,
+2.46M facts. The forward check (\cref{sec:prooflog:background}) needs
+none of these: 488K records.
+
+\paragraph{2. The answering side first.} A pair is one vector. A relation
+of the side whose positions come second must copy the other side's
+positions before it reaches its own, one fact per node (\emph{copy
+levels}). The answerer's relations are applied most (each label, each
+silent round), so its positions come first (\loc{lib/learn/learn.ml}{1305};
+for a bisimilarity, where both answer, the narrower side's), and each
+meta stops at its relation's last touched position (\code{meta_levels},
+\loc{lib/learn/learn.ml}{520}). The answerer's images are about 100 facts
+in all.
+
+\paragraph{3. Each image one way only: its role.} The logged run records
+each image it makes at its top level with the way the proof uses it, 1
+sound or 2 complete (\code{Ldd.log_top_relprod} in \file{lib/ldd}, the
+fork's \code{lddmc_log_top}, operation 6 in the log), with the arguments
+as passed, before Sylvan skips any node. The translator proves each image
+only in that direction; a sound image needs no comparison.
+
+\paragraph{4. Smaller tables in the translator.} The translator looks up a
+record by its call (the operation and its arguments) in a table of its own
+(\code{Itab} in \file{lib/certify/dd_cert.ml}: open addressing, the call
+packed into two integers, the result and a ``called by another record''
+bit in a third), about 32 bytes a record, and reads the log as a stream
+(\code{Proof_log.read_iter}).
+
+\paragraph{5. Comparisons shared within a chunk.} A complete skip needs the
+comparison \code{a < b} of two node values, proved digit by digit
+(\cref{sec:prooflog:images}). The same pair of values recurs: its proof is
+made once per chunk (three processes: about 17,000 comparison facts).
+
+\paragraph{6. A chain's last step folded in.} Many facts end a chain with
+a fact about an empty set: the last written value of a read-write
+position, then the empty rest (\code{wl_nd}, then \code{wl_r0}); a node
+with no right sibling (\code{post_copy}, then \code{post_x0}); a union
+with an empty or an equal side. A lemma for each such pair, proved once
+from the two (\code{wl_last}, \code{post_copy_last}, \code{post_rw_last},
+\code{u_lt0}, \code{u_gt0}, \code{u_eq_d}, \code{u_eq_r}, \code{mi_eq0d},
+\code{mi_eq0r}), makes it one fact; and each union is proved in the order
+of its arguments the caller asked for, with no fact to swap them. Three
+processes: 963,941 facts down to 668,460, and 10\% less time (the folded
+facts were the small ones).
+
+\paragraph{7. The largest chunk first.} Rocq's kernel, when it checks a
+constant, first copies its whole term into a hash-consed form (each
+distinct subterm once, with a table), and keeps the types of the shared
+parts. Measured on a chunk of 292,000 facts: its term took 52\,MB, and
+checking it 510\,MB more, most of it live data, not garbage (a GC four
+times as eager still needed 386\,MB). So a chunk's check needs memory in
+proportion to its size, on top of what the chunks declared before it keep
+(about 400 bytes a fact). One root alone can give 300,000 facts (one
+image of the game's check), so chunks cannot simply be made smaller. Since the
+check chunks need nothing from each other, \code{Dd_read} reads them
+largest first: the largest check then meets the least memory held.
+(Cutting a large root across chunks would need the nodes shared between
+chunks as constants of their own; measured, a constant costs about 3\,KB,
+too much for 233,068 nodes.)
+
+\paragraph{Where the time goes.} Measured on three processes: the kernel
+spends about 14\,\textmu s per node \code{let} and 28\,\textmu s per fact,
+typing and hash-consing about equally. Binding the lists of codes and the
+numbers as \code{let}s, or one chunk instead of eight, does not change the
+total: what reduces it is fewer facts and fewer nodes.
+
+\paragraph{Measured} (10 November 2026, \file{bench/prooflog.py}):
+\begin{center}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & decided & facts & checked in & memory at most \\
+\midrule
+two-process CADP & 0.8\,s & 15,200 & 0.7\,s & 0.34\,GB \\
+three-process CADP & 22.9\,s & 668,460 & 29.5\,s & 0.83\,GB \\
+\bottomrule
+\end{tabular}
+\end{center}
+Before these changes, three processes took 2,461,163 facts, checked in
+121\,s, 1.69\,GB at most. These are the facts alone (\code{MeBi Check
+Log}); \cref{sec:qed} builds the proof of the goal from them.
+
+\subsection{Trying it}\label{sec:prooflog:try}
+
+For the two CADP examples, \file{bench/prooflog.py} does all of this
+(after \code{dune build}): it copies each file into \file{_certify/log/},
+turns the log on, stops once the engine has decided, checks each log in a
+file of its own next to it, and prints the facts, times and memory. A
+complete example is \file{test/rocq/LogTest.v} (in the build). In short:
+\begin{verbatim}
+Require Import MEBI.loader.
+(* ... an LTS [step], then: *)
+Set MeBi Log Mode "keep".
+Example logged : weak_bisimilar step step (par A B) (par B A).
+Proof. weak_bisim. Qed.
+Set MeBi Log Mode "off".
+MeBi Check Log ".LogTest.v.mebi/logged.log".
+Print Assumptions mebi_log1_c1.
+\end{verbatim}
+\begin{enumerate}
+\item The tactic decides the goal and proves it from the certificate
+  (\cref{sec:qed}); with \code{"keep"}, the engine also leaves
+  \file{.LogTest.v.mebi/logged.log}, and prints on standard error a line
+  \code{[proof log] 628 records; the check as images: passes \dots}: the
+  number of records, and that the check holds in the repeated run (it
+  must pass).
+\item \code{MeBi Check Log} prints the number of chunks, facts and nodes,
+  the times, and the name of the last chunk's constant
+  (\code{mebi_log1_c1}: the first use of the command in the file, its
+  first chunk).
+\item \code{Print Assumptions} on that constant must say ``Closed under the
+  global context'': the facts use no axiom.
+\end{enumerate}
+To measure a large example, add \code{Set MeBi Log Mode "keep".} before its
+proof and run it with \code{MEBI_CERT_STOP=decided} (stop once the engine
+has decided) and \code{MEBI_CERT_STATS=1}; then check the log in a second
+file. Run heavy examples under a memory cap (\file{CLAUDE.md}).
+
+\subsection{What remains, and what was decided}\label{sec:prooflog:next}
+
+\paragraph{Next} (\file{doc/certificate.md}; \cref{sec:status}): the
+optimisations (\cref{sec:optimisations}); every example's proof already
+ends with \code{Qed} (\cref{sec:qed:cost}).
+
+\paragraph{Decided} (10 November 2026):
+\begin{itemize}
+\item \emph{one extra logged check}, not a log of every iteration;
+\item \emph{the logged check as images}, the mover's complete and the
+  answerer's sound by inverse relations, not the game's backward check:
+  no universe, no closure of the exploration, no intersection, no
+  complete preimage;
+\item \emph{evidence, not re-checking}: where Sylvan has compared two
+  values, the comparison is written as a proof built from the two
+  numbers' binary digits, one lemma per digit, not as a computation the
+  kernel repeats; lookups in lists are avoided by giving the element
+  itself;
+\item \emph{steps from the rules only}: the engine finds a term's steps by
+  interpreting the LTS's rules; a step it cannot follow is an error;
+\item \emph{side conditions with a \code{Decidable} instance}: proved
+  through the instance, the kernel reducing its boolean once per step.
+\end{itemize}

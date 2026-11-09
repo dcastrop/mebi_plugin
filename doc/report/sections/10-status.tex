@@ -1,0 +1,97 @@
+\section{Status and what comes next}\label{sec:status}
+
+\paragraph{Done.} The engine decides strong and weak (bi)similarity on
+Sylvan's diagrams; Sylvan logs the decision's check made again as images
+(the mover's complete, the answerer's sound), each top-level image with
+the way the game's proof uses it; the plugin turns the log into facts of
+\file{theories/DdTree.v} and the kernel checks them, a chunk at a time
+(three-process CADP: 668,460 facts in 30\,s, 0.83\,GB).
+
+\paragraph{Next, in order} (\file{doc/certificate.md}):
+\begin{enumerate}
+\item \textbf{Only-write levels} (Sylvan's meta code 4, Proc's
+  \code{termLTS}): their inverse relations, from the position's values in
+  the explored states, and the translator's cases.
+\item \textbf{The certificate's top level.} Its theorems are proved once,
+  closed under the global context (\file{theories/DdGame.v}): the game on
+  vectors from the logged facts (\code{VWSim}, \code{VSSim}, and a toolkit
+  of lemmas), and its transfer to \code{weak_sim}, \code{strong_sim} and
+  the bisimilarities (\code{cert_weak_sim} and the others), given an
+  encoding complete for the mover and sound for the answerer. What
+  remains is the assembly for a goal: the toolkit applied as the logged
+  check ran, with \code{Srt} facts for \code{z} and the mover's
+  relations, and the relations' nodes as constants.
+\item \textbf{Each relation's tuples as the LTS's steps:} each step's
+  derivation from the engine's rule interpreter, and the absence of other
+  steps from inversion lemmas; the encoding of states from the engine's
+  tables, its facts as terms. Then the tactics close their goals with
+  \code{Qed}.
+\item \textbf{The optimisations} of \cref{sec:optimisations} on the same
+  machinery.
+\end{enumerate}
+
+\paragraph{Decisions to double-check.}
+\begin{itemize}
+\item \textbf{A pair's vector holds the answering side's positions first}
+  (\code{b_first}, \file{lib/learn/learn.ml}; for a bisimilarity, the
+  narrower side's), so that the answerer's relations need no copied
+  prefix. Alternative: the two sides' positions interleaved.
+\item \textbf{\code{rstep} carries the positions after the last code
+  unchanged} (\file{theories/DdTree.v}), as Sylvan does past a meta's end,
+  so that an image there is one fact. Alternative: codes padded with
+  copies to the vector's length: a fact per node below the end, and a
+  sound image would need the vectors' length.
+\item \textbf{\code{Srt} keeps \code{Lead}} (a node's value below its right
+  sibling's), which no lemma uses now; one comparison gives both it and
+  \code{Above}, so it costs no fact. Alternative: drop it from \code{Srt}.
+\item \textbf{Large roots stay whole; chunks are read largest first}
+  (\file{lib/certify/dd_read.ml}). Alternative: cut a root across chunks,
+  with the nodes they share as constants (about 3\,KB each). It matters
+  because one root bounds the memory of its chunk's check: 300,000 facts
+  on three-process CADP.
+\item \textbf{The lemma's name for its log comes from Rocq's internal
+  proof state} (\file{.F.v.mebi/L.log}; \code{files_dir},
+  \file{src/user_tactics.ml}), from the deprecated
+  \code{Vernacstate.Declare}; it matters if that module goes away.
+\item \textbf{\code{Decidable} side conditions are proved through their
+  instance} (\code{Decidable_sound}, refuted by
+  \code{Decidable_complete_alt}), the kernel reducing the boolean once per
+  step. Alternative: structural proofs for the usual forms. It matters as
+  the one computation of the user's side conditions the design keeps.
+\item \textbf{The proof is generated Gallina text, elaborated}
+  (\file{src/lts_proof.ml}), not terms built directly: the elaborator
+  infers the generated matches' motives and the omitted arguments.
+  Alternative: build every term in OCaml. It matters for the proof's
+  build time (elaboration is most of it).
+\item \textbf{The engine reads every slot a step overwrites}, so that the
+  answerer's relations can be read backwards (a relation that only writes
+  a position has no finite inverse). Alternative: an inverse built from
+  the values each position takes. It matters for the number of
+  projections the engine learns.
+\item \textbf{The proof's pieces are constants} declared as \code{abstract}
+  declares a sub-proof (side effects exported at \code{Qed}, named
+  \code{<lemma>_mb_...}; \file{src/lts_proof.ml}, \code{declare_now}):
+  each is checked once, when declared, and the elaboration sees only a
+  proof's statement. Alternative: \code{let}s of the proof's term
+  (\code{MEBI_QED_LETS=1}), which leave the user's module uncluttered but
+  put the whole check at \code{Qed}. It matters because the exported
+  constants are visible in the module (\code{Search}, \code{Print}).
+\item \textbf{A coverage's membership by a trie lookup}
+  (\code{DdEnc.tall_get}, accepted on 11 November 2026): the kernel finds
+  the statement by its number while typing, as it finds a value by
+  \code{val}; no \code{eq_refl}. Alternative: one fact per membership,
+  whose applications cost the kernel time quadratic in their number. It
+  matters because it is a conversion on the certificate's data.
+\item \textbf{A coverage's memberships checked apart}
+  (\cref{sec:qed:packs}): a chunk per relation diagram (a transparent
+  constant of its nodes) and a chunk per pack (an opaque constant),
+  checked while the proof is built. Alternative: the memberships' facts
+  in the main term, which made three processes' \code{Qed} exceed
+  6\,GB. It matters because each relation's nodes are made again in its
+  chunks, and the diagrams' copies are compared at \code{Qed}.
+\item \textbf{The plugin changes the GC's setting} (\code{space_overhead})
+  while it builds a proof (80), and after a decision of over a million
+  pairs until the next tactic (60), so that \code{Qed} fits in less
+  memory (\file{src/user_tactics.ml}). Alternative: leave Rocq's 200.
+  It matters because the setting is global to the process.
+\end{itemize}

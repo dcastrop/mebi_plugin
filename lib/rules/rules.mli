@@ -25,6 +25,10 @@ type premise =
       }
   (** a decidable proposition, e.g. [allowed ns l = true], with its
       [Decidable_witness], a boolean over the rule's variables *)
+  | Opaque of Constr.t
+  (** any other proposition, e.g. [exists k, k = n]: the rules cannot
+      evaluate it, so a step through it comes from the explicit route,
+      which searches for its derivation *)
 
 type rule =
   { name : Names.Id.t (** the constructor's name *)
@@ -50,11 +54,6 @@ type lts =
 *)
 exception Not_an_lts of Names.inductive
 
-(** Raised by {!of_lts}: a premise of the constructor named here is
-    neither a step of an LTS nor a proposition with a [Decidable] instance.
-    The premise is over the constructor's whole context, given with it. *)
-exception Not_decidable of Names.Id.t * Constr.rel_context * Constr.t
-
 (** Raised by {!of_lts}: stdlib's [Decidable] class is not loaded
     ([theories/loader.v] Requires it). *)
 exception Decidable_not_loaded
@@ -63,7 +62,6 @@ exception Decidable_not_loaded
     rules' step premises use, transitively, first met first.
 
     @raise Not_an_lts if [ind], or an LTS a premise steps by, is not one
-    @raise Not_decidable if a premise is neither a step nor decidable
     @raise Decidable_not_loaded
       if the [Decidable] class is not loaded (all raised here). *)
 val of_lts : Environ.env -> Evd.evar_map -> Names.inductive -> lts list

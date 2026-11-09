@@ -1,0 +1,3 @@
+; Sylvan and Lace, git submodules (lib/ldd/README.md): sources only, read
+; by lib/ldd/dune. Dune does not look for build rules in them.
+(data_only_dirs sylvan lace)

@@ -1,0 +1,9 @@
+; doc/learn.md: relations learned from the rules, on Sylvan's LDDs, the
+; strong and weak games, and the last check logged by Sylvan
+; (doc/certificate.md). Only the plugin (src/) uses it, in the tactics.
+(library
+ (name learn)
+ (public_name rocq-mebi.learn)
+ (libraries unix rocq-runtime.vernac rocq-mebi.ldd rocq-mebi.skeleton)
+ (modules learn)
+ (wrapped false))

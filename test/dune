@@ -1,24 +1,15 @@
-; Links rocq-mebi.model only -- no plugin, no rocq-runtime. If this stops
-; building because a Rocq dependency crept back into lib/utils, lib/terms or
-; lib/model, that is the regression this target exists to catch.
+; lib/ldd's tests (Sylvan's LDDs). No Rocq.
 ;
 ; No (public_name): this is a test binary, and installing it would drop it into
 ; the opam switch's bin/.
 (test
- (name tests)
- (modules tests)
- (libraries rocq-mebi.model))
+ (name ldd_tests)
+ (modules ldd_tests)
+ (libraries rocq-mebi.ldd))
 
-; Throwaway scaling probe for the saturation algorithm (see satscale.ml).
-; Same constraint as the test binary above: model only, no rocq-runtime.
+; the proof log's translation alone (lib/certify/dd_cert.ml's write_log):
+; the facts per lemma, without Rocq. Tooling, run by hand.
 (executable
- (name satscale)
- (modules satscale)
- (libraries rocq-mebi.model unix))
-
-; Differential harness for the saturation rewrite (see satdiff.ml).
-; Model only, no rocq-runtime, as above.
-(executable
- (name satdiff)
- (modules satdiff)
- (libraries rocq-mebi.model))
+ (name cert_tool)
+ (modules cert_tool)
+ (libraries rocq-mebi.certify unix))

@@ -1,0 +1,49 @@
+\section{Overview}\label{sec:overview}
+
+\paragraph{What the plugin is for.} A \emph{labelled transition system}
+(LTS) is a set of states and labelled steps between them. In Rocq, the
+plugin takes an LTS as an inductive predicate
+\code{step : M -> option A -> M -> Prop} without parameters: a step
+\code{step s l s'} goes from \code{s} to \code{s'} with label \code{l}, and
+the label \code{None} is a \emph{silent} step. Given two LTSs and a start
+state in each, the plugin answers four kinds of goal
+(\file{theories/Bisimilarity.v}): \code{strong_sim} and
+\code{strong_bisimilar} (every step is answered by one step with the same
+label), and \code{weak_sim} and \code{weak_bisimilar} (silent steps may be
+taken freely around the answer). The tactics are \code{sim}, \code{bisim},
+\code{weak_sim} and \code{weak_bisim}.
+
+\paragraph{How a goal is decided and certified.} In three stages.
+\begin{enumerate}
+\item \textbf{Deciding} (\cref{sec:symbolic}). The engine reads the LTS's
+  constructors as rules, reads each state as a \emph{container} (a shape,
+  and a value at each position: \cref{sec:containers}), and stores sets of
+  states as \emph{list decision diagrams} in Sylvan, a C library. It learns
+  each rule's steps on the positions the rule reads, explores both systems,
+  and plays the simulation game on pairs of states to its greatest
+  fixpoint. The verdict is whether the start pair is in it.
+\item \textbf{The certificate} (\cref{sec:prooflog}). The engine
+  checks the game's result once more, as images, with Sylvan's \emph{proof log} on: every move from
+  the relation found lands among the pairs that can answer it. Every
+  result Sylvan computes (a union, a difference, an image) is recorded
+  with the case its algorithm took. That log, kept in memory (or in a file
+  next to the file being checked, on request), is the certificate: what
+  Sylvan computed, step by step.
+\item \textbf{The proof} (\cref{sec:prooflog:facts}, \cref{sec:qed}). The
+  plugin turns each record into a \emph{fact}: a lemma of
+  \file{theories/DdTree.v} applied to the record's nodes. From the facts
+  and from proofs generated for the goal's own systems (each state as a
+  vector, each learned step a real step, every real step learned), it
+  builds the proof: its pieces as constants the kernel checks as they are
+  made, and one term that names them, with which the tactic closes the
+  goal. Rocq's kernel checks that term at \code{Qed}: it typechecks it.
+\end{enumerate}
+
+\paragraph{Reading path.} For a newcomer: \cref{sec:prooflog} first (it
+defines every term it uses, with worked examples), then \cref{sec:qed}
+for how the goal's proof is built from the certificate (it defines what
+it needs from Rocq and recalls the terms of \cref{sec:prooflog}), then
+\cref{sec:symbolic} for the engine and \cref{sec:containers} for the
+encoding of states, then \cref{sec:optimisations} for how the
+optimisations fit the certificate, and \cref{sec:commands,sec:tests} to
+run things.

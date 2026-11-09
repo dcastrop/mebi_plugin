@@ -1,8 +1,8 @@
-; The plugin's Rocq-level tests (Test.v) and development benchmarks
-; (DevTest.v). Built by `dune build` and CI. Not part of the opam package
-; (there is no `(package ...)`), so `dune build -p rocq-mebi @install`, which
-; is what opam runs, neither builds nor installs them: DevTest.v alone was
-; ~50s of that build, and users do not need either.
+; The plugin's Rocq-level tests (LogTest.v: Sylvan's proof log, kept and
+; checked; CongruenceTest.v: the reorderings found in the rules).
+; Built by `dune build` and CI. Not part of the opam package (there is no
+; `(package ...)`), so `dune build -p rocq-mebi @install`, which is what
+; opam runs, neither builds nor installs them.
 ;
 ; They are not in theories/ because dune maps a directory to one logical path,
 ; so a second theory there would shadow MEBI.

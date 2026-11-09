@@ -1,12 +1,12 @@
 ; The examples, as the theory MEBI.Examples. Built by `dune build` and CI;
 ; not part of the opam package (no (package ...)), like test/rocq.
 ;
-; Only the files listed are built: the fast ones (~2 min together). The
-; heavy proof files (the Alternating Bit Protocol, Test4, the large CADP
-; and evaluation files, the Proc/Test1-3 and CADP proof suites) take
-; minutes and gigabytes each: bench/proofs.sh compiles them one at a time,
-; under a memory cap, against this build (bench/README.md). Until 2026-11-05
-; this list was the uncommented part of _CoqProject, built by make.
+; Each goal is decided, its certificate logged by Sylvan, and the goal
+; closed by the proof built from it, checked by the kernel at Qed
+; (doc/certificate.md). Only the files listed
+; are built. The others, CADP/TwoProcesses.v, CADP/ThreeProcesses.v
+; (5 minutes, 6.6GB) and Proc/Test4/TermTests.v: bench/prooflog.py runs
+; them, each step under a memory cap (bench/README.md).
 
 (rocq.theory
  (name MEBI.Examples)
@@ -16,32 +16,23 @@
  (theories Stdlib MEBI)
  (modules
   ; CCS (value-free, Milner 1989): textbook pairs and the Alternating Bit
-  ; Protocol, and instances of CTrees' CCS laws (~25s)
+  ; Protocol
   CCS
   Bisimilarity.CCS.PluginProofs
-  Bisimilarity.CCS.LawProofs
-  ; the evaluation levers, small instances (~40s)
-  Evaluation.Base
-  Evaluation.Width
-  Evaluation.Layers
-  Evaluation.Depth
-  ; Proc, and Test4 under the normalised semantics (82 states)
+  ; Proc: Test1-3 (Test4's terms; its goals, TermTests.v, not built)
   Proc
-  ProcCongruence
   Bisimilarity.Proc.Test1.Terms
   Bisimilarity.Proc.Test2.Terms
   Bisimilarity.Proc.Test3.Terms
   Bisimilarity.Proc.Test4.Terms
-  Bisimilarity.Proc.Test4.NormTermTests
-  ; CADP: the models and specifications the proof files use (no plugin
-  ; proofs; Norm.v's hand proof ~35s)
+  Bisimilarity.Proc.Test1.PluginProofs
+  Bisimilarity.Proc.Test2.PluginProofs
+  Bisimilarity.Proc.Test3.PluginProofs
+  ; CADP: the MCS queue lock against the lock server, one process
+  ; (TwoProcesses.v, ThreeProcesses.v: bench/prooflog.py, not built)
   CADP.Model
-  CADP.Glued
-  CADP.Norm
-  CADP.Obs
   CADP.SpecMutex
-  CADP.SpecFifo
-  CADP.Hidden
-  CADP.Terms))
+  CADP.Terms
+  CADP.MutualExclusion))
 
 (include_subdirs qualified)

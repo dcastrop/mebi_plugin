@@ -14,51 +14,20 @@
                                     ; (foreign_stubs                     ; we link our plugin with a C
                                     ;  (language c)                      ; library! Optional, of course.
                                     ;  (names ce_get))
- (libraries ; OCaml Libraries we want to link
-            ; with, your choice here.
-            ; rocq-runtime.vernac ; Needed for vernac extend.
-            ; rocq-runtime.plugins.ltac ; Needed for tactic extend.
-  rocq-mebi.utils
-  rocq-mebi.terms
+ (libraries
+  rocq-runtime.vernac
+  rocq-runtime.plugins.ltac
+  rocq-mebi.utils ; the Logger the libraries emit through
   rocq-mebi.rocq_tools
-  rocq-mebi.model
-  rocq-mebi.rules ; S2: an LTS's constructors read as rules
-  yojson
-  benchmark)
- ; cppo, as in lib/rocq_tools/dune: see the comment there.
- (preprocess
-  (per_module
-   ((action
-     (run %{bin:cppo} -V ROCQ:%{rocq:version.major}.%{rocq:version.minor}.0 %{input-file}))
-    proof_solver_step)))
- (modules_without_implementation decoder_intf graph_type_intf wrapper_intf results_intf proof_solver_statem_intf proof_solver_tactics_intf)
+  rocq-mebi.rules ; an LTS's constructors read as rules
+  rocq-mebi.skeleton ; rules to a vector
+  rocq-mebi.learn ; learned relations, the game, certificates
+  rocq-mebi.certify) ; certificates from Sylvan's proof log
  (modules
   rocq_output ; installs the Rocq Feedback sink that lib/ emits through
-  decoder_intf
-  decoder
-  api ; stores modules created by [loader.v], used by commands
-  weak
-  graph_type_intf
-  graph_type
-  graph_builder
-  graph_extract_lts
-  graph
-  config_loader ; load configuration (of api)
-  benchmarking
-  wrapper_intf
-  wrapper ; basic plugin commands
-  results_intf
-  results
-  proof_solver_statem_intf
-  proof_solver_statem
-  proof_solver_tactic
-  proof_solver_theory
-  proof_solver_wrapper
-  proof_solver_tactics_intf
-  proof_solver_tactics
-  proof_solver_step
-  proof_solver ; 
-  user_tactics ; [bisim] and [sim]
+  game_proof ; the game on vectors from the plan and the facts
+  lts_proof ; encodings, soundness and completeness, by elaborated text
+  user_tactics ; [sim], [bisim], [weak_sim], [weak_bisim]
   help ; [MeBi Help]
   g_mebi))
 

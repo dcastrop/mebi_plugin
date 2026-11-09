@@ -1,0 +1,129 @@
+\section{Terms as containers, and decision diagrams}\label{sec:containers}
+
+A state is a closed Rocq term; a decision diagram stores sets of integer
+vectors of one length. This section says how one becomes the other, and
+why the way it is done is the theory of \emph{containers}~\cite{abbott05}:
+the code is organised along that theory (\file{lib/skeleton/container.ml},
+\file{lib/learn/learn.ml}, ``Serialisation''), which lets one encoding
+serve systems whose states have several shapes.
+
+\subsection{Containers}
+
+A container $S \lhd P$ is a set of \emph{shapes} $S$ and, for each shape
+$s$, a set of \emph{positions} $P(s)$. Its extension is the functor
+\[
+  [\![ S \lhd P ]\!](X) \;=\; \Sigma\, s \in S.\; (P(s) \to X),
+\]
+an element of which is a shape and a value in $X$ at each of its
+positions. Strictly positive types are the initial algebras of
+containers, and containers are closed under the usual constructions, the
+free monad among them~\cite{abbott05}; with positions that carry types,
+they are indexed containers~\cite{altenkirch15}.
+
+\subsection{Three stages}
+
+\paragraph{The term language} (\code{Container.view}). A closed term is a
+constructor applied to parameters and fields, or something else (a value
+that is not a constructor application). This stage knows nothing of the
+rules.
+
+\paragraph{Refinement by the rules} (\code{Container.split},
+\code{Skeleton.classify}). A constructor is \emph{structural} if some rule
+keeps it in place: it occurs in the rule's source and the same
+constructor is at the same position of its target
+(\cref{sec:sym-skeleton}). Write the state type as $T = \mu X.\, F_s(X) +
+F_v(X)$, with $F_s$ the structural constructors and $F_v$ the others. Then
+\[
+  T \;\cong\; F_s^{*}(V),
+\]
+where $F_s^{*}$ is the free monad on $F_s$ and $V$ the terms whose head
+is not structural. The free monad on a container is a container: its
+shapes are the finite trees of structural constructors with holes, its
+positions the holes. A term is therefore a shape (its top part made of
+structural constructors), and a value at each position (the subterm
+where that part stops), and the split is canonical: no value starts with
+a structural constructor. Positions are \emph{paths} from the root (field
+indices), not slot numbers.
+
+The rules also classify each summand (a rule chain from a shape,
+\code{Skeleton.kind}), and the three classes are the three kinds of map
+on container elements:
+\begin{itemize}
+\item \textbf{local} (the shape stays): the identity on shapes, a new
+  value at some positions;
+\item \textbf{structural} (the shape changes, values are moved or
+  dropped: $0 \mid 0 \to 0$, Proc's \code{do_par_end} and \code{do_assoc}):
+  a container morphism, a map on shapes and a renumbering of positions;
+\item \textbf{dynamic} (a computed value has structure, as a process that
+  becomes a parallel composition): the value is itself an element of
+  $F_s^{*}(V)$, and the state is flattened by the free monad's
+  multiplication $F_s^{*}F_s^{*} \Rightarrow F_s^{*}$; the new shape is
+  known only with the value.
+\end{itemize}
+
+\paragraph{Serialisation} (\file{lib/learn/learn.ml}). A shape becomes a
+number, a position (a path) a vector index, a value a number (tables
+built as the engine meets them, \code{0} meaning ``no position here''). A
+state is the vector $[\textit{shape}; \textit{value at each position}]$,
+padded to the system's width (8 positions to start with, doubled when a
+state needs more). A path is numbered the first time a shape of the
+system has it, in the order of its slots' use for the start shape
+(\cref{sec:sym-learn}), so \emph{the same path has the same index in every
+shape}: a step that changes the shape at one place leaves every value
+elsewhere at its index, and the engine's relation copies those indices
+instead of reading them.
+
+\subsection{Decision diagrams are sets of container elements}
+
+A list decision diagram (\cref{sec:sym-ldd}) over such vectors is a set
+of serialised container elements, and its structure follows the
+container's:
+\begin{itemize}
+\item its first level is the shape, a finite set: the diagram branches
+  first on which shape a state has;
+\item each further level is a position, and a node there holds the values
+  that position takes; positions a shape does not have hold $0$, shared by
+  all the states of that shape, so they cost one node;
+\item the sharing of the diagram is the sharing of values among
+  positions: a product of choices, one per position (independent
+  processes), costs a sum of nodes, not a product;
+\item a summand's relation is a relation on the positions it reads and
+  writes, the others copied: on the container, a local map touches the
+  positions at or below one place; a structural map, the shape and the
+  positions it moves; a dynamic one, the shape and the positions of the
+  structure the value became.
+\end{itemize}
+Because positions are paths, this locality is the container's: a change
+below a place is a change of the vector below that place's indices. With
+positions numbered as slots (left to right in the current shape, as until
+10 November 2026), removing one leaf of the tree renumbered every leaf
+after it, so a structural step rewrote values it did not touch, and the
+engine had to learn it on whole states.
+
+\subsection{Up to structural congruence}\label{sec:containers:upto}
+
+\paragraph{Reorderings, found in the rules} (\code{Skeleton.reorderings}).
+A rule is a \emph{reordering} if it has no premise, its label is
+\code{None}, its source is a structure over pattern variables each used
+once, and its target uses the same variables each once, otherwise
+arranged: a container morphism that only permutes positions. That covers
+commutation (Proc's \code{do_comm}), associativity (\code{do_assocl},
+\code{do_assocr}), a swap or a rotation inside a structure. Only
+reorderings whose inverse is one too are kept, so that they are
+reversible; \code{do_par_end} ($0 \mid 0 \to 0$) is not one. When none is
+found, or not the right ones, the command \code{MeBi Congruence lts
+rules} names them by hand.
+
+\paragraph{Proofs up to congruence: to design.} The engine can put every
+reachable state in a class: the states it reaches by the congruence's
+silent steps, and that reach it back. A certificate over pairs of classes
+must answer the moves of \emph{every member} of a class, not only those of
+a representative. Checking the representatives alone is unsound: with $b
+\xrightarrow{\tau} a \xrightarrow{x} 0$ and $a \xrightarrow{\tau} b$, the
+class $\{a, b\}$ would be ``matched'' by an inert state. This is weak
+bisimulation up to a relation contained in mutual silent reachability,
+with the whole class's moves checked, which makes it sound where ``up to
+$\approx$'' is not~\cite{pous-sangiorgi11}. It covers weak goals only:
+the silent path to the representative is not a one-step answer. The
+certificate comes from the engine and is loaded as a proof term; Rocq
+recomputes nothing (\cref{sec:optimisations}).

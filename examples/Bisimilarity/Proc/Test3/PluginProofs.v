@@ -1,15 +1,5 @@
 Require Import MEBI.loader.
 
-MeBi Config Output "Debug" False.
-MeBi Config Output "Info" False.
-MeBi Config Output "Notice" True.
-MeBi Config Output "Warning" True.
-MeBi Config Output "Error" True.
-MeBi Config Output "Trace" False.
-MeBi Config Output "Result" False.
-MeBi Config Output "Show" False.
-MeBi Config Output "DecodeResults" False.
-MeBi Config Output "DumpResults" False.
 
 Require Stdlib.Program.Tactics.
 
@@ -19,25 +9,17 @@ From Stdlib Require Operators_Properties.
 
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.Proc.
-Import Layered.
+Import Stacked.
 
 Require Import MEBI.Examples.Bisimilarity.Proc.Test3.Terms.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs".
 
-MeBi Config Weak As Option label.
 
-(* This file needs one mutual cofix over the whole precomputed product
-   relation, instead of a fresh nested cofix per newly-seen pair. Without it
-   it does not finish: [wsim_pq] exhausted [Solve 100000] and [wsim_p3] was
-   recorded as unfinished after 500000 and crashing at 1000000.
-
-   The default strategy is [Auto], which measures both on the model before
-   the proof starts and takes the mutual path here on its own -- it says so
-   at Notice. The setting below is left explicit so the file still works if
-   someone changes that default, and as a record of what it depends on. See
-   ASSISTED-CHANGES.md, 2026-09-29, and backlog item B2. *)
-MeBi Config Solver MutualCofix True.
+(* Until 2026-11-08 this file needed the removed solver's mutual cofix
+   over the whole product relation (without it [wsim_pq] exhausted 100000
+   steps; ASSISTED-CHANGES.md, 2026-09-29, backlog item B2). With
+   certificates it takes about a second. *)
 
 Require Import Logic.
 
@@ -46,44 +28,32 @@ Example r0 : term := (tact (recv A) tend).
 Example p0 : comp := cpar (cprc s0) (cprc r0). 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.p0".
-Set MeBi MaxSteps 2.
-(* Example wsim_p0 : weak_sim compLTS compLTS p0 p0. 
-Proof. sim.
-  (* Iteration History: 2 <- 283 <- 425 <- _ *)
-Qed. *)
+(* Example wsim_p0 : weak_sim compLTS compLTS p0 p0.
+Proof. weak_sim. Qed. *)
 
 Example s1 : term := tfix (tact (send A) trec).
 Example r1 : term := tfix (tact (recv A) trec).
 Example p1 : comp := cpar (cprc s1) (cprc r1). 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.p1".
-Set MeBi MaxSteps 2.
-(* Example wsim_p1 : weak_sim compLTS compLTS p1 p1. 
-Proof. sim.
-  (* Iteration History: 2 <- 2835 <- _ <- _ *)
-Qed. *)
+(* Example wsim_p1 : weak_sim compLTS compLTS p1 p1.
+Proof. weak_sim. Qed. *)
 
 Example s1b : term := tfix (tact (send A) trec).
 Example r1b : term := tfix (tact (recv A) trec).
 Example p1b : comp := cpar (cpar (cprc tend) (cprc s1b)) (cprc r1b). 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.p1b".
-Set MeBi MaxSteps 2.
-(* Example wsim_p1b : weak_sim compLTS compLTS p1b p1b. 
-Proof. sim.
-  (* Iteration History: 2 <- _ <- _ <- _ *)
-Qed. *)
+(* Example wsim_p1b : weak_sim compLTS compLTS p1b p1b.
+Proof. weak_sim. Qed. *)
 
 Example s2 : term := tfix (tseq (tact (send A) tend) trec).
 Example r2 : term := tfix (tseq (tact (recv A) tend) trec).
 Example p2 : comp := cpar (cprc s2) (cprc r2). 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.p2".
-Set MeBi MaxSteps 2.
-(* Example wsim_p2 : weak_sim compLTS compLTS p2 p2. 
-Proof. sim.
-  (* Iteration History: 2 <- _ <- _ <- _ *)
-Qed. *)
+(* Example wsim_p2 : weak_sim compLTS compLTS p2 p2.
+Proof. weak_sim. Qed. *)
 
 Example s3 : term := tfix (tseq (tact (send A) tend) trec).
 Example r3 : term := tfix (tseq (tact (recv A) tend) trec).
@@ -92,104 +62,75 @@ Example p3b : comp := cpar (cprc r3) (cprc s3).
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.p3".
 (* Was: unfinished after 500000, crashed on 1000000. 42 pairs. *)
-Set MeBi MaxSteps 1126.
 Example wsim_p3 : weak_sim compLTS compLTS p3a p3b. 
-Proof. sim. Qed.
+Proof. weak_sim. Qed.
 
 (**************************************************)
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pq".
-Set MeBi MaxSteps 386.
 Example wsim_pq : weak_sim compLTS compLTS p q. 
-Proof. sim. Qed.
+Proof. weak_sim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qp".
-Set MeBi MaxSteps 518.
 Example wsim_qp : weak_sim compLTS compLTS q p. 
-Proof. sim. Qed.
+Proof. weak_sim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pq.mutual".
-(* Mutual similarity: the two [weak_sim]s above, one each way. *)
-Example msim_pq : mutual_sim compLTS compLTS p q.
-Proof. split; [exact wsim_pq | exact wsim_qp]. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qr".
-Set MeBi MaxSteps 518.
 Example wsim_qr : weak_sim compLTS compLTS q r. 
-Proof. sim. Qed.
+Proof. weak_sim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rq".
-Set MeBi MaxSteps 602.
 Example wsim_rq : weak_sim compLTS compLTS r q. 
-Proof. sim. Qed.
+Proof. weak_sim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qr.mutual".
-(* Mutual similarity: the two [weak_sim]s above, one each way. *)
-Example msim_qr : mutual_sim compLTS compLTS q r.
-Proof. split; [exact wsim_qr | exact wsim_rq]. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pr".
-Set MeBi MaxSteps 210.
 Example wsim_pr : weak_sim compLTS compLTS p r. 
-Proof. sim. Qed.
+Proof. weak_sim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rp".
-Set MeBi MaxSteps 330.
 Example wsim_rp : weak_sim compLTS compLTS r p. 
-Proof. sim. Qed.
+Proof. weak_sim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pr.mutual".
-(* Mutual similarity: the two [weak_sim]s above, one each way. *)
-Example msim_pr : mutual_sim compLTS compLTS p r.
-Proof. split; [exact wsim_pr | exact wsim_rp]. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rs".
-Set MeBi MaxSteps 602.
 Example wsim_rs : weak_sim compLTS compLTS r s.
-Proof. sim. Qed.
+Proof. weak_sim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.sr".
-Set MeBi MaxSteps 330.
 Example wsim_sr : weak_sim compLTS compLTS s r.
-Proof. sim. Qed.
+Proof. weak_sim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rs.mutual".
-(* Mutual similarity: the two [weak_sim]s above, one each way. *)
-Example msim_rs : mutual_sim compLTS compLTS r s.
-Proof. split; [exact wsim_rs | exact wsim_sr]. Qed.
 
 (**************************************************)
 (* Weak bisimilarity: one relation, both directions, in one proof
    ([weak_bisimilar]), one per pair -- stronger than the [mutual_sim]s above.
-   These need the mutual cofix, which [Auto] chooses for every one of them;
-   forced to the nested strategy, all but [Glued/MutualExclusion]'s are
-   unfinished after 20000 steps, which is why they come last: a run with the
-   strategy forced still reaches every [weak_sim] above. Bounds are the
-   measured count minus one ([Solve N] permits N + 1 steps). *)
+   (Until 2026-11-08 these were the costly proofs of the removed solver,
+   which needed its mutual cofix; git history has its step counts.) *)
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.p3.bisimilar".
-Set MeBi MaxSteps 14426.
 Example wbis_p3 : weak_bisimilar compLTS compLTS p3a p3b.
-Proof. bisim. Qed.
+Proof. weak_bisim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pq.bisimilar".
-Set MeBi MaxSteps 6786.
 Example wbis_pq : weak_bisimilar compLTS compLTS p q.
-Proof. bisim. Qed.
+Proof. weak_bisim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qr.bisimilar".
-Set MeBi MaxSteps 10242.
 Example wbis_qr : weak_bisimilar compLTS compLTS q r.
-Proof. bisim. Qed.
+Proof. weak_bisim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pr.bisimilar".
-Set MeBi MaxSteps 4466.
 Example wbis_pr : weak_bisimilar compLTS compLTS p r.
-Proof. bisim. Qed.
+Proof. weak_bisim. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rs.bisimilar".
-Set MeBi MaxSteps 6754.
 Example wbis_rs : weak_bisimilar compLTS compLTS r s.
-Proof. bisim. Qed.
+Proof. weak_bisim. Qed.

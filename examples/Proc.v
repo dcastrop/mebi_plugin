@@ -123,7 +123,7 @@ Module Flat.
   End Complex.
 End Flat.
 
-Module Layered.
+Module Stacked.
   Inductive term : Set :=
   | trec : term
   | tend : term
@@ -176,7 +176,7 @@ Module Layered.
   .
 
   (****************************************************************************)
-  (** Layered Semantics *******************************************************)
+  (** Stacked Semantics *******************************************************)
   (****************************************************************************)
 
   Inductive comp : Set :=
@@ -209,4 +209,4 @@ Module Layered.
   | compLTS_ts : forall t a t', compLTS t a t' -> compLTS_tc t' -> compLTS_tc t
   | compLTS_ns : forall t, compLTS_tc t
   .
-End Layered.
+End Stacked.

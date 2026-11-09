@@ -1,0 +1,51 @@
+\section{Optimisations on the certificate}\label{sec:optimisations}
+
+Each optimisation below makes a goal smaller to decide or to certify, and
+each is added to the certificate in the same way: the engine computes it,
+Sylvan logs the computation, and Rocq is given lemma applications to
+typecheck (\file{doc/optimisations.md} has the full sketches). None asks
+Rocq to compute.
+
+\paragraph{Confluence reduction} \citep{groote-vdpol00}. A silent step
+$s \xrightarrow{\tau} s_1$ is \emph{confluent} in a set $T$ of silent steps
+when every other step $s \xrightarrow{a} s_2$ can be closed: some $s_3$
+with $s_1 \xrightarrow{a} s_3$ and $s_2 \xrightarrow{\tau} s_3$ in $T$. The
+greatest such $T$ is reached by removing failing steps until none fails; a
+state with a step of $T$ out of its own cycle of $T$ steps then takes only
+that step, its \emph{priority step}, and the reduced system is weakly
+bisimilar to the full one. On the certificate: the engine computes $T$ on
+diagrams (the failing steps are an image, a preimage and differences per
+label), and the priority steps with a rank per state; Sylvan logs the
+fixpoint's last check and the ranks' check; Rocq typechecks that $T$ is
+confluent, that ranks decrease along priority steps, and the game on the
+reduced system, with one theorem, proved once, that such a reduction
+preserves weak bisimilarity.
+
+\paragraph{Static confluence.} Two summands (rule chains) that read and
+write disjoint positions of the state vector commute in every state. Their
+codes (copy, read, write per position) are in the log; one lemma, proved
+once, says such relations commute, and per pair the disjointness is read
+off the codes by lemmas. This gives $T$ without exploring the full system.
+
+\paragraph{Reduction by movers} \citep{lipton75}. As static confluence,
+with commutation per pair of summands, then as confluence reduction.
+
+\paragraph{Compositional proofs.} One certificate per component, and one
+lemma, proved once, that composition over the stated shared state
+preserves weak simulation, its side conditions read off the summands'
+codes.
+
+\paragraph{Up to structural congruence.} States equal up to reorderings
+(commutation, associativity, a swap: detected in the rules,
+\cref{sec:containers:upto}) are one state for the game. The engine's
+classes are a relation diagram from states to representatives; Sylvan logs
+its construction and the game on classes; Rocq typechecks each member's
+silent reordering path to its representative and the game, with one
+theorem: a weak simulation up to a congruence of silent reversible steps
+is contained in weak similarity.
+
+\paragraph{Large certificates in pieces.} The facts are declared a chunk
+at a time, each chunk a constant the kernel checks when declared, the
+largest first, with a tight GC (\cref{sec:prooflog:fit}); the theorem's
+top level will refer to the chunks' constants, so that no single
+\code{Qed} holds the whole certificate.

@@ -1,6 +1,6 @@
-; S2 (doc/s2-linearisation.md): the constructors of an LTS, read as rules.
-; Uses rocq-runtime and rocq_tools; only the plugin (src/) uses it. S3's
-; bit format and BDD code (which needs CUDD) go in a library of their own.
+; the constructors of an LTS, read as rules.
+; Uses rocq-runtime and rocq_tools; used by lib/skeleton, lib/certify and
+; the plugin (src/).
 (library
  (name rules)
  (public_name rocq-mebi.rules)

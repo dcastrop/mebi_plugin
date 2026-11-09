@@ -1,0 +1,6 @@
+[submodule "vendor/sylvan"]
+	path = vendor/sylvan
+	url = https://github.com/dcastrop/sylvan.git
+[submodule "vendor/lace"]
+	path = vendor/lace
+	url = https://github.com/dcastrop/lace.git

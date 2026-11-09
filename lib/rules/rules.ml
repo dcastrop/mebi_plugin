@@ -1,4 +1,4 @@
-(* See the [.mli]. S2, doc/s2-linearisation.md. *)
+(* See the [.mli]. *)
 
 type premise =
   | Step of
@@ -11,6 +11,7 @@ type premise =
       { prop : Constr.t
       ; witness : Constr.t
       }
+  | Opaque of Constr.t
 
 type rule =
   { name : Names.Id.t
@@ -28,7 +29,6 @@ type lts =
   }
 
 exception Not_an_lts of Names.inductive
-exception Not_decidable of Names.Id.t * Constr.rel_context * Constr.t
 exception Decidable_not_loaded
 
 (** [global name] is the constant [name] of stdlib's DecidableClass.
@@ -83,7 +83,6 @@ let step_args (env : Environ.env) (t : Constr.t)
     every term of the rule is over the whole context.
 
     @raise Not_an_lts if its conclusion is not a step of [ind]
-    @raise Not_decidable if a premise is neither a step nor decidable
     @raise Decidable_not_loaded (all raised here, or by {!witness}) *)
 let rule
       (env : Environ.env)
@@ -108,7 +107,7 @@ let rule
            under all [n] *)
         let lift = Vars.lift (n - i) in
         let vars, premises =
-          if Bool.not (Premise_search.is_prop env_i sigma (EConstr.of_constr t))
+          if Bool.not (Rocq_utils.is_prop env_i sigma (EConstr.of_constr t))
           then (Context.Rel.Declaration.get_name decl, t) :: vars, premises
           else (
             match step_args env_i t with
@@ -120,7 +119,7 @@ let rule
               (match witness env_i sigma t with
                | Some w ->
                  vars, Decide { prop = lift t; witness = lift w } :: premises
-               | None -> raise (Not_decidable (name, ctx, lift t))))
+               | None -> vars, Opaque (lift t) :: premises))
         in
         vars, premises, i + 1, Environ.push_rel decl env_i)
       ([], [], 0, env)
@@ -157,7 +156,8 @@ let of_lts (env : Environ.env) (sigma : Evd.evar_map) (root : Names.inductive)
       List.iter
         (fun (r : rule) ->
           List.iter
-            (function Step { lts; _ } -> visit lts | Decide _ -> ())
+            (function
+              | Step { lts; _ } -> visit lts | Decide _ | Opaque _ -> ())
             r.premises)
         rules)
   in
@@ -177,6 +177,7 @@ let pr (env : Environ.env) (sigma : Evd.evar_map) (ltss : lts list) : Pp.t =
           (Constr.mkApp
              (Constr.mkIndU (lts, UVars.Instance.empty), [| src; lbl; tgt |]))
       | Decide { prop; _ } -> pr_t prop ++ str "   [Decidable]"
+      | Opaque prop -> pr_t prop ++ str "   [Opaque]"
     in
     let vars = prlist_with_sep spc (fun (x, _) -> Names.Name.print x) r.vars in
     v

@@ -1,0 +1,557 @@
+% The bibliography of the technical report: what the plugin uses, and
+% related work it is compared with or builds towards.
+
+% ---- Bisimulation and coinduction
+
+@book{milner89,
+  author    = {Robin Milner},
+  title     = {Communication and Concurrency},
+  publisher = {Prentice Hall},
+  year      = {1989}
+}
+
+@incollection{park81,
+  author    = {David Park},
+  title     = {Concurrency and Automata on Infinite Sequences},
+  booktitle = {Theoretical Computer Science, 5th GI-Conference},
+  series    = {LNCS},
+  volume    = {104},
+  publisher = {Springer},
+  year      = {1981}
+}
+
+@book{sangiorgi11,
+  author    = {Davide Sangiorgi},
+  title     = {Introduction to Bisimulation and Coinduction},
+  publisher = {Cambridge University Press},
+  year      = {2011}
+}
+
+@incollection{pous-sangiorgi11,
+  author    = {Damien Pous and Davide Sangiorgi},
+  title     = {Enhancements of the Bisimulation Proof Method},
+  booktitle = {Advanced Topics in Bisimulation and Coinduction},
+  editor    = {Davide Sangiorgi and Jan Rutten},
+  publisher = {Cambridge University Press},
+  year      = {2011}
+}
+
+@article{kanellakis-smolka90,
+  author  = {Paris C. Kanellakis and Scott A. Smolka},
+  title   = {{CCS} Expressions, Finite State Processes, and Three Problems of Equivalence},
+  journal = {Information and Computation},
+  volume  = {86},
+  number  = {1},
+  year    = {1990}
+}
+
+@article{paige-tarjan87,
+  author  = {Robert Paige and Robert E. Tarjan},
+  title   = {Three Partition Refinement Algorithms},
+  journal = {SIAM Journal on Computing},
+  volume  = {16},
+  number  = {6},
+  year    = {1987}
+}
+
+% ---- Rocq, reflection, evaluation, coinduction in type theory
+
+@misc{rocq,
+  author       = {{The Rocq Development Team}},
+  title        = {The {Rocq} Prover},
+  howpublished = {\url{https://rocq-prover.org}},
+  note         = {Version 9.3},
+  year         = {2026}
+}
+
+@inproceedings{boutin97,
+  author    = {Samuel Boutin},
+  title     = {Using Reflection to Build Efficient and Certified Decision Procedures},
+  booktitle = {Theoretical Aspects of Computer Software (TACS)},
+  series    = {LNCS},
+  volume    = {1281},
+  publisher = {Springer},
+  year      = {1997}
+}
+
+@inproceedings{gregoire-leroy02,
+  author    = {Benjamin Gr{\'e}goire and Xavier Leroy},
+  title     = {A Compiled Implementation of Strong Reduction},
+  booktitle = {International Conference on Functional Programming (ICFP)},
+  publisher = {ACM},
+  year      = {2002}
+}
+
+@inproceedings{boespflug11,
+  author    = {Mathieu Boespflug and Maxime D{\'e}n{\`e}s and Benjamin Gr{\'e}goire},
+  title     = {Full Reduction at Full Throttle},
+  booktitle = {Certified Programs and Proofs (CPP)},
+  series    = {LNCS},
+  volume    = {7086},
+  publisher = {Springer},
+  year      = {2011}
+}
+
+@inproceedings{gimenez94,
+  author    = {Eduardo Gim{\'e}nez},
+  title     = {Codifying Guarded Definitions with Recursive Schemes},
+  booktitle = {Types for Proofs and Programs (TYPES)},
+  series    = {LNCS},
+  volume    = {996},
+  publisher = {Springer},
+  year      = {1994}
+}
+
+@inproceedings{hur13,
+  author    = {Chung-Kil Hur and Georg Neis and Derek Dreyer and Viktor Vafeiadis},
+  title     = {The Power of Parameterization in Coinductive Proof},
+  booktitle = {Principles of Programming Languages (POPL)},
+  publisher = {ACM},
+  year      = {2013}
+}
+
+@misc{rocq-sims,
+  key          = {rocq-sims},
+  title        = {rocq-sims},
+  howpublished = {\url{https://github.com/rocq-sims/rocq-sims}},
+  note         = {A Rocq library of simulations and bisimulations}
+}
+
+% ---- Decision diagrams and symbolic model checking
+
+@article{bryant86,
+  author  = {Randal E. Bryant},
+  title   = {Graph-Based Algorithms for {Boolean} Function Manipulation},
+  journal = {IEEE Transactions on Computers},
+  volume  = {C-35},
+  number  = {8},
+  year    = {1986}
+}
+
+@inproceedings{bouali-desimone92,
+  author    = {Amar Bouali and Robert de Simone},
+  title     = {Symbolic Bisimulation Minimisation},
+  booktitle = {Computer Aided Verification (CAV)},
+  series    = {LNCS},
+  volume    = {663},
+  publisher = {Springer},
+  year      = {1992}
+}
+
+@inproceedings{blom-vdpol08,
+  author    = {Stefan Blom and Jaco van de Pol},
+  title     = {Symbolic Reachability for Process Algebras with Recursive Data Types},
+  booktitle = {Theoretical Aspects of Computing (ICTAC)},
+  series    = {LNCS},
+  volume    = {5160},
+  publisher = {Springer},
+  year      = {2008}
+}
+
+@inproceedings{ciardo01,
+  author    = {Gianfranco Ciardo and Gerald L{\"u}ttgen and Radu Siminiceanu},
+  title     = {Saturation: An Efficient Iteration Strategy for Symbolic State-Space Generation},
+  booktitle = {Tools and Algorithms for the Construction and Analysis of Systems (TACAS)},
+  series    = {LNCS},
+  volume    = {2031},
+  publisher = {Springer},
+  year      = {2001}
+}
+
+@inproceedings{meijer14,
+  author    = {Jeroen Meijer and Gijs Kant and Stefan Blom and Jaco van de Pol},
+  title     = {Read, Write and Copy Dependencies for Symbolic Model Checking},
+  booktitle = {Hardware and Software: Verification and Testing (HVC)},
+  series    = {LNCS},
+  volume    = {8855},
+  publisher = {Springer},
+  year      = {2014}
+}
+
+@inproceedings{meijer-vdpol16,
+  author    = {Jeroen Meijer and Jaco van de Pol},
+  title     = {Bandwidth and Wavefront Reduction for Static Variable Ordering in Symbolic Reachability Analysis},
+  booktitle = {NASA Formal Methods (NFM)},
+  series    = {LNCS},
+  volume    = {9690},
+  publisher = {Springer},
+  year      = {2016}
+}
+
+@inproceedings{vandijk-vdpol15,
+  author    = {Tom van Dijk and Jaco van de Pol},
+  title     = {Sylvan: Multi-Core Decision Diagrams},
+  booktitle = {Tools and Algorithms for the Construction and Analysis of Systems (TACAS)},
+  series    = {LNCS},
+  volume    = {9035},
+  publisher = {Springer},
+  year      = {2015}
+}
+
+@inproceedings{vandijk-vdpol16,
+  author    = {Tom van Dijk and Jaco van de Pol},
+  title     = {Multi-Core Symbolic Bisimulation Minimisation},
+  booktitle = {Tools and Algorithms for the Construction and Analysis of Systems (TACAS)},
+  series    = {LNCS},
+  volume    = {9636},
+  publisher = {Springer},
+  year      = {2016}
+}
+
+@inproceedings{kant15,
+  author    = {Gijs Kant and Alfons Laarman and Jeroen Meijer and Jaco van de Pol and Stefan Blom and Tom van Dijk},
+  title     = {{LTSmin}: High-Performance Language-Independent Model Checking},
+  booktitle = {Tools and Algorithms for the Construction and Analysis of Systems (TACAS)},
+  series    = {LNCS},
+  volume    = {9035},
+  publisher = {Springer},
+  year      = {2015}
+}
+
+@article{tarjan72,
+  author  = {Robert E. Tarjan},
+  title   = {Depth-First Search and Linear Graph Algorithms},
+  journal = {SIAM Journal on Computing},
+  volume  = {1},
+  number  = {2},
+  year    = {1972}
+}
+
+% ---- Tools and the running example
+
+@article{garavel13,
+  author  = {Hubert Garavel and Fr{\'e}d{\'e}ric Lang and Radu Mateescu and Wendelin Serwe},
+  title   = {{CADP} 2011: A Toolbox for the Construction and Analysis of Distributed Processes},
+  journal = {International Journal on Software Tools for Technology Transfer},
+  volume  = {15},
+  number  = {2},
+  year    = {2013}
+}
+
+@article{mateescu-serwe13,
+  author  = {Radu Mateescu and Wendelin Serwe},
+  title   = {Model Checking and Performance Evaluation with {CADP} Illustrated on Shared-Memory Mutual Exclusion Protocols},
+  journal = {Science of Computer Programming},
+  volume  = {78},
+  number  = {7},
+  year    = {2013}
+}
+
+@article{mellor-crummey91,
+  author  = {John M. Mellor-Crummey and Michael L. Scott},
+  title   = {Algorithms for Scalable Synchronization on Shared-Memory Multiprocessors},
+  journal = {ACM Transactions on Computer Systems},
+  volume  = {9},
+  number  = {1},
+  year    = {1991}
+}
+
+@inproceedings{bunte19,
+  author    = {Olav Bunte and Jan Friso Groote and Jeroen J. A. Keiren and Maurice Laveaux and Thomas Neele and Erik P. de Vink and Wieger Wesselink and Anton Wijs and Tim A. C. Willemse},
+  title     = {The {mCRL2} Toolset for Analysing Concurrent Systems: Improvements in Expressivity and Usability},
+  booktitle = {Tools and Algorithms for the Construction and Analysis of Systems (TACAS)},
+  series    = {LNCS},
+  volume    = {11428},
+  publisher = {Springer},
+  year      = {2019}
+}
+
+% ---- State-space reduction: confluence, partial orders, movers
+
+@article{groote-sellink96,
+  author  = {Jan Friso Groote and M. P. A. Sellink},
+  title   = {Confluence for Process Verification},
+  journal = {Theoretical Computer Science},
+  volume  = {170},
+  number  = {1--2},
+  year    = {1996}
+}
+
+@inproceedings{groote-vdpol00,
+  author    = {Jan Friso Groote and Jaco van de Pol},
+  title     = {State Space Reduction Using Partial $\tau$-Confluence},
+  booktitle = {Mathematical Foundations of Computer Science (MFCS)},
+  series    = {LNCS},
+  volume    = {1893},
+  publisher = {Springer},
+  year      = {2000}
+}
+
+@techreport{blom01,
+  author      = {Stefan Blom},
+  title       = {Partial $\tau$-Confluence for Efficient State Space Generation},
+  institution = {CWI},
+  number      = {SEN-R0123},
+  year        = {2001}
+}
+
+@inproceedings{valmari91,
+  author    = {Antti Valmari},
+  title     = {Stubborn Sets for Reduced State Space Generation},
+  booktitle = {Advances in Petri Nets 1990},
+  series    = {LNCS},
+  volume    = {483},
+  publisher = {Springer},
+  year      = {1991}
+}
+
+@inproceedings{peled93,
+  author    = {Doron Peled},
+  title     = {All from One, One for All: on Model Checking Using Representatives},
+  booktitle = {Computer Aided Verification (CAV)},
+  series    = {LNCS},
+  volume    = {697},
+  publisher = {Springer},
+  year      = {1993}
+}
+
+@book{godefroid96,
+  author    = {Patrice Godefroid},
+  title     = {Partial-Order Methods for the Verification of Concurrent Systems},
+  series    = {LNCS},
+  volume    = {1032},
+  publisher = {Springer},
+  year      = {1996}
+}
+
+@article{gerth99,
+  author  = {Rob Gerth and Ruurd Kuiper and Doron Peled and Wojciech Penczek},
+  title   = {A Partial Order Approach to Branching Time Logic Model Checking},
+  journal = {Information and Computation},
+  volume  = {150},
+  number  = {2},
+  year    = {1999}
+}
+
+@article{lipton75,
+  author  = {Richard J. Lipton},
+  title   = {Reduction: A Method of Proving Properties of Parallel Programs},
+  journal = {Communications of the ACM},
+  volume  = {18},
+  number  = {12},
+  year    = {1975}
+}
+
+@techreport{lamport-schneider89,
+  author      = {Leslie Lamport and Fred B. Schneider},
+  title       = {Pretending Atomicity},
+  institution = {Digital Equipment Corporation, Systems Research Center},
+  number      = {44},
+  year        = {1989}
+}
+
+@inproceedings{flanagan-qadeer03pldi,
+  author    = {Cormac Flanagan and Shaz Qadeer},
+  title     = {A Type and Effect System for Atomicity},
+  booktitle = {Programming Language Design and Implementation (PLDI)},
+  publisher = {ACM},
+  year      = {2003}
+}
+
+@inproceedings{elmas09,
+  author    = {Tayfun Elmas and Shaz Qadeer and Serdar Tasiran},
+  title     = {A Calculus of Atomic Actions},
+  booktitle = {Principles of Programming Languages (POPL)},
+  publisher = {ACM},
+  year      = {2009}
+}
+
+% ---- Composition over shared state
+
+@article{jones83,
+  author  = {Cliff B. Jones},
+  title   = {Tentative Steps Toward a Development Method for Interfering Programs},
+  journal = {ACM Transactions on Programming Languages and Systems},
+  volume  = {5},
+  number  = {4},
+  year    = {1983}
+}
+
+@inproceedings{flanagan-qadeer03spin,
+  author    = {Cormac Flanagan and Shaz Qadeer},
+  title     = {Thread-Modular Model Checking},
+  booktitle = {Model Checking Software (SPIN)},
+  series    = {LNCS},
+  volume    = {2648},
+  publisher = {Springer},
+  year      = {2003}
+}
+
+@inproceedings{liang12,
+  author    = {Hongjin Liang and Xinyu Feng and Ming Fu},
+  title     = {A Rely-Guarantee-Based Simulation for Verifying Concurrent Program Transformations},
+  booktitle = {Principles of Programming Languages (POPL)},
+  publisher = {ACM},
+  year      = {2012}
+}
+
+@book{clarke99,
+  author    = {Edmund M. Clarke and Orna Grumberg and Doron A. Peled},
+  title     = {Model Checking},
+  publisher = {MIT Press},
+  year      = {1999}
+}
+
+% ---- Arbitrarily many components: network invariants, congruence formats
+
+@inproceedings{wolper-lovinfosse89,
+  author    = {Pierre Wolper and Vinciane Lovinfosse},
+  title     = {Verifying Properties of Large Sets of Processes with Network Invariants},
+  booktitle = {Automatic Verification Methods for Finite State Systems},
+  series    = {LNCS},
+  volume    = {407},
+  publisher = {Springer},
+  year      = {1989}
+}
+
+@inproceedings{kurshan-mcmillan89,
+  author    = {Robert P. Kurshan and Kenneth L. McMillan},
+  title     = {A Structural Induction Theorem for Processes},
+  booktitle = {Principles of Distributed Computing (PODC)},
+  publisher = {ACM},
+  year      = {1989}
+}
+
+@article{apt-kozen86,
+  author  = {Krzysztof R. Apt and Dexter C. Kozen},
+  title   = {Limits for Automatic Verification of Finite-State Concurrent Systems},
+  journal = {Information Processing Letters},
+  volume  = {22},
+  number  = {6},
+  year    = {1986}
+}
+
+@article{desimone85,
+  author  = {Robert de Simone},
+  title   = {Higher-Level Synchronising Devices in {Meije-SCCS}},
+  journal = {Theoretical Computer Science},
+  volume  = {37},
+  year    = {1985}
+}
+
+@article{bloom95,
+  author  = {Bard Bloom},
+  title   = {Structural Operational Semantics for Weak Bisimulations},
+  journal = {Theoretical Computer Science},
+  volume  = {146},
+  number  = {1--2},
+  year    = {1995}
+}
+
+@article{vanglabbeek11,
+  author  = {Rob J. van Glabbeek},
+  title   = {On Cool Congruence Formats for Weak Bisimulations},
+  journal = {Theoretical Computer Science},
+  volume  = {412},
+  number  = {28},
+  year    = {2011}
+}
+
+@inproceedings{brace90,
+  author    = {Karl S. Brace and Richard L. Rudell and Randal E. Bryant},
+  title     = {Efficient Implementation of a {BDD} Package},
+  booktitle = {Proceedings of the 27th ACM/IEEE Design Automation Conference (DAC)},
+  pages     = {40--45},
+  year      = {1990},
+  doi       = {10.1145/123186.123222}
+}
+
+@inproceedings{burch91,
+  author    = {Jerry R. Burch and Edmund M. Clarke and David E. Long},
+  title     = {Symbolic Model Checking with Partitioned Transition Relations},
+  booktitle = {VLSI 91: Proceedings of the IFIP TC10/WG 10.5 International
+               Conference on Very Large Scale Integration},
+  pages     = {49--58},
+  publisher = {North-Holland},
+  year      = {1991}
+}
+
+@inproceedings{sinz-biere06,
+  author    = {Carsten Sinz and Armin Biere},
+  title     = {Extended Resolution Proofs for Conjoining {BDD}s},
+  booktitle = {Computer Science -- Theory and Applications ({CSR} 2006)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {3967},
+  publisher = {Springer},
+  year      = {2006}
+}
+
+@inproceedings{bryant-heule21,
+  author    = {Randal E. Bryant and Marijn J. H. Heule},
+  title     = {Generating Extended Resolution Proofs with a {BDD}-Based {SAT} Solver},
+  booktitle = {Tools and Algorithms for the Construction and Analysis of Systems ({TACAS} 2021)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {12651},
+  publisher = {Springer},
+  year      = {2021}
+}
+
+@inproceedings{namjoshi01,
+  author    = {Kedar S. Namjoshi},
+  title     = {Certifying Model Checkers},
+  booktitle = {Computer Aided Verification ({CAV} 2001)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {2102},
+  publisher = {Springer},
+  year      = {2001}
+}
+
+@inproceedings{verma00,
+  author    = {Kumar Neeraj Verma and Jean Goubault-Larrecq and Sanjiva Prasad and S. Arun-Kumar},
+  title     = {Reflecting {BDD}s in {Coq}},
+  booktitle = {Advances in Computing Science -- {ASIAN} 2000},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {1961},
+  publisher = {Springer},
+  year      = {2000}
+}
+
+@article{abbott05,
+  author    = {Michael Abbott and Thorsten Altenkirch and Neil Ghani},
+  title     = {Containers: Constructing Strictly Positive Types},
+  journal   = {Theoretical Computer Science},
+  volume    = {342},
+  number    = {1},
+  pages     = {3--27},
+  year      = {2005}
+}
+
+@article{altenkirch15,
+  author    = {Thorsten Altenkirch and Neil Ghani and Peter Hancock and Conor McBride and Peter Morris},
+  title     = {Indexed Containers},
+  journal   = {Journal of Functional Programming},
+  volume    = {25},
+  pages     = {e5},
+  year      = {2015}
+}
+
+@article{ip-dill96,
+  author    = {C. Norris Ip and David L. Dill},
+  title     = {Better Verification Through Symmetry},
+  journal   = {Formal Methods in System Design},
+  volume    = {9},
+  number    = {1/2},
+  pages     = {41--75},
+  year      = {1996}
+}
+
+@article{emerson-sistla96,
+  author    = {E. Allen Emerson and A. Prasad Sistla},
+  title     = {Symmetry and Model Checking},
+  journal   = {Formal Methods in System Design},
+  volume    = {9},
+  number    = {1/2},
+  pages     = {105--131},
+  year      = {1996}
+}
+
+@inproceedings{monin-shi13,
+  author    = {Jean-Fran{\c{c}}ois Monin and Xiaomu Shi},
+  title     = {Handcrafted Inversions Made Operational on Operational Semantics},
+  booktitle = {Interactive Theorem Proving (ITP 2013)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {7998},
+  pages     = {338--353},
+  publisher = {Springer},
+  year      = {2013}
+}

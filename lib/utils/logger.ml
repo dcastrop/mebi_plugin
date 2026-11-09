@@ -55,7 +55,16 @@ let reset_config () : unit =
 
 let () = reset_config ()
 let configure (k : Output.Kind.t) (b : bool) : unit = the_config.(index k) <- b
-let is_enabled (k : Output.Kind.t) : bool = the_config.(index k)
+
+(** A test installed by the plugin ({!set_enabled_test}), replacing the
+    table: inside Rocq, whether a kind is on is Rocq's own setting. *)
+let the_test : (Output.Kind.t -> bool) option ref = ref None
+
+let set_enabled_test (f : Output.Kind.t -> bool) : unit = the_test := Some f
+
+let is_enabled (k : Output.Kind.t) : bool =
+  match !the_test with Some f -> f k | None -> the_config.(index k)
+;;
 
 (***********************************************************************)
 
@@ -206,8 +215,7 @@ include Body (struct
 
 (* See the [.mli]: for a module that wants output settings independent of the
    user-facing configuration. Unlike the old [Logger.Make], this is {b not}
-   threaded anywhere: it is declared and used within a single file. Only
-   [Rocq_utils] and [Mebi_theories] need it. *)
+   threaded anywhere: it is declared and used within a single file. *)
 module Scoped (X : sig
     val overrides : (Output.Kind.t * bool) list
   end) : S = Body (struct

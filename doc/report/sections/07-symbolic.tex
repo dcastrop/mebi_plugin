@@ -1,0 +1,1066 @@
+\section{The symbolic engine}\label{sec:symbolic}
+\begingroup\sloppy
+
+\providecommand{\Reach}{\mathit{Reach}}
+\providecommand{\Uni}{U}
+\providecommand{\pre}{\mathrm{pre}}
+\providecommand{\post}{\mathrm{post}}
+\providecommand{\Bad}{\mathit{Bad}}
+\providecommand{\Ok}{\mathit{Ok}}
+\providecommand{\lddsem}[1]{[\![#1]\!]}
+
+This section describes the engine that decides every goal:
+\code{strong_sim}, \code{strong_bisimilar}, \code{weak_sim} and
+\code{weak_bisimilar} between closed start terms, without building an
+explicit graph of the systems. It reads the user's LTS as a set of rules,
+splits each state into a finite \emph{shape} and a vector of \emph{slot}
+values, learns one transition relation per \emph{summand} (a rule chain) on
+only the slots it reads, stores sets and relations as
+Sylvan's~\cite{vandijk-vdpol15} List Decision Diagrams
+(LDDs)~\cite{blom-vdpol08}, and decides the weak or the strong game as a
+greatest fixpoint over pairs. With the log on, the game's last check is
+repeated with Sylvan's proof log open: that log is the certificate
+(\cref{sec:prooflog}). The engine is not trusted; the kernel checks the
+certificate.
+
+\paragraph{How a user reaches it.}
+\begin{itemize}
+\item The tactics \code{sim}, \code{bisim} (strong) and \code{weak_sim},
+  \code{weak_bisim} (weak) (\file{src/g_mebi.mlg}) all call
+  \code{Learn.check ~strong:(not weak)} (\file{src/user_tactics.ml},
+  \code{read_goal}). With the prefix \code{debug} they also print
+  \code{Learn.pr} (\cref{sec:sym-debug}).
+\item \code{Print MeBi Rules <lts>} and
+  \code{Print MeBi Skeleton <term> Using <lts>} (\file{src/g_mebi.mlg})
+  print the first two stages.
+\end{itemize}
+
+\subsection{Map of the code}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}l r >{\raggedright\arraybackslash}X@{}}
+\toprule
+File & lines & Role \\
+\midrule
+\file{lib/rules/rules.ml}, \file{.mli} & 209, 73 &
+  An LTS's constructors read as rules (\cref{sec:sym-rules}). \\
+\file{lib/skeleton/skeleton.ml}, \file{.mli} & 786, 138 &
+  Structural constructors, shapes and slots, summands
+  (\cref{sec:sym-skeleton}). \\
+\file{lib/ldd/ldd.ml}, \file{.mli} & 123, 96 &
+  OCaml interface to Sylvan's LDDs (\cref{sec:sym-ldd}). \\
+\file{lib/ldd/ldd_stubs.c} & 235 & The C stubs. \\
+\file{lib/ldd/dune} & 48 & Compiles Sylvan and Lace into the binding's
+  library. \\
+\file{vendor/sylvan/}, \file{vendor/lace/} & (C) & git submodules
+  (forks): Sylvan on the branch \code{proof-log} (the proof log), Lace
+  1.10.0 (\file{lib/ldd/README.md}). \\
+\file{lib/learn/learn.ml}, \file{.mli} & 1195, 79 &
+  The interpreter, learning, exploration, the game, the logged last check
+  (\cref{sec:sym-learn,sec:sym-game,sec:sym-check}). \\
+\file{test/ldd_tests.ml} & & 25 checks of the binding and the proof
+  log, no Rocq; run in CI (\cref{sec:tests}). \\
+\file{src/user_tactics.ml} & & \code{prove}: the four tactics, the call to
+  \code{Learn.check}, the log's place; \code{check_log}. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+The libraries depend on each other in a line:
+\code{rocq-mebi.rules} $\leftarrow$ \code{rocq-mebi.skeleton}
+$\leftarrow$ \code{rocq-mebi.learn} $\rightarrow$ \code{rocq-mebi.ldd}
+(\file{lib/learn/dune}, \file{lib/skeleton/dune}). Only \code{ldd} is free
+of \code{rocq-runtime}, which is why its test binary needs no Rocq.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[node distance=6mm and 7mm]
+  \node[box] (lts) {Rocq LTS\\ \scriptsize inductive $M\to\Opt\,A\to M\to\mathsf{Prop}$};
+  \node[box,right=of lts] (rules) {rules\\ \scriptsize \texttt{Rules.of\_lts}};
+  \node[box,right=of rules] (skel) {shapes, slots,\\ summands\\ \scriptsize \texttt{Skeleton}};
+  \node[box,right=of skel] (enc) {vectors\\ $[\mathit{shape};v_0;\dots;v_{w-1}]$\\ \scriptsize \texttt{encode}};
+  \node[box,below=12mm of enc] (learn) {learning\\ \scriptsize \texttt{fire}, \texttt{interp}};
+  \node[box,left=of learn] (rel) {relations per\\ summand, label,\\ meta (LDDs)};
+  \node[box,left=of rel] (expl) {chained\\ exploration\\ \scriptsize \texttt{relprod}};
+  \node[box,left=of expl] (game) {weak or strong game\\ $\nu F$ on $\Reach_A\times\Reach_B$\\ \scriptsize \texttt{relprev}};
+  \node[box,below=10mm of game] (verdict) {verdict};
+  \node[box,right=of verdict] (cert) {proof log\\ \scriptsize (Sylvan)};
+  \node[box,right=of cert] (coq) {facts, typechecked\\ \scriptsize \cref{sec:prooflog}};
+  \draw[dep] (lts) -- (rules);
+  \draw[dep] (rules) -- (skel);
+  \draw[dep] (skel) -- (enc);
+  \draw[dep] (enc) -- (learn);
+  \draw[dep] (learn) -- (rel);
+  \draw[dep] (rel.170) -- (expl.10);
+  \draw[dep] (expl.-10) -- node[lbl,below]{frontier} (rel.-170);
+  \draw[dep] (expl) -- (game);
+  \draw[dep] (game) -- (verdict);
+  \draw[dep] (verdict) -- (cert);
+  \draw[dep] (cert) -- (coq);
+\end{tikzpicture}
+\caption{The symbolic pipeline, and the certificate it leaves.}
+\label{fig:sym-pipeline}
+\end{figure}
+
+\subsection{Rules: \texttt{lib/rules}}\label{sec:sym-rules}
+
+\begin{definition}[Rule]
+Let \code{L : M -> option A -> M -> Prop} be an inductive without
+parameters (checked by \code{Rocq_utils.lts_shaped}). Each constructor
+\[
+  c : \forall\, x_1\dots x_k,\ P_1 \to \dots \to P_m \to L\ s\ \ell\ t
+\]
+is a rule $\rho_c$ with variables $\vec x$ (the binders that are not
+propositions), premises $P_1,\dots,P_m$ (the binders that are), source
+$s$, label $\ell$ and target $t$. A premise is
+\begin{itemize}
+\item \code{Step}: a step $L'\ s'\ \ell'\ t'$ of an LTS $L'$ (any LTS, not
+  necessarily $L$);
+\item \code{Decide}: a proposition $P$ for which typeclass resolution finds
+  an instance of stdlib's \code{Decidable P}; the rule keeps
+  \code{Decidable_witness P i}, a boolean over the rule's variables;
+\item \code{Opaque}: any other proposition (an equation, \code{In}, a
+  relation, an existential).
+\end{itemize}
+\end{definition}
+
+The types are at \locr{lib/rules/rules.mli}{15}{51}. Every term of a rule
+is over the \emph{whole} context \code{ctx} in de Bruijn indices: each
+premise, read in the context of the binders before it, is lifted over the
+rest (\loc{lib/rules/rules.ml}{108}). \code{rule}
+(\locr{lib/rules/rules.ml}{87}{139}) classifies each binder: a non-\code{Prop}
+binder is a variable (\loc{lib/rules/rules.ml}{110}); a \code{Prop} binder
+is a \code{Step} if its head is an LTS-shaped inductive applied to three
+arguments (\code{step_args}, \locr{lib/rules/rules.ml}{68}{78}), else a
+\code{Decide} if \code{witness} (\locr{lib/rules/rules.ml}{50}{63}) finds a
+\code{Decidable} instance, else \code{Opaque}
+(\loc{lib/rules/rules.ml}{122}). The conclusion must be a step of the
+same inductive, or \code{Not_an_lts} is raised. \code{of_lts}
+(\locr{lib/rules/rules.ml}{142}{166}) returns the rules of the root LTS
+and, transitively, of every LTS its \code{Step} premises use, first met
+first. The \code{Decidable} class must be loaded:
+\file{theories/loader.v} \code{Require}s (does not import)
+\code{Stdlib.Classes.DecidableClass}.
+
+\code{Opaque} premises are kept; the interpreter
+stops at them (\cref{sec:sym-interp}) and the skeleton marks the summand
+dynamic.
+
+\begin{example}[\code{Print MeBi Rules}]
+\begin{rocq}
+Inductive step : tm -> option act -> tm -> Prop :=
+| s_pre x k : step (pre x k) (Some x) k
+| s_hide k l k' : step k l k' -> visible l = true -> step (hide k) l (hide k').
+\end{rocq}
+reads as two rules; \code{s_hide} has a \code{Step} premise and a
+\code{Decide} premise (\code{=} on \code{bool} has a stdlib instance). The
+rule \code{q : forall n m, (exists k, k = n) -> opaque n None m} has an
+\code{Opaque} premise, printed with \code{[Opaque]}
+(\loc{lib/rules/rules.ml}{180}).
+\end{example}
+
+\paragraph{Stale comments.} \file{lib/rules/dune} says ``only the plugin
+(src/) uses it'' and ``S3's bit format goes in a library of its own'';
+\file{doc/s2-linearisation.md} decision 8 says the same. Today
+\file{lib/skeleton}, \file{lib/learn} and \file{lib/certify} use it, and
+the bit format is gone.
+
+\subsection{The skeleton: \texttt{lib/skeleton}}\label{sec:sym-skeleton}
+
+Phase~1 turns a start term into a vector whose positions a rule touches
+locally. Everything is computed from the user's rules, with no knowledge
+of any calculus (\file{doc/skeleton.md}).
+
+\subsubsection{Structural constructors}
+
+\begin{definition}[Structural]
+For a rule $\rho$ with source $s$ and target $t$, a constructor $c$
+occurring in $s$ at path $\pi$ (a list of field indices, parameters
+excluded) is \emph{kept} by $\rho$ if $t$ has a constructor application
+with head $c$ at the same path $\pi$. $c$ is \emph{structural} for $L$ if
+some rule of $L$ keeps it. Constructors that occur in sources but that no
+rule keeps are \emph{never kept}.
+\end{definition}
+
+\code{classify} (\locr{lib/skeleton/skeleton.ml}{103}{125}) computes both
+lists from \code{occurrences} and \code{at}
+(\locr{lib/skeleton/skeleton.ml}{81}{96}). Only the rules of the root LTS
+are used (\code{structural_of}, \locr{lib/skeleton/skeleton.ml}{726}{733}).
+CCS's \code{par} is structural (kept by \code{s_parl}); Proc's \code{cpar}
+is structural although \code{do_par_end} dissolves it, since
+\code{do_parl} keeps it. \code{pre}, \code{tend} are never kept.
+
+An earlier version (same day) took the constructors that \emph{every} rule
+keeps and collapsed a node into one slot where a rule changed its shape.
+Proc then had no skeleton at all, so the shape became part of the state
+instead (decision D3 of \file{SYMBOLIC_PLAN.md}).
+
+\subsubsection{Shapes, slots and the canonical split}
+
+\begin{definition}[Shape, split]
+A \emph{shape} is a tree $\sigma ::= \mathsf{Slot}\ i \mid
+\mathsf{Node}(c, \vec p, \sigma_1\dots\sigma_n)$ with $c$ structural and
+$\vec p$ its type parameters (\locr{lib/skeleton/skeleton.ml}{5}{14}).
+The \emph{canonical split} of a closed term $t$ is
+\[
+\mathrm{split}(t) =
+\begin{cases}
+\mathsf{Node}(c,\vec p,\mathrm{split}(t_1)\dots\mathrm{split}(t_n)) &
+  t = c\ \vec p\ t_1\dots t_n \text{ fully applied},\ c \text{ structural}\\
+\mathsf{Slot}\ i,\ \text{with value } t & \text{otherwise}
+\end{cases}
+\]
+slots numbered $0,1,\dots$ left to right (\code{split},
+\locr{lib/skeleton/skeleton.ml}{736}{753}; inverse \code{rebuild},
+\locr{lib/skeleton/skeleton.ml}{756}{765}). A slot's value never starts
+with a structural constructor. Shapes are compared by \code{key}
+(\locr{lib/skeleton/skeleton.ml}{134}{142}), a string of the structure
+with slots unnumbered.
+\end{definition}
+
+A \emph{state} is a shape together with its slot values. Since a slot
+value is never structural, a rule's structural constructors match nodes
+only, and every other part of its source reads slot values.
+
+\paragraph{A possible key collision.} \code{key} prints a constructor as
+its mutual block's name and the constructor's index
+(\code{MutInd.to_string (fst (fst n.cons))}, \code{snd n.cons}); it omits
+the index of the inductive within the block, and the parameters. Two
+structural constructors with the same index in two inductives of one
+mutual block, or one polymorphic constructor at two parameter
+instantiations, would get the same key. No example in the repository has
+either; it is a latent issue, not an observed one.
+
+\subsubsection{Summands}
+
+\begin{definition}[Summand, origins]
+A \emph{summand} of a shape $\sigma$ (\locr{lib/skeleton/skeleton.ml}{31}{37})
+is a rule chain that can fire from $\sigma$: a list of rule names,
+outermost first, where \code{<L>} stands for ``a step of a closed value by
+$L$, computed at run time''; the source slots it \emph{reads}; its
+\emph{target} $\tau ::= \mathsf{TSlot}(o) \mid \mathsf{TNode}(c,\vec
+p,\tau_1\dots\tau_n)$ with origins $o ::= \mathsf{Moved}\ i \mid
+\mathsf{Computed}\ \vec \imath$ (the slot's value is source slot $i$
+unchanged, or computed from slots $\vec\imath$); the label's head
+constructor where the rules fix it; and a flag \code{dynamic}, set when a
+computed value may start with a structural constructor at run time, so
+its shape is known only then.
+\end{definition}
+
+\code{summands} (\locr{lib/skeleton/skeleton.ml}{381}{535}) computes them
+by abstract matching of each rule against the shape, seen as a target of
+moved slots (\code{target_of_shape}):
+
+\begin{shell}[mathescape=true]
+go($\tau$):                                            (skeleton.ml:394-427)
+  if $\tau$ = TSlot o:  [ chain <L>, reads(o), target = normalize(Computed reads(o)) ]
+  if $\tau$ is a node already in progress:  [ chain <L>, Computed, dynamic ]   (recursion guard)
+  else  concat over rules $\rho$ of L: rule($\rho$, $\tau$)
+rule($\rho$, $\tau$):                                       (skeleton.ml:428-533)
+  pmatch $\rho$.src against $\tau$          -- No_match: structural c vs other node/slot
+  for the premises, in order:
+    Decide P / Opaque P:  reads += slots P mentions   (Opaque: dynamic)
+    Step L' s' l' t':
+      if L' = L and inst(s') is made of nodes and moved slots:
+        for each summand $\mu$ of go(inst(s')), compatible label head:
+          pmatch t' against $\mu$.target; chain @= $\mu$.chain; reads += $\mu$.reads
+      else  chain @= [<L'>]; t' bound to "computed from inst(s')'s slots"
+  target := normalize(inst($\rho$.tgt));  reads += label's slots + computed_reads(target)
+\end{shell}
+
+\begin{itemize}
+\item \code{pmatch} (\locr{lib/skeleton/skeleton.ml}{224}{246}) binds a
+  variable to a part of the shape; a variable bound twice (a non-linear
+  pattern) reads both parts (equality decided at run time); a
+  non-structural constructor over a slot reads the slot.
+\item \code{inst} (\locr{lib/skeleton/skeleton.ml}{251}{277}) turns a rule
+  term into a target: structural constructors become nodes, a variable
+  bound to a part of the shape is moved, anything else is computed from
+  the slots its variables are bound to.
+\item \code{normalize} (\locr{lib/skeleton/skeleton.ml}{335}{365}) expands
+  a computed value whose type has a single, structural constructor (a
+  pair, a record) into its node, with fuel 20, and reports whether a
+  computed value's type has structural constructors (\code{carries},
+  \locr{lib/skeleton/skeleton.ml}{321}{328}): then the summand is
+  \emph{dynamic}.
+\item \code{computed_reads} (\locr{lib/skeleton/skeleton.ml}{187}{191})
+  adds the sources of each computed slot to the reads. It was missing in
+  stage 2b, and made CADP's \code{DO_ACQUIRE} get stuck
+  (\file{doc/learn.md}, stage 2c, item 2).
+\end{itemize}
+
+\code{build} (\locr{lib/skeleton/skeleton.ml}{539}{598}) normalises the
+start term with \code{nf_all}, splits it, and explores shapes
+breadth-first by following the summands' target shapes, up to
+\code{max_shapes} $=200$; it is used only by \code{Print MeBi Skeleton}.
+The engine instead asks for summands per shape as it meets shapes
+(\code{summands_of}, \locr{lib/skeleton/skeleton.ml}{768}{777}), without
+a bound. \code{pr} (\locr{lib/skeleton/skeleton.ml}{621}{721}) prints the
+classes, the start shape and its first 12 values, the first 15 shapes,
+and the locality: the number of summands, how many keep their shape and
+the average number of slots they write (\code{writes},
+\locr{lib/skeleton/skeleton.ml}{604}{619}), how many change it, how many
+are dynamic.
+
+\begin{example}[\code{Print MeBi Skeleton}]\label{ex:sym-par}
+\begin{rocq}
+Inductive pr := nil | pre (x : act) (k : pr) | par (p q : pr).
+Inductive step : pr -> option act -> pr -> Prop :=
+| s_pre x k : step (pre x k) (Some x) k
+| s_parl p q l p' : step p l p' -> step (par p q) l (par p' q)
+| s_parr p q l q' : step q l q' -> step (par p q) l (par p q')
+| s_end : step (par nil nil) None nil.
+Print MeBi Skeleton (par (par (pre a nil) (pre b nil)) (pre a nil)) Using step.
+\end{rocq}
+Derived by hand from the code (not run for this report): \code{par} is
+structural, \code{pre} and \code{nil} never kept. The start shape is
+$\sigma_1 = \mathsf{par}(\mathsf{par}(P_0,P_1),P_2)$ with
+$P_0 = P_2 = \code{pre a nil}$, $P_1 = \code{pre b nil}$. Its summands:
+\begin{center}
+\small
+\begin{tabular}{@{}l l l l@{}}
+\toprule
+chain & reads & target & keeps shape \\
+\midrule
+\code{s_parl; s_parl; <step>} & 0 & $\mathsf{par}(\mathsf{par}(C_{0}, M_1), M_2)$ & yes \\
+\code{s_parl; s_parr; <step>} & 1 & $\mathsf{par}(\mathsf{par}(M_0, C_{1}), M_2)$ & yes \\
+\code{s_parl; s_end} & 0, 1 & $\mathsf{par}(C_{\emptyset}, M_2)$ & no \\
+\code{s_parr; <step>} & 2 & $\mathsf{par}(\mathsf{par}(M_0, M_1), C_{2})$ & yes \\
+\bottomrule
+\end{tabular}
+\end{center}
+($M_i$ = moved from slot $i$, $C_{\vec\imath}$ = computed from
+$\vec\imath$.) The shapes reached are $\sigma_1$, $\sigma_2 =
+\mathsf{par}(P_0,P_1)$ (summands \code{s_parl; <step>}, \code{s_parr;
+<step>}, \code{s_end}) and $\sigma_3 = P_0$ (one summand \code{<step>}):
+3 shapes, 6 summands keeping their shape, 2 changing it, all 8 dynamic,
+as \file{doc/skeleton.md}'s table records. Every summand is dynamic
+because a computed value of type \code{pr} could be a \code{par}.
+\end{example}
+
+\paragraph{Measured locality} (\file{doc/skeleton.md}, 2026-11-06):
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}X r r r r@{}}
+\toprule
+system & start shape & shapes & keep/ change & avg.\ writes & dyn. \\
+\midrule
+CCS \code{abp} & \code{res P0 (par (par P1 P2) (par P3 P4))} & 1 & 16/0 & 1.8 & 16 \\
+Proc stacked, Test4 \code{p} & \code{cpar (cpar ..) (cpar ..)} & 9 & 39/31 & 1.3 & 0 \\
+Proc flat, Test1 \code{p} & \code{P0} (\code{tfix} never kept) & 1 & 1/0 & 1 & 1 \\
+CADP fine-grained, 2 processes & \code{pair (PAR ..) ..}, 10 slots & 1 & 2/0 & 6 & 0 \\
+CADP fine-grained, 3 processes & 14 slots & 1 & 3/0 & 6 & 0 \\
+\code{PrintSkeleton} & \code{par (par P0 P1) P2} & 3 & 6/2 & 1 & 8 \\
+streams (\code{nats 0}) & \code{P0} & 1 & 1/0 & 1 & 0 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+The CCS row reproduces the ABP's synchronisation vectors (4 local steps,
+12 synchronisations); stacked Proc has the 9 binary trees of at most 4
+leaves, with \code{do_par_end} and \code{do_assoc} moving between them;
+flat Proc has no structure until \code{tfix} unfolds. CADP's ``writes''
+over-estimate: every computed field counts as written.
+
+\subsection{List Decision Diagrams: \texttt{lib/ldd}}\label{sec:sym-ldd}
+
+\subsubsection{Definition}
+
+\begin{definition}[LDD; after van Dijk and van de Pol]
+An LDD is a node of a directed acyclic graph with two terminals
+$\mathbf 0$ and $\mathbf 1$; every other node $v$ has a value
+$\mathit{val}(v)\in\N$ (here below $2^{32}-1$), a \emph{down} edge and a
+\emph{right} edge. Its meaning, a set of finite sequences over $\N$, is
+\[
+\lddsem{\mathbf 0} = \emptyset,\qquad
+\lddsem{\mathbf 1} = \{\varepsilon\},\qquad
+\lddsem{v} = \{\mathit{val}(v)\cdot w \mid w \in \lddsem{\mathit{down}(v)}\}
+  \cup \lddsem{\mathit{right}(v)}.
+\]
+Invariants: $\mathit{down}(v) \ne \mathbf 0$; $\mathit{right}(v)$ is
+$\mathbf 0$ or a node with a strictly larger value (so the right chain is
+a sorted list of the values possible at one level); nodes are unique in a
+hash table. Under these invariants each set has exactly one LDD, so set
+equality is node identity.
+\end{definition}
+
+In Sylvan, \code{lddmc_makenode(value, ifeq, ifneq)} builds a node with
+\code{ifeq} the down edge and \code{ifneq} the right edge; it returns
+\code{ifneq} when \code{ifeq} is $\mathbf 0$ and asserts the order
+(\file{vendor/sylvan/src/sylvan_ldd.c}, lines 352--364). Values are labels,
+never bits: a domain needs no bound and no width. In MeBi each slot value
+(a Rocq term of any size or type) gets the next integer from a table, so
+the cost of a deep or large term is paid once, in the table, not in the
+diagram.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  n/.style={draw,rectangle,minimum width=6mm,minimum height=5mm,inner sep=1pt,font=\small},
+  dn/.style={-{Stealth[length=1.8mm]}},
+  rt/.style={-{Stealth[length=1.8mm]},dashed}]
+  % level 0: shape
+  \node[n] (a1) at (0,0) {1};
+  \node[n] (a2) at (2.2,0) {2};
+  \node[n] (a3) at (4.6,0) {3};
+  % level 1: slot 0
+  \node[n] (b1) at (-1.2,-1.3) {1};
+  \node[n] (b2) at (0.2,-1.3) {3};
+  \node[n] (b3) at (2.2,-1.3) {3};
+  \node[n] (b4) at (4.6,-1.3) {3};
+  % level 2: slot 1
+  \node[n] (c1) at (-1.2,-2.6) {2};
+  \node[n] (c2) at (0.2,-2.6) {3};
+  \node[n] (c3) at (1.6,-2.6) {1};
+  \node[n] (c4) at (3.0,-2.6) {3};
+  \node[n] (c5) at (4.6,-2.6) {0};
+  % level 3: slot 2
+  \node[n] (d1) at (-1.2,-3.9) {1};
+  \node[n] (d2) at (0.2,-3.9) {3};
+  \node[n] (d3) at (3.6,-3.9) {0};
+  \node[n,fill=black!8] (T) at (1.4,-5.2) {$\mathbf 1$};
+  \draw[rt] (a1) -- (a2); \draw[rt] (a2) -- (a3);
+  \draw[rt] (b1) -- (b2);
+  \draw[rt] (c1) -- (c2); \draw[rt] (c3) -- (c4);
+  \draw[rt] (d1) -- (d2);
+  \draw[dn] (a1) -- (b1); \draw[dn] (a2) -- (b3); \draw[dn] (a3) -- (b4);
+  \draw[dn] (b1) -- (c1); \draw[dn] (b2) -- (c1);
+  \draw[dn] (b3) -- (c3); \draw[dn] (b4) -- (c5);
+  \draw[dn] (c1) -- (d1); \draw[dn] (c2) -- (d1);
+  \draw[dn] (c3) -- (d3); \draw[dn] (c4) -- (d3); \draw[dn] (c5) -- (d3);
+  \draw[dn] (d1) -- (T); \draw[dn] (d2) -- (T); \draw[dn] (d3) -- (T);
+  \node[font=\scriptsize,anchor=west] at (5.4,0) {shape};
+  \node[font=\scriptsize,anchor=west] at (5.4,-1.3) {slot 0};
+  \node[font=\scriptsize,anchor=west] at (5.4,-2.6) {slot 1};
+  \node[font=\scriptsize,anchor=west] at (5.4,-3.9) {slot 2};
+\end{tikzpicture}
+\caption{The reachable states of \cref{ex:sym-par} as an LDD (derived by
+hand; the five padding positions of the real vectors, each a single node
+$0$, are left out). Solid: down; dashed: right. Values: $1 = \code{pre a
+nil}$, $2 = \code{pre b nil}$, $3 = \code{nil}$, $0$ = no slot; shapes
+$1 = \sigma_1$, $2 = \sigma_2$, $3 = \sigma_3$. The 15 nodes hold 11
+vectors: the 8 of $\{1\}\times\{1,3\}\times\{2,3\}\times\{1,3\}$, then
+$(2,3,1,0)$, $(2,3,3,0)$, $(3,3,0,0)$. The nodes $2{\to}3$ at level 2 and
+$0$ at level 3 are shared.}
+\label{fig:sym-ldd}
+\end{figure}
+
+\subsubsection{Relations}
+
+A relation is an LDD read through a \emph{meta} vector, one code per state
+position, ended by $-1$ (\code{0xFFFFFFFF};
+\locr{lib/ldd/ldd.ml}{73}{84}). For a set $S$ of vectors of length $n$,
+a relation LDD $R$ and meta $m$, Sylvan's \code{lddmc_relprod} and
+\code{lddmc_relprev} interpret each position $i$ by its code:
+
+\begin{center}
+\small
+\begin{tabular}{@{}c l l l@{}}
+\toprule
+code & \code{Ldd.level} & levels of $R$ & meaning for $(w, w')$ \\
+\midrule
+0 & \code{Copy} & none & $w'_i = w_i$ \\
+1, 2 & \code{Read}, \code{Write} & two: old, new & $R$ holds $w_i$, then $w'_i$ \\
+3 & \code{Only_read} & one & $R$ holds $w_i$, and $w'_i = w_i$ \\
+4 & \code{Only_write} & one & $R$ holds $w'_i$, $w_i$ arbitrary \\
+5 & \code{Label} & one, no state position & skipped \\
+$-1$ & (end) & & the remaining positions copied \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Writing $w \to_{R,m} w'$ when some sequence of $R$ matches $(w,w')$
+under $m$:
+\[
+\mathrm{relprod}(S,R,m) = \{w' \mid \exists w\in S.\ w\to_{R,m}w'\},
+\]
+\[
+\mathrm{relprev}(S,R,m,U) = \{w \in U \mid \exists w'\in S.\ w\to_{R,m}w'\}.
+\]
+The point of the meta is locality: a relation over $k$ touched positions
+of an $n$-vector stores only those $k$ (or $2k$) levels, and one learned
+tuple applies to every state that agrees on the read positions.
+\code{Label} is bound and tested (\loc{test/ldd_tests.ml}{47}) but the
+engine never uses it: it keeps one relation per label instead.
+
+\subsubsection{The bound operations}
+
+Every OCaml function and the C stub behind it
+(\file{lib/ldd/ldd.mli}; \file{lib/ldd/ldd.ml} lines 5--24 for the
+externals; \file{lib/ldd/ldd_stubs.c}):
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{3.6cm} >{\raggedright\arraybackslash}X@{}}
+\toprule
+OCaml (\file{ldd.mli}) & C stub (\file{ldd_stubs.c}) & Sylvan call, notes \\
+\midrule
+\code{init} (22) & \code{ml_ldd_init} (74--84) & \code{lace_start(workers, 1000000)};
+  \code{sylvan_set_limits(mb MB, 1, 5)}; \code{sylvan_init_package};
+  \code{sylvan_init_ldd}. Only the first call acts (static \code{started}).
+  Defaults: 1 worker, 1024\,MB (\loc{lib/ldd/ldd.ml}{26}). \\
+\code{empty}, \code{epsilon} (25, 28) & \code{ml_ldd_false}, \code{_true} (86--87) &
+  $\mathbf 0$, $\mathbf 1$. \\
+\code{cube} (32) & \code{ml_ldd_cube} (89--95) & \code{lddmc_cube} inside a Lace task
+  (\code{cube_task}, 56); values checked in OCaml to lie in $[0,2^{32}-2]$
+  (\locr{lib/ldd/ldd.ml}{29}{40}); width at most 4096 (\code{MAX_WIDTH}, 20). \\
+\code{of_list} (36) & \code{ml_ldd_union_cubes} (97--104) & Blocks of 64 cubes by
+  \code{lddmc_union_cube} in a task (58--70), merged by halves with
+  intermediate sets released (\locr{lib/ldd/ldd.ml}{42}{58}). Row width is
+  taken from the first row and not checked for the others. \\
+\code{union}, \code{minus}, \code{inter} (38--40) & 106--122 &
+  \code{lddmc_union}, \code{lddmc_minus}, \code{lddmc_intersect}. \\
+\code{equal}, \code{is_empty} (41--42) & \code{ml_ldd_equal} (146) & Node identity
+  (canonicity); \code{is_empty s} is \code{equal s (empty ())}. \\
+\code{mem} (43) & \code{ml_ldd_mem} (148--153) & \code{lddmc_member_cube}. \\
+\code{count} (46) & \code{ml_ldd_count} (142) & \code{lddmc_satcount} (a long double)
+  as a float. \\
+\code{nodes} (49) & \code{ml_ldd_nodes} (144) & \code{lddmc_nodecount}. \\
+\code{elements} (52) & \code{ml_ldd_elements} (188--207) & A read-only walk
+  (\code{walk}, 168--186) collecting at most \code{limit} rows
+  (default 1000, \loc{lib/ldd/ldd.ml}{61}), in lexicographic order; the
+  engine always passes \code{~limit:max_int}. \\
+\code{rel_meta} (65) & via \code{cube_c} & The meta cube, codes then $-1$. \\
+\code{relprod}, \code{relprev} (68, 72) & 124--134 & \code{lddmc_relprod},
+  \code{lddmc_relprev} (with \code{within} as Sylvan's universe). \\
+\code{project} (76) & \code{ml_ldd_project} (136--140) & \code{lddmc_project} with
+  codes 1 keep, 0 quantify, $-2$ ``quantify the rest''
+  (\locr{lib/ldd/ldd.ml}{91}{100}). \\
+\code{product} (80) & \code{ml_ldd_join} (209--213) & \code{lddmc_join} with
+  projections $1^{w}\,{-2}$ for $a$ and $0^{w}\,{-1}$ for $b$: since $b$
+  has none of $a$'s positions, the join is $\{u\cdot v\}$
+  (\locr{lib/ldd/ldd.ml}{104}{115}). \\
+\code{release} (83) & \code{ml_ldd_release} (155--162) & \code{lddmc_deref} now;
+  the value then holds $\mathbf 0$. \\
+\code{table_usage} (87) & 217--227 & \code{sylvan_table_usage}'s filled count, and
+  \code{llmsset_get_max_size} (the maximum, not the current size). \\
+\code{gc} (91) & \code{ml_ldd_gc} (230--235) & \code{sylvan_gc}. \\
+\code{reclaim} (96) & OCaml only & If the table is over half full,
+  \code{Gc.full_major ()} then \code{gc ()} (\locr{lib/ldd/ldd.ml}{117}{123}). \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Sylvan's own operations (\code{lddmc_union} etc.) are macros that
+\code{RUN} a Lace task (\file{vendor/sylvan/src/sylvan_ldd.h}, e.g.\
+line 106), so the stubs may call them from the OCaml thread; only
+\code{lddmc_cube} and \code{lddmc_union_cube} are wrapped by hand
+(\locr{lib/ldd/ldd_stubs.c}{1}{8}).
+
+\subsubsection{Memory: who keeps what alive, and when it is freed}
+
+\begin{itemize}
+\item \textbf{One reference per OCaml value.} \code{wrap}
+  (\locr{lib/ldd/ldd_stubs.c}{40}{46}) allocates a custom block with
+  \code{caml_alloc_custom_mem(.., 4096)}, telling OCaml's GC that each value
+  holds about 4\,KB outside the heap (so the major GC runs sooner), and
+  takes \code{lddmc_ref} on the node. The finaliser
+  (\locr{lib/ldd/ldd_stubs.c}{22}{25}) drops the reference.
+  \code{compare} and \code{hash} are by node index
+  (\locr{lib/ldd/ldd_stubs.c}{27}{33}), so OCaml's \code{=} on \code{Ldd.t}
+  is set equality.
+\item \textbf{Nodes are freed only by Sylvan's GC}, which runs on demand
+  when the unique table fills during an operation, or by \code{Ldd.gc}. It
+  frees every node not reachable from a reference. A dead OCaml value not
+  yet finalised still holds its reference, so its nodes stay. Hence
+  \code{release} (free now) and \code{reclaim} (finalise, then collect).
+\item \textbf{When the table is full even after a collection,} Sylvan
+  prints ``MDD Unique table full'' and calls \code{exit(1)}
+  (\file{vendor/sylvan/src/sylvan_ldd.c}, lines 373--374 and 400--401). Inside
+  Rocq this ends the whole process (and the proof with it); it is not an
+  exception, so no tactic can report it.
+  The size is fixed at the first \code{init}: 1024\,MB in the plugin
+  (\loc{lib/learn/learn.ml}{858} calls \code{Ldd.init ()}), 256\,MB in
+  \file{test/ldd_tests.ml}. There is no Rocq option to change it.
+\item \textbf{Sylvan is never shut down.} Once started inside a Rocq
+  process, its tables (and one Lace worker thread) live until the process
+  ends; nodes from one command are collected by later GCs once their OCaml
+  values are finalised.
+\end{itemize}
+
+What the engine releases explicitly is listed with each algorithm below.
+The rewrite of the game for memory (Phase~4) was prompted by three-process
+coarse-grained against fine-grained CADP filling the 1024\,MB table in the game's sixth
+iteration, while its relation was only 114k nodes: dead intermediate sets
+filled the rest.
+
+\subsubsection{Building and testing}
+
+\file{lib/ldd/dune} copies the C files of \file{vendor/sylvan/src} and
+\file{vendor/lace/src} and compiles them
+\emph{into the binding's own library} (\code{-O2 -std=gnu11
+-D_GNU_SOURCE -w}), not into a separate C library: Rocq loads the plugin's
+libraries as \code{.cmxs} with Dynlink, and a C archive's objects reach a
+\code{.cmxs} only when the same link refers to them.
+\file{lib/ldd/README.md} gives the upstream versions, the two
+hand-written configuration headers (\file{lib/ldd/config/sylvan_config.h},
+\file{lace_config.h}) and how to update. \file{test/ldd_tests.ml} checks counts, the set
+operations, canonicity, large values, image and preimage with a copy
+level, a labelled relation, projection, product, release, and locality:
+two independent counters mod 100, one relation each, reach 10,000 states
+in at most 202 nodes (\locr{test/ldd_tests.ml}{64}{89}).
+
+\subsection{Learning relations: \texttt{lib/learn}}\label{sec:sym-learn}
+
+\subsubsection{States as vectors}
+
+All tables are shared by the two systems of a check, so that labels
+compare (\code{tables}, \locr{lib/learn/learn.ml}{40}{52}): values,
+shapes and labels each get an integer from 1 in order of first meeting
+(\code{intern}, \locr{lib/learn/learn.ml}{91}{99}); 0 means ``no slot''.
+Terms are hashed by \code{deep_hash} (\locr{lib/learn/learn.ml}{8}{21}),
+a structural hash of the whole term consistent with \code{Constr.equal}:
+\code{Hashtbl.hash} looks at 10 nodes only, and CADP's large terms that
+differ deep down collided (stage 2c).
+
+A state $t$ of a system with \code{width} $w$ is the vector
+\[
+\mathrm{enc}(t) = [\,\#\mathit{shape};\ \#v_0;\ \dots;\ \#v_{k-1};\
+0;\ \dots;\ 0\,] \in \N^{w+1}
+\]
+from \code{Skeleton.split} (\code{encode},
+\locr{lib/learn/learn.ml}{117}{138}; \code{decode} rebuilds,
+\locr{lib/learn/learn.ml}{140}{146}), each slot at its place in the
+shape's order (below). If a state has more than $w$ slots,
+\code{Too_wide n} is raised (also from \code{make_summand} and
+\code{split_target}), and \code{check} restarts that system's exploration
+with width $\max(n, 2w)$ (\code{run_explore},
+\locr{lib/learn/learn.ml}{1632}{1635}). The initial width is 8.
+
+\paragraph{The order of the slots.} A slot need not sit at its own
+index: since 9 November 2026, for a system whose summands all keep the
+start's shape, the slots go in order of how many summands read or write
+them, most first, ties left to right (\code{explore},
+\locr{lib/learn/learn.ml}{1141}{1187}). Each summand's positions are
+then near the front and the rest of the vector is copied, which is what a
+static variable ordering over the dependency matrix aims
+for~\cite{meijer-vdpol16}; in CADP the shared memory comes first, each
+process's own slots after. The order is a table per shape
+(\code{perm}, \code{pos}; \code{pos_of} and \code{slot_at},
+\locr{lib/learn/learn.ml}{69}{89}), read by \code{encode},
+\code{decode}, the summands' codes and the partial terms, and handed to
+the summands' codes and the partial terms. \code{MEBI_ORDER=off} keeps
+each slot at its index.
+
+\subsubsection{The interpreter}\label{sec:sym-interp}
+
+A summand is learned on a \emph{partial term}: the source shape with the
+read slots' values and, in every other slot $i$, a placeholder
+\code{Meta i} (\code{partial}, \locr{lib/learn/learn.ml}{994}{1008}).
+\code{fire c lts src chain} (\locr{lib/learn/learn.ml}{295}{325}) follows
+the chain:
+
+\begin{shell}[mathescape=true]
+fire(lts, src, chain):                                   (learn.ml:259-312)
+  []           -> []
+  "<..>" :: r  -> if src has a placeholder: Stuck
+                  else [(l, t, r) | (l, t) in steps(lts, src)]
+  name :: r    -> $\rho$ := the rule called name;  b := cmatch($\rho$.src, src)   (No_match -> [])
+                  for each b' in prems($\rho$.premises, b, r):
+                      (compute(subst b' $\rho$.lbl), compute(subst b' $\rho$.tgt), rest)
+prems(Decide w :: ps)        -> if compute(subst b w) = true then prems(ps) else []
+prems(Opaque _ :: _)         -> Stuck
+prems(Step L' s l t :: ps)   -> for each (l', t', r') in fire(L', compute(subst b s), chain):
+                                   cmatch l against l', t against t'; prems(ps)
+steps(lts, src):  memoised per (lts, src)
+  if depth $\ge$ 64: Unfollowable(lts, src)
+  else interp(lts, src), or Unfollowable(lts, src) on Stuck   (interpreted += 1)
+interp(lts, src): every rule of lts, as fire, premises by prems_all  (learn.ml:345-385)
+\end{shell}
+
+\begin{itemize}
+\item \code{cmatch} (\locr{lib/learn/learn.ml}{167}{202}) is first-order
+  matching of a rule's source pattern against a term. A constructor
+  pattern against a placeholder raises \code{Stuck}; a variable bound twice
+  to a term with a placeholder raises \code{Stuck}; a closed non-constructor
+  pattern (a constant such as \code{Acquire}) is compared with the term
+  after \code{nf_all}.
+\item \code{compute} (\locr{lib/learn/learn.ml}{212}{227}) normalises a
+  closed term with \code{nf_all}; around placeholders it only descends
+  through constructor applications, and raises \code{Stuck} on anything
+  else or on \code{unbound} (\code{Meta 1000000}, a variable nothing
+  bound, \loc{lib/learn/learn.ml}{199}). So a placeholder in the result
+  means ``that slot carried unchanged''.
+\item Two exceptions with distinct meanings: \code{No_match} (this rule
+  does not apply) and \code{Stuck} (the interpreter cannot decide: on a
+  closed term, the step is \code{Unfollowable}, an error). \code{max_depth} $= 64$ (\loc{lib/learn/learn.ml}{281}) stops a
+  rule whose premise steps from its own source from recursing forever.
+\item Rules of other LTSs are read lazily through \code{rules_of}
+  (\locr{lib/learn/learn.ml}{283}{291}).
+\end{itemize}
+
+
+
+\subsubsection{Summands' relations and meta codes}
+
+Each summand of a source shape becomes a record
+(\locr{lib/learn/learn.ml}{410}{420}) with its chain, its projection
+\code{keep} (position 0, the shape, always; then the read slots), its
+static codes, the projections already learned (\code{seen}), its
+relations, and the projections that escaped. The static codes come from
+\code{make_summand} (\locr{lib/learn/learn.ml}{443}{500}). With $k_s$ the
+source's slots, $k_t$ the target's, and \emph{same} whether the target
+shape equals the source shape:
+\[
+\mathrm{reads} = \mathrm{reads}_{\mathrm{skeleton}} \cup \{ i \mid
+  \text{target slot } j \text{ is } \mathsf{Moved}\ i,\ \neg(\mathit{same}
+  \wedge i = j) \}
+\]
+(a value moved to another place counts as read: its new place holds the
+old value), and position $p$ gets (LTSmin's read, write and copy
+dependencies~\cite{meijer14})
+\[
+\mathrm{code}(0) = \begin{cases}\mathsf{RO} & \mathit{same}\\
+\mathsf{RW} & \text{else}\end{cases}
+\qquad
+\mathrm{code}(1+j) = \begin{cases}
+\mathsf{RW} & j\in\mathrm{reads},\ \mathrm{written}(j)\\
+\mathsf{RO} & j\in\mathrm{reads},\ \neg\mathrm{written}(j)\\
+\mathsf{WO} & j\notin\mathrm{reads},\ \mathrm{written}(j)\\
+\mathsf{Copy} & \text{else}
+\end{cases}
+\]
+where $\mathrm{written}(j)$ holds if $j<k_t$ and target slot $j$ is not
+$\mathsf{Moved}\ j$ in the same shape, or $k_t \le j < k_s$ (the slot
+disappears and is padded to 0). \code{levels}
+(\locr{lib/learn/learn.ml}{469}{477}) maps $\mathsf{RW}$ to
+\code{[Read; Write]}, $\mathsf{RO}$ to \code{Only_read}, $\mathsf{WO}$ to
+\code{Only_write}, $\mathsf{Copy}$ to \code{Copy}.
+
+\subsubsection{Learning a projection}
+
+\code{learn sm frontier visited} (\locr{lib/learn/learn.ml}{625}{746}):
+
+\begin{shell}[mathescape=true]
+fresh := project(frontier, sm.keep) $\setminus$ sm.seen
+for each pv in fresh with pv[0] = sm.sid:                   projections += 1
+  results := fire(lts, partial(shape, sm.keep, pv), sm.chain)    (Stuck -> escape pv)
+  for each (l, t): split t into (target shape, slots: Mv i | Val v)    (split_target, 523-535)
+  if some Mv i with i $\ne$ j and slot i unread: escape pv     (a move of an unread slot)
+  else for each result:
+    widen the static codes where this result writes more        (needs, 695-716):
+      RO $\to$ RW, Copy $\to$ WO   if position written;  WO $\to$ Copy  if not
+    tuple := per code: RW (old,new), RO old, WO new, Copy nothing
+    batch[(codes, label)] += tuple
+sm.seen $\cup$= fresh;  add batch as one LDD per (codes, label)       (add_rel, 491-500)
+escaped projections: learn their whole states among visited  (learn_global, 589-618)
+\end{shell}
+
+\begin{itemize}
+\item A position ``needs'' a write (\locr{lib/learn/learn.ml}{695}{706})
+  if it is the shape and the shape changed, a slot moved from elsewhere, a
+  value that is not the read slot's own old value, or a slot beyond the
+  new shape but within the old (padded to 0). A read slot comes back from
+  the interpreter as a value, not a placeholder, so ``value equal to the
+  old one'' is no write: this misclassification caused all 37,584 of
+  Test4's escapes in stage 2b (\file{doc/learn.md}, stage 2c item 1).
+\item Hence one summand may hold several relations, one per (codes,
+  label): a result whose shape changed at run time (a dynamic summand,
+  e.g.\ a \code{tfix} unfolding into a \code{tpar}) goes into a relation
+  with more positions written.
+\item \textbf{Escapes.} \code{learn_global} decodes each whole state and
+  fires the chain on it; if that is \code{Stuck} too, it takes
+  \emph{all} the state's steps from \code{steps} (a superset of the
+  summand's, ``always correct to add''). Its tuples have every position
+  $\mathsf{RW}$. Escapes cost time, never correctness: every tuple added is
+  a real step. After stage 2c, escapes were 0 on every measured file.
+\end{itemize}
+
+\paragraph{A placeholder in a value is not checked.} \code{split_target}
+interns any non-placeholder slot value as a value, even one that contains
+a placeholder deeper inside (e.g.\ a non-structural constructor applied
+to an unread slot). That would intern an open term as a state value.
+Skeleton's \code{computed_reads} is meant to make every slot a computed
+value depends on ``read'', so this should not arise; the code relies on
+that analysis and does not check it (\locr{lib/learn/learn.ml}{526}{533}).
+
+\begin{example}[\cref{ex:sym-par}, learned]
+For \code{s_parl; s_parl; <step>} the codes are $[\mathsf{RO};
+\mathsf{RW}; \mathsf{Copy};\dots]$ and the projections are $(1, v_0)$.
+On $(1,1)$ the partial term is
+\code{par (par (pre a nil) ?1) ?2}; \code{fire} matches \code{s_parl}
+twice, then \code{steps step (pre a nil)} interprets \code{s_pre}: label
+\code{Some a}, target \code{nil}. The result
+\code{par (par nil ?1) ?2} splits to $[\mathsf{Val}\,3; \mathsf{Mv}\,1;
+\mathsf{Mv}\,2]$, so the relation for label \code{Some a} is the single
+tuple $(1;\,1,3)$: ``in shape 1, slot 0 goes from 1 to 3, the rest is
+copied''. It applies to all four states $(1,1,\ast,\ast)$ at once.
+For \code{s_parl; s_end} every position $0..3$ is $\mathsf{RW}$ (the shape
+changes, slot 2 moves to slot 1, slot 2 is padded); its relation, label
+\code{None}, is $\{(1,2,\,3,3,\,3,v,\,v,0) \mid v \in\{1,3\}\}$, learned on
+the projections $(1,3,3,v)$; other projections do not match
+\code{par nil nil} and give nothing.
+\end{example}
+
+\subsubsection{Chained exploration}
+
+\code{explore} (\locr{lib/learn/learn.ml}{972}{1242}) is breadth-first with
+LTSmin's~\cite{kant15} \emph{chaining}: within a round, each summand in turn is learned
+on and applied to the round's frontier grown by what the summands before
+it found.
+
+\begin{shell}[mathescape=true]
+visited := frontier := {enc(start)}
+while frontier $\ne\emptyset$:                                      (763-809)
+  reclaim()
+  sms := summands of the shapes in frontier     (766-771)
+  cur := frontier;  added := $\emptyset$
+  for sm in sms:
+    learn(sm, cur, visited)
+    f := $\bigcup_{r\in sm.rels}$ relprod(cur, r.rel, meta(r.codes)) $\setminus$ visited
+    visited, cur, added $\cup$= f;  learn escaped projections' states in f
+  frontier := added
+\end{shell}
+
+Released explicitly: the projection, \code{fresh}, the old \code{seen},
+\code{next}, \code{f}, and the previous \code{visited}, \code{cur},
+\code{added}, \code{frontier}. Not released (left to finalisers): the meta
+cubes built per application (\loc{lib/learn/learn.ml}{785}) and the
+shape projection (\loc{lib/learn/learn.ml}{769}). Chaining pays where
+summands feed each other (Proc's Test1: 3--6 rounds) and not on CADP's
+fine-grained model (2 summands, 81 rounds).
+
+\paragraph{A bug fixed on 2026-11-08: 1000 shapes.} The shapes of a
+frontier were listed with \code{Ldd.elements} at its default \code{limit}
+of 1000. A frontier with more than 1000 distinct shapes would silently have
+skipped the summands of the others; their states would have stayed in
+\code{visited} without successors, giving a smaller reachable set and
+possibly a wrong verdict (no measured example has more than 9 shapes).
+Found by the first draft of this report; now every call in the file passes
+\code{~limit:max_int} (\loc{lib/learn/learn.ml}{769}; also 730, 745, 759,
+1087, 1104, 1118). \code{Ldd.elements}'s default is still 1000, a trap for
+a future caller.
+
+\paragraph{Why it is complete.} Each state enters some \code{cur} exactly
+once, when it is new; every projection of it is then learned (or escaped
+and learned whole), and a projection's results, once learned, are all its
+steps. So a later state with an already-seen projection gets its
+successors from the existing tuples, and no earlier state can gain
+successors later. Soundness rests on every tuple being a real step: from
+the interpreter, which follows the rules.
+
+\paragraph{Saturation, measured and set aside}~\cite{ciardo01} (Phase~3; \file{doc/future-work.md},
+``Saturation for the symbolic route''). On three-process coarse-grained CADP
+against \code{spec_lts}: 119\,s interpreting summands (1.92M projections),
+16\,s other learning, \textbf{0.25\,s applying relations}, 0.2\,s the
+game. Saturation speeds up the application of relations, which is under
+1\% of the time on every example.
+
+\subsection{The game, symbolically: weak and strong}\label{sec:sym-game}
+
+Let $\to_A$ and $\to_B$ be the learned relations (the union over
+summands, per label), $\Reach_A$, $\Reach_B$ the explored sets, and
+\[
+\Uni = \Reach_A \times \Reach_B
+\]
+built by \code{Ldd.product} (\loc{lib/learn/learn.ml}{887}); a pair is the
+concatenation of $A$'s vector and $B$'s. A relation of $B$ acts on pairs
+with $|A|$ copy codes in front (\code{rels_of ~offset},
+\locr{lib/learn/learn.ml}{890}{909}); a relation of $A$ needs no padding,
+since positions after the meta's end are copied.
+
+\paragraph{The silent label, and \code{?strong}.} \code{tau}
+(\locr{lib/learn/learn.ml}{1327}{1343}) is an \code{int option}:
+\begin{ocaml}
+  let tau =
+    let none = Rocqlib.lib_ref "core.option.None" in
+    if strong
+    then None
+    else
+      CTbl.fold (fun t i acc -> match Constr.kind (fst (Constr.decompose_app t)) with
+        | Constr.Construct (c, _) when (* c is None *) ... -> Some i
+        | _ -> acc) tb.labels None
+\end{ocaml}
+In weak mode ($\mathit{strong}=\mathsf{false}$, the default) it is the
+intern number of the label whose head constructor is \code{None}, found by
+scanning the shared label table, or \code{None} if no reachable step is
+silent. In strong mode it
+is \code{None}: no label is silent, and a \code{None}-labelled step is an
+ordinary label like any other. Write $\tau$ for the silent label when
+there is one; everything below is defined for both modes.
+
+\begin{definition}[The game]
+For $Z\subseteq\Uni$ and a side $X\in\{A,B\}$ (the other side's component
+fixed):
+\begin{align*}
+\pre^X_l(Z) &= \{ (p,q)\in\Uni \mid X\text{'s component steps by } l
+  \text{ into a pair of } Z\} \\
+T_X(Z) &= \begin{cases} \mu Y.\ (Z\cap\Uni) \cup \pre^X_\tau(Y) &
+  \text{weak, with a silent label } \tau\\
+  Z\cap\Uni & \text{strong (or no silent label)} \end{cases} \\
+\Ok^X_l(Z) &= \begin{cases} T_X(Z) & l = \tau \\
+  T_X(\pre^X_l(T_X(Z))) & l \ne \tau \end{cases}\\
+\Bad_{A\to B}(Z) &= \textstyle\bigcup_{l\in L_A} \pre^A_l(\Uni \setminus \Ok^B_l(Z))
+\end{align*}
+($T_X(Z)$: $X$ reaches $Z$ by $\tau^\ast$; $\Ok^X_l(Z)$: $X$ answers $l$
+weakly into $Z$; in strong mode there is no $l=\tau$ case), and
+$\Bad_{B\to A}$ symmetrically. With $F_{\mathrm{sim}}(Z) = Z\setminus
+\Bad_{A\to B}(Z)$ and $F_{\mathrm{bis}}(Z) = Z \setminus (\Bad_{A\to
+B}(Z)\cup\Bad_{B\to A}(Z))$, the result is $Z^\ast = \nu F$, computed as
+$Z_0 = \Uni$, $Z_{i+1} = F(Z_i)$ until $Z_{i+1} = Z_i$. The verdict is
+$(\mathrm{enc}(s_A),\mathrm{enc}(s_B)) \in Z^\ast$.
+\end{definition}
+
+Unfolded: $(p,q)\in\Bad_{A\to B}(Z)$ iff $p\to^l_A p'$ for some $l, p'$
+and there is no $q'$ with $q \wtr{l} q'$ (for $l=\tau$: $q\to_\tau^\ast
+q'$) and $(p',q')\in Z$. This is exactly \code{simF}
+(\locr{theories/Bisimilarity.v}{60}{64}): a strong move answered by a
+\code{weak} move (\locr{theories/Bisimilarity.v}{44}{47}), the silent
+case allowing zero steps; \code{bisimF}
+(\locr{theories/Bisimilarity.v}{212}{218}) adds the converse.
+
+\paragraph{The strong game.} With no silent label, $T_X(Z) = Z\cap\Uni$, so
+$\Ok^X_l(Z) = \pre^X_l(Z)\cap\Uni$ for every $l$, and
+\[
+F^{s}_{\mathrm{sim}}(Z) = Z \setminus \textstyle\bigcup_{l\in L_A}
+  \pre^A_l\bigl(\Uni\setminus\pre^B_l(Z)\bigr),
+\qquad
+F^{s}_{\mathrm{bis}}(Z) = F^{s}_{\mathrm{sim}}(Z) \setminus
+  \textstyle\bigcup_{l\in L_B}\pre^B_l\bigl(\Uni\setminus\pre^A_l(Z)\bigr).
+\]
+Unfolded: $(p,q)$ is removed iff $p\to^l_A p'$ and no $q\to^l_B q'$ has
+$(p',q')\in Z$ (and, for bisimilarity, symmetrically). The result is again
+$Z^\ast = \nu F^{s}$, iterated from $\Uni$. Its post-fixpoints are exactly
+the relations satisfying \code{ssimF} (\code{sbisimF}) of
+\locr{theories/Bisimilarity.v}{361}{376}: a step, \code{None} included,
+answered by one step with the same label. Since the same code computes both,
+the strong game is the weak one with $\tau^\ast$ replaced by the identity;
+nothing else changes (\code{bad} still takes the answerer's
+\code{tau_star} once, which is now $Z\cap\Uni$, and the test
+\code{Some l = tau} is never true).
+
+\begin{proposition}
+$F$ is monotone and $F(Z)\subseteq Z$, so the iteration from $\Uni$
+reaches $\nu F$ in at most $|\Uni|$ steps. $\nu F$ is the largest weak
+simulation (for $F_{\mathrm{bis}}$: the largest weak bisimulation)
+contained in $\Uni$ of the learned LTSs. If the learned relations are
+exactly the Rocq LTS's steps on reachable states, the verdict is
+\code{weak_sim} (\code{weak_bisimilar}) of the start terms; for
+$F^{s}$, \code{strong_sim} (\code{strong_bisimilar}).
+\end{proposition}
+\begin{proof}[Sketch]
+$Z\subseteq Z'$ gives $T_X(Z)\subseteq T_X(Z')$, hence
+$\Ok(Z)\subseteq\Ok(Z')$ and $\Bad(Z)\supseteq\Bad(Z')$. A post-fixpoint
+$R\subseteq F(R)$ is a relation in $\Uni$ whose every move is answered
+into $R$, i.e.\ a weak (bi)simulation; the greatest fixpoint contains all
+of them. Every successor of a reachable state is reachable, so
+restricting to $\Uni$ loses no pair a (bi)simulation from the start pair
+needs.
+\end{proof}
+This argument is not mechanised. What is checked in Rocq is the
+certificate (\cref{sec:prooflog}), not the engine.
+
+\paragraph{With LDD operations} (\locr{lib/learn/learn.ml}{927}{1024}):
+\begin{shell}[mathescape=true]
+pre(X, l, S)       = $\bigcup$ over X's relations r with label l: relprev(S, r, meta, within = U)
+tau_star(X, Z)     = Z := Z $\cap$ U;  if tau = None: Z            -- strong: the identity on U
+                     fresh := Z
+                     while fresh $\ne\emptyset$: p := pre(X,$\tau$,fresh); fresh := p $\setminus$ Z; Z $\cup$= fresh
+bad(M, Ans, Z)     = tz := tau_star(Ans, Z)                 -- once per iteration, not per label
+                     $\bigcup_{l\in L_M}$ pre(M, l, U $\setminus$ ok_l),   ok_$\tau$ = tz,  ok_l = tau_star(Ans, pre(Ans, l, tz))
+                     -- strong: tz = Z $\cap$ U and ok_l = pre(Ans, l, tz) $\cap$ U for every l
+gfp(Z)             = bd := bad(A, B, Z) [$\cup$ bad(B, A, Z) for Bisim]
+                     Z' := Z $\setminus$ bd;  if Z' = Z then Z else gfp(Z')
+verdict            = mem(gfp(U), start)
+\end{shell}
+A pair is one vector, the \emph{answering} side's positions first (for
+\code{Sim}, $B$'s: $\Uni = \Reach_B \times \Reach_A$; for \code{Bisim},
+where both answer, the narrower side's; \code{b_first},
+\loc{lib/learn/learn.ml}{1305}), so that the answerer's relations, applied
+most, need no copied prefix; \code{start} is the two start vectors in that
+order. A relation applied at an offset copies the positions before it, and
+its meta stops at its last touched position (\code{meta_levels},
+\loc{lib/learn/learn.ml}{520}): past the end Sylvan carries the rest of
+the vector unchanged.
+\code{tau_star} (\locr{lib/learn/learn.ml}{1354}{1373}; the strong case is
+\loc{lib/learn/learn.ml}{1356}) applies only the pairs new in each round.
+\code{pre} is at \locr{lib/learn/learn.ml}{1344}{1350}, \code{labels_of} at
+\loc{lib/learn/learn.ml}{1375}, \code{bad} at
+\loc{lib/learn/learn.ml}{1385}, \code{gfp} at
+\loc{lib/learn/learn.ml}{1414}, called from $\Uni$ at
+\loc{lib/learn/learn.ml}{1444}; the verdict is \code{Ldd.mem} of the start
+pair (\locr{lib/learn/learn.ml}{1555}{1560}). Each iteration starts with
+\code{reclaim ()}. Intermediate sets are released as soon as they are
+dead (\code{union_into}, \loc{lib/learn/learn.ml}{1337}); the meta
+cubes in \code{rels_tbl} and \code{uni} are not. Each iteration recomputes
+the whole of $\Bad(Z)$; nothing is incremental across iterations
+(40--47 iterations on CADP).
+
+\subsection{\texttt{Learn.check} and its report}\label{sec:sym-check}
+
+\begin{ocaml}
+val check : Environ.env -> Evd.evar_map -> ?width:int
+  -> ?strong:bool -> kind -> system -> system -> report
+val pr : ?strong:bool -> kind -> report -> Pp.t
+\end{ocaml}
+(\file{lib/learn/learn.mli}.)
+\code{kind} is \code{Bisim} or \code{Sim} (the first simulated by the
+second); \code{strong} (default \code{false}) selects the strong game
+(\cref{sec:sym-game}); it changes nothing before the game, so exploration,
+the report's counts and the reachable sets are the same in both modes.
+The tactics pass \code{~strong:true} for \code{sim}/\code{bisim} and
+\code{false} for \code{weak_sim}/\code{weak_bisim}. \code{check} starts
+Sylvan, builds the shared tables and interpreter context, explores $A$
+then $B$, builds $\Uni$, runs the game, and, with the log on
+(\code{proof_log}), repeats the last check with Sylvan's proof log open
+(\cref{sec:prooflog}). The \code{report}:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}l >{\raggedright\arraybackslash}X@{}}
+\toprule
+field & meaning \\
+\midrule
+\code{verdict} & start pair $\in Z^\ast$ \\
+\code{states} & $|\Reach_A|$, $|\Reach_B|$ (floats, from \code{count}) \\
+\code{pairs}, \code{nodes} & $|Z^\ast|$ and its node count \\
+\code{labels} & distinct labels, both systems \\
+\code{interpreted} & closed terms interpreted (shared context; counts
+  from an aborted \code{Too_wide} attempt are included) \\
+\code{projections}, \code{escapes} & per system \\
+\code{summands}, \code{width}, \code{rounds} & per system; \code{width} is
+  the vector length $w+1$ \\
+\code{iterations}, \code{seconds} & of the game; wall-clock of the whole
+  check \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Exceptions: \code{Unfollowable}; and, outside OCaml, Sylvan's
+\code{exit(1)} on a full table.
+
+\subsection{The \texttt{debug} output}\label{sec:sym-debug}
+
+Under \code{debug} $t$ for any of the four tactics, \code{prove} runs the
+same \code{Learn.check} and, before testing the
+verdict, prints \code{debug }$t$\code{: } followed by \code{Learn.pr
+~strong k r} (\locr{lib/learn/learn.ml}{1142}{1195}) as a notice
+(\file{src/user_tactics.ml}). The tactic then proceeds exactly as
+without \code{debug}. There is no ``not run'' case any more: an exception
+from the engine is the tactic's error. The format:
+\begin{shell}
+debug weak_bisim: symbolic (learned per summand, Sylvan): weakly bisimilar.
+  reachable states: <a> and <b>; pairs in the relation: <n> (<k> nodes); labels: <l>
+  summands: <sa> and <sb>; projections learned: <pa> and <pb> (escaped: <ea> and <eb>); steps interpreted: <i>
+  vector widths <wa> and <wb>; exploration rounds: <ra> and <rb>; game iterations: <g>; <t>s
+\end{shell}
+The word is ``strongly'' under \code{~strong:true}
+(\loc{lib/learn/learn.ml}{1143}); the verdict reads ``NOT \ldots\
+bisimilar'', ``\ldots\ simulated'' or ``NOT \ldots\ simulated'' otherwise
+. The goal checks of \code{prove}
+(closed terms, LTS-shaped inductives) run first, so the engine never sees
+an open goal.
+
+\subsection{Limits}\label{sec:sym-limits}
+
+\begin{itemize}
+\item A closed premise's steps are interpreted from its LTS's rules to a
+  depth of 64; a step the interpreter cannot follow (a rule whose source
+  is not a pattern it can match, or a premise stepping from its own source
+  without end) is an error, \code{Learn.Unfollowable}.
+\item An LTS must be an inductive \code{M -> option A -> M -> Prop} without
+  parameters.
+\end{itemize}
+
+\endgroup

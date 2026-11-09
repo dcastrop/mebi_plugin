@@ -138,8 +138,8 @@ Definition set_swap (b:bool) (v:local_vars) : local_vars :=
 (**** Value **************************************************************)
 (*************************************************************************)
 
-(* FIXME: David mentioned to use [Set] instead of [Type] here,
-but it returned [Universal inconsistency, cannot enforce pid.u0<=Set] *)
+(* FIXME: [Set] instead of [Type] here was suggested, but it gives
+   [Universal inconsistency, cannot enforce pid.u0<=Set] *)
 Inductive value : Type (*Set*) :=
 | NIL : value
 | NAT : nat -> value

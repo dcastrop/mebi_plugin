@@ -2,6 +2,9 @@
 open Ltac_plugin
 open Tacarg
 
+(* [lconstr], a term up to the end of the command *)
+open Extraargs
+
 (* This one is necessary, to avoid message about missing wit_string *)
 open Stdarg
 
@@ -10,18 +13,17 @@ open Stdarg
 let () = Rocq_output.install ()
 
 (* Said once, when Rocq loads the plugin ([Require Import MEBI.loader]): where
-   the commands are listed, and how to hide the routine messages. A [Notice],
+   the commands are listed, and how to see the routine messages. A [Notice],
    so it is shown by default. *)
 let () =
   Logger.notice
-    "(MeBi loaded. [MeBi Help.] lists the commands; [MeBi Config Output \"Info\" \
-     False.] hides routine messages.)"
+    "(MeBi loaded. [MeBi Help.] lists the commands; [Set Debug \"mebi-info\".] \
+     shows routine progress messages.)"
 }
 
 DECLARE PLUGIN "rocq-mebi.mebi"
 
-(* S2 (doc/s2-linearisation.md): the rules read from an LTS's
-   constructors, for debugging. *)
+(* the rules the engine reads from an LTS's constructors, for debugging *)
 VERNAC COMMAND EXTEND MeBi_Print_Rules CLASSIFIED AS QUERY
 | [ "Print" "MeBi" "Rules" reference(r) ] ->
   { let env = Global.env () in
@@ -34,377 +36,108 @@ VERNAC COMMAND EXTEND MeBi_Print_Rules CLASSIFIED AS QUERY
          CErrors.user_err
            Pp.(Printer.pr_global (Names.GlobRef.IndRef i)
                ++ str " is not an LTS: an inductive [M -> option A -> M -> Prop] without parameters.")
-       | exception Rules.Not_decidable (c, ctx, p) ->
-         CErrors.user_err
-           Pp.(str "In " ++ Names.Id.print c ++ str ", the premise "
-               ++ Printer.pr_constr_env (Environ.push_rel_context ctx env) sigma p
-               ++ str " is neither a step of an LTS nor a proposition with a [Decidable] instance (Stdlib.Classes.DecidableClass).")
        | exception Rules.Decidable_not_loaded ->
          CErrors.user_err
            (Pp.str "Stdlib's Decidable class is not loaded: [Require MEBI.loader.] loads it."))
     | _ -> CErrors.user_err Pp.(Libnames.pr_qualid r ++ str " is not an inductive.") }
 END
 
-(* [bisim] and [sim]: a [weak_bisimilar] or [weak_sim] goal proved with no
-   setup, its LTSs, terms, [Using] list and silent label read from the goal
-   ([User_tactics]); limits come from [Set MeBi ...] options. *)
+(* doc/skeleton.md: a start term's skeleton,
+   positions and summands, for debugging. *)
+VERNAC COMMAND EXTEND MeBi_Print_Skeleton CLASSIFIED AS QUERY
+| [ "Print" "MeBi" "Skeleton" constr(t) "Using" reference(r) ] ->
+  { let env = Global.env () in
+    let sigma = Evd.from_env env in
+    match Nametab.global r with
+    | Names.GlobRef.IndRef ind ->
+      let v, _ = Constrintern.interp_constr env sigma t in
+      (match Skeleton.build env sigma ind (EConstr.to_constr sigma v) with
+       | s -> Feedback.msg_notice (Skeleton.pr env sigma s)
+       | exception Rules.Not_an_lts i ->
+         CErrors.user_err
+           Pp.(Printer.pr_global (Names.GlobRef.IndRef i)
+               ++ str " is not an LTS: an inductive [M -> option A -> M -> Prop] without parameters.")
+       | exception Rules.Decidable_not_loaded ->
+         CErrors.user_err (Pp.str "Stdlib's Decidable class is not loaded."))
+    | _ -> CErrors.user_err Pp.(Libnames.pr_qualid r ++ str " is not an inductive.") }
+END
+
+(* doc/certificate.md, A: the records of a proof log (a file
+   [Set MeBi Log Mode "keep"] left) as facts, each chunk its own constant,
+   checked when declared. *)
+VERNAC COMMAND EXTEND MeBi_Check_Log CLASSIFIED AS SIDEFF
+| [ "MeBi" "Check" "Log" string(file) ] -> { User_tactics.check_log file }
+END
+
+(* Structural congruence by hand (doc/upto.md): the silent rules of an
+   LTS to take as its structural congruence, instead of the reorderings
+   found in its rules ([Print MeBi Skeleton] shows which); for proofs up
+   to congruence (doc/optimisations.md, 5). *)
+VERNAC COMMAND EXTEND MeBi_Congruence CLASSIFIED AS SIDEFF
+| [ "MeBi" "Congruence" reference(r) ne_ident_list(ids) ] ->
+  { match Nametab.global r with
+    | Names.GlobRef.IndRef ind ->
+      let env = Global.env () in
+      let _, mip = Inductive.lookup_mind_specif env ind in
+      let cons = Array.to_list mip.Declarations.mind_consnames in
+      List.iter
+        (fun id ->
+          if Bool.not (List.exists (Names.Id.equal id) cons)
+          then
+            CErrors.user_err
+              Pp.(str "MeBi Congruence: " ++ Names.Id.print id
+                  ++ str " is not a rule of " ++ Libnames.pr_qualid r ++ str "."))
+        ids;
+      Skeleton.set_congruence ind ids;
+      Feedback.msg_notice
+        Pp.(str "MeBi Congruence: " ++ Libnames.pr_qualid r ++ str ": "
+            ++ prlist_with_sep pr_comma Names.Id.print ids ++ str ".")
+    | _ ->
+      CErrors.user_err
+        Pp.(Libnames.pr_qualid r ++ str " is not an inductive.") }
+END
+
+(* [sim], [bisim]: a [strong_sim] or [strong_bisimilar] goal; [weak_sim],
+   [weak_bisim]: a [weak_sim] or [weak_bisimilar] goal. Decided by the
+   engine on Sylvan's diagrams, the certificate logged by Sylvan
+   ([User_tactics], doc/certificate.md). [debug] first: the engine's report
+   is printed too. *)
 TACTIC EXTEND MeBi_bisim
-| [ "bisim" nat_or_var_opt(n) ] ->
-  { User_tactics.prove ?steps:n User_tactics.Bisim }
+| [ "bisim" ] -> { User_tactics.prove ~weak:false User_tactics.Bisim }
+| [ "debug" "bisim" ] ->
+  { User_tactics.prove ~debug:true ~weak:false User_tactics.Bisim }
 END
 
 TACTIC EXTEND MeBi_sim
-| [ "sim" nat_or_var_opt(n) ] ->
-  { User_tactics.prove ?steps:n User_tactics.Sim }
+| [ "sim" ] -> { User_tactics.prove ~weak:false User_tactics.Sim }
+| [ "debug" "sim" ] ->
+  { User_tactics.prove ~debug:true ~weak:false User_tactics.Sim }
 END
 
-(* as [debug auto]: the same, and on stopping without a proof, the search's
-   open goals are printed *)
-TACTIC EXTEND MeBi_debug_bisim
-| [ "debug" "bisim" nat_or_var_opt(n) ] ->
-  { User_tactics.prove ?steps:n ~debug:true User_tactics.Bisim }
+TACTIC EXTEND MeBi_weak_bisim
+| [ "weak_bisim" ] -> { User_tactics.prove ~weak:true User_tactics.Bisim }
+| [ "debug" "weak_bisim" ] ->
+  { User_tactics.prove ~debug:true ~weak:true User_tactics.Bisim }
 END
 
-TACTIC EXTEND MeBi_debug_sim
-| [ "debug" "sim" nat_or_var_opt(n) ] ->
-  { User_tactics.prove ?steps:n ~debug:true User_tactics.Sim }
-END
-
-(* Weak similarity: is <x> weakly simulated by <y>? ([Wrapper.similarity]:
-   only pairs reachable from the two start states, and on demand within
-   [Set MeBi MaxGame].) *)
-VERNAC COMMAND EXTEND MeBi_Run_Sim CLASSIFIED AS QUERY
-| ["MeBi" "Run"
-   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] ->
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run [] (W.Command.CheckSim {a=(x, a); b=(y, b)})
-            |> W.M.run ~reset_encoding:true
-    in
-    Logger.info "(Finished Checking Similarity.)";
-    ()
-  }
-| ["MeBi" "Run"
-   "Sim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)
-   "Using" reference_list(rs)] ->
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run rs (W.Command.CheckSim {a=(x, a); b=(y, b)})
-            |> W.M.run ~reset_encoding:true
-    in
-    Logger.info "(Finished Checking Similarity.)";
-    ()
-  }
-END
-
-(* Bisimilarity *)
-VERNAC COMMAND EXTEND MeBi_Run_Bisim CLASSIFIED AS QUERY
-| ["MeBi" "Run" 
-   "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run [] (W.Command.RunBisim {a=(x, a); b=(y, b)}) 
-            |> W.M.run ~reset_encoding:true
-    in 
-    Logger.info "(Finished Checking Bisimilarity.)";
-    ()
-  }
-
-| ["MeBi" "Run" 
-   "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b) 
-   "Using" reference_list(rs)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run rs (W.Command.RunBisim {a=(x, a); b=(y, b)})
-            |> W.M.run ~reset_encoding:true
-    in 
-    Logger.info "(Finished Checking Bisimilarity.)";
-    ()
-  }
-END 
-
-
-(* Merge *)
-VERNAC COMMAND EXTEND MeBi_Run_Merge CLASSIFIED AS QUERY
-| ["MeBi" "Run" 
-   "Merge" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run [] (W.Command.Merge {a=(x, a); b=(y, b)})
-            |> W.M.run ~reset_encoding:true
-    in 
-    Logger.info "(Finished Merging FSMs.)";
-    ()
-  }
-
-| ["MeBi" "Run" 
-   "Merge" constr(x) "With" reference(a) "And" constr(y) "With" reference(b) 
-   "Using" reference_list(rs)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run rs (W.Command.Merge {a=(x, a); b=(y, b)})
-            |> W.M.run ~reset_encoding:true
-    in 
-    Logger.info "(Finished Merging FSMs.)";
-    ()
-  }
-END 
-
-(* Minimize *)
-VERNAC COMMAND EXTEND MeBi_Run_Minimize CLASSIFIED AS QUERY
-| ["MeBi" "Run" "Minimize" constr(x) "Using" reference(r)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run [] (W.Command.Minimize (x, r))
-            |> W.M.run ~reset_encoding:true
-    in 
-    Logger.info "(Finished Minimizing FSM.)";
-    ()
-  }
-  
-| ["MeBi" "Run" "Minimize" constr(x) "Using" reference(r) reference_list(rs)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run rs (W.Command.Minimize (x, r))
-            |> W.M.run ~reset_encoding:true 
-    in 
-    Logger.info "(Finished Minimizing FSM.)";
-    ()
-  }
-END 
-
-(* Saturate *)
-VERNAC COMMAND EXTEND MeBi_Run_Saturate CLASSIFIED AS QUERY
-| ["MeBi" "Run" "Saturate" constr(x) "Using" reference(r)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run [] (W.Command.Saturate (x, r))
-          |> W.M.run ~reset_encoding:true
-    in 
-    Logger.info "(Finished Saturating FSM.)";
-    ()
-  }
-  
-| ["MeBi" "Run" "Saturate" constr(x) "Using" reference(r) reference_list(rs)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run rs (W.Command.Saturate (x, r))
-            |> W.M.run ~reset_encoding:true 
-    in 
-    Logger.info "(Finished Saturating FSM.)";
-    ()
-  }
-END 
-
-(* FSM *)
-VERNAC COMMAND EXTEND MeBi_Run_FSM CLASSIFIED AS QUERY
-| ["MeBi" "Run" "FSM" constr(x) "Using" reference(r)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run [] (W.Command.MakeFSM (x, r))
-            |> W.M.run ~reset_encoding:true
-    in 
-    Logger.info "(Finished Making FSM.)";
-    ()
-  }
-  
-| ["MeBi" "Run" "FSM" constr(x) "Using" reference(r) reference_list(rs)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run rs (W.Command.MakeFSM (x, r))
-            |> W.M.run ~reset_encoding:true 
-    in 
-    Logger.info "(Finished Making FSM.)";
-    ()
-  }
-END 
-
-(* LTS *)
-VERNAC COMMAND EXTEND MeBi_Run_LTS CLASSIFIED AS QUERY
-| ["MeBi" "Run" "LTS" constr(x) "Using" reference(r)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run [] (W.Command.MakeLTS (x, r))
-            |> W.M.run ~reset_encoding:true 
-    in 
-    Logger.info "(Finished Making LTS.)";
-    ()
-  }
-  
-| ["MeBi" "Run" "LTS" constr(x) "Using" reference(r) reference_list(rs)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run rs (W.Command.MakeLTS (x, r))
-            |> W.M.run ~reset_encoding:true
-    in 
-    Logger.info "(Finished Making LTS.)";
-    ()
-  }
-END 
-
-(* Benchmark LTS *)
-VERNAC COMMAND EXTEND MeBi_Benchmark_LTS CLASSIFIED AS QUERY
-| ["MeBi" "Benchmark" "LTS" int(i) int(j) constr(x) "Using" reference(r)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run [] (W.Command.BenchmarkGraph ((x, r), (i, j)))
-            |> W.M.run ~reset_encoding:true 
-    in 
-    Logger.info "(Finished Benchmarking LTS.)";
-    ()
-  }
-  
-| ["MeBi" "Benchmark" "LTS" int(i) int(j) constr(x) "Using" reference(r) reference_list(rs)] -> 
-  {
-    let module W : Wrapper.S = (val Wrapper.get ()) in
-    let _ = W.Command.run rs (W.Command.BenchmarkGraph ((x, r), (i, j)))
-            |> W.M.run ~reset_encoding:true
-    in 
-    Logger.info "(Finished Benchmarking LTS.)";
-    ()
-  }
-END 
-
-VERNAC COMMAND EXTEND MeBi_Config_Reset CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Reset"]          -> { Api.reset_all            () }
-| ["MeBi" "Config" "Reset" "Bounds"] -> { Api.reset_bounds_args    () }
-| ["MeBi" "Config" "Reset" "Weak"]   -> { Api.reset_weak_args      () }
-| ["MeBi" "Config" "Reset" "FailIf"] -> { Api.reset_the_fail_flags () }
-| ["MeBi" "Config" "Reset" "Output"] -> { Api.reset_output_config  () }
-END
-
-(* Config -- graph bounds *)
-(* The bounds are Rocq options ([Set MeBi MaxStates <n>.], ...; see
-   [Api]); only the premise tactic, which an option cannot hold, is set
-   here. *)
-VERNAC COMMAND EXTEND MeBi_Config_Premise CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Premise" "Tactic" tactic(t)] -> 
-  { Api.set_premise_tactic (Tacinterp.interp t) }
-| ["MeBi" "Config" "Reset" "Premise"] -> 
-  { Api.reset_premise () }
-END
-
-(* Config -- weak_args for both *)
-VERNAC COMMAND EXTEND MeBi_Config_Weak_Both CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Weak" "As" "Option" constr(x)] -> 
-  { Api.set_the_weak_args (Some (Api.Option x)) None }
-| ["MeBi" "Config" "Weak" "As" constr(x) "Of" reference(y)] -> 
-  { Api.set_the_weak_args (Some (Api.Custom (x,y))) None }
-END
-
-(* Config -- weak_args for first *)
-VERNAC COMMAND EXTEND MeBi_Config_Weak_First CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Weak1" "As" "Option" constr(x)] -> 
-  { Api.set_the_weak_arg1 (Api.Option x) }
-| ["MeBi" "Config" "Weak1" "As" constr(x) "Of" reference(y)] -> 
-  { Api.set_the_weak_arg1 (Api.Custom (x,y)) }
-END
-
-(* Config -- weak_args for second *)
-VERNAC COMMAND EXTEND MeBi_Config_Weak_Second CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Weak2" "As" "Option" constr(x)] -> 
-  { Api.set_the_weak_arg2 (Api.Option x) }
-| ["MeBi" "Config" "Weak2" "As" constr(x) "Of" reference(y)] -> 
-  { Api.set_the_weak_arg2 (Api.Custom (x,y)) }
-END
-
-(* Config -- fail-if empty flag *)
-VERNAC COMMAND EXTEND MeBi_Config_FailIf_Empty CLASSIFIED AS QUERY
-| ["MeBi" "Config" "FailIf" "Empty" "True"] -> 
-  { Api.set_fail_flag_empty true }
-| ["MeBi" "Config" "FailIf" "Empty" "False"] -> 
-  { Api.set_fail_flag_empty false }
-END
-
-(* Config -- fail-if incomplete flag *)
-VERNAC COMMAND EXTEND MeBi_Config_FailIf_Incomplete CLASSIFIED AS QUERY
-| ["MeBi" "Config" "FailIf" "Incomplete" "True"] -> 
-  { Api.set_fail_flag_incomplete true }
-| ["MeBi" "Config" "FailIf" "Incomplete" "False"] -> 
-  { Api.set_fail_flag_incomplete false }
-END
-
-(* Config -- fail-if not-bisimilar flag *)
-VERNAC COMMAND EXTEND MeBi_Config_FailIf_NotBisimilar CLASSIFIED AS QUERY
-| ["MeBi" "Config" "FailIf" "NotBisimilar" "True"] -> 
-  { Api.set_fail_flag_non_bisimilar true }
-| ["MeBi" "Config" "FailIf" "NotBisimilar" "False"] -> 
-  { Api.set_fail_flag_non_bisimilar false }
-END
-
-(* Config -- fail-if oversaturated flag *)
-VERNAC COMMAND EXTEND MeBi_Config_FailIf_Oversaturated CLASSIFIED AS QUERY
-| ["MeBi" "Config" "FailIf" "Oversaturated" "True"] -> 
-  { Api.set_fail_flag_oversaturated true }
-| ["MeBi" "Config" "FailIf" "Oversaturated" "False"] -> 
-  { Api.set_fail_flag_oversaturated false }
-END
-
-(* Config -- saturation: whole, or on demand (notes/13) *)
-VERNAC COMMAND EXTEND MeBi_Config_Saturation_OnDemand CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Saturation" "OnDemand" "True"] ->
-  { Api.set_saturation_mode Api.Saturation_on_demand }
-| ["MeBi" "Config" "Saturation" "OnDemand" "False"] ->
-  { Api.set_saturation_mode Api.Saturation_whole }
-| ["MeBi" "Config" "Saturation" "OnDemand" "Auto"] ->
-  { Api.set_saturation_mode Api.Saturation_auto }
-END
-
-(* Config -- solver strategy *)
-VERNAC COMMAND EXTEND MeBi_Config_Solver_MutualCofix CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Solver" "MutualCofix" "True"] ->
-  { Api.set_solver_strategy Api.Mutual }
-| ["MeBi" "Config" "Solver" "MutualCofix" "False"] ->
-  { Api.set_solver_strategy Api.Nested }
-| ["MeBi" "Config" "Solver" "MutualCofix" "Auto"] ->
-  { Api.set_solver_strategy Api.Auto }
-END
-
-VERNAC COMMAND EXTEND MeBi_Config_Solver_Answers CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Solver" "Answers" "Default"] ->
-  { Api.set_answer_policy Api.Answers_default }
-| ["MeBi" "Config" "Solver" "Answers" "Greedy"] ->
-  { Api.set_answer_policy Api.Answers_greedy }
-| ["MeBi" "Config" "Solver" "Answers" "Minimal"] ->
-  { Api.set_answer_policy Api.Answers_minimal }
-| ["MeBi" "Config" "Solver" "Answers" "Auto"] ->
-  { Api.set_answer_policy Api.Answers_auto }
-END
-
-(* Config -- output *)
-VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Output" string(x) "True"] -> 
-  { Api.set_output true x }
-| ["MeBi" "Config" "Output" string(x) "False"] -> 
-  { Api.set_output false x }
-| ["MeBi" "Config" "Output" "Format" "Text"] ->
-  { Api.set_output_format Api.Text }
-| ["MeBi" "Config" "Output" "Format" "JSON"] ->
-  { Api.set_output_format Api.Json }
+TACTIC EXTEND MeBi_weak_sim
+| [ "weak_sim" ] -> { User_tactics.prove ~weak:true User_tactics.Sim }
+| [ "debug" "weak_sim" ] ->
+  { User_tactics.prove ~debug:true ~weak:true User_tactics.Sim }
 END
 
 (* Help -- topics and text in [src/help.ml] *)
 VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
 | ["MeBi" "Help"] -> { Help.show [] }
-| ["MeBi" "Help" "Run"] -> { Help.show [ "Run" ] }
+| ["MeBi" "Help" "Debug"] -> { Help.show [ "Debug" ] }
 | ["MeBi" "Help" "Sim"] -> { Help.show [ "Sim" ] }
-| ["MeBi" "Help" "Benchmark"] -> { Help.show [ "Benchmark" ] }
-| ["MeBi" "Help" "Premises"] -> { Help.show [ "Premises" ] }
-| ["MeBi" "Help" "Config"] -> { Help.show [ "Config" ] }
-| ["MeBi" "Help" "Config" "Bounds"] -> { Help.show [ "Config"; "Bounds" ] }
-| ["MeBi" "Help" "Config" "Bounds" "Saturation"] ->
-  { Help.show [ "Config"; "Bounds"; "Saturation" ] }
-| ["MeBi" "Help" "Config" "Saturation"] -> { Help.show [ "Config"; "Saturation" ] }
-| ["MeBi" "Help" "Config" "Weak"] -> { Help.show [ "Config"; "Weak" ] }
-| ["MeBi" "Help" "Config" "FailIf"] -> { Help.show [ "Config"; "FailIf" ] }
-| ["MeBi" "Help" "Config" "Solver"] -> { Help.show [ "Config"; "Solver" ] }
-| ["MeBi" "Help" "Config" "Output"] -> { Help.show [ "Config"; "Output" ] }
+| ["MeBi" "Help" "Output"] -> { Help.show [ "Output" ] }
 END
 
 VERNAC COMMAND EXTEND MeBi_Divider CLASSIFIED AS QUERY
 (* for outputting messages -- useful for sifting through compiler output *)
 | ["MeBi" "Message" string(x)] -> {Feedback.msg_info (Pp.str x)}
-| ["MeBi" "Debug"   string(x)] -> {Feedback.msg_debug  (Pp.str x)}
+| ["MeBi" "Debug"   string(x)] -> { Logger.debug x }
 | ["MeBi" "Divider"          ] -> {Feedback.msg_info (Pp.str "\n- - - - - - - - - - - - - - - -")}
 | ["MeBi" "Divider" string(x)] -> {Feedback.msg_info (Pp.str (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s" x))}
 END 

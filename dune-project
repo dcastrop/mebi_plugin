@@ -21,10 +21,7 @@
 
 (maintainers "David Castro-Perez")
 
-; Two licences, by directory: see LICENSE. The plugin is GPL-3.0-or-later,
-; the Rocq library (theories/ but for loader.v and the tests) and examples/
-; are LGPL-2.1-or-later.
-(license "GPL-3.0-or-later AND LGPL-2.1-or-later")
+(license "GPL-3.0-or-later")
 
 ; (documentation https://url/to/documentation)
 
@@ -34,7 +31,7 @@
  (name rocq-mebi)
  (synopsis "Automating bisimilarity proofs in Rocq")
  (description
-  "MeBi (Mechanised Bisimilarities) builds labelled transition systems and finite state machines from Rocq inductive relations, checks (weak) bisimilarity between them, and drives interactive tactic-based proof search for bisimilarity goals, following the methods in Sangiorgi and Rutten's \"Advanced Topics in Bisimulation and Coinduction\", Section 3.2.2.")
+  "MeBi (Mechanised Bisimilarities) proves strong and weak simulation and bisimilarity goals between labelled transition systems given as Rocq inductive relations. It decides each goal symbolically, on decision diagrams (Sylvan), and closes it with a certificate that a Gallina checker, proved sound once, checks by computation.")
  ; Bounds matter here: the plugin links against rocq-runtime's OCaml API, which
  ; breaks across Rocq *minor* versions. Exact versions are pinned separately in
  ; rocq-mebi.opam.locked; these are the ranges the source is known to compile in.
@@ -49,13 +46,8 @@
   ; theories/dune declares (theories Stdlib) and the .v files `From Stdlib Require`
   (rocq-stdlib
    (>= 9.1))
-  ; 3.x exposes Yojson.t; 2.x requires Yojson.Safe.t
-  (yojson
-   (>= 3.0))
-  (benchmark
-   (>= 1.6))
   ; Preprocesses the modules whose code differs by Rocq version: the
-  ; (preprocess ...) in lib/rocq_tools/dune and src/dune.
+  ; (preprocess ...) in lib/rocq_tools/dune and lib/reify/dune.
   (cppo
    (and
     :build
@@ -73,6 +65,9 @@
     :with-dev-setup
     (= 0.29.0)))
   (vsrocq-language-server :with-dev-setup))
+ ; Optional: Rocq built with its native compiler (no proof needs it).
+ ; rocq-native.2 goes with Rocq 9.2, rocq-native.3 with 9.3.
+ (depopts rocq-native)
  (tags
   (bisimulation coinduction "process algebra" "proof automation" rocq)))
 
