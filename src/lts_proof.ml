@@ -342,7 +342,7 @@ let env_for st (text : string) : Environ.env =
       (Hashtbl.fold (fun _ (i, d) acc -> (i, d) :: acc) found [])
   in
   List.fold_left
-    (fun env (_, d) -> Environ.push_named Environ.ProofVar d env)
+    (fun env (_, d) -> Rocq_utils.push_var d env)
     (Global.env ())
     ds
 ;;
@@ -621,7 +621,7 @@ let push_def st ?(opaque = false) n body ty =
     then Context.Named.Declaration.LocalAssum (annot n, ty)
     else Context.Named.Declaration.LocalDef (annot n, body, ty)
   in
-  st.env <- Environ.push_named Environ.ProofVar d st.env;
+  st.env <- Rocq_utils.push_var d st.env;
   record st n d (if opaque then [ ty ] else [ body; ty ]);
   declare st (n, body, ty, opaque)
 ;;
@@ -644,7 +644,7 @@ let fdef st ?opaque base body ty =
 let assume st base ty =
   let n = fresh st base in
   let d = Context.Named.Declaration.LocalAssum (annot n, ty) in
-  st.env <- Environ.push_named Environ.ProofVar d st.env;
+  st.env <- Rocq_utils.push_var d st.env;
   record st n d [ ty ];
   st.assumed <- (n, ty) :: st.assumed;
   Hashtbl.replace
@@ -673,7 +673,7 @@ let report text e =
 
 (* the sort variables elaboration left, settled (each to the least sort) *)
 let settle (sigma : Evd.evar_map) (c : EConstr.t) : Constr.t =
-  let sigma = Evd.collapse_sort_variables ~only_above_prop:false sigma in
+  let sigma = Rocq_utils.collapse_sorts sigma in
   let sigma = Evd.minimize_universes sigma in
   univs := Univ.ContextSet.union !univs (Evd.universe_context_set sigma);
   if Evarutil.has_undefined_evars sigma c

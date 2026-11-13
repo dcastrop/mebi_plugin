@@ -31,3 +31,21 @@ let is_prop (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t) : bool =
   with
   | _ -> false
 ;;
+
+(* See the [.mli]. *)
+let push_var (d : Constr.named_declaration) (env : Environ.env) : Environ.env =
+#if ROCQ_VERSION >= (9, 3, 0)
+  Environ.push_named Environ.ProofVar d env
+#else
+  Environ.push_named d env
+#endif
+;;
+
+(* See the [.mli]. *)
+let collapse_sorts (sigma : Evd.evar_map) : Evd.evar_map =
+#if ROCQ_VERSION >= (9, 3, 0)
+  Evd.collapse_sort_variables ~only_above_prop:false sigma
+#else
+  Evd.collapse_sort_variables sigma
+#endif
+;;

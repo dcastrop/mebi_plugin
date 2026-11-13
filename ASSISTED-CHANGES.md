@@ -568,4 +568,15 @@ Docs 1.
   left the examples' compiled files stale, and the bench failed on
   "inconsistent assumptions" until a full build.
 
-**Session tally:** New feature 5 · Docs 2.
+- **Bug fix (CI, Rocq 9.2):** CI builds with Rocq 9.2.0 (the lock), and
+  only 9.3 had been built here: `Environ.push_named` takes a variable's
+  kind in 9.3 only, and `Evd.collapse_sort_variables` its
+  `~only_above_prop` flag in 9.3 only (`src/lts_proof.ml`). Both now go
+  through `Rocq_utils.push_var` and `Rocq_utils.collapse_sorts`, under
+  cppo. Every Rocq function the plugin calls was then compared between
+  9.2.0's interfaces (fetched from its tag) and 9.3's: no other
+  difference that a call depends on (`Evd.from_env` and
+  `Evd.minimize_universes` differ only in optional arguments not given).
+  Still not compiled with 9.2 here: CI is the check.
+
+**Session tally:** New feature 5 · Bug fix 1 · Docs 2.
