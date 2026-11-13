@@ -123,7 +123,42 @@ let inv_keys : (int * int * int) list ref = ref []
 let move_entries : b list ref = ref []
 let inv_entries_out : b list ref = ref []
 
+(* up to reordering (doc/upto.md, route B): the normalisation relations
+   backwards, of the vector's first part (label -1) and its second (-2),
+   from every direction's closures, in order: the same for both
+   directions *)
+let norm_keys (plan : P.t) : (int * int * int) list * (int * int * int) list =
+  let l = ref []
+  and r = ref [] in
+  let add (x : P.prel) =
+    let k = x.P.label, x.P.meta, x.P.rel in
+    if x.P.label = -1 && Bool.not (List.mem k !l) then l := !l @ [ k ];
+    if x.P.label = -2 && Bool.not (List.mem k !r) then r := !r @ [ k ]
+  in
+  let of_closure (cl : P.pclosure) =
+    List.iter (fun (rd : P.pround) -> List.iter add rd.P.p.P.rels) cl.P.rounds
+  in
+  List.iter
+    (fun (d : P.pdir) ->
+      of_closure d.P.tzc;
+      List.iter
+        (fun (pl : P.plabel) ->
+          match pl.P.okfrom with
+          | Some (pi, cl) ->
+            List.iter add pi.P.rels;
+            of_closure cl
+          | None -> ())
+        d.P.plabels)
+    plan.P.dirs;
+  !l, !r
+;;
+
+(* the normalisation lists' entries, for the last direction *)
+let nsl_entries_out : b list ref = ref []
+let nsr_entries_out : b list ref = ref []
+
 let direction
+      ?(upto = false)
       (rq : reqs)
       (t : terms)
       ~(strong : bool)
@@ -133,6 +168,14 @@ let direction
       (d : P.pdir)
   : b * b * b
   =
+  let label_term l =
+    if l < 0
+    then (
+      match tau with
+      | Some t -> label_term t
+      | None -> failf "game: a normalisation with no silent label")
+    else label_term l
+  in
   let node x = ask rq (Dd_cert.Node x) in
   let z = plan.P.z in
   let kz = node z
@@ -140,7 +183,8 @@ let direction
   (* the answerer's relations backwards, each once, in order *)
   let invs = ref [] in
   let add_inv (r : P.prel) =
-    if Bool.not (List.mem (r.P.label, r.P.meta, r.P.rel) !invs)
+    if
+      r.P.label >= 0 && Bool.not (List.mem (r.P.label, r.P.meta, r.P.rel) !invs)
     then invs := !invs @ [ r.P.label, r.P.meta, r.P.rel ]
   in
   let rels_of_closure (cl : P.pclosure) =
@@ -164,6 +208,41 @@ let direction
   in
   let inv_entries = List.map entry_of !invs in
   let inv_list get = list_of t (List.map (fun e -> e get) inv_entries) in
+  let nkl, nkr = if upto then norm_keys plan else [], [] in
+  let nsl_entries = List.map entry_of nkl
+  and nsr_entries = List.map entry_of nkr in
+  let nsl get = list_of t (List.map (fun e -> e get) nsl_entries)
+  and nsr get = list_of t (List.map (fun e -> e get) nsr_entries) in
+  let in_keys keys entries (r : P.prel) get =
+    let rec find i = function
+      | [] -> failf "game: a normalisation relation not in its list"
+      | x :: rest ->
+        if x = (r.P.label, r.P.meta, r.P.rel) then i else find (i + 1) rest
+    in
+    in_proof t (List.map (fun e -> e get) entries) (find 0 keys)
+  in
+  (* the toolkit's lemma, and its arguments before its own: up to
+     reordering, the normalisation lists after the answerer's *)
+  let lem name get =
+    if upto
+    then (
+      let nname =
+        match name with
+        | "all_reach_self" -> "all_reachN_self"
+        | "movew_tau" -> "movewN_tau"
+        | "movew_l" -> "movewN_l"
+        | "OkL" -> "OkLN"
+        | "all_back_okl" -> "all_back_oklN"
+        | "MoveW" -> "MoveWN"
+        | x -> failf "game: no up-to version of %s" x
+      in
+      c ("mebi.du." ^ nname), [| t.a_ty; inv_list get; nsl get; nsr get |])
+    else c ("mebi.dg." ^ name), [| t.a_ty; inv_list get |]
+  in
+  let lapp name get args =
+    let f, pre = lem name get in
+    app f (Array.append pre args)
+  in
   let inv_index (r : P.prel) =
     let rec find i = function
       | [] -> failf "game: a relation not among the answerer's"
@@ -271,9 +350,47 @@ let direction
   let inv get = inv_list get in
   let zt get = get kz in
   let reach_z get =
-    app
-      (c "mebi.dg.Reach")
-      [| t.a_ty; inv get; app (c "mebi.dg.InZ") [| zt get |] |]
+    if upto
+    then
+      app
+        (c "mebi.du.ReachN")
+        [| t.a_ty
+         ; inv get
+         ; nsl get
+         ; nsr get
+         ; app (c "mebi.dg.InZ") [| zt get |]
+        |]
+    else
+      app
+        (c "mebi.dg.Reach")
+        [| t.a_ty; inv get; app (c "mebi.dg.InZ") [| zt get |] |]
+  in
+  (* a closure's lemma for relation [r]: the answerer's, or a
+     normalisation of either part *)
+  let back_lem (r : P.prel) (base : string) get =
+    if r.P.label = -1
+    then
+      ( c ("mebi.du." ^ base ^ "N_nl")
+      , [| t.a_ty; inv get; nsl get; nsr get |]
+      , in_keys nkl nsl_entries r get )
+    else if r.P.label = -2
+    then
+      ( c ("mebi.du." ^ base ^ "N_nr")
+      , [| t.a_ty; inv get; nsl get; nsr get |]
+      , in_keys nkr nsr_entries r get )
+    else (
+      let f, pre =
+        if upto
+        then
+          ( c
+              ("mebi.du." ^ base ^ if base = "all_back_okl" then "N_tau" else "N"
+              )
+          , [| t.a_ty; inv get; nsl get; nsr get |] )
+        else
+          ( c ("mebi.dg." ^ base ^ if base = "all_back_okl" then "_tau" else "")
+          , [| t.a_ty; inv get |] )
+      in
+      f, pre, in_inv r get)
   in
   (* a sound image backwards: its fact *)
   let posts (r : P.prel) src img =
@@ -288,8 +405,7 @@ let direction
       closure
         d.P.tzc
         reach_z
-        (fun get ->
-          app (c "mebi.dg.all_reach_self") [| t.a_ty; inv get; zt get |])
+        (fun get -> lapp "all_reach_self" get [| zt get |])
         (fun r src img fresh_all ->
           let ps = posts r src img in
           let ncs = cs_of r
@@ -297,19 +413,20 @@ let direction
           and nsrc = nd src
           and nimg = nd img in
           fun get ->
+            let f, pre, inr = back_lem r "all_back_reach" get in
             app
-              (c "mebi.dg.all_back_reach")
-              [| t.a_ty
-               ; inv get
-               ; ncs get
-               ; nr get
-               ; nsrc get
-               ; nimg get
-               ; app (c "mebi.dg.InZ") [| zt get |]
-               ; in_inv r get
-               ; ps get
-               ; fresh_all get
-              |])
+              f
+              (Array.append
+                 pre
+                 [| ncs get
+                  ; nr get
+                  ; nsrc get
+                  ; nimg get
+                  ; app (c "mebi.dg.InZ") [| zt get |]
+                  ; inr
+                  ; ps get
+                  ; fresh_all get
+                 |]))
   in
   let tz = d.P.tzc.P.final in
   (* each label: the pairs that can answer it, then its moves *)
@@ -317,7 +434,7 @@ let direction
   List.iter
     (fun (pl : P.plabel) ->
       let lab = label_term pl.P.lab in
-      let okl get = app (c "mebi.dg.OkL") [| t.a_ty; inv get; zt get; lab |] in
+      let okl get = lapp "OkL" get [| zt get; lab |] in
       let oks get = app (c "mebi.dg.OkS") [| t.a_ty; inv get; zt get; lab |] in
       let ok_all : b =
         match pl.P.okfrom with
@@ -356,11 +473,10 @@ let direction
                 and ntz = nd tz
                 and nimg = nd img in
                 fun get ->
-                  app
-                    (c "mebi.dg.all_back_okl")
-                    [| t.a_ty
-                     ; inv get
-                     ; lab
+                  lapp
+                    "all_back_okl"
+                    get
+                    [| lab
                      ; ncs get
                      ; nr get
                      ; ntz get
@@ -378,20 +494,21 @@ let direction
               and nsrc = nd src
               and nimg = nd img in
               fun get ->
+                let f, pre, inr = back_lem r "all_back_okl" get in
                 app
-                  (c "mebi.dg.all_back_okl_tau")
-                  [| t.a_ty
-                   ; inv get
-                   ; lab
-                   ; ncs get
-                   ; nr get
-                   ; nsrc get
-                   ; nimg get
-                   ; zt get
-                   ; in_inv r get
-                   ; ps get
-                   ; fresh_all get
-                  |]))
+                  f
+                  (Array.append
+                     pre
+                     [| lab
+                      ; ncs get
+                      ; nr get
+                      ; nsrc get
+                      ; nimg get
+                      ; zt get
+                      ; inr
+                      ; ps get
+                      ; fresh_all get
+                     |])))
       in
       List.iter
         (fun (mv : P.pmove) ->
@@ -423,19 +540,14 @@ let direction
                 (c "mebi.dg.moves_of")
                 (Array.append [| t.a_ty; inv get; zt get; lab |] common)
             else if Some pl.P.lab = tau
-            then
-              app
-                (c "mebi.dg.movew_tau")
-                (Array.append [| t.a_ty; inv get; zt get |] common)
+            then lapp "movew_tau" get (Array.append [| zt get |] common)
             else (
               let arg =
                 match Constr.kind lab with
                 | Constr.App (_, args) when Array.length args = 2 -> args.(1)
                 | _ -> failf "game: a visible label that is not [Some _]"
               in
-              app
-                (c "mebi.dg.movew_l")
-                (Array.append [| t.a_ty; inv get; zt get; arg |] common))
+              lapp "movew_l" get (Array.append [| zt get; arg |] common))
           in
           moves := (e, proof) :: !moves)
         pl.P.moves)
@@ -452,12 +564,14 @@ let direction
   inv_keys := !invs;
   move_entries := List.map fst moves;
   inv_entries_out := inv_entries;
+  nsl_entries_out := nsl_entries;
+  nsr_entries_out := nsr_entries;
   let rel_list get = list_of t (List.map (fun (e, _) -> e get) moves) in
   let game get =
     let pred =
-      app
-        (c (if strong then "mebi.dg.MoveS" else "mebi.dg.MoveW"))
-        [| t.a_ty; inv get; zt get |]
+      if strong
+      then app (c "mebi.dg.MoveS") [| t.a_ty; inv get; zt get |]
+      else lapp "MoveW" get [| zt get |]
     in
     let rec forall = function
       | [] -> app (c "mebi.dg.Forall_nil") [| t.rel_ty; pred |]
@@ -472,9 +586,27 @@ let direction
            ; forall rest
           |]
     in
-    app
-      (c (if strong then "mebi.dg.vssim_of" else "mebi.dg.vwsim_of"))
-      [| t.a_ty; rel_list get; inv get; zt get; forall moves |]
+    if strong
+    then
+      app
+        (c "mebi.dg.vssim_of")
+        [| t.a_ty; rel_list get; inv get; zt get; forall moves |]
+    else if upto
+    then
+      app
+        (c "mebi.du.vwsimN_of")
+        [| t.a_ty
+         ; inv get
+         ; nsl get
+         ; nsr get
+         ; rel_list get
+         ; zt get
+         ; forall moves
+        |]
+    else
+      app
+        (c "mebi.dg.vwsim_of")
+        [| t.a_ty; rel_list get; inv get; zt get; forall moves |]
   in
   ignore a;
   rel_list, inv, game

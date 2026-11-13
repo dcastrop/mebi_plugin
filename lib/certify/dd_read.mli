@@ -38,6 +38,18 @@ type proof_ctx =
 type proof_reader =
   { feed : string -> unit
   ; finish : unit -> proof_ctx
+    (** the chunk in pieces: its nodes by height (each height a trie, a
+        node named by its number there, as [val] names a value), its facts
+        in segments of [seg] (each a trie of the statements later pieces
+        or the proof need, and [TAll] of it), each piece handed to
+        [declare] (name, body, type, opaque) once made, a piece naming
+        only pieces before it; then the requests, as closed terms over
+        the pieces' names ([lets] empty, [depth] 0) *)
+  ; finish_pieces :
+      declare:(string -> Constr.t -> Constr.types -> bool -> unit)
+      -> seg:int
+      -> unit
+      -> proof_ctx
   }
 
 (** [proof_reader env]: a reader for one proof's chunk *)

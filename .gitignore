@@ -72,11 +72,12 @@ doc/report/*.synctex.gz
 doc/report/main.pdf
 
 # the report's bibliography outputs (the report itself, doc/report/main.pdf,
-# is tracked: rebuild it with pdflatex main; bibtex main; pdflatex main;
-# pdflatex main, and commit it with the sources)
+# is ignored above: build it with pdflatex main; bibtex main; pdflatex main;
+# pdflatex main)
 doc/report/main.bbl
 doc/report/main.blg
 
 # the plugin's files for a file F.v, next to it: Sylvan's proof logs (Set
 # MeBi Log Mode; doc/certificate.md) and a proof's temporary files
 .*.v.mebi/
+__pycache__/

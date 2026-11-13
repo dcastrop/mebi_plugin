@@ -5,7 +5,7 @@
 ; closed by the proof built from it, checked by the kernel at Qed
 ; (doc/certificate.md). Only the files listed
 ; are built. The others, CADP/TwoProcesses.v, CADP/ThreeProcesses.v
-; (5 minutes, 6.6GB) and Proc/Test4/TermTests.v: bench/prooflog.py runs
+; (MeBi Prove, about 280s, 2.6GB) and Proc/Test4/TermTests.v: bench/prooflog.py runs
 ; them, each step under a memory cap (bench/README.md).
 
 (rocq.theory
@@ -19,7 +19,8 @@
   ; Protocol
   CCS
   Bisimilarity.CCS.PluginProofs
-  ; Proc: Test1-3 (Test4's terms; its goals, TermTests.v, not built)
+  ; Proc: Test1-3, Test3's goals up to reordering (Test4's terms; its
+  ; goals, TermTests.v, not built: about 8 minutes)
   Proc
   Bisimilarity.Proc.Test1.Terms
   Bisimilarity.Proc.Test2.Terms

@@ -37,6 +37,9 @@ taken freely around the answer). The tactics are \code{sim}, \code{bisim},
   builds the proof: its pieces as constants the kernel checks as they are
   made, and one term that names them, with which the tactic closes the
   goal. Rocq's kernel checks that term at \code{Qed}: it typechecks it.
+  For a large goal, the command \code{MeBi Prove} builds the same proof
+  with every part of it a constant, each checked as it is declared, and
+  declares the lemma (\cref{sec:qed:prove}): it needs less memory.
 \end{enumerate}
 
 \paragraph{Reading path.} For a newcomer: \cref{sec:prooflog} first (it

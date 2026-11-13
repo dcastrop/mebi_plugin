@@ -392,3 +392,180 @@ Bug fix 1 · Docs 1 · Tooling 0.
   status sections.
 
 **Session tally:** Optimization 8 · Tooling 1 · Docs 1.
+
+## 2026-11-12 — How low three processes can go; a relation read the wrong way
+
+- **Measured (three-process CADP, memory sampled every 2s):** the proof
+  is built with 2.9GB at most; 1.6GB when `Qed` starts; the kernel's
+  check of the term grows it steadily to 6GB over 145s (about 5KB per
+  fact of the term's 829K: the term, its hash-consed copy, the typing of
+  1.16M nested `let`s); writing the compiled file takes 2s more, 6.6GB at
+  most.
+- **Mistake, corrected:** a first conclusion that 3GB was out of reach
+  assumed that a piece's statement must name the pairs' diagram by a
+  constant per node; nodes can be named by number instead.
+- **New feature (`MeBi Prove id : goal.`, a command):** decides and
+  proves a goal given as a statement, as the tactics do, and declares the
+  lemma `id`. Its proof is in pieces, each a global constant the kernel
+  checks as it is declared (`Dd_read.finish_pieces`): the main chunk's
+  nodes in a trie per height (a node named `val D0 G_h p`, looked up by
+  number: accepted as the same kind of conversion as `val`), its facts in
+  segments of 20,000, each a trie of the statements others need and an
+  opaque `TAll` of it; the lemma's term names only the pieces. Three
+  processes (`examples/CADP/ThreeProcesses.v` now uses it): decided and
+  proved in about 280s, 2.6GB at most, the lemma itself checked in 0.4s,
+  closed under the global context; two processes: 5.8s, 0.72GB.
+  `LogTest.v` proves a goal with it, prints its assumptions, and checks
+  that it refuses a goal that does not hold.
+- **The same from a tactic: not possible, measured.** Declared as global
+  constants, the pieces were gone at `Qed` (Rocq discards a tactic's
+  global declarations: "Constant ... does not appear in the
+  environment"); declared as side effects (as `abstract`), each keeps
+  its typed form (`HConstr`, about three times the term) until `Qed`:
+  three processes went from 1.65GB to 4.1GB while declaring them, and
+  past 7GB at `Qed`. A command to run inside a proof (`MeBi Certify`,
+  tried, removed) declared them, but Rocq replays a side-effecting
+  command once the proof ends, so it did the work twice. The tactics
+  keep the proof as one term with its constants as side effects (6.6GB
+  for three processes). **Checked in Rocq 9.3's source, when the
+  conclusion was questioned** (the first explanation was inferred from
+  the failures): `Qed` declares the lemma in the state from before the
+  proof (`stm/stm.ml`); a private constant keeps its `HConstr` until
+  export (`kernel/safe_typing.ml`, `seff_body`); a command inside a
+  proof is run in it and again on the main branch, outside it, at `Qed`
+  (the docs had said "replayed once the proof ends", corrected);
+  Program's obligations live in the commands' program state, out of a
+  tactic's reach.
+- **Optimization:** a large certificate's log and Sylvan's tables are
+  given back as soon as the facts are written (not after the proof is
+  built): three processes, 3.2GB to 2.9GB while the proof is built.
+- **Bug fix (`Learn`, the plan's `rinfo`):** the mover's relations and
+  the answerer's inverse relations were recorded under one key (label,
+  meta, node), and Sylvan stores equal sets once: the inverse of a
+  reassociation's relation is the other reassociation's relation. In a
+  bisimilarity, where each system is both mover and answerer, an inverse
+  entry could be replaced by a forward one, with the other rule's chain:
+  its tuples were then read the wrong way ("a tuple with no
+  derivation"). `rinfo` now holds the answerer's relations only, the
+  only ones the proof reads it for.
+- **Proc Test4 (`TermTests.v`, four processes):** with that fix, its
+  proof gets past soundness, but makes over 2.3M facts (85 answerer
+  relations, 94 coverages of up to 1,992 projections) for 9,720 states:
+  the reorderings multiply each class by its 120 bracketings and orders.
+  It stays `Abort` until proofs up to the congruence (`doc/upto.md`).
+- **Tooling (work files):** the watcher logs the job's memory every 2s;
+  a tuple with no derivation names its chain, source, label, expected
+  target and what was derived.
+- **Docs:** `MeBi Prove` in the README's commands, CLAUDE.md (the
+  pipeline, verification), the examples' and bench's READMEs,
+  `doc/limitations.md` and `doc/certificate.md` ("Large goals", and what
+  Rocq computes: a node by its number); the report gains "Large goals:
+  the command `MeBi Prove`" (why, use, the nodes by height with an
+  example, the segments, cost, why a tactic cannot), a cost row, the
+  command, the test, and a decision to double-check; its status ("Done",
+  "Next") rewritten to the current state (it still described the
+  certificate before goals reached `Qed`). The report's PDF is
+  gitignored, kept so: CLAUDE.md and the `.gitignore` comment said it was
+  tracked, now corrected.
+
+**Session tally:** Bug fix 1 · Optimization 1 · New feature 1 · Tooling 1 ·
+Docs 1.
+
+## 2026-11-13 — Proofs up to reordering (route B): theory and plan
+
+- **Docs:** route B chosen for proofs up to the structural congruence
+  (`doc/upto.md`): the rules shown to commute with the reorderings, so
+  that the game runs on one representative per class; representatives
+  by saturating each shape under the reorderings, value-free (each item
+  a shape and a slot map, with its path), the least of a state's items
+  its representative, and sorting for larger classes (not to be pushed
+  far: larger systems from compositionality). The staged plan is in
+  `doc/upto.md`, "Route B: implementation plan".
+- **Mistake, corrected before any code:** a first answer said Test4's
+  120 states per class were 120 skeletons, so a representative skeleton
+  would merge them; Proc's skeletons are its bracketings only (9 in
+  all), and the 24 orders are values permuted within a skeleton, so a
+  representative needs a canonical placement of the values too.
+- **Found while designing:** Proc's `do_par_end` (`cprc tend | cprc tend
+  -> cprc tend`) does not commute with associativity, so the
+  commutation lemmas range over the slot values that can occur (closed
+  under the slots' steps), which excludes `tend` in Test4.
+- **New feature, part 1 (theory): `theories/DdUpto.v`.** `Cong`,
+  `cong_equiv` (a one-step relation with inverse paths and commuting
+  with the steps gives a strong bisimulation); the game answered into a
+  property (`VWSimP`, `NormZ`: the vectors that normalise into `z`)
+  with its toolkit; `cert_weak_sim_upto` and `cert_weak_bisim_upto`
+  (DdGame's completeness and soundness of the encodings unchanged, plus
+  each normalisation step sound). Both closed under the global context.
+
+- **Theory, revised the same day:** an answer may interleave
+  normalisation steps with the answerer's silent steps (`VWSimN`,
+  `TausN`), because the answerer's relations are learned from
+  representatives only, so an answer must come back to representatives
+  as it goes; a real answer is carried along the congruence at each
+  normalisation (`taus_left_upto`, `taus_right_upto`). Closed under the
+  global context.
+- **New feature, part 2 (engine, behind `MEBI_UPTO=1`, built, not yet
+  run):** reordering summands (`Learn.is_reordering`); per-shape
+  saturation under them, value-free, with paths and a bound
+  (`Learn.saturate`, `MEBI_UPTO_BOUND`); a vector's representative, the
+  least of its items applied to its values (`Learn.represent`);
+  exploration from representatives, each target normalised, the
+  one-step targets kept (`explored.ext`); the game from the
+  representatives' pairs, over the wider universe, the normalisation
+  relations among the answer's silent steps, logged backwards (label
+  -1, chain `<norm>`); the plan gains each side's normalisation tuples
+  with their items, and the start's exact vector (`Plan.pnorm`,
+  `pstart_v`). A dynamic summand turns it off for that system.
+
+- **Engine checked (development runs, allowed until route B's stage 4):**
+  the same verdicts with and without up-to on four goals (two
+  bisimilar, one not, one simulation); states 18 -> 9 (two processes),
+  324 -> 27 (three), 9,720 -> 81 (Test4). A first comparison was wrong:
+  `MEBI_UPTO=` (empty) still sets the variable, so both runs had up-to.
+- **New feature, part 3 (proof, the congruence): `upto_cong`
+  (`src/lts_proof.ml`).** `Ro` (a disjunction over the slots' numbers),
+  its eliminator, inverse paths, commutation lemmas by the
+  small-inversion engine, and `Equiv`, all checked by the kernel for
+  Test4 (31 reorderings, 18s, 1.1GB). The first version quantified over
+  values with a set `V` and split it where a rule needed a slot's
+  constructor: 40-85K characters per lemma for three processes and 68s
+  for one side of Test4; over numbers, the existing refutation
+  (`ns_def`) and a closure lemma (`Vn`) replace it.
+
+- **New feature, part 4 (proof, the rest): Test4 proved up to
+  reordering.** Item lemmas (each by its path, `item_lemma`);
+  normalisation soundness by `soundness_rel` with the relation `Cong
+  Ro` and the items as the tuples' proofs (`norm_pf`, `forall_ok`,
+  `soundNL_of`); the game with the normalisation lists
+  (`game_proof.ml`, `~upto`); the start's normalisation steps
+  (`normz_l`, `normz_r`); `cert_weak_sim_upto` / `cert_weak_bisim_upto`
+  applied. With `MEBI_UPTO=1`: two processes, `Qed` in 1.3s; three,
+  6.2s (86K facts); Test4's `p` and `q` (`weak_bisimilar`), `Qed` in
+  52.5s, 3.85GB at most (593K facts), each closed under the global
+  context. Before: over 2.3M facts, `Abort`.
+
+- **New feature, part 5: up to reordering on by default** where it
+  applies (weak goals, an LTS with reorderings, no dynamic summand;
+  `MEBI_UPTO=off`); a proof up to it that cannot be built is replaced by
+  one without, with a notice (`Learn.upto_off`, the tactic's retry). The
+  full build passes with it: Proc Test3's 14 goals use it; Test1, Test2
+  and CCS have dynamic summands and CADP no reorderings, so they do
+  not. Two-process CADP unchanged (5.8s, 0.83GB).
+- **Examples:** Test4's `TermTests.v` now proves `p ≈ q`, `q ≈ r` and
+  `p ≈ r` by `MeBi Prove` up to reordering (the file in 493s, 3.3GB;
+  by the tactic, one goal 52s, 3.9GB); its six `Abort`s and log checks
+  removed (bisimilarity is symmetric). Not in the default build.
+- **Docs:** `doc/upto.md` (status, stages), `doc/limitations.md`,
+  `OUTSTANDING.md` (up to reordering resolved; what is left of it),
+  CLAUDE.md, README, the examples' README and `dune` comment; the report
+  gains "Proofs up to reordering" (`sections/18-upto.tex`: the terms,
+  why representatives alone are unsound, the engine, a worked example,
+  the theorem, the proof, cost, limits), and its status, options,
+  tests and optimisations sections are brought up to date. `loader.v`
+  requires `DdUpto`.
+- **Mistake:** a rebuild of `@install` alone after changing `loader.v`
+  left the examples' compiled files stale, and the bench failed on
+  "inconsistent assumptions" until a full build.
+
+**Session tally:** New feature 5 · Docs 2.

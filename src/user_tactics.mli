@@ -29,6 +29,15 @@ type kind =
       or if the proof cannot be built from the certificate. *)
 val prove : ?debug:bool -> weak:bool -> kind -> unit Proofview.tactic
 
+(** [prove_command id goal] ([MeBi Prove id : goal]): the goal (one of
+    the four relations between two closed states) decided and proved from
+    its certificate as the tactics do, each piece of the proof a global
+    constant checked when declared (its facts too, a segment at a time:
+    nodes named by number), then the lemma [id], whose proof names them.
+    For large goals: a tactic can only make its pieces side effects of the
+    proof, which Rocq keeps in their typed form until [Qed]. *)
+val prove_command : Names.Id.t -> Constrexpr.constr_expr -> unit
+
 (** [check_log file] ([MeBi Check Log]): the records of Sylvan's proof log
     [file] (left by [Set MeBi Log Mode "keep"]; relative to the checked
     file's directory) as facts of theories/DdTree.v, each chunk its own

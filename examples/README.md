@@ -5,14 +5,17 @@ Worked examples of the MeBi plugin, mapped to the logical path
 semantics; the plugin decides it, Sylvan logs the certificate, and the
 tactic closes the goal with the proof built from that certificate
 ([`doc/certificate.md`](../doc/certificate.md)), which the kernel checks
-at `Qed`. A goal that does not hold is a `Fail` (a decided "no"). Plain
+at `Qed` (for the largest, `MeBi Prove` proves it in pieces and declares
+the lemma). A goal that does not hold is a `Fail` (a decided "no"). Plain
 tests live in `test/rocq/`.
 
 `dune build` builds the examples `examples/dune` lists.
 `python3 bench/prooflog.py` runs `CADP/TwoProcesses.v` and
-`CADP/ThreeProcesses.v` (to `Qed` in about 5 minutes, 6.6GB), each
+`CADP/ThreeProcesses.v` (by `MeBi Prove` in about 280s, 2.6GB), each
 step under a memory cap (`bench/README.md`). `Bisimilarity/Proc/Test4/TermTests.v`
-is not built.
+is not built: its three lemmas are proved up to reordering by `MeBi
+Prove` (the file in about 8 minutes, 3.3GB; `python3 bench/prooflog.py
+examples/Bisimilarity/Proc/Test4/TermTests.v`).
 
 ## Layout
 
@@ -22,7 +25,7 @@ is not built.
 | `Bisimilarity/CCS/PluginProofs.v` | Textbook pairs, each stating exactly what holds (simulations each way, bisimilarity, and decided refusals), and the Alternating Bit Protocol against a one-place buffer (the buffer simulates the protocol, and the two are weakly bisimilar). About 2s. |
 | `Proc.v` | A small process calculus with sends and receives on labels `A`/`B`/`C`, in two styles: `Flat` (one relation) and `Stacked` (terms, and a composition of processes, each with its own relation). |
 | `Bisimilarity/Proc/Test1`-`Test3` | `Terms.v` (the systems compared) and `PluginProofs.v` (`weak_sim` and `weak_bisimilar` goals). Under a second each. |
-| `Bisimilarity/Proc/Test4` | `Proc.Stacked`, four processes: `Terms.v`, and `TermTests.v`, its goals (9,720 states, 120 shapes; decided in under 1s; to be certified up to reordering, `doc/optimisations.md`). |
+| `Bisimilarity/Proc/Test4` | `Proc.Stacked`, four processes: `Terms.v`, and `TermTests.v`, its goals (9,720 states, 120 bracketings and orders per class; up to reordering 81 states, `doc/upto.md`), three lemmas by `MeBi Prove`. Not in the default build. |
 | `CADP/` | The MCS queue lock from CADP's demo against a lock server: see below. |
 
 ## CADP
@@ -69,7 +72,7 @@ mutually exclusive.
 |---|---|---|---|
 | `MutualExclusion.v` | 1 | small | the server simulates the system, and the two are weakly bisimilar |
 | `TwoProcesses.v` | 2 | 12,027 | the server simulates the system (`Qed`; the file in about 6s, 0.83GB) |
-| `ThreeProcesses.v` | 3 | 7,935,608 | the server simulates the system (`Qed`; the file in about 5 minutes, 6.6GB) |
+| `ThreeProcesses.v` | 3 | 7,935,608 | the server simulates the system (`MeBi Prove`; the file in about 280s, 2.6GB; by the tactic, 6.6GB) |
 
 Only the direction **system ≤ spec** is decided: it is mutual exclusion
 proper (every `ENTER`/`LEAVE` trace of the system is allowed by the

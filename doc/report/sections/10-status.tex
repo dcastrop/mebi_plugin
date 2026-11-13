@@ -4,34 +4,50 @@
 Sylvan's diagrams; Sylvan logs the decision's check made again as images
 (the mover's complete, the answerer's sound), each top-level image with
 the way the game's proof uses it; the plugin turns the log into facts of
-\file{theories/DdTree.v} and the kernel checks them, a chunk at a time
-(three-process CADP: 668,460 facts in 30\,s, 0.83\,GB).
+\file{theories/DdTree.v} and proves the goal from them
+(\cref{sec:qed}), and the kernel checks the proof. Every example is
+proved: by the tactics, closed with \code{Qed}; three-process CADP (7.9M
+pairs) by the command \code{MeBi Prove}, in 279\,s with 2.6\,GB at most
+(\cref{sec:qed:prove}; by the tactic, 293\,s and 6.6\,GB). Weak goals
+are proved up to reordering where it applies (\cref{sec:upto}): Proc's
+four processes (9,720 states, 81 up to reordering) by \code{MeBi
+Prove}, three lemmas in 493\,s, 3.3\,GB.
 
-\paragraph{Next, in order} (\file{doc/certificate.md}):
+\paragraph{Next, in order} (\file{OUTSTANDING.md}):
 \begin{enumerate}
-\item \textbf{Only-write levels} (Sylvan's meta code 4, Proc's
-  \code{termLTS}): their inverse relations, from the position's values in
-  the explored states, and the translator's cases.
-\item \textbf{The certificate's top level.} Its theorems are proved once,
-  closed under the global context (\file{theories/DdGame.v}): the game on
-  vectors from the logged facts (\code{VWSim}, \code{VSSim}, and a toolkit
-  of lemmas), and its transfer to \code{weak_sim}, \code{strong_sim} and
-  the bisimilarities (\code{cert_weak_sim} and the others), given an
-  encoding complete for the mover and sound for the answerer. What
-  remains is the assembly for a goal: the toolkit applied as the logged
-  check ran, with \code{Srt} facts for \code{z} and the mover's
-  relations, and the relations' nodes as constants.
-\item \textbf{Each relation's tuples as the LTS's steps:} each step's
-  derivation from the engine's rule interpreter, and the absence of other
-  steps from inversion lemmas; the encoding of states from the engine's
-  tables, its facts as terms. Then the tactics close their goals with
-  \code{Qed}.
-\item \textbf{The optimisations} of \cref{sec:optimisations} on the same
-  machinery.
+\item \textbf{Up to reordering, what is left} (\file{doc/upto.md}):
+  fewer facts for the answer's closure through the normalisation
+  relations (Test4: 593K facts for 81 states), and sorting for classes
+  past the bound.
+\item \textbf{The other optimisations} of \cref{sec:optimisations} on the
+  certificate: confluence reduction, static confluence, movers,
+  compositional proofs.
+\item \textbf{Summands with escaped projections, and premises the rules
+  cannot evaluate}: the proof refuses them (\file{doc/limitations.md}).
 \end{enumerate}
 
 \paragraph{Decisions to double-check.}
 \begin{itemize}
+\item \textbf{Up to reordering by default} (\cref{sec:upto}), for weak
+  goals of an LTS with reorderings and no dynamic summand, with a retry
+  without it when its proof cannot be built. Alternative: an option to
+  ask for it. It matters because a goal then takes the proof's other
+  route silently (a notice says so), and because the decision's states
+  are representatives.
+\item \textbf{The game's answers normalise as they go}: normalisation
+  steps are silent steps of any answer, not a step at its end, because
+  the answerer's relations are learned from representatives only.
+  Alternative: relations learned from every state of a class, which is
+  what up to reordering avoids. It matters for the theorem's shape
+  (\code{VWSimN}).
+\item \textbf{\code{Ro} over the slots' numbers}, not their values: a
+  slot then holds a value of its table, so no set of values is needed,
+  and the existing refutation of impossible constructors applies. A first
+  version over values split the values where a rule inspected them:
+  about ten times larger lemmas. It matters because the commutation
+  lemmas range over the table's values only, which is what makes a rule
+  like Proc's \code{do_par_end} (which does not commute with
+  associativity) harmless when no slot ever holds \code{tend}.
 \item \textbf{A pair's vector holds the answering side's positions first}
   (\code{b_first}, \file{lib/learn/learn.ml}; for a bisimilarity, the
   narrower side's), so that the answerer's relations need no copied
@@ -92,6 +108,18 @@ the way the game's proof uses it; the plugin turns the log into facts of
 \item \textbf{The plugin changes the GC's setting} (\code{space_overhead})
   while it builds a proof (80), and after a decision of over a million
   pairs until the next tactic (60), so that \code{Qed} fits in less
-  memory (\file{src/user_tactics.ml}). Alternative: leave Rocq's 200.
-  It matters because the setting is global to the process.
+  memory (\file{src/user_tactics.ml}); \code{MeBi Prove} uses 40 while
+  it builds and checks the pieces. Alternative: leave Rocq's 200. It
+  matters because the setting is global to the process.
+\item \textbf{Large goals by a command, \code{MeBi Prove}}
+  (\cref{sec:qed:prove}): the proof in pieces, each a global constant
+  checked as it is declared, its nodes named by their number in a trie
+  per height (a conversion of \code{val}'s kind, accepted on 12 November
+  2026), its facts in segments of 20,000. Three processes: 2.6\,GB
+  instead of the tactic's 6.6\,GB. Alternative: the tactic only, for
+  which no way to check the proof in pieces was found (each tried way
+  is in \cref{sec:qed:prove}). It matters because a large goal is then
+  stated by the command, not as \code{Lemma \dots{} Proof. weak_sim.
+  Qed.}, and its pieces are global constants of the user's module
+  (\code{mb_dn}$h$, \code{mb_ds}$s$, \code{mb_dp}$s$, \dots).
 \end{itemize}

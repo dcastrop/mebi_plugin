@@ -5,7 +5,9 @@
     context. With [Set MeBi Log Mode "keep"] the log stays in
     [.LogTest.v.mebi/<lemma>.log], next to this file, and
     [MeBi Check Log] turns its records into facts, each chunk a constant
-    the kernel checks. *)
+    the kernel checks. [MeBi Prove id : goal] proves a goal given as a
+    statement and declares the lemma [id], each piece of its proof a
+    constant checked when declared (less memory on large goals). *)
 Require Import MEBI.loader.
 
 Module Logged.
@@ -51,4 +53,10 @@ Module Logged.
   (* a negative verdict is an error *)
   Example refused : weak_bisimilar step step (par A B) (par A A).
   Proof. Fail weak_bisim. Abort.
+
+  (* the command: the lemma declared, each piece of its proof a constant
+     checked when declared; expected "Closed under the global context" *)
+  MeBi Prove proved : weak_bisimilar step step (par A B) (par B A).
+  Print Assumptions proved.
+  Fail MeBi Prove refused2 : weak_bisimilar step step (par A B) (par A A).
 End Logged.

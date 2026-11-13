@@ -27,7 +27,8 @@ let text : string list -> string option = function
   | [] -> Some (overview ())
   | [ "Sim" ] ->
     Some
-      "sim.  bisim.  weak_sim.  weak_bisim.   (each with debug in front)\n\n\
+      "sim.  bisim.  weak_sim.  weak_bisim.   (each with debug in front)\n\
+       MeBi Prove <id> : <goal>.\n\n\
        Each reads its goal: strong_sim, strong_bisimilar, weak_sim or \
        weak_bisimilar between two closed terms of inductive LTSs (relations M \
        -> option A -> M -> Prop, without parameters; for the weak ones, None \
@@ -39,7 +40,10 @@ let text : string list -> string option = function
        with the proof built from it (doc/certificate.md); end with Qed, where \
        the kernel checks that proof. With Set MeBi Log Mode \"keep\" the log \
        stays in .<File>.v.mebi/<lemma>.log next to the file, for MeBi Check \
-       Log."
+       Log. MeBi Prove <id> : <goal> does the same for a goal given as a \
+       statement, and declares the lemma <id>; each piece of its proof is a \
+       constant the kernel checks when it is declared, so a large goal needs \
+       far less memory than with a tactic (whose pieces Rocq keeps until Qed)."
   | [ "Debug" ] ->
     Some
       "debug sim | bisim | weak_sim | weak_bisim.\n\

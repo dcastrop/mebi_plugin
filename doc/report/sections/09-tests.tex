@@ -4,9 +4,13 @@
 \item \code{dune build -j 2} (under a memory cap, \file{CLAUDE.md}) builds
   the library, the plugin, \file{test/rocq/*.v} and the examples
   \file{examples/dune} lists. Every example goal is decided and proved
-  from its certificate (\code{Qed}; \cref{sec:qed}).
+  from its certificate (\code{Qed}; \cref{sec:qed}); Proc Test3's goals
+  up to reordering (\cref{sec:upto}). Test4's three lemmas, up to
+  reordering, by \file{bench/prooflog.py} with the file as argument.
 \item \file{test/rocq/LogTest.v}: the four relations proved
-  (\code{Print Assumptions} of each: closed under the global context), a
+  (\code{Print Assumptions} of each: closed under the global context);
+  a goal proved by \code{MeBi Prove} (\cref{sec:qed:prove}), its
+  assumptions printed, and one it refuses (a negative verdict); a
   log kept and its facts checked alone (its chunk closed too), no log
   file with \code{"off"}, a refused mode, and a negative verdict.
 \item \file{test/rocq/CongruenceTest.v}: the reorderings found in the rules,
@@ -16,11 +20,12 @@
   semantics on the dumped nodes; every node a record names is dumped; a
   top-level record names its role and arguments; the same operations
   logged in memory, read back from Sylvan's buffers and table).
-\item \file{bench/prooflog.py}: two- and three-process CADP, each decided
-  and its log checked in processes of their own, each under a memory cap
-  sized from free memory. Measured on 10 November 2026: two processes,
-  15,200 facts in 0.7\,s, 0.34\,GB; three processes, decided in 23\,s
-  (1.33\,GB), 668,460 facts in 8 chunks checked in 30\,s, 0.83\,GB.
+\item \file{bench/prooflog.py}: two- and three-process CADP, each file
+  compiled in a process of its own, under a memory cap sized from the
+  memory available (less 4\,GB). Measured on 12 November 2026: two
+  processes, the file in about 6\,s, 0.83\,GB; three processes, by
+  \code{MeBi Prove}, the file in 279\,s, 2.6\,GB
+  (\cref{sec:qed:cost}).
 \item \file{test/cert_tool.exe --log <log>}: the translation alone, with
   the facts per lemma.
 \item \file{scripts/check_no_computation.py} (first in CI) fails on any

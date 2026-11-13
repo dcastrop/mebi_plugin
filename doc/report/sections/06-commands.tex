@@ -18,6 +18,11 @@ command & what it does\\
   (\cref{sec:qed}), checked by the kernel at \code{Qed}\\
 \code{debug} \emph{tactic}\code{.} & the same, and first the engine's
   report (states, pairs, summands, projections, iterations, time)\\
+\code{MeBi Prove <id> : <goal>.} & decide the goal (one of the four
+  relations, as for the tactics) and prove it from its certificate, the
+  proof in pieces, each a global constant the kernel checks as it is
+  declared; then declare the lemma \code{<id>} (\cref{sec:qed:prove}:
+  three-process CADP in 2.6\,GB, by the tactic 6.6\,GB)\\
 \code{MeBi Check Log "<file>".} & the log's records as facts, each chunk a
   constant the kernel checks (\cref{sec:prooflog:facts}); a relative path is
   taken from the file's directory\\
@@ -60,4 +65,6 @@ Environment variables, for measuring (\file{CLAUDE.md}):
 each game iteration; \code{MEBI_CERT_STOP=decided} stops the process once
 the engine has decided; \code{MEBI_CERT_KEEP=1} keeps a log's facts file;
 \code{MEBI_LOG_FACTS=<file>} makes \code{MeBi Check Log} read a facts file
-instead of translating the log.
+instead of translating the log. \code{MEBI_UPTO=off} turns proofs up to
+reordering off (\cref{sec:upto}); \code{MEBI_UPTO_BOUND=<n>} bounds a
+class's items (default 50,000).

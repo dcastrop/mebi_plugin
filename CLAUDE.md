@@ -40,9 +40,9 @@ Guidance for Claude Code sessions working on `mebi_plugin`.
 
 The engine decides; Sylvan's log is the certificate; the plugin
 translates it into facts and builds from them the proof of the goal,
-which the kernel checks at `Qed` (`doc/certificate.md`); every example,
-three-process CADP included, ends with `Qed`. What remains: the
-optimisations on the certificate.
+which the kernel checks at `Qed` (`doc/certificate.md`); every example
+is proved, by a tactic and `Qed`, three-process CADP by `MeBi Prove`.
+What remains: the optimisations on the certificate (up-to first).
 If a change would add a genuine new capability to the plugin (something
 it could not do before), say so explicitly *before* writing it.
 Net-new code that is purely infrastructure (a pure-OCaml test binary, a
@@ -75,7 +75,15 @@ The tactics `sim`/`bisim` (`strong_sim`/`strong_bisimilar`) and
    `lib/ldd`): rules from the constructors (`lib/rules`), states as
    containers (`lib/skeleton`), each rule's steps learned by an
    interpreter (a step it cannot follow is `Learn.Unfollowable`), the
-   game to its greatest fixpoint;
+   game to its greatest fixpoint; for a weak goal of an LTS with
+   reorderings and no dynamic summand, up to reordering
+   (`doc/upto.md`): each shape saturated under the reorderings, states
+   replaced by their class's representative, normalisation steps among
+   an answer's silent steps; its proof (`upto_cong`, `item_lemma`,
+   `theories/DdUpto.v`) shows the rules commute with the reorderings; a
+   proof up to reordering that fails is replaced by one without
+   (`Learn.upto_off`); `MEBI_UPTO=off` turns it off,
+   `MEBI_UPTO_BOUND` bounds a class (50,000 items);
 2. **log the certificate**: the fixpoint's check made again as images
    with Sylvan's proof log on (the fork's local branch `proof-log`:
    `lddmc_log_open`, `lddmc_log_top`, `lddmc_log_close`), in memory
@@ -106,7 +114,14 @@ The tactics `sim`/`bisim` (`strong_sim`/`strong_bisimilar`) and
    elaborator sees only their statements), data transparent, one over the
    facts abstracted over those it uses; the kernel checks each once. The
    tactic closes the goal with a term naming them (the facts, the game,
-   the theorem); the kernel checks it at `Qed`. `MeBi Check Log
+   the theorem); the kernel checks it at `Qed`. The command
+   `MeBi Prove id : goal.` does the same for a goal given as a
+   statement, its proof in pieces, each a global constant the kernel
+   checks as it is declared (`Dd_read.finish_pieces`: nodes in a trie
+   per height, named by number; facts in segments of
+   `MEBI_CHUNK_FACTS`), then declares `id` (three processes: 2.6GB, the
+   tactic 6.6GB; a tactic cannot do the same, `doc/certificate.md`,
+   "Large goals"). `MeBi Check Log
    "<file>"` (relative to the file) checks a
    kept log's facts alone, a chunk at a time, each chunk a constant
    (`Dd_read.read`).
@@ -118,8 +133,8 @@ stops once the engine has decided; `MEBI_PLAN_DUMP=1` prints the plan;
 instead of constants (for comparison);
 `MEBI_CERT_KEEP=1` keeps a log's facts file; `MEBI_LOG_FACTS=<file>`
 makes `MeBi Check Log` read a facts file instead; `MEBI_CHUNK_FACTS=<n>`
-sets the facts per chunk (default 20,000: fewer chunks, more memory, the
-same time); `test/cert_tool.exe --log <log> [<facts>]` translates alone,
+sets the facts per chunk, and per segment of `MeBi Prove` (default
+20,000: fewer chunks, more memory, the same time); `test/cert_tool.exe --log <log> [<facts>]` translates alone,
 with the facts per lemma.
 
 To verify a change (rule 4):
@@ -127,16 +142,20 @@ To verify a change (rule 4):
    `python3 scripts/check_module_lists.py`.
 1. `dune build -j 2`, capped (about 2.5GB): the library, the plugin,
    `test/rocq/*.v` (`LogTest.v`: the four relations proved, each closed
-   under the global context; a log kept and its chunk checked; "off"
-   deletes the log; a refused mode; a negative verdict) and the examples,
+   under the global context; one by `MeBi Prove`, and one it refuses; a
+   log kept and its chunk checked; "off" deletes the log; a refused
+   mode; a negative verdict) and the examples,
    each goal proved from its certificate (`Qed`).
 2. `dune exec test/ldd_tests.exe` (30 tests, 12 of the proof log, 5 of them
    kept in memory).
 3. Heavy: `python3 bench/prooflog.py` (each step's cap: available memory
    less 4GB, at most 7GB): two-process CADP to `Qed`, the file in about
-   6s, 0.83GB at most; three-process CADP to `Qed`, the proof built in
-   124s, `Qed` 144s, the file in 293s, 6.6GB at most, so it needs about
-   11GB available (2026-11-11).
+   6s, 0.83GB at most; three-process CADP by `MeBi Prove`, the lemma
+   declared in about 280s, 2.6GB at most, so it needs about 7GB
+   available (2026-11-12; by the tactic, 6.6GB, about 11GB available).
+   Proc Test4 up to reordering, by hand:
+   `python3 bench/prooflog.py examples/Bisimilarity/Proc/Test4/TermTests.v`
+   (three `MeBi Prove` lemmas, about 8 minutes, 3.3GB, 2026-11-13).
 4. For a change to `DdTree.v`: `Print Assumptions` of a chunk stays
    "Closed under the global context" (`LogTest.v`).
 
@@ -232,8 +251,8 @@ To verify a change (rule 4):
 - **The technical report** (`doc/report`) has a bibliography
   (`refs.bib`, natbib): build with `pdflatex main; bibtex main; pdflatex
   main; pdflatex main`, and cite every technique or tool it mentions.
-  The built `doc/report/main.pdf` is tracked: rebuild it after changing
-  the sources, so the two are committed together.
+  The built `doc/report/main.pdf` is gitignored (kept that way): rebuild
+  it after changing the sources, to check they build.
 - **Terms:** CADP's semantics is `lts` over `step`, one step per
   instruction. Proc's LTS over a component LTS is *stacked*
   (`Proc.Stacked`).

@@ -457,6 +457,11 @@ type proof_ctx =
 type proof_reader =
   { feed : string -> unit
   ; finish : unit -> proof_ctx
+  ; finish_pieces :
+      declare:(string -> Constr.t -> Constr.types -> bool -> unit)
+      -> seg:int
+      -> unit
+      -> proof_ctx
   }
 
 let proof_reader env : proof_reader =
@@ -677,5 +682,346 @@ let proof_reader env : proof_reader =
           | None -> failf "certificate: request %d not answered" k)
     }
   in
-  { feed; finish }
+  (* the chunk in pieces (doc/certificate.md, "Large goals"): its
+     nodes by height, each height a trie of its nodes, a node named by
+     its number there (looked up as [val] looks a value up); its facts in
+     segments of [seg], each a trie of the statements of the facts others
+     need and [TAll] of it, its facts [let]s of its own; each piece handed
+     to [declare] as it is made (name, body, type, opaque), in an order
+     where a piece names only pieces before it. A request is then a
+     closed term over the pieces' names. *)
+  let finish_pieces
+        ~(declare : string -> Constr.t -> Constr.types -> bool -> unit)
+        ~(seg : int)
+        ()
+    : proof_ctx
+    =
+    if !final < 0 then failf "certificate: the chunk did not end";
+    let items = Array.of_list (List.rev !items) in
+    let seg = max 1 seg in
+    let c = ctx.c in
+    let n_ty = c "num.N.type" in
+    let posty = c "num.pos.type" in
+    (* a binary trie of terms by key (1, then 2 and 3, ...) *)
+    let module T = struct
+      type t =
+        | Leaf
+        | Node of Constr.t option * t * t
+    end
+    in
+    let rec insert (t : T.t) (k : int) (x : Constr.t) : T.t =
+      let v, l, r =
+        match t with
+        | T.Leaf -> None, T.Leaf, T.Leaf
+        | T.Node (v, l, r) -> v, l, r
+      in
+      if k = 1
+      then T.Node (Some x, l, r)
+      else if k land 1 = 0
+      then T.Node (v, insert l (k lsr 1) x, r)
+      else T.Node (v, l, insert r (k lsr 1) x)
+    in
+    let rec trie_t ty (t : T.t) =
+      match t with
+      | T.Leaf -> app (c "mebi.de.tleaf") [| ty |]
+      | T.Node (v, l, r) ->
+        let o =
+          match v with
+          | Some x -> app (c "core.option.Some") [| ty; x |]
+          | None -> app (c "core.option.None") [| ty |]
+        in
+        app (c "mebi.de.tnode") [| ty; o; trie_t ty l; trie_t ty r |]
+    in
+    (* {2 Nodes} *)
+    let height : (int, int) Hashtbl.t = Hashtbl.create 4096 in
+    let place : (int, int * int) Hashtbl.t = Hashtbl.create 4096 in
+    let groups : (int, (int * int * int * int) list ref) Hashtbl.t =
+      Hashtbl.create 256
+    in
+    let h_of i = if i <= 1 then 0 else Hashtbl.find height i in
+    Array.iter
+      (fun it ->
+        if it.(0) < 0
+        then (
+          let id, v, d, r = it.(1), it.(2), it.(3), it.(4) in
+          let h = 1 + max (h_of d) (h_of r) in
+          Hashtbl.replace height id h;
+          let g =
+            match Hashtbl.find_opt groups h with
+            | Some g -> g
+            | None ->
+              let g = ref [] in
+              Hashtbl.add groups h g;
+              g
+          in
+          let p = List.length !g + 1 in
+          g := (p, v, d, r) :: !g;
+          Hashtbl.replace place id (h, p)))
+      items;
+    let gname h = Printf.sprintf "mb_dn%d" h in
+    let var n = Constr.mkVar (Names.Id.of_string n) in
+    let node_refs : (int, Constr.t) Hashtbl.t = Hashtbl.create 4096 in
+    let node_ref (i : int) =
+      if i = 0
+      then ctx.d0
+      else if i = 1
+      then ctx.d1
+      else (
+        match Hashtbl.find_opt node_refs i with
+        | Some t -> t
+        | None ->
+          let h, p =
+            match Hashtbl.find_opt place i with
+            | Some x -> x
+            | None -> failf "certificate: node %d not made" i
+          in
+          let t =
+            app (c "mebi.de.val") [| ctx.dd; ctx.d0; var (gname h); num ctx p |]
+          in
+          Hashtbl.add node_refs i t;
+          t)
+    in
+    let heights =
+      List.sort compare (Hashtbl.fold (fun h _ acc -> h :: acc) groups [])
+    in
+    List.iter
+      (fun h ->
+        let entries = !(Hashtbl.find groups h) in
+        let tr =
+          List.fold_left
+            (fun t (p, v, d, r) ->
+              insert t p (app ctx.nd [| num ctx v; node_ref d; node_ref r |]))
+            T.Leaf
+            entries
+        in
+        declare
+          (gname h)
+          (trie_t ctx.dd tr)
+          (app (c "mebi.de.trie") [| ctx.dd |])
+          false)
+      heights;
+    (* {2 Facts} *)
+    let nf =
+      Array.fold_left
+        (fun m it -> if it.(0) >= 0 then max m (it.(1) + 1) else m)
+        0
+        items
+    in
+    let fact_item = Array.make (max nf 1) [||] in
+    Array.iter (fun it -> if it.(0) >= 0 then fact_item.(it.(1)) <- it) items;
+    let seg_of i = i / seg in
+    (* a fact a later segment or the proof names: its segment exports it *)
+    let exported = Array.make (max nf 1) false
+    and uses = Array.make (max nf 1) 0 in
+    Array.iter
+      (fun it ->
+        if it.(0) >= 0
+        then
+          for k = 2 to Array.length it - 1 do
+            if kind it.(k) = k_fact
+            then (
+              let g = payload it.(k) in
+              if seg_of g < seg_of it.(1)
+              then exported.(g) <- true
+              else uses.(g) <- uses.(g) + 1)
+          done)
+      items;
+    List.iter
+      (fun r -> if kind r.(2) = k_fact then exported.(payload r.(2)) <- true)
+      !reqs;
+    let codes i =
+      match Hashtbl.find_opt qcodes i with
+      | Some t -> t
+      | None -> failf "certificate: unknown codes %d" i
+    in
+    let list_terms : (int list, Constr.t) Hashtbl.t = Hashtbl.create 4096 in
+    let nil_t = app (c "core.list.nil") [| n_ty |] in
+    let rec list_of = function
+      | [] -> nil_t
+      | x :: rest as l ->
+        (match Hashtbl.find_opt list_terms l with
+         | Some t -> t
+         | None ->
+           let t =
+             app (c "core.list.cons") [| n_ty; num ctx x; list_of rest |]
+           in
+           Hashtbl.add list_terms l t;
+           t)
+    in
+    let prop = Constr.mkProp in
+    let q0 =
+      Constr.mkLambda
+        ( Context.anonR
+        , posty
+        , Constr.mkLambda (Context.anonR, prop, Constr.mkRel 1) )
+    in
+    let sname s = Printf.sprintf "mb_ds%d" s
+    and pname s = Printf.sprintf "mb_dp%d" s in
+    (* an exported fact: its segment and key *)
+    let key_of : (int, int * int) Hashtbl.t = Hashtbl.create 4096 in
+    let import (g : int) =
+      match Hashtbl.find_opt key_of g with
+      | Some (s, k) ->
+        app
+          (c "mebi.de.tall_get")
+          [| prop; var (sname s); q0; pos ctx k; var (pname s) |]
+      | None -> failf "certificate: fact %d not exported" g
+    in
+    let lemma_of it =
+      let name, (cst, n, concl) = !lemma_tbl.(it.(0)) in
+      if Array.length it - 2 <> n
+      then
+        failf
+          "certificate: %s takes %d arguments, not %d"
+          name
+          n
+          (Array.length it - 2);
+      cst, n, concl
+    in
+    let nseg = if nf = 0 then 0 else seg_of (nf - 1) + 1 in
+    for s = 0 to nseg - 1 do
+      let lo = s * seg
+      and hi = min nf ((s + 1) * seg) in
+      let fact_let = Hashtbl.create 1024 in
+      let lets = ref []
+      and depth = ref 0 in
+      let rels = ref [||] in
+      let rel i =
+        if i >= Array.length !rels
+        then
+          rels
+          := Array.init
+               (max (2 * i) 1024)
+               (fun j ->
+                 if j < Array.length !rels then !rels.(j) else Constr.mkRel j);
+        !rels.(i)
+      in
+      let rec arg_t dep (a : int) =
+        let x = payload a in
+        match kind a with
+        | 0 -> node_ref x
+        | 1 -> fact_t dep x
+        | 2 -> num ctx x
+        | 3 -> pos ctx x
+        | 4 -> codes x
+        | 5 -> list_of (Array.to_list !lists.(x))
+        | _ -> failf "certificate: bad argument"
+      and fact_t dep (g : int) =
+        if g < lo
+        then import g
+        else (
+          match Hashtbl.find_opt fact_let g with
+          | Some k -> rel (dep - k)
+          | None ->
+            let it = fact_item.(g) in
+            let cst, n, _ = lemma_of it in
+            app cst (Array.init n (fun k -> arg_t dep it.(k + 2))))
+      in
+      let exp = ref [] in
+      for i = lo to hi - 1 do
+        let it = fact_item.(i) in
+        if Array.length it > 0 && (uses.(i) >= 2 || exported.(i))
+        then (
+          let cst, n, concl = lemma_of it in
+          let a = Array.init n (fun k -> arg_t !depth it.(k + 2)) in
+          let ty = Vars.substl (List.rev (Array.to_list a)) concl in
+          lets := (app cst a, ty) :: !lets;
+          Hashtbl.replace fact_let i !depth;
+          incr depth;
+          if exported.(i) then exp := (i, ty) :: !exp)
+      done;
+      let exp = List.rev !exp in
+      if exp <> []
+      then (
+        (* the statements, keyed 1, 2, ...: closed (nodes by number) *)
+        let keyed = List.mapi (fun j (i, ty) -> j + 1, i, ty) exp in
+        List.iter
+          (fun (k, i, ty) ->
+            if Bool.not (Vars.closed0 ty)
+            then failf "certificate: an exported statement not closed";
+            Hashtbl.replace key_of i (s, k))
+          keyed;
+        let tr =
+          List.fold_left (fun t (k, _, ty) -> insert t k ty) T.Leaf keyed
+        in
+        let pf_of = Hashtbl.create 1024 in
+        List.iter (fun (k, i, _) -> Hashtbl.replace pf_of k i) keyed;
+        let d = !depth in
+        let shift k q =
+          Constr.mkLambda
+            ( Context.anonR
+            , posty
+            , app (Vars.lift 1 q) [| app (c k) [| Constr.mkRel 1 |] |] )
+        in
+        (* each subtrie: its term (made once) and the proof of its [TAll] *)
+        let rec go q (t : T.t) acc dp : Constr.t * Constr.t =
+          match t with
+          | T.Leaf -> trie_t prop T.Leaf, c "core.True.I"
+          | T.Node (v, l, r) ->
+            let key = acc + (1 lsl dp) in
+            let a_ty, a_pf =
+              match v with
+              | Some x ->
+                x, rel (d - Hashtbl.find fact_let (Hashtbl.find pf_of key))
+              | None -> c "core.True.type", c "core.True.I"
+            in
+            let ql = shift "num.pos.xO" q
+            and qr = shift "num.pos.xI" q in
+            let lt, lp = go ql l acc (dp + 1)
+            and rt, rp = go qr r (acc + (1 lsl dp)) (dp + 1) in
+            let tl = app (c "mebi.de.TAll") [| prop; ql; lt |]
+            and tr' = app (c "mebi.de.TAll") [| prop; qr; rt |] in
+            ( app
+                (c "mebi.de.tnode")
+                [| prop
+                 ; (match v with
+                    | Some x -> app (c "core.option.Some") [| prop; x |]
+                    | None -> app (c "core.option.None") [| prop |])
+                 ; lt
+                 ; rt
+                |]
+            , app
+                (c "core.and.conj")
+                [| a_ty
+                 ; app (c "core.and.type") [| tl; tr' |]
+                 ; a_pf
+                 ; app (c "core.and.conj") [| tl; tr'; lp; rp |]
+                |] )
+        in
+        let stries, pf = go q0 tr 0 0 in
+        declare (sname s) stries (app (c "mebi.de.trie") [| prop |]) false;
+        let ty = app (c "mebi.de.TAll") [| prop; q0; var (sname s) |] in
+        (* the proof given its statement inside the [let]s (typing a [let]
+           substitutes into the type of what follows it) *)
+        let body =
+          List.fold_left
+            (fun acc (b, t) -> Constr.mkLetIn (Context.anonR, b, t, acc))
+            (app (Constr.mkLambda (Context.anonR, ty, Constr.mkRel 1)) [| pf |])
+            !lets
+        in
+        declare (pname s) body ty true)
+    done;
+    let req_tbl = Hashtbl.create 64 in
+    List.iter (fun r -> Hashtbl.replace req_tbl r.(1) r.(2)) !reqs;
+    let closed_arg (a : int) =
+      let x = payload a in
+      match kind a with
+      | 0 -> node_ref x
+      | 1 -> import x
+      | 2 -> num ctx x
+      | 3 -> pos ctx x
+      | 4 -> codes x
+      | 5 -> list_of (Array.to_list !lists.(x))
+      | _ -> failf "certificate: bad argument"
+    in
+    { lets = []
+    ; depth = 0
+    ; req =
+        (fun k _ ->
+          match Hashtbl.find_opt req_tbl k with
+          | Some a -> closed_arg a
+          | None -> failf "certificate: request %d not answered" k)
+    }
+  in
+  { feed; finish; finish_pieces }
 ;;

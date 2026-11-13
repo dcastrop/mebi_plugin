@@ -245,7 +245,10 @@ vector, made 9.4M of the proof's 11.1M facts.
 number to its term (`val`, a trie lookup); a coverage's membership of a
 tuple in a relation, by its key in the trie of the coverage's
 memberships (`tall_get`, the same lookup: the kernel follows one branch
-per binary digit of the key, no `eq_refl`); a vector after a tuple
+per binary digit of the key, no `eq_refl`); with `MeBi Prove`, a node
+by its number in the trie of its height's nodes (`val` again; accepted
+on 2026-11-12) and a fact of an earlier segment by its key in that
+segment's trie of statements (`tall_get`); a vector after a tuple
 (`post`, `Reads`) and a projection (`projv`) on lists of known length;
 the user's own functions in a rule's label, target or premise source
 (CADP's `do_act`, CCS's `def`); a decidable side condition's boolean
@@ -265,8 +268,46 @@ node: relations with the same tuples share a node).
 goal; CADP, one process, about a second per goal; two processes (12,027
 pairs), the file in about 6s (the proof built in 3.3s, `Qed` 1.7s),
 0.83GB at most; three processes (7.9M pairs), the proof built in 124s
-(the packs' 280K membership facts checked then, 59s), `Qed` in 144s on
-the main term's 829K facts, the file in 293s, 6.6GB at most.
+(the packs' 280K membership facts checked then, 59s; 2.9GB at most,
+Sylvan's tables given back once the facts are written), `Qed` in 144s on
+the main term's 829K facts, the file in 293s, 6.6GB at most. Over time
+(sampled every 2s): 1.6GB when `Qed` starts, growing steadily to 6GB as
+the kernel checks the term (about 5KB per fact: the term, its
+hash-consed copy, the typing of 1.16M nested `let`s); the compiled file's
+writing takes 2s.
+
+**Large goals: `MeBi Prove id : goal.`** (2026-11-12) proves a goal
+given as a statement, as the tactics do, then declares the lemma `id`;
+each piece of the proof is a global constant the kernel checks when it is
+declared, and the certificate's main chunk is in pieces too
+(`Dd_read.finish_pieces`): its nodes named by number (a trie per height,
+a node `val D0 G_h p`, looked up as a value is), its facts in segments of
+20,000 (`MEBI_CHUNK_FACTS`), each a trie of the statements others need
+and an opaque `TAll` of it. The lemma's own term names only the pieces
+(three processes: checked in 0.4s). Rocq keeps a declared constant once,
+hash-consed, so the memory is what one piece's check needs on top of what
+is kept: three processes in about 280s, 2.6GB at most (`Proof. weak_sim.
+Qed.`: 6.6GB). A tactic cannot do the same (read in Rocq 9.3's source):
+- `rocq compile` runs a proof's sentences on a branch of their own (the
+  STM's), and `Qed` takes the proof's term at the branch's end, then
+  declares the lemma in the state from before the proof
+  (`stm/stm.ml`, the synchronous `Qed`: `reach eop`, `close_proof`,
+  `reach view.next`): a global constant a tactic declares is gone ("does
+  not appear in the environment").
+- What a proof passes on besides its term is its side effects, private
+  constants (`Safe_typing.add_private_constant`, as `abstract` makes),
+  each kept with its body's typed form (`seff_body`'s `HConstr`, built by
+  `Constant_typing.infer_opaque`, about three times the term) until `Qed`
+  exports it (`export_private_constants`). In pieces: 4.1GB while
+  declaring, beyond 7GB at `Qed`. A global constant's typed form is
+  dropped once it is checked, which is what `MeBi Prove` relies on.
+- A command written inside a proof is run by the STM twice: in the
+  proof, and at `Qed` on the main branch, outside the proof, without its
+  goal (`VtSideff`: `ReplayCommand`; only `Definition x := body` is run
+  once, its environment copied into the proof).
+- Program's obligations are kept in the program state that commands
+  receive (`Declare.OblState`, `vernac/vernactypes.ml`); a tactic gets
+  only its goals.
 
 ## Decided (10 November 2026)
 

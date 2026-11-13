@@ -325,7 +325,10 @@ main term, the coverage's pack argument is the pack's constant.
 Only conversions, while typing the term: a value's number to its term
 (\code{val}); a coverage's membership by its number in the trie of the
 coverage's memberships (\code{tall_get}, the same lookup; accepted on 11
-November 2026 as of the same kind as \code{val}); a vector after a
+November 2026 as of the same kind as \code{val}); with \code{MeBi
+Prove}, a node by its number in its height's trie (\code{val}; accepted
+on 12 November 2026) and a fact of an earlier segment by its key
+(\code{tall_get}) (\cref{sec:qed:prove}); a vector after a
 tuple, and a projection of it, on lists of known length (\code{post},
 \code{Reads}, \code{projv}); the user's own functions in a rule (CADP's
 \code{do_act}, CCS's \code{def}); a decidable side condition's boolean
@@ -418,10 +421,123 @@ lowers it to 80\% while it builds a proof, and after a decision of more
 than a million pairs to 60\% until the next tactic, so that \code{Qed}
 and writing the compiled file need less.
 
+\subsection{Large goals: the command \texorpdfstring{\code{MeBi Prove}}{MeBi Prove}}\label{sec:qed:prove}
+
+\paragraph{Why.} The tactic's proof is one term: the main chunk's nodes
+and facts as \code{let}s, and inside them the rest
+(\cref{sec:qed:assembly}). The kernel checks it at \code{Qed} in one go,
+and its memory grows with the facts it has checked so far: three-process
+CADP, 829K facts, from 1.6\,GB to 6.6\,GB. Nothing in that check needs
+the whole term at once: a fact needs only the nodes and facts it names.
+So the proof can be checked in pieces, each declared as a global
+constant: the kernel checks a piece when it is declared, and from then on
+Rocq keeps the piece, stored once, but not the work of checking it.
+
+\paragraph{Use.} The command takes a name and a statement, one of the
+four relations between closed terms, as the tactics' goals are:
+\begin{verbatim}
+MeBi Prove wsim_lts_3 : weak_sim lts spec_lts c3 (make_spec 2).
+\end{verbatim}
+It decides the statement and proves it from its certificate as the
+tactics do, then declares the lemma \code{wsim_lts_3}, used like any
+other (\file{examples/CADP/ThreeProcesses.v}; \file{test/rocq/LogTest.v}
+prints its assumptions: none). A negative verdict is an error, and no
+lemma is declared.
+
+\paragraph{The nodes, by height.} A diagram's leaves, \code{D0} (the
+empty set) and \code{D1}, have height 0; a node \code{Nd v d r} (its
+value \code{v}, the diagram \code{d} below it, its right sibling
+\code{r}) has height one more than the greater of \code{d}'s and
+\code{r}'s. The nodes of each height $h$ are numbered $1, 2, \dots$ and
+kept in a trie by number, as a pack's memberships are
+(\cref{sec:qed:packs}): a transparent constant, \code{mb_dn}$h$. A node
+is written \code{val dd D0 mb_dn}$h$\code{ p}, its number $p$ in its
+height's trie: the kernel finds it by conversion, as it finds a value
+(\code{val}, \cref{sec:qed:rocq}; this lookup was accepted on 12 November
+2026 as of the same kind). A node's children are lower, so they are in
+tries declared before its own.
+
+\emph{Example.} The diagram of $\{(1,5), (2,5), (3,5)\}$ has one node
+for the second position, $X = $ \code{Nd 5 D1 D0} (height 1), and three
+siblings for the first, each with $X$ below it: \code{Nd 3 X D0} (height
+2), \code{Nd 2 X (Nd 3 X D0)} (height 3), \code{Nd 1 X (Nd 2 \dots)}
+(height 4). So \code{mb_dn1} holds $X$ at 1, \code{mb_dn2} holds
+\code{Nd 3 (val dd D0 mb_dn1 1) D0} at 1, and so on: four tries, each a
+single entry here. Three-process CADP has 360 heights.
+
+Naming a node by number matters for the facts: a fact's statement names
+nodes, and a statement written outside the term that defines its nodes
+(the \code{let}s of \cref{sec:qed:assembly}) must name them by something
+global. A constant per node would do, but make hundreds of thousands of
+global declarations; a trie per height makes one per height.
+
+\paragraph{The facts, in segments.} The translator writes the facts in
+an order where each names only facts before it, numbered $0, 1, \dots$.
+They are cut into \emph{segments} of 20,000 (\code{MEBI_CHUNK_FACTS}):
+facts $0$ to $19{,}999$, then from $20{,}000$, and so on (three
+processes: 42 segments). A fact that a later segment or the rest of the
+proof names is \emph{exported} by its segment $s$:
+\begin{itemize}
+\item its statement goes in the segment's trie of statements,
+  \code{mb_ds}$s$ (transparent), keyed $1, 2, \dots$;
+\item the segment's proof, \code{mb_dp}$s$\code{ : TAll mb_ds}$s$
+  (opaque), proves every statement in it: inside it, the segment's facts
+  used twice or more are \code{let}s, as in the tactic's term, and the
+  proof is given its statement inside them by an identity function, as
+  in \cref{sec:qed:fit};
+\item a later segment, or the lemma, names the fact as
+  \code{tall_get mb_ds}$s$\code{ }$k$\code{ mb_dp}$s$, whose type is the
+  entry at $k$, which converts to the statement (\cref{sec:qed:packs}).
+\end{itemize}
+The rest of the proof (encodings, case and step lemmas, coverages,
+packs, soundness) is made as by the tactic, each piece a global constant
+instead of a side effect. The lemma's own term names only the pieces:
+three processes, checked in 0.4\,s.
+
+\paragraph{Cost.} Three-process CADP: the proof built, every piece
+checked as it is declared, in 231\,s (of which the kernel's time: packs
+73\,s, segments 52\,s, coverages 37\,s, node tries 19\,s); the lemma
+0.4\,s; the file in 279\,s, 2.6\,GB at most. Two processes: the file in
+5.8\,s, 0.72\,GB (by the tactic: 6\,s, 0.83\,GB). The time is about the
+tactic's (293\,s); the memory is less than half.
+
+\paragraph{Why a tactic cannot do the same.} Each way was tried, and
+the reason read in Rocq 9.3's source:
+\begin{itemize}
+\item \emph{Global constants from a tactic.} \code{rocq compile} runs
+  the sentences of a proof on a branch of their own (the branches of its
+  document manager, the STM), and \code{Qed} takes the proof's term at
+  the end of that branch, then declares the lemma in the state from
+  before the proof (\file{stm/stm.ml}, the synchronous \code{Qed}). What
+  a tactic declares globally is on the proof's branch: at \code{Qed} the
+  term names constants that are gone (``Constant \dots does not appear
+  in the environment'').
+\item \emph{Constants as side effects} (as \code{abstract} makes,
+  \cref{sec:qed:rocq}), the only constants a proof passes on. The kernel
+  keeps each with its typed form (a copy of the term carrying what the
+  kernel computed while typing it, \code{HConstr}, about three times the
+  term: \code{seff_body} in \file{kernel/safe_typing.ml}) until
+  \code{Qed} exports them; a global constant's is dropped once it is
+  checked. Three processes in pieces: 1.65\,GB to 4.1\,GB while
+  declaring them, beyond 7\,GB at \code{Qed}: more than the single term.
+\item \emph{A command inside the proof} (written between two tactics)
+  declaring the pieces. The STM runs such a command twice: in the proof,
+  and at \code{Qed} on the main branch, outside the proof and without
+  its goal (only \code{Definition x := body} is run once, its
+  environment copied into the proof). So the work is done twice.
+\item \emph{As Program's obligations are recorded.} They are kept in the
+  state that commands receive (\code{Declare.OblState},
+  \file{vernac/vernactypes.ml}); a tactic receives only its goals.
+\end{itemize}
+So the tactics keep the single term (\cref{sec:qed:assembly}), and
+\code{MeBi Prove} is for the goals whose memory matters.
+
 \subsection{Cost}\label{sec:qed:cost}
 
 Measured on 11 November 2026 (the proof built by the tactic, then
-\code{Qed}; memory at most, for the whole file):
+\code{Qed}; memory at most, for the whole file; for \code{MeBi Prove},
+the proof built with its pieces checked, then the lemma checked,
+\cref{sec:qed:prove}):
 \begin{center}
 \begin{tabular}{lrrr}
 \toprule
@@ -432,6 +548,7 @@ Proc Test1--3, each & 0.1--0.4\,s & -- & -- \\
 CADP, one process, each & 0.8\,s & 0.2\,s & 0.5\,GB \\
 CADP, two processes (12,027 pairs) & 3.3\,s & 1.7\,s & 0.83\,GB \\
 CADP, three processes (7.9M pairs) & 124\,s & 144\,s & 6.6\,GB \\
+\quad by \code{MeBi Prove} (12 November) & 231\,s & 0.4\,s & 2.6\,GB \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -441,8 +558,9 @@ Now the three-process proof's main term holds 828,865 facts, and the
 packs' memberships, about 280,000 facts in all, are checked as constants
 while the proof is built (59\,s of the 124\,s). The whole file,
 \file{examples/CADP/ThreeProcesses.v}, compiles in 293\,s, with 6.6\,GB
-at most, the compiled file written (113\,MB). Every example therefore
-ends with \code{Qed}. What the cost grows with is the certificate itself:
+at most, the compiled file written (113\,MB); by \code{MeBi Prove},
+in 279\,s, with 2.6\,GB at most (\cref{sec:qed:prove}), as the example
+now does. Every example is therefore proved. What the cost grows with is the certificate itself:
 the facts the kernel checks, about 6\,KB of its memory each, which only
 the optimisations of \cref{sec:optimisations} can reduce.
 

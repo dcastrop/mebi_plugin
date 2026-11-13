@@ -729,6 +729,19 @@ module Plan = struct
     ; cover : psum list
     }
 
+  (** a normalisation tuple (doc/upto.md, route B): a vector, its
+      representative, and the item that gives it: the item's shape, its
+      slot map (slot [j] of the item's shape holds the vector's slot
+      [nmap.(j)]), its path (each step's source shape and reordering
+      summand, by index in [Skeleton.summands_of]) *)
+  type pnorm =
+    { nfrom : int array
+    ; nto : int array
+    ; nshape : Skeleton.shape
+    ; nmap : int array
+    ; npath : (Skeleton.shape * int) list
+    }
+
   (** a system, for its encoding: its width (positions after the shape),
       its shapes (number, shape, each slot's position), its start *)
   type psys =
@@ -736,6 +749,11 @@ module Plan = struct
     ; pshapes : (int * Skeleton.shape * int array) list
     ; pstart : Constr.t
     ; plts : Names.inductive
+    ; pstart_v : int array
+      (** the start's vector, not normalised (up to reordering) *)
+    ; pnorm : pnorm list
+      (** up to reordering: each vector met that is not its own
+          representative *)
     }
 
   type t =
@@ -958,6 +976,146 @@ let split_target (e : encoder) (t : Constr.t) : string * int * tslot list =
   Skeleton.key shape, shape_id e.tb shape, slots
 ;;
 
+(* {1 Up to reordering (doc/upto.md, route B)}
+
+   A reordering summand only moves slots: its target is a shape and a
+   slot map. A shape's class is saturated under the reordering summands,
+   value-free: each item a shape and a slot map, with its path. A
+   vector's representative is the least, lexicographically, of its
+   shape's items applied to its values. *)
+
+(** an item of a shape's class: a shape reachable from it by reordering
+    summands; slot [j] of [ishape] holds the source's slot [imap.(j)];
+    the path, each step its source shape and the index of the reordering
+    summand fired (in {!Skeleton.summands_of}'s order) *)
+type item =
+  { ishape : Skeleton.shape
+  ; imap : int array
+  ; ipath : (Skeleton.shape * int) list
+  }
+
+(** [is_reordering cong sm]: [sm]'s innermost rule is one of [cong], and
+    its target only moves slots *)
+let is_reordering (cong : string list) (sm : Skeleton.summand) : bool =
+  match List.rev sm.Skeleton.chain with
+  | last :: _ ->
+    List.mem last cong
+    && List.for_all
+         (function Skeleton.Moved _ -> true | Skeleton.Computed _ -> false)
+         (Skeleton.target_slots sm.Skeleton.target)
+  | [] -> false
+;;
+
+(** the up-to state of a system: its congruence rules, the summands per
+    shape (by key), the items per shape (by key; [None] past [bound]) *)
+type upto =
+  { ucong : string list
+  ; usms : (string, Skeleton.summand list) Hashtbl.t
+  ; uitems : (string, item list option) Hashtbl.t
+  ; ubound : int
+  }
+
+let upto_off = ref false
+
+let upto_bound () =
+  match Sys.getenv_opt "MEBI_UPTO_BOUND" with
+  | Some b -> (try int_of_string b with _ -> 50_000)
+  | None -> 50_000
+;;
+
+let usummands (c : ctx) lts (u : upto) (sh : Skeleton.shape) =
+  let k = Skeleton.key sh in
+  match Hashtbl.find_opt u.usms k with
+  | Some l -> l
+  | None ->
+    let l = Skeleton.summands_of c.env c.sigma lts sh in
+    Hashtbl.add u.usms k l;
+    l
+;;
+
+(** [saturate c lts u sh]: the items of [sh]'s class, [sh] itself first;
+    [None] if there are more than [u.ubound] *)
+let saturate (c : ctx) lts (u : upto) (sh : Skeleton.shape) : item list option =
+  let k0 = Skeleton.key sh in
+  match Hashtbl.find_opt u.uitems k0 with
+  | Some r -> r
+  | None ->
+    let n = List.length (Skeleton.slots sh) in
+    let seen = Hashtbl.create 64 in
+    let q = Queue.create () in
+    let start = { ishape = sh; imap = Array.init n Fun.id; ipath = [] } in
+    Hashtbl.add seen (k0, start.imap) ();
+    Queue.add start q;
+    let items = ref []
+    and count = ref 0 in
+    let r =
+      try
+        while Bool.not (Queue.is_empty q) do
+          let it = Queue.pop q in
+          items := it :: !items;
+          incr count;
+          if !count > u.ubound then raise Exit;
+          List.iteri
+            (fun i sm ->
+              if is_reordering u.ucong sm
+              then (
+                let t =
+                  Container.renumber (Skeleton.target_shape sm.Skeleton.target)
+                in
+                let m =
+                  Array.of_list
+                    (List.map
+                       (function
+                         | Skeleton.Moved j -> it.imap.(j)
+                         | Skeleton.Computed _ -> assert false)
+                       (Skeleton.target_slots sm.Skeleton.target))
+                in
+                let key = Skeleton.key t, m in
+                if Bool.not (Hashtbl.mem seen key)
+                then (
+                  Hashtbl.add seen key ();
+                  Queue.add
+                    { ishape = t
+                    ; imap = m
+                    ; ipath = it.ipath @ [ it.ishape, i ]
+                    }
+                    q)))
+            (usummands c lts u it.ishape)
+        done;
+        Some (List.rev !items)
+      with
+      | Exit -> None
+    in
+    Hashtbl.add u.uitems k0 r;
+    r
+;;
+
+(** [represent c lts u e v]: the representative of [v] and the item that
+    gives it ([None] for [v] itself, or a class past the bound) *)
+let represent (c : ctx) lts (u : upto) (e : encoder) (v : int array)
+  : int array * item option
+  =
+  let sh = Hashtbl.find e.tb.shape_of v.(0) in
+  match saturate c lts u sh with
+  | None | Some [] | Some [ _ ] -> v, None
+  | Some (_ :: rest) ->
+    let apply (it : item) =
+      let tsid = shape_id e.tb it.ishape in
+      let w = Array.make (Array.length v) 0 in
+      w.(0) <- tsid;
+      Array.iteri
+        (fun j src -> w.(pos_of e tsid j) <- v.(pos_of e v.(0) src))
+        it.imap;
+      w
+    in
+    List.fold_left
+      (fun ((best, _) as acc) it ->
+        let w = apply it in
+        if compare w best < 0 then w, Some it else acc)
+      (v, None)
+      rest
+;;
+
 (** A system explored: its reachable states, its summands and costs. *)
 type explored =
   { reach : Ldd.t
@@ -969,9 +1127,22 @@ type explored =
   ; escapes : int
   ; rounds : int
   ; enc : encoder (** to decode its vectors *)
+  ; ext : Ldd.t
+    (** up to reordering: the representatives and their one-step targets
+        (a move's target is not normalised); else [reach] *)
+  ; norm : (int array * int array * item) list
+    (** up to reordering: each vector met that is not its own
+        representative, its representative, and the item giving it *)
+  ; start_exact : int array (** the start's vector, not normalised *)
   }
 
-let explore (c : ctx) (e : encoder) (sys : system) : explored =
+(** up to reordering was asked for, but a summand is dynamic: explored
+    again without *)
+exception No_upto
+
+let explore ?(upto : upto option) (c : ctx) (e : encoder) (sys : system)
+  : explored
+  =
   let vwidth = e.width + 1 in
   (* the order of the slots in the vector (MEBI_ORDER=off: left to
      right): for a system of one shape, the slots its summands use most
@@ -1019,18 +1190,35 @@ let explore (c : ctx) (e : encoder) (sys : system) : explored =
         let a = Array.make n 0 in
         List.iteri (fun o j -> a.(j) <- o) order;
         Hashtbl.replace e.tb.perm k a)));
-  let start_v = encode e sys.start in
+  let start_exact = encode e sys.start in
+  (* up to reordering: each vector met replaced by its representative *)
+  let norm_tbl : (int array, int array * item) Hashtbl.t = Hashtbl.create 64 in
+  let normalize (v : int array) : int array =
+    match upto with
+    | None -> v
+    | Some u ->
+      (match Hashtbl.find_opt norm_tbl v with
+       | Some (r, _) -> r
+       | None ->
+         (match represent c sys.lts u e v with
+          | r, Some it ->
+            Hashtbl.replace norm_tbl v (r, it);
+            r
+          | r, None -> r))
+  in
+  let start_v = normalize start_exact in
   let by_shape : (int, summand list) Hashtbl.t = Hashtbl.create 8 in
   let summands_of sid =
     match Hashtbl.find_opt by_shape sid with
     | Some l -> l
     | None ->
       let shape = Hashtbl.find e.tb.shape_of sid in
-      let l =
-        List.map
-          (make_summand e sid shape)
-          (Skeleton.summands_of e.env c.sigma sys.lts shape)
-      in
+      let sms = Skeleton.summands_of e.env c.sigma sys.lts shape in
+      if
+        upto <> None
+        && List.exists (fun (sm : Skeleton.summand) -> sm.Skeleton.dynamic) sms
+      then raise No_upto;
+      let l = List.map (make_summand e sid shape) sms in
       Hashtbl.add by_shape sid l;
       l
   in
@@ -1231,6 +1419,7 @@ let explore (c : ctx) (e : encoder) (sys : system) : explored =
   in
   let visited = ref (Ldd.cube start_v) in
   let frontier = ref (Ldd.cube start_v) in
+  let ext = ref (Ldd.cube start_v) in
   let rounds = ref 0 in
   let escaped_states (sm : summand) (s : Ldd.t) =
     if sm.escaped <> []
@@ -1273,6 +1462,22 @@ let explore (c : ctx) (e : encoder) (sys : system) : explored =
         in
         let f = Ldd.minus next !visited in
         Ldd.release next;
+        let f =
+          if upto = None
+          then f
+          else (
+            (* the targets as they are, then their representatives *)
+            let x = Ldd.union !ext f in
+            Ldd.release !ext;
+            ext := x;
+            let reps =
+              Ldd.of_list (List.map normalize (Ldd.elements ~limit:max_int f))
+            in
+            Ldd.release f;
+            let f' = Ldd.minus reps !visited in
+            Ldd.release reps;
+            f')
+        in
         if Bool.not (Ldd.is_empty f)
         then (
           let v = Ldd.union !visited f
@@ -1301,6 +1506,9 @@ let explore (c : ctx) (e : encoder) (sys : system) : explored =
   ; escapes = !escapes
   ; rounds = !rounds
   ; enc = e
+  ; ext = (if upto = None then !visited else Ldd.union !ext !visited)
+  ; norm = Hashtbl.fold (fun v (r, it) acc -> (v, r, it) :: acc) norm_tbl []
+  ; start_exact
   }
 ;;
 
@@ -1431,11 +1639,30 @@ let check
     ; lay = layout ()
     }
   in
-  let rec run_explore s w =
-    match explore c (encoder s w) s with
-    | x -> x
-    | exception Too_wide n -> run_explore s (max n (2 * w))
+  (* up to reordering (doc/upto.md, route B): weak goals, an LTS with
+     congruence rules, no dynamic summand; off with [MEBI_UPTO=off], or
+     [upto_off] (the plugin's retry when the proof up to it fails) *)
+  let upto_of (s : system) : upto option =
+    if !upto_off || Sys.getenv_opt "MEBI_UPTO" = Some "off" || strong
+    then None
+    else (
+      match Skeleton.congruence env sigma s.lts with
+      | [], _ -> None
+      | names, _ ->
+        Some
+          { ucong = List.map Names.Id.to_string names
+          ; usms = Hashtbl.create 16
+          ; uitems = Hashtbl.create 16
+          ; ubound = upto_bound ()
+          })
   in
+  let rec run_explore ?upto s w =
+    match explore ?upto c (encoder s w) s with
+    | x -> x
+    | exception Too_wide n -> run_explore ?upto s (max n (2 * w))
+    | exception No_upto -> run_explore s w
+  in
+  let run_explore s w = run_explore ?upto:(upto_of s) s w in
   let ea = run_explore a width in
   let eb = run_explore b width in
   (* the silent label: [None]; none at all for strong (bi)similarity *)
@@ -1603,10 +1830,46 @@ let check
   let b_first = match kind with Sim -> true | Bisim -> wb <= wa in
   let off_a = if b_first then wb else 0
   and off_b = if b_first then 0 else wa in
-  let uni =
+  (* the pairs the game starts from (the representatives', up to
+     reordering), and the pairs an answer may pass through (with the
+     one-step targets) *)
+  let z0 =
     if b_first
     then Ldd.product eb.reach ~width:wb ea.reach
     else Ldd.product ea.reach ~width:wa eb.reach
+  in
+  let uni =
+    if ea.ext == ea.reach && eb.ext == eb.reach
+    then z0
+    else if b_first
+    then Ldd.product eb.ext ~width:wb ea.ext
+    else Ldd.product ea.ext ~width:wa eb.ext
+  in
+  (* up to reordering: each side's normalisation relation (every
+     position read and written), a silent step of any answer *)
+  let norm_rel (x : explored) =
+    if x.norm = []
+    then None
+    else (
+      let w = x.vwidth in
+      Some
+        (Ldd.of_list
+           (List.map
+              (fun (v, r, _) ->
+                Array.init (2 * w) (fun i ->
+                  if i mod 2 = 0 then v.(i / 2) else r.(i / 2)))
+              x.norm)))
+  in
+  let norm_a = norm_rel ea
+  and norm_b = norm_rel eb in
+  let nrels =
+    List.filter_map
+      (fun (n, x, offset) ->
+        Stdlib.Option.map
+          (fun rel ->
+            Ldd.rel_meta (meta_levels ~offset (Array.make x.vwidth RW)), rel)
+          n)
+      [ norm_a, ea, off_a; norm_b, eb, off_b ]
   in
   (* every relation of a side, per label, with its meta for pairs; made
      once *)
@@ -1661,6 +1924,13 @@ let check
           z)
         else (
           let p = pre x ~offset t fresh in
+          let p =
+            List.fold_left
+              (fun acc (meta, rel) ->
+                union_into acc (Ldd.relprev fresh ~rel ~meta ~within:uni))
+              p
+              nrels
+          in
           Ldd.release fresh;
           let fresh = Ldd.minus p z in
           Ldd.release p;
@@ -1739,7 +2009,7 @@ let check
       Ldd.release z;
       gfp z')
   in
-  let z = gfp (Ldd.union uni (Ldd.empty ())) in
+  let z = gfp (Ldd.union z0 (Ldd.empty ())) in
   (* [proof_log] (doc/certificate.md, A; set by the plugin, from
      [Set MeBi Log]): once the fixpoint has finished, its check, made again
      as images with Sylvan's proof log on (the cache cleared first, so that
@@ -1812,6 +2082,29 @@ let check
            Hashtbl.add inv_tbl (offset, l) r;
            r
        in
+       (* up to reordering: each side's normalisation relation backwards,
+          as a silent step of any answer (in the plan, label -1 for the
+          vector's first part, -2 for its second; chain ["<norm>"]) *)
+       let all_rw_of (x : explored) = Array.make x.vwidth RW in
+       let norm_inv =
+         List.filter_map
+           (fun (n, x, offset) ->
+             match n with
+             | None -> None
+             | Some rel ->
+               let codes = all_rw_of x in
+               (match inverse codes rel with
+                | None -> None
+                | Some inv ->
+                  let meta = Ldd.rel_meta (meta_levels ~offset codes) in
+                  let lab = if offset = 0 then -1 else -2 in
+                  Hashtbl.replace
+                    rinfo
+                    (lab, Ldd.index meta, Ldd.index inv)
+                    (lab, codes_string codes, inv, -1, [ "<norm>" ]);
+                  Some (lab, (meta, inv))))
+           [ norm_a, ea, off_a; norm_b, eb, off_b ]
+       in
        let ix = Ldd.index in
        let img ~role s (meta, rel) =
          let r = Ldd.relprod s ~rel ~meta in
@@ -1820,8 +2113,9 @@ let check
        in
        (* the images of [src] by [rs] (label [l]) and their union from the
           empty set, left to right, with their plan *)
-       let images ~role l src rs =
-         let results = List.map (img ~role src) rs in
+       let images ~role ?(extra = []) l src rs =
+         let rs = List.map (fun r -> l, r) rs @ extra in
+         let results = List.map (fun (_, r) -> img ~role src r) rs in
          let acc = ref (Ldd.empty ())
          and unions = ref [] in
          List.iter
@@ -1834,7 +2128,8 @@ let check
          , { Plan.src = ix src
            ; rels =
                List.map
-                 (fun (m, r) -> { Plan.label = l; meta = ix m; rel = ix r })
+                 (fun (l, (m, r)) ->
+                   { Plan.label = l; meta = ix m; rel = ix r })
                  rs
            ; imgs = List.map ix results
            ; unions = List.rev !unions
@@ -1855,7 +2150,7 @@ let check
                , { Plan.cstart = ix z0; rounds = List.rev rounds; final = ix z }
                )
              else (
-               let p, pi = images ~role:1 t fresh rs in
+               let p, pi = images ~role:1 ~extra:norm_inv t fresh rs in
                let fresh' = Ldd.minus p z in
                let z' = Ldd.union z fresh' in
                go
@@ -1939,20 +2234,12 @@ let check
            mover.enc.lay.spos
            []
        in
+       (* [rinfo] holds the answerer's relations backwards only: a mover's
+          relation can be the very node of an answerer's inverse (Sylvan
+          stores equal sets once: the inverse of a reassociation is the
+          other one), and recorded under the same key its chain and its
+          direction would replace the inverse's *)
        let check ~mover_a mover ~moff answerer ~aoff =
-         List.iter
-           (fun (sm : summand) ->
-             List.iter
-               (fun (r : rel) ->
-                 Hashtbl.replace
-                   rinfo
-                   ( r.label
-                   , Ldd.index
-                       (Ldd.rel_meta (meta_levels ~offset:moff r.rcodes))
-                   , Ldd.index r.rel )
-                   (r.label, codes_string r.rcodes, r.rel, sm.sid, sm.chain))
-               sm.rels)
-           (mover : explored).summands;
          let cov = coverage mover ~moff in
          let tz, tzc = back_tau answerer ~offset:aoff z in
          let plabels = ref [] in
@@ -2010,6 +2297,17 @@ let check
                []
          ; pstart = s.start
          ; plts = s.lts
+         ; pstart_v = x.start_exact
+         ; pnorm =
+             List.map
+               (fun (v, r, (it : item)) ->
+                 { Plan.nfrom = v
+                 ; nto = r
+                 ; nshape = it.ishape
+                 ; nmap = it.imap
+                 ; npath = it.ipath
+                 })
+               x.norm
          }
        in
        let fixed =

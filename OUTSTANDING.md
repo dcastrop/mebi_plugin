@@ -14,9 +14,11 @@ new is found, add one line, and put its detail in the right `doc/` file.
 - **Escaped summands and premises the rules cannot evaluate:** the proof
   refuses them ([`doc/limitations.md`](doc/limitations.md)).
 - **The optimisations on the certificate:** confluence reduction, static
-  confluence, movers, compositional proofs, up to structural congruence
-  ([`doc/optimisations.md`](doc/optimisations.md); detection of
-  reorderings is built, [`doc/upto.md`](doc/upto.md)).
+  confluence, movers, compositional proofs
+  ([`doc/optimisations.md`](doc/optimisations.md)).
+- **Up to reordering, what is left:** sorting for classes past the
+  bound, and fewer facts for the normalisation closure
+  ([`doc/upto.md`](doc/upto.md), stage 4).
 
 ## Decisions to double-check
 

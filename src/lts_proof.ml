@@ -237,7 +237,8 @@ type st =
     (** each local name: its order, its declaration, the names it uses *)
   ; mutable effs : Evd.side_effects option
     (** the constants declared so far (as [abstract] declares its
-        sub-proofs); [None]: the definitions are [let]s of the term *)
+        sub-proofs: a tactic's global declarations do not last); [None]:
+        the definitions are [let]s of the term *)
   ; consts : (Names.Id.t, Constr.t) Hashtbl.t
     (** each local name declared: its term (its constant, applied to the
         facts it uses; or, a small one, its body) *)
@@ -251,11 +252,14 @@ type st =
     (** the universe constraints declared with the constants *)
   ; prefix : string (** the lemma's name: the constants' prefix *)
   ; mutable nconst : int
+  ; global : bool
+    (** the constants global, as a command declares them (else side
+        effects of the proof) *)
   ; used_facts : (Names.Id.t, unit) Hashtbl.t
     (** the facts the constants declared are over *)
   }
 
-let new_st ?(constants = true) (prefix : string) =
+let new_st ?(constants = true) ?(global = false) (prefix : string) =
   Hashtbl.reset qtbl;
   { env = Global.env ()
   ; named = []
@@ -273,6 +277,7 @@ let new_st ?(constants = true) (prefix : string) =
   ; upushed = Univ.ContextSet.empty
   ; prefix
   ; nconst = 0
+  ; global
   ; used_facts = Hashtbl.create 1024
   }
 ;;
@@ -533,15 +538,43 @@ let declare_now st (n, body, ty, opaque) =
       let ctx = Univ.ContextSet.diff !univs st.upushed in
       st.upushed <- Univ.ContextSet.union st.upushed ctx;
       let t0 = Unix.gettimeofday () in
-      let kn, effs =
-        try Evd.push_side_effects (fresh_label st n) decl ctx effs with
-        | e when CErrors.noncritical e ->
-          failf
-            "lts proof: the kernel refuses %s: %s"
-            n
-            (Pp.string_of_ppcmds (CErrors.print e))
+      let refused e =
+        failf
+          "lts proof: the kernel refuses %s: %s"
+          n
+          (Pp.string_of_ppcmds (CErrors.print e))
       in
-      st.effs <- Some effs;
+      let kn =
+        if st.global
+        then (
+          (* a global constant, as a command declares one: checked now,
+             kept once (its universes declared with it) *)
+          try
+            Declare.declare_constant
+              ~name:(fresh_label st n)
+              ~kind:
+                (if opaque
+                 then Decls.(IsProof Lemma)
+                 else Decls.(IsDefinition Definition))
+              (Declare.DefinitionEntry
+                 (Declare.definition_entry
+                    ~opaque
+                    ~types:ty
+                    ~univs:
+                      (UState.Monomorphic_entry ctx, UnivNames.empty_binders)
+                    body))
+          with
+          | e when CErrors.noncritical e -> refused e)
+        else (
+          try
+            let kn, effs =
+              Evd.push_side_effects (fresh_label st n) decl ctx effs
+            in
+            st.effs <- Some effs;
+            kn
+          with
+          | e when CErrors.noncritical e -> refused e)
+      in
       st.nconst <- st.nconst + 1;
       if Unix.gettimeofday () -. t0 > 1.
       then mark "%s: the kernel's check %.1fs" n (Unix.gettimeofday () -. t0);
@@ -4741,7 +4774,18 @@ let meta_base = 500_000
 
 (* the proof of [AllT r (TSound L E l cs)] for the answerer's relation
    [k] (logged backwards), its diagram written out; and [cs] *)
-let soundness_rel (gn : gen) (en : enc) (k : int * int * int)
+(* [norm] (up to reordering): the relation stated instead of the LTS (its
+   text and term), and each tuple's proof from its shapes and the slots'
+   numbers before and after, instead of a derivation *)
+let soundness_rel
+      ?(norm :
+         (string
+         * Constr.t
+         * (shp -> shp -> int array -> int array -> Constr.t))
+           option)
+      (gn : gen)
+      (en : enc)
+      (k : int * int * int)
   : Constr.t * string * Constr.t
   =
   let st = gn.st in
@@ -4750,7 +4794,14 @@ let soundness_rel (gn : gen) (en : enc) (k : int * int * int)
   let n = String.length cs in
   if n = 0 || (cs.[0] <> 'O' && cs.[0] <> 'X')
   then failf "lts proof: a relation that does not read the shape";
-  let lab = List.assoc lid gn.plan.P.label_terms in
+  let lab =
+    if lid < 0
+    then (
+      match gn.plan.P.tau with
+      | Some t -> List.assoc t gn.plan.P.label_terms
+      | None -> failf "lts proof: a normalisation with no silent label")
+    else List.assoc lid gn.plan.P.label_terms
+  in
   let lbn = term st lab
   and csn = term st (codes_constr cs) in
   let code q = if q < n then cs.[q] else 'C' in
@@ -4849,7 +4900,7 @@ let soundness_rel (gn : gen) (en : enc) (k : int * int * int)
       in
       let allc _ q = cname q
       and allu j _ = uname j in
-      let lts = gind en.lts in
+      let lts = match norm with Some (t, _, _) -> t | None -> gind en.lts in
       let dty =
         let body = apps lts [ src allc; lbn; tgt allc ] in
         if frees = []
@@ -5061,17 +5112,57 @@ let soundness_rel (gn : gen) (en : enc) (k : int * int * int)
                    then value (oof q')
                    else Constr.mkMeta (meta_base + j)))
           in
-          let derivs = Learn.derive_chain env sigma en.lts src chain in
+          let body_norm =
+            match norm with
+            | None -> None
+            | Some (_, _, pf) ->
+              if frees <> []
+              then failf "lts proof: a normalisation that copies a slot";
+              let srcn = Array.map (fun q -> oof q) sh.pos in
+              let tgtn =
+                Array.map
+                  (fun q' -> if code q' = 'X' then vof q' else oof q')
+                  sh'.pos
+              in
+              Some (pf sh sh' srcn tgtn)
+          in
+          ignore src;
+          ignore expected;
+          let derivs =
+            if body_norm <> None
+            then []
+            else Learn.derive_chain env sigma en.lts src chain
+          in
           let d =
-            match
-              List.find_opt
-                (fun (dv : Learn.deriv) ->
-                  eq_closed dv.Learn.dlbl lab
-                  && Constr.equal dv.Learn.dtgt expected)
-                derivs
-            with
-            | Some x -> x
-            | None -> failf "lts proof: a tuple with no derivation"
+            if body_norm <> None
+            then None
+            else
+              Some
+                (match
+                   List.find_opt
+                     (fun (dv : Learn.deriv) ->
+                       eq_closed dv.Learn.dlbl lab
+                       && Constr.equal dv.Learn.dtgt expected)
+                     derivs
+                 with
+                 | Some x -> x
+                 | None ->
+                   let pr t =
+                     Pp.string_of_ppcmds (Printer.pr_constr_env env sigma t)
+                   in
+                   failf
+                     "lts proof: a tuple with no derivation: chain [%s], from \
+                      %s, label %s, expected %s; derived: %s"
+                     (String.concat ";" chain)
+                     (pr src)
+                     (pr lab)
+                     (pr expected)
+                     (String.concat
+                        " | "
+                        (List.map
+                           (fun (dv : Learn.deriv) ->
+                             pr dv.Learn.dlbl ^ " -> " ^ pr dv.Learn.dtgt)
+                           derivs)))
           in
           let m = List.length frees in
           let meta mt =
@@ -5090,7 +5181,12 @@ let soundness_rel (gn : gen) (en : enc) (k : int * int * int)
                ; Constr.mkRel (m - i)
               |]
           in
-          let body = deriv_term d meta in
+          let body =
+            match body_norm, d with
+            | Some b, _ -> b
+            | None, Some d -> deriv_term d meta
+            | None, None -> assert false
+          in
           let dfun =
             List.fold_left
               (fun acc _ -> Constr.mkLambda (Context.anonR, n_ty (), acc))
@@ -5110,7 +5206,9 @@ let soundness_rel (gn : gen) (en : enc) (k : int * int * int)
       (c "mebi.de.TSound")
       [| var en.m
        ; en.a_c
-       ; Constr.mkIndU (en.lts, UVars.Instance.empty)
+       ; (match norm with
+          | Some (_, r, _) -> r
+          | None -> Constr.mkIndU (en.lts, UVars.Instance.empty))
        ; var en.e
        ; var lbn
        ; var csn
@@ -5123,6 +5221,953 @@ let soundness_rel (gn : gen) (en : enc) (k : int * int * int)
   let _, pf = allt_build ~top:ty q !leaves in
   let sn = def st ~opaque:true "snd" pf ty in
   var sn, cs, lab
+;;
+
+(* {1 Up to reordering (doc/upto.md, route B)}
+
+   For a system the engine explored up to reordering: the one-step
+   reorderings [Ro] (a disjunction, one disjunct per reordering summand
+   of a shape of the encoding, over the slots' numbers: a slot holds a
+   value of its type's table, [T_v u]); its eliminator, its inverse paths,
+   and its commutation with the steps of the LTS (by small inversion: a
+   rule that needs a slot to start with a constructor no value starts
+   with is refuted; a slot's own step is kept as a hypothesis, its target
+   a value of the table by the closure lemma [Vn]), so that [Cong Ro] is
+   a strong bisimulation ([cong_equiv], theories/DdUpto.v). *)
+
+let du s = g ("mebi.du." ^ s)
+let tor_ty a b = apps (g "core.or.type") [ a; b ]
+let tand_ty a b = apps (g "core.and.type") [ a; b ]
+
+let tex_ty x ty body =
+  apps
+    (g "core.ex.type")
+    [ ty; Printf.sprintf "(fun (%s : %s) => %s)" x ty body ]
+;;
+
+let rec ors = function
+  | [] -> tfalse ()
+  | [ x ] -> x
+  | x :: rest -> tor_ty x (ors rest)
+;;
+
+let rec ands = function
+  | [] -> ttrue ()
+  | [ x ] -> x
+  | x :: rest -> tand_ty x (ands rest)
+;;
+
+let rec conjs = function
+  | [] -> tI ()
+  | [ x ] -> x
+  | x :: rest -> tconj x (conjs rest)
+;;
+
+let ucount = ref 0
+
+let ufresh base =
+  incr ucount;
+  Printf.sprintf "%s%d" base !ucount
+;;
+
+(* [match h with or_introl a => case 0 a | or_intror b => ...], [n]
+   disjuncts, right-nested *)
+let destr_or (n : int) (h : string) (case : int -> string -> string) : string =
+  let rec go k h =
+    if k = n - 1
+    then case k h
+    else (
+      let a = ufresh "mb_o"
+      and b = ufresh "mb_o" in
+      Printf.sprintf
+        "(match %s with | %s => %s | %s => %s end)"
+        h
+        (apps (g "mebi.de.or_introl") [ "_"; "_"; a ])
+        (case k a)
+        (apps (g "mebi.de.or_intror") [ "_"; "_"; b ])
+        (go (k + 1) b))
+  in
+  if n = 0 then apps (g "mebi.de.False_ind") [ "_"; h ] else go 0 h
+;;
+
+(* the number of a value in its type's table *)
+let value_num (gn : gen) (key : string) (c : Constr.t) : int =
+  let vs =
+    match List.assoc_opt key gn.svals with
+    | Some l -> l
+    | None -> failf "up to: no values of %s" key
+  in
+  match List.find_opt (fun (_, v) -> eq_closed v c) vs with
+  | Some (i, _) -> i
+  | None -> failf "up to: a step to a value no state holds"
+;;
+
+(* [Vn]: [forall u a w, L (T_v u) a w -> exists n, w = T_v n], [L] the
+   slots' LTS: each value of the table (and the default) by its step
+   lemma *)
+let vn_tbl : ((string * Names.inductive) * string) list ref = ref []
+
+let vn (gn : gen) (key : string) (ind : Names.inductive) : string =
+  match
+    List.find_opt
+      (fun ((k, i), _) -> k = key && Names.Ind.CanOrd.equal i ind)
+      !vn_tbl
+  with
+  | Some (_, n) -> n
+  | None ->
+    let st = gn.st in
+    let _, lt_c, _ = lts_types ind in
+    let lty = term st lt_c in
+    let nt = g "num.N.type" in
+    let qtext v =
+      Printf.sprintf
+        "forall (mb_a : %s) (mb_w : %s), %s -> %s"
+        lty
+        key
+        (apps (gind ind) [ v; "mb_a"; "mb_w" ])
+        (tex_ty "mb_n" nt (teq "mb_w" (tval key "mb_n")))
+    in
+    let q = Printf.sprintf "(fun (mb_z : %s) => %s)" key (qtext "mb_z") in
+    let qproof (c : Constr.t) =
+      let asn, steps = as_lemma gn ind c in
+      let q' =
+        Printf.sprintf
+          "(fun (mb_a : %s) (mb_w : %s) => %s)"
+          lty
+          key
+          (tex_ty "mb_n" nt (teq "mb_w" (tval key "mb_n")))
+      in
+      let cases =
+        List.map
+          (fun (_, t) ->
+            apps
+              (g "core.ex.intro")
+              [ "_"; "_"; num st (value_num gn key (nf t)); trefl ])
+          steps
+      in
+      Printf.sprintf
+        "(fun mb_a mb_w mb_s => %s)"
+        (apps asn ((q' :: cases) @ [ "mb_a"; "mb_w"; "mb_s" ]))
+    in
+    let vs = List.assoc key gn.svals in
+    let tr = List.fold_left (fun t (i, v) -> insert t i v) Leaf vs in
+    let tallty t =
+      apps
+        (g "mebi.de.TAll")
+        [ key
+        ; Printf.sprintf "(fun (_ : %s) => %s)" (g "num.pos.type") q
+        ; term
+            st
+            (trie_constr
+               (var key)
+               (let rec conv = function
+                  | Leaf -> Leaf
+                  | Node (v, l, r) ->
+                    Node
+                      ( Stdlib.Option.map (fun x -> var (term st x)) v
+                      , conv l
+                      , conv r )
+                in
+                conv t))
+        ]
+    in
+    let rec tallv t =
+      match t with
+      | Leaf -> tI ()
+      | Node (v, l, r) ->
+        let a_ty, a_pf =
+          match v with
+          | Some x -> apps q [ term st x ], qproof x
+          | None -> ttrue (), tI ()
+        in
+        apps
+          (g "core.and.conj")
+          [ a_ty
+          ; tand_ty (tallty l) (tallty r)
+          ; a_pf
+          ; apps (g "core.and.conj") [ tallty l; tallty r; tallv l; tallv r ]
+          ]
+    in
+    let d =
+      match vs with
+      | (_, v) :: _ -> v
+      | [] -> failf "up to: no values of %s" key
+    in
+    let text =
+      apps
+        (g "mebi.de.val_all")
+        [ key; key ^ "_d"; key ^ "_tr"; q; qproof d; tallv tr ]
+    in
+    let ty =
+      elab_type
+        st
+        (Printf.sprintf "forall (mb_u : %s), %s" nt (qtext (tval key "mb_u")))
+    in
+    let n = def st ~opaque:true "Vn" (elab st ~expected:ty text) ty in
+    vn_tbl := ((key, ind), n) :: !vn_tbl;
+    n
+;;
+
+(* a disjunct of [Ro]: a reordering summand of a shape, its target shape,
+   its slot map (target slot [j] holds source slot [dmap.(j)]), its rule
+   chain *)
+type disj =
+  { dsrc : shp
+  ; dtgt : shp
+  ; dmap : int array
+  ; dchain : string list
+  }
+
+type ucong =
+  { ro : string
+  ; ro_inv : string
+  ; equiv : string
+  ; disjs : disj list
+  ; inj : int -> string list -> string
+    (** [inj k ns]: [Ro (src ns) (tgt (map ns))] by disjunct [k] *)
+  ; uen : enc
+  }
+
+let rules_only ch =
+  List.filter (fun x -> Bool.not (String.length x > 0 && x.[0] = '<')) ch
+;;
+
+let find_shp (en : enc) (sh : Skeleton.shape) : shp =
+  let k = Skeleton.key sh in
+  match List.find_opt (fun s -> Skeleton.key s.shape = k) en.shapes with
+  | Some s -> s
+  | None -> failf "up to: a reordering's shape the encoding lacks"
+;;
+
+let moved_map (tgt : Skeleton.target) : int array =
+  Array.of_list
+    (List.map
+       (function
+         | Skeleton.Moved i -> i
+         | Skeleton.Computed _ -> failf "up to: a reordering computes a slot")
+       (Skeleton.target_slots tgt))
+;;
+
+(* the summands of a shape, cached *)
+let usms_tbl : (string, Skeleton.summand list) Hashtbl.t = Hashtbl.create 16
+
+let usms (en : enc) (sh : Skeleton.shape) =
+  let k = Skeleton.key sh in
+  match Hashtbl.find_opt usms_tbl k with
+  | Some l -> l
+  | None ->
+    let env = Global.env () in
+    let l = Skeleton.summands_of env (Evd.from_env env) en.lts sh in
+    Hashtbl.add usms_tbl k l;
+    l
+;;
+
+(* a derivation of a rule chain (outermost first) of [ind], the innermost
+   rule's premise [inner] (or none) *)
+let deriv_text
+      (ind : Names.inductive)
+      (chain : string list)
+      (inner : string option)
+  : string
+  =
+  let ris = rules_of ind in
+  let rec go = function
+    | [] -> failf "up to: an empty rule chain"
+    | [ r ] -> one r inner
+    | r :: rest -> one r (Some (go rest))
+  and one r prem =
+    let ri =
+      match
+        List.find_opt (fun ri -> Names.Id.to_string ri.rule.Rules.name = r) ris
+      with
+      | Some ri -> ri
+      | None -> failf "up to: rule %s not found" r
+    in
+    let nprem = Array.fold_left (fun a b -> if b then a + 1 else a) 0 ri.prem in
+    if nprem > 1 then failf "up to: a rule with %d premises" nprem;
+    let args =
+      List.init ri.n (fun i ->
+        if ri.prem.(i)
+        then (
+          match prem with
+          | Some p -> p
+          | None -> failf "up to: a premise with no derivation")
+        else "_")
+    in
+    apps (gcons (ind, ri.ridx)) args
+  in
+  go chain
+;;
+
+let upto_cong (gn : gen) ?(also : enc option) (en : enc) : ucong =
+  (* the other system's shapes too, when it is of the same LTS *)
+  let en =
+    match also with
+    | Some e2 when Names.Ind.CanOrd.equal e2.lts en.lts ->
+      { en with
+        shapes =
+          en.shapes
+          @ List.filter
+              (fun (s2 : shp) ->
+                Bool.not
+                  (List.exists
+                     (fun (s1 : shp) ->
+                       Skeleton.key s1.shape = Skeleton.key s2.shape)
+                     en.shapes))
+              e2.shapes
+      }
+    | _ -> en
+  in
+  let st = gn.st in
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let cong =
+    List.map Names.Id.to_string (fst (Skeleton.congruence env sigma en.lts))
+  in
+  let disjs =
+    List.concat_map
+      (fun (sh : shp) ->
+        List.filter_map
+          (fun (sm : Skeleton.summand) ->
+            if Learn.is_reordering cong sm
+            then (
+              let t =
+                Container.renumber (Skeleton.target_shape sm.Skeleton.target)
+              in
+              Some
+                { dsrc = sh
+                ; dtgt = find_shp en t
+                ; dmap = moved_map sm.Skeleton.target
+                ; dchain = rules_only sm.Skeleton.chain
+                })
+            else None)
+          (usms en sh.shape))
+      en.shapes
+  in
+  let nd = List.length disjs in
+  let m = en.m in
+  let lname = gind en.lts in
+  let nt = g "num.N.type" in
+  let slot_names n base = List.init n (fun j -> Printf.sprintf "%s%d" base j) in
+  (* a shape's state from its slots' numbers *)
+  let st_of (sh : shp) (ns : string list) =
+    apps sh.fill (List.mapi (fun j u -> tval sh.keys.(j) u) ns)
+  in
+  let mapped (d : disj) (ns : string list) =
+    Array.to_list (Array.map (List.nth ns) d.dmap)
+  in
+  let disj_text (d : disj) x y =
+    let n = Array.length d.dsrc.keys in
+    let ns = slot_names n "mb_r" in
+    let body =
+      tand_ty (teq x (st_of d.dsrc ns)) (teq y (st_of d.dtgt (mapped d ns)))
+    in
+    List.fold_right (fun u acc -> tex_ty u nt acc) ns body
+  in
+  let ro_ty = elab_type st (Printf.sprintf "%s -> %s -> Prop" m m) in
+  let ro =
+    def
+      st
+      "Ro"
+      (elab
+         st
+         ~expected:ro_ty
+         (Printf.sprintf
+            "fun (mb_x mb_y : %s) => %s"
+            m
+            (ors (List.map (fun d -> disj_text d "mb_x" "mb_y") disjs))))
+      ro_ty
+  in
+  let inj k (ns : string list) =
+    let p =
+      List.fold_right
+        (fun u acc -> apps (g "core.ex.intro") [ "_"; "_"; u; acc ])
+        ns
+        (tconj trefl trefl)
+    in
+    case_pattern k nd p
+  in
+  (* the eliminator: a property of every pair of [Ro], from one per
+     disjunct *)
+  let hyp_ty (d : disj) prop =
+    let n = Array.length d.dsrc.keys in
+    let ns = slot_names n "mb_r" in
+    Printf.sprintf
+      "forall %s, %s"
+      (String.concat
+         " "
+         (List.map (fun u -> Printf.sprintf "(%s : %s)" u nt) ns))
+      (prop (st_of d.dsrc ns) (st_of d.dtgt (mapped d ns)))
+  in
+  let elim_ty =
+    Printf.sprintf
+      "forall (mb_P : %s -> %s -> Prop), %s forall (mb_x mb_y : %s), %s -> \
+       mb_P mb_x mb_y"
+      m
+      m
+      (String.concat
+         ""
+         (List.map
+            (fun d ->
+              paren (hyp_ty d (fun a b -> apps "mb_P" [ a; b ])) ^ " -> ")
+            disjs))
+      m
+      (apps ro [ "mb_x"; "mb_y" ])
+  in
+  let elim_text =
+    let hs = List.mapi (fun k _ -> Printf.sprintf "mb_c%d" k) disjs in
+    let case k h =
+      let d = List.nth disjs k in
+      let n = Array.length d.dsrc.keys in
+      let ns = slot_names n "mb_r" in
+      let rec ex_d j h =
+        if j = n
+        then (
+          let ex = ufresh "mb_e"
+          and ey = ufresh "mb_e" in
+          let src = st_of d.dsrc ns in
+          Printf.sprintf
+            "(match %s with %s => (match %s in %s return %s with %s => (match \
+             %s in %s return %s with %s => %s end) end) end)"
+            h
+            (apps (g "core.and.conj") [ "_"; "_"; ex; ey ])
+            (apps (g "mebi.de.eq_sym") [ "_"; "_"; "_"; ex ])
+            (apps (g "core.eq.type") [ "_"; "_"; "mb_x0" ])
+            (apps "mb_P" [ "mb_x0"; "mb_y" ])
+            (paren (g "core.eq.refl" ^ " _ _"))
+            (apps (g "mebi.de.eq_sym") [ "_"; "_"; "_"; ey ])
+            (apps (g "core.eq.type") [ "_"; "_"; "mb_y0" ])
+            (apps "mb_P" [ src; "mb_y0" ])
+            (paren (g "core.eq.refl" ^ " _ _"))
+            (apps (List.nth hs k) ns))
+        else (
+          let h' = ufresh "mb_e" in
+          Printf.sprintf
+            "(match %s with %s => %s end)"
+            h
+            (apps (g "core.ex.intro") [ "_"; "_"; List.nth ns j; h' ])
+            (ex_d (j + 1) h'))
+      in
+      ex_d 0 h
+    in
+    Printf.sprintf
+      "fun mb_P %s mb_x mb_y mb_H => %s"
+      (String.concat " " hs)
+      (destr_or nd "mb_H" case)
+  in
+  let elim_t = elab_type st elim_ty in
+  let elim =
+    def st ~opaque:true "roe" (elab st ~expected:elim_t elim_text) elim_t
+  in
+  (* inverse paths: each disjunct's inverse disjunct, one step back *)
+  let inv_case (d : disj) =
+    let n = Array.length d.dsrc.keys in
+    let ns = slot_names n "mb_r" in
+    let k' =
+      let rec find i = function
+        | [] -> failf "up to: a reordering with no inverse"
+        | d' :: rest ->
+          if
+            d'.dsrc.sid = d.dtgt.sid
+            && d'.dtgt.sid = d.dsrc.sid
+            && Array.length d'.dmap = n
+            && List.for_all
+                 (fun i -> d.dmap.(d'.dmap.(i)) = i)
+                 (List.init n Fun.id)
+          then i
+          else find (i + 1) rest
+      in
+      find 0 disjs
+    in
+    let ws = mapped d ns in
+    let x = st_of d.dsrc ns
+    and y = st_of d.dtgt ws in
+    Printf.sprintf
+      "(fun %s => %s)"
+      (String.concat " " ns)
+      (apps
+         (du "cong_step")
+         [ m; ro; y; x; x; inj k' ws; apps (du "cong_refl") [ m; ro; x ] ])
+  in
+  let inv_ty =
+    Printf.sprintf
+      "forall (mb_x mb_y : %s), %s -> %s"
+      m
+      (apps ro [ "mb_x"; "mb_y" ])
+      (apps (du "Cong") [ m; ro; "mb_y"; "mb_x" ])
+  in
+  let inv_t = elab_type st inv_ty in
+  let ro_inv =
+    def
+      st
+      ~opaque:true
+      "roi"
+      (elab
+         st
+         ~expected:inv_t
+         (apps
+            elim
+            (Printf.sprintf
+               "(fun (mb_x mb_y : %s) => %s)"
+               m
+               (apps (du "Cong") [ m; ro; "mb_y"; "mb_x" ])
+             :: List.map inv_case disjs)))
+      inv_t
+  in
+  (* commutation: each disjunct's lemma, by small inversion *)
+  let lty = en.lty in
+  let sim_prop x y =
+    Printf.sprintf
+      "forall (mb_a : %s) (mb_t : %s), %s -> %s"
+      lty
+      m
+      (apps lname [ x; "mb_a"; "mb_t" ])
+      (tex_ty
+         "mb_yy"
+         m
+         (tand_ty
+            (apps lname [ y; "mb_a"; "mb_yy" ])
+            (apps (du "Cong") [ m; ro; "mb_t"; "mb_yy" ])))
+  in
+  let commute (k : int) (d : disj) : string =
+    let src = d.dsrc
+    and tgt = d.dtgt in
+    let n = Array.length src.keys in
+    let holes = Array.init n (fun _ -> new_var ~name:"mb_u" nt) in
+    let hole_of v =
+      let r = ref (-1) in
+      Array.iteri (fun j h -> if h = v then r := j) holes;
+      !r
+    in
+    let a = new_var ~name:"mb_a" lty
+    and t = new_var ~name:"mb_t" m in
+    let rec xs_of (sh : Skeleton.shape) =
+      match sh with
+      | Container.Slot j -> U (holes.(j), src.keys.(j))
+      | Container.Node nd ->
+        Cn
+          ( nd.Container.cons
+          , nd.Container.params
+          , List.map xs_of nd.Container.kids )
+    in
+    let xs = xs_of src.shape in
+    let hole_text s j = vtext gn s holes.(j) in
+    let goal_with s tt =
+      tex_ty
+        "mb_yy"
+        m
+        (tand_ty
+           (apps
+              lname
+              [ st_of tgt (mapped d (List.init n (hole_text s)))
+              ; vtext gn s a
+              ; "mb_yy"
+              ])
+           (apps (du "Cong") [ m; ro; tt; "mb_yy" ]))
+    in
+    let goal s = goal_with s (vtext gn s t) in
+    let rec res s x =
+      match x with
+      | Var v -> (match IM.find_opt v s with Some y -> res s y | None -> x)
+      | Pat p when Constr.isRel p.body ->
+        let i = Array.length p.inst - Constr.destRel p.body in
+        if p.inst.(i) >= 0 then res s (Var p.inst.(i)) else x
+      | _ -> x
+    in
+    (* the slots of [x], of shape [sh] *)
+    let rec slots_of s (sh : Skeleton.shape) (x : pt) acc =
+      match sh with
+      | Container.Slot j -> (j, x) :: acc
+      | Container.Node nd ->
+        (match view gn s x with
+         | VC (cn, _, args)
+           when Names.Construct.CanOrd.equal cn nd.Container.cons ->
+           List.fold_left2
+             (fun acc kid x -> slots_of s kid x acc)
+             acc
+             nd.Container.kids
+             args
+         | _ -> failf "up to: a target that does not have its summand's shape")
+    in
+    let finish s path =
+      (* a reordering of the source: answered by the inverse reordering
+         back to it *)
+      match List.rev path with
+      | r :: _ when List.mem r cong ->
+        let dsig =
+          let rec find i = function
+            | [] ->
+              failf
+                "up to: a reordering of no disjunct: [%s]"
+                (String.concat ";" path)
+            | (d' : disj) :: rest ->
+              if d'.dsrc.sid = src.sid && d'.dchain = path
+              then i
+              else find (i + 1) rest
+          in
+          find 0 disjs
+        in
+        let back =
+          match
+            List.find_opt
+              (fun (sm : Skeleton.summand) ->
+                Learn.is_reordering cong sm
+                && Skeleton.key
+                     (Container.renumber
+                        (Skeleton.target_shape sm.Skeleton.target))
+                   = Skeleton.key src.shape
+                &&
+                let mm = moved_map sm.Skeleton.target in
+                List.for_all (fun i -> d.dmap.(mm.(i)) = i) (List.init n Fun.id))
+              (usms en tgt.shape)
+          with
+          | Some sm -> sm
+          | None -> failf "up to: no reordering back from a disjunct's target"
+        in
+        let ws = List.init n (hole_text s) in
+        let x = st_of src ws in
+        let dv = deriv_text en.lts (rules_only back.Skeleton.chain) None in
+        apps
+          (g "core.ex.intro")
+          [ "_"
+          ; "_"
+          ; x
+          ; tconj dv (apps ro_inv [ x; vtext gn s t; inj dsig ws ])
+          ]
+      | _ ->
+        failf
+          "up to: rules [%s] do not commute with reordering [%s]"
+          (String.concat ";" path)
+          (String.concat ";" d.dchain)
+    in
+    let rec stuck rc s path _ (hyps : hyp list) =
+      match
+        List.find_opt
+          (fun h ->
+            match h.hk with HEq (v, _) -> Bool.not (IM.mem v s) | _ -> false)
+          hyps
+      with
+      | Some ({ hk = HEq (v, p); _ } as h) ->
+        define rc s path h (List.filter (fun h' -> h' != h) hyps) v p
+      | _ -> local s path hyps
+    and local s path (hyps : hyp list) =
+      (* a slot's own step: the same rule at the slot's place in the
+         reordered state, the same premise; its target a value of the
+         table ([Vn]) *)
+      let h, ind, x0, a0, b0 =
+        match hyps with
+        | [ ({ hk = HStep (ind, x0, a0, b0); _ } as h) ] -> h, ind, x0, a0, b0
+        | _ ->
+          failf
+            "up to: a case the proof cannot follow, along [%s]: %s"
+            (String.concat ";" path)
+            (String.concat "; " (List.map (htype gn s) hyps))
+      in
+      let i =
+        match x0 with
+        | U (v, _) when hole_of v >= 0 -> hole_of v
+        | _ ->
+          (match res s x0 with
+           | U (v, _) when hole_of v >= 0 -> hole_of v
+           | _ -> failf "up to: a step from no slot")
+      in
+      let key = src.keys.(i) in
+      let j =
+        let r = ref (-1) in
+        Array.iteri (fun j' i' -> if i' = i then r := j') d.dmap;
+        !r
+      in
+      let leaf_depth (sh : Skeleton.shape) slot =
+        let rec go sh depth =
+          match sh with
+          | Container.Slot q -> if q = slot then Some depth else None
+          | Container.Node nd ->
+            List.find_map (fun k -> go k (depth + 1)) nd.Container.kids
+        in
+        match go sh 0 with
+        | Some dd -> dd
+        | None -> failf "up to: a slot not in its shape"
+      in
+      let inner =
+        List.filteri (fun q _ -> q >= leaf_depth src.shape i - 1) path
+      in
+      let dp = leaf_depth tgt.shape j - 1 in
+      let sm' =
+        match
+          List.find_opt
+            (fun (sm : Skeleton.summand) ->
+              let ch = rules_only sm.Skeleton.chain in
+              sm.Skeleton.reads = [ j ]
+              && List.length ch = dp + List.length inner
+              && List.filteri (fun q _ -> q >= dp) ch = inner)
+            (usms en tgt.shape)
+        with
+        | Some sm -> sm
+        | None ->
+          failf
+            "up to: no summand at a slot's new place, along [%s]"
+            (String.concat ";" path)
+      in
+      (* the step's target, a free variable of the case: rewritten to the
+         table's value [T_v n] *)
+      let bv =
+        match res s (Var b0) with
+        | Var v -> v
+        | _ -> failf "up to: a step's target already known"
+      in
+      let nv = new_var ~name:"mb_n" nt in
+      let zv = new_var ~name:"mb_z" key in
+      let s_z = IM.add bv (Var zv) s in
+      (* the target, of the source's shape: slot [i] the new value *)
+      let xv = slots_of s src.shape (Var t) [] in
+      List.iter
+        (fun (q, x) ->
+          if q <> i
+          then (
+            match res s x with
+            | U (v, _) when v = holes.(q) -> ()
+            | _ -> failf "up to: a step that changes more than its slot"))
+        xv;
+      let ns =
+        List.init n (fun q -> if q = i then vname nv else hole_text s q)
+      in
+      let x' = st_of src ns in
+      let y' = st_of tgt (mapped d ns) in
+      let h' = ufresh "mb_s" in
+      let dv = deriv_text en.lts (rules_only sm'.Skeleton.chain) (Some h') in
+      let body =
+        apps
+          (g "core.ex.intro")
+          [ "_"
+          ; "_"
+          ; y'
+          ; tconj
+              dv
+              (apps
+                 (du "cong_step")
+                 [ m
+                 ; ro
+                 ; x'
+                 ; y'
+                 ; y'
+                 ; inj k ns
+                 ; apps (du "cong_refl") [ m; ro; y' ]
+                 ])
+          ]
+      in
+      let e = ufresh "mb_e" in
+      let step_z = apps (gind ind) [ ptext gn s x0; vtext gn s a0; vname zv ] in
+      Printf.sprintf
+        "(match %s with %s => (match %s in %s return (%s -> %s) with %s => \
+         (fun %s => %s) end) %s end)"
+        (apps
+           (vn gn key ind)
+           [ hole_text s i; vtext gn s a0; vtext gn s b0; h.hn ])
+        (apps (g "core.ex.intro") [ "_"; "_"; vname nv; e ])
+        (apps (g "mebi.de.eq_sym") [ "_"; "_"; "_"; e ])
+        (apps (g "core.eq.type") [ "_"; "_"; vname zv ])
+        step_z
+        (goal_with s_z (vtext gn s_z t))
+        (paren (g "core.eq.refl" ^ " _ _"))
+        h'
+        body
+        h.hn
+    in
+    let rc =
+      { gn
+      ; goal
+      ; finish
+      ; stuck = Some stuck
+      ; scope = Array.to_list holes @ [ a; t ]
+      ; extends = (fun _ -> true)
+      }
+    in
+    let hT = { hn = "mb_H"; hk = HStep (en.lts, xs, a, t) } in
+    let t0 = Unix.gettimeofday () in
+    let body = run rc IM.empty [] [ hT ] in
+    let ty = elab_type st (hyp_ty d sim_prop) in
+    let text =
+      Printf.sprintf
+        "fun %s %s %s mb_H => %s"
+        (String.concat " " (Array.to_list (Array.map vname holes)))
+        (vname a)
+        (vname t)
+        body
+    in
+    let r = def st ~opaque:true "rc" (elab st ~expected:ty text) ty in
+    mark
+      "up to: commutation %d (%s): %d chars, %.2fs"
+      k
+      (String.concat ";" d.dchain)
+      (String.length text)
+      (Unix.gettimeofday () -. t0);
+    r
+  in
+  let cs = List.mapi commute disjs in
+  let sim_ty =
+    Printf.sprintf
+      "forall (mb_x mb_y : %s), %s -> %s"
+      m
+      (apps ro [ "mb_x"; "mb_y" ])
+      (sim_prop "mb_x" "mb_y")
+  in
+  let sim_t = elab_type st sim_ty in
+  let ro_sim =
+    def
+      st
+      ~opaque:true
+      "ros"
+      (elab
+         st
+         ~expected:sim_t
+         (apps
+            elim
+            (Printf.sprintf
+               "(fun (mb_x mb_y : %s) => %s)"
+               m
+               (sim_prop "mb_x" "mb_y")
+             :: cs)))
+      sim_t
+  in
+  let eq_ty =
+    elab_type
+      st
+      (apps (du "Equiv") [ m; "_"; lname; apps (du "Cong") [ m; ro ] ])
+  in
+  let equiv =
+    def
+      st
+      ~opaque:true
+      "req"
+      (elab
+         st
+         ~expected:eq_ty
+         (apps (du "cong_equiv") [ m; "_"; lname; ro; ro_inv; ro_sim ]))
+      eq_ty
+  in
+  { ro; ro_inv; equiv; disjs; inj; uen = en }
+;;
+
+(* {2 Items: a state and its representative, by the item's path} *)
+
+let items_tbl : ((int * string * int array) * string) list ref = ref []
+
+let st_of_shp (sh : shp) (ns : string list) =
+  apps sh.fill (List.mapi (fun j u -> tval sh.keys.(j) u) ns)
+;;
+
+(* [forall us, Cong Ro (src us) (item (map us))], by the item's path:
+   each step a disjunct of [Ro] *)
+let item_lemma (gn : gen) (uc : ucong) (src : shp) (it : P.pnorm) : string =
+  let key = src.sid, Skeleton.key it.P.nshape, it.P.nmap in
+  match List.assoc_opt key !items_tbl with
+  | Some n -> n
+  | None ->
+    let st = gn.st in
+    let en = uc.uen in
+    let m = en.m in
+    let n = Array.length src.keys in
+    let ns = List.init n (fun j -> Printf.sprintf "mb_r%d" j) in
+    let at (pi : int array) = Array.to_list (Array.map (List.nth ns) pi) in
+    let fin = find_shp en it.P.nshape in
+    let w = st_of_shp fin (at it.P.nmap) in
+    let rec go (cur : shp) (pi : int array) steps =
+      match steps with
+      | [] ->
+        if Skeleton.key cur.shape <> Skeleton.key it.P.nshape || pi <> it.P.nmap
+        then failf "up to: an item's path that does not reach it";
+        apps (du "cong_refl") [ m; uc.ro; w ]
+      | (shk, idx) :: rest ->
+        if Skeleton.key shk <> Skeleton.key cur.shape
+        then failf "up to: an item's path out of its shapes";
+        let sm = List.nth (usms en shk) idx in
+        let ch = rules_only sm.Skeleton.chain in
+        let dk =
+          let rec find i = function
+            | [] -> failf "up to: a path step of no disjunct"
+            | (d : disj) :: r ->
+              if
+                Skeleton.key d.dsrc.shape = Skeleton.key cur.shape
+                && d.dchain = ch
+              then i
+              else find (i + 1) r
+          in
+          find 0 uc.disjs
+        in
+        let d = List.nth uc.disjs dk in
+        let pi' = Array.map (fun j -> pi.(j)) d.dmap in
+        apps
+          (du "cong_step")
+          [ m
+          ; uc.ro
+          ; st_of_shp cur (at pi)
+          ; st_of_shp d.dtgt (at pi')
+          ; w
+          ; uc.inj dk (at pi)
+          ; go d.dtgt pi' rest
+          ]
+    in
+    let body = go src (Array.init n Fun.id) it.P.npath in
+    let ty =
+      elab_type
+        st
+        (Printf.sprintf
+           "forall %s, %s"
+           (String.concat
+              " "
+              (List.map
+                 (fun u -> Printf.sprintf "(%s : %s)" u (g "num.N.type"))
+                 ns))
+           (apps (du "Cong") [ m; uc.ro; st_of_shp src ns; w ]))
+    in
+    let text = Printf.sprintf "fun %s => %s" (String.concat " " ns) body in
+    let nm = def st ~opaque:true "item" (elab st ~expected:ty text) ty in
+    items_tbl := (key, nm) :: !items_tbl;
+    nm
+;;
+
+(* the relation [fun x _ y => Cong Ro x y], its text and term *)
+let cong_lts (gn : gen) (uc : ucong) : string * Constr.t =
+  let en = uc.uen in
+  let text =
+    Printf.sprintf
+      "(fun (mb_x : %s) (_ : %s) (mb_y : %s) => %s)"
+      en.m
+      en.lty
+      en.m
+      (apps (du "Cong") [ en.m; uc.ro; "mb_x"; "mb_y" ])
+  in
+  text, elab gn.st text
+;;
+
+(* a normalisation tuple's proof: its item's lemma at the source's
+   numbers *)
+let norm_pf (gn : gen) (uc : ucong) (pnorm : P.pnorm list)
+  : shp -> shp -> int array -> int array -> Constr.t
+  =
+  let tbl = Hashtbl.create 256 in
+  List.iter (fun (it : P.pnorm) -> Hashtbl.replace tbl it.P.nfrom it) pnorm;
+  fun sh sh' srcn tgtn ->
+    let found =
+      Hashtbl.fold
+        (fun v (it : P.pnorm) acc ->
+          match acc with
+          | Some _ -> acc
+          | None ->
+            if
+              v.(0) = sh.sid
+              && it.P.nto.(0) = sh'.sid
+              && Array.for_all2 (fun q u -> v.(q) = u) sh.pos srcn
+              && Array.for_all2 (fun q u -> it.P.nto.(q) = u) sh'.pos tgtn
+            then Some it
+            else None)
+        tbl
+        None
+    in
+    match found with
+    | None -> failf "up to: a normalisation tuple of no item"
+    | Some it ->
+      app (var (item_lemma gn uc sh it)) (Array.map (fun u -> n_constr u) srcn)
 ;;
 
 (* {1 The proof of a goal} *)
@@ -5144,22 +6189,25 @@ type pdir =
 
 (* [Forall InvOk inv]: per entry of the answerer's list, its relation's
    codes and its tuples' proof *)
-let forall_inv (gn : gen) (pd : pdir) (get : int -> Constr.t) : Constr.t =
-  let a_c = pd.aen.a_c in
+(* [Forall InvOk entries]: each entry's soundness, [lts_c] in the place of
+   the LTS (the answerer's, or a normalisation's [fun x _ y => Cong Ro x
+   y]) *)
+let forall_ok
+      (gn : gen)
+      ~(right_answers : bool)
+      ~(en : enc)
+      ~(lts_c : Constr.t)
+      (entries : Constr.t list)
+      (snds : (Constr.t * string * Constr.t) list)
+  : Constr.t
+  =
+  let a_c = en.a_c in
   let rty = rel_ty a_c in
-  let right_answers = pd.mv.right = false in
-  let en = pd.aen in
   let pred =
     app
       (c (if right_answers then "mebi.de.InvOkR" else "mebi.de.InvOkL"))
-      [| var en.m
-       ; a_c
-       ; Constr.mkIndU (en.lts, UVars.Instance.empty)
-       ; var en.e
-       ; var gn.nl_name
-      |]
+      [| var en.m; a_c; lts_c; var en.e; var gn.nl_name |]
   in
-  let entries = List.map (fun e -> e get) pd.ientries in
   let proof (e : Constr.t) (allt, cs, lab) =
     let ent_cs, ent_r =
       match Constr.kind e with
@@ -5171,15 +6219,7 @@ let forall_inv (gn : gen) (pd : pdir) (get : int -> Constr.t) : Constr.t =
     in
     let csl = codes_constr cs in
     let tsound csx =
-      app
-        (c "mebi.de.TSound")
-        [| var en.m
-         ; a_c
-         ; Constr.mkIndU (en.lts, UVars.Instance.empty)
-         ; var en.e
-         ; lab
-         ; csx
-        |]
+      app (c "mebi.de.TSound") [| var en.m; a_c; lts_c; var en.e; lab; csx |]
     in
     let nw = nowo_constr cs in
     if Bool.not right_answers
@@ -5242,7 +6282,17 @@ let forall_inv (gn : gen) (pd : pdir) (get : int -> Constr.t) : Constr.t =
          ; go rest
         |]
   in
-  go (List.combine entries pd.snd_)
+  go (List.combine entries snds)
+;;
+
+let forall_inv (gn : gen) (pd : pdir) (get : int -> Constr.t) : Constr.t =
+  forall_ok
+    gn
+    ~right_answers:(pd.mv.right = false)
+    ~en:pd.aen
+    ~lts_c:(Constr.mkIndU (pd.aen.lts, UVars.Instance.empty))
+    (List.map (fun e -> e get) pd.ientries)
+    pd.snd_
 ;;
 
 (* the coverage fact of a summand *)
@@ -5312,11 +6362,17 @@ let qed_term
       env
       ~(name : string)
       ~(log : Proof_log.source)
+      ?(global = false)
       (plan : P.t)
       ~(strong : bool)
   : Constr.t * Evd.side_effects option
   =
-  let st = new_st ~constants:(Sys.getenv_opt "MEBI_QED_LETS" = None) name in
+  let st =
+    new_st
+      ~constants:(global || Sys.getenv_opt "MEBI_QED_LETS" = None)
+      ~global
+      name
+  in
   univs := Univ.ContextSet.empty;
   el_n := 0;
   as_count := 0;
@@ -5330,6 +6386,9 @@ let qed_term
   as_failed := [];
   Hashtbl.reset vars.names;
   Hashtbl.reset vars.types;
+  vn_tbl := [];
+  items_tbl := [];
+  Hashtbl.reset usms_tbl;
   let value_of = Hashtbl.create 64 in
   List.iter (fun (i, t) -> Hashtbl.replace value_of i t) plan.P.values;
   let nl, nr = plan.P.widths in
@@ -5455,10 +6514,30 @@ let qed_term
     in
     univs := Univ.ContextSet.union !univs (Evd.universe_context_set sigma));
   set_ready st;
+  (* up to reordering (doc/upto.md, route B): each side's congruence *)
+  let upto_on = sys_l.P.pnorm <> [] || sys_r.P.pnorm <> [] in
+  let ucl, ucr =
+    if upto_on
+    then (
+      if strong then failf "lts proof: up to reordering for a strong goal";
+      let l = upto_cong gn ~also:enr enl in
+      mark "up to: the left congruence, %d reorderings" (List.length l.disjs);
+      let r =
+        if Names.Ind.CanOrd.equal enl.lts enr.lts then l else upto_cong gn enr
+      in
+      mark "up to: the right congruence, %d reorderings" (List.length r.disjs);
+      Some l, Some r)
+    else None, None
+  in
   let lenl = lenl gn enl in
   let start = plan.P.start in
-  let hl, pvec = start_proof gn enl sys_l.P.pstart (Array.sub start 0 nl)
-  and hr, qvec = start_proof gn enr sys_r.P.pstart (Array.sub start nl nr) in
+  (* up to reordering: the start's own vectors, normalised by the
+     certificate into [z] *)
+  let start_v =
+    if upto_on then Array.append sys_l.P.pstart_v sys_r.P.pstart_v else start
+  in
+  let hl, pvec = start_proof gn enl sys_l.P.pstart (Array.sub start_v 0 nl)
+  and hr, qvec = start_proof gn enr sys_r.P.pstart (Array.sub start_v nl nr) in
   let a_c = enl.a_c in
   let rq = Game_proof.new_reqs () in
   Game_proof.lets := [];
@@ -5475,7 +6554,15 @@ let qed_term
     List.map
       (fun (d : P.pdir) ->
         let rels, inv, game =
-          Game_proof.direction rq t ~strong ~label_term ~tau:plan.P.tau plan d
+          Game_proof.direction
+            ~upto:upto_on
+            rq
+            t
+            ~strong
+            ~label_term
+            ~tau:plan.P.tau
+            plan
+            d
         in
         let mkeys = !Game_proof.move_keys
         and mentries = !Game_proof.move_entries
@@ -5521,6 +6608,46 @@ let qed_term
         })
       plan.P.dirs
   in
+  (* up to reordering: the normalisation relations' soundness, by item;
+     the start's normalisation steps, their tuples' memberships *)
+  let nkl, nkr = if upto_on then Game_proof.norm_keys plan else [], [] in
+  let nsl_entries = !Game_proof.nsl_entries_out
+  and nsr_entries = !Game_proof.nsr_entries_out in
+  let norm_snd (uc : ucong option) en (pn : P.pnorm list) keys =
+    match uc with
+    | None -> [], Constr.mkProp
+    | Some uc ->
+      let tx, tc = cong_lts gn uc in
+      ( List.map
+          (fun key -> soundness_rel ~norm:(tx, tc, norm_pf gn uc pn) gn en key)
+          keys
+      , tc )
+  in
+  let snl, lnl = norm_snd ucl enl sys_l.P.pnorm nkl in
+  let snr, lnr = norm_snd ucr enr sys_r.P.pnorm nkr in
+  if upto_on
+  then
+    mark
+      "up to: normalisation sound, %d and %d relations"
+      (List.length snl)
+      (List.length snr);
+  let interl (a : int array) (b : int array) =
+    Array.concat (Array.to_list (Array.mapi (fun i x -> [| x; b.(i) |]) a))
+  in
+  let rep_l = Array.sub start 0 nl
+  and rep_r = Array.sub start nl nr
+  and ex_l = Array.sub start_v 0 nl
+  and ex_r = Array.sub start_v nl nr in
+  let kstart keys rep ex =
+    if (not upto_on) || rep = ex
+    then None
+    else (
+      match keys with
+      | [ (_, _, r) ] -> Some (ask (Dd_cert.Mem (r, interl rep ex)))
+      | _ -> failf "lts proof: a start normalised by no relation")
+  in
+  let kstart_l = kstart nkl rep_l ex_l
+  and kstart_r = kstart nkr rep_r ex_r in
   (* the facts the completeness proofs name, requested *)
   let freqs =
     List.map
@@ -5626,14 +6753,45 @@ let qed_term
       if String.length l > 0 && l.[0] = 'C' then incr cur;
       readers.(!cur).Dd_read.feed l)
   in
-  ignore
-    (Dd_cert.write_log
-       ~requests:(List.rev rq.Game_proof.rev)
-       ~groups
-       ~log
-       (Dd_cert.To_lines feed));
-  let ctx = readers.(0).Dd_read.finish () in
-  mark "facts: %d lets" (List.length ctx.Dd_read.lets);
+  let wst =
+    Dd_cert.write_log
+      ~requests:(List.rev rq.Game_proof.rev)
+      ~groups
+      ~log
+      (Dd_cert.To_lines feed)
+  in
+  (* the facts written, nothing reads Sylvan's nodes any more: for a large
+     certificate, its log and tables given back now, before the kernel
+     checks the pieces (collection back on; its table shrunk to fit) *)
+  if wst.Dd_cert.facts > 100_000
+  then (
+    (match log with
+     | Proof_log.Memory -> Ldd.log_free ()
+     | Proof_log.File _ -> ());
+    Gc.full_major ();
+    Ldd.gc ();
+    mark "Sylvan's tables given back");
+  (* the main chunk in pieces, each a constant the kernel checks now (its
+     nodes by number, its facts by segment): the term names them *)
+  let ctx =
+    (* in pieces for a command only: a tactic's pieces are side effects,
+       which Rocq keeps in their typed form until [Qed] (more memory than
+       one term) *)
+    if Bool.not global
+    then readers.(0).Dd_read.finish ()
+    else
+      readers.(0).Dd_read.finish_pieces
+        ~declare:(fun n b ty opaque -> declare st (n, b, ty, opaque))
+        ~seg:
+          (match Sys.getenv_opt "MEBI_CHUNK_FACTS" with
+           | Some k -> (try int_of_string k with _ -> 20_000)
+           | None -> 20_000)
+        ()
+  in
+  mark
+    "facts: %d, %d lets in the term"
+    wst.Dd_cert.facts
+    (List.length ctx.Dd_read.lets);
   let lets_around (lets : (Constr.t * Constr.types) list) (body : Constr.t) =
     List.fold_left
       (fun acc (b, ty) -> Constr.mkLetIn (Context.anonR, b, ty, acc))
@@ -5834,8 +6992,152 @@ let qed_term
           (c "mebi.de.soundR_of")
           [| mr; a_c; lts_r; var enr.e; var nl_name; inv; fa |] )
   in
+  (* up to reordering: the congruences, the normalisation lists and
+     their soundness, the start normalised into [z] *)
+  let upto_args () =
+    let ucl = Stdlib.Option.get ucl
+    and ucr = Stdlib.Option.get ucr in
+    let rty = rel_ty a_c in
+    let nsl = List.map (fun e -> e get) nsl_entries
+    and nsr = List.map (fun e -> e get) nsr_entries in
+    let nsl_c = list_constr rty nsl
+    and nsr_c = list_constr rty nsr in
+    let eql = app (c "mebi.du.Cong") [| ml; var ucl.ro |]
+    and eqr = app (c "mebi.du.Cong") [| mr; var ucr.ro |] in
+    let fal = forall_ok gn ~right_answers:false ~en:enl ~lts_c:lnl nsl snl
+    and far = forall_ok gn ~right_answers:true ~en:enr ~lts_c:lnr nsr snr in
+    let snl_pf =
+      app
+        (c "mebi.du.soundNL_of")
+        [| ml
+         ; a_c
+         ; var enl.e
+         ; eql
+         ; nsl_c
+         ; app
+             (c "mebi.de.soundL_of")
+             [| ml; a_c; lnl; var enl.e; var nl_name; nsl_c; var lenl; fal |]
+        |]
+    and snr_pf =
+      app
+        (c "mebi.du.soundNR_of")
+        [| mr
+         ; a_c
+         ; var enr.e
+         ; var nl_name
+         ; eqr
+         ; nsr_c
+         ; app
+             (c "mebi.de.soundR_of")
+             [| mr; a_c; lnr; var enr.e; var nl_name; nsr_c; far |]
+        |]
+    in
+    let ent_parts (e : Constr.t) =
+      match Constr.kind e with
+      | Constr.App (_, [| _; _; inner; r |]) ->
+        (match Constr.kind inner with
+         | Constr.App (_, [| _; _; _; csc |]) -> csc, r
+         | _ -> failf "lts proof: an entry not a triple")
+      | _ -> failf "lts proof: an entry not a triple"
+    in
+    let lst a = nlist_constr (Array.to_list a) in
+    let napp a b = app (c "mebi.de.app") [| n_ty (); a; b |] in
+    let lcode = app (c "core.list.type") [| c "mebi.dt.code" |] in
+    let nat = c "num.nat.type" in
+    let len a = app (c "mebi.de.length") [| n_ty (); a |] in
+    let normz =
+      app
+        (c "mebi.du.normz_refl")
+        [| a_c; nsl_c; nsr_c; zt; napp (lst rep_l) (lst rep_r); get kmem |]
+    in
+    let normz =
+      match kstart_r with
+      | None -> normz
+      | Some km ->
+        let e = List.hd nsr in
+        let cs, r = ent_parts e in
+        app
+          (c "mebi.du.normz_r")
+          [| a_c
+           ; nsl_c
+           ; nsr_c
+           ; zt
+           ; cs
+           ; r
+           ; lst rep_l
+           ; lst rep_r
+           ; lst ex_r
+           ; Game_proof.in_proof t nsr 0
+           ; get km
+           ; app (c "core.eq.refl") [| lcode; cs |]
+           ; app (c "core.eq.refl") [| nat; len (lst rep_r) |]
+           ; normz
+          |]
+    in
+    let normz =
+      match kstart_l with
+      | None -> normz
+      | Some km ->
+        let e = List.hd nsl in
+        let cs, r = ent_parts e in
+        app
+          (c "mebi.du.normz_l")
+          [| a_c
+           ; nsl_c
+           ; nsr_c
+           ; zt
+           ; cs
+           ; r
+           ; lst rep_l
+           ; lst ex_l
+           ; lst ex_r
+           ; Game_proof.in_proof t nsl 0
+           ; get km
+           ; app (c "core.eq.refl") [| lcode; cs |]
+           ; app (c "core.eq.refl") [| nat; len (lst rep_l) |]
+           ; normz
+          |]
+    in
+    ( [| ml
+       ; mr
+       ; a_c
+       ; lts_l
+       ; lts_r
+       ; var enl.e
+       ; var enr.e
+       ; var f_z
+       ; var nl_name
+       ; eql
+       ; eqr
+       ; nsl_c
+       ; nsr_c
+       ; var ucl.equiv
+       ; var ucr.equiv
+       ; var lenl
+       ; snl_pf
+       ; snr_pf
+      |]
+    , [| x0; r0; pvec; qvec; var hl; var hr; normz |] )
+  in
   let body =
     match dirs with
+    | [ pd ] when upto_on ->
+      if Bool.not pd.mv.right
+      then failf "lts proof: a simulation whose mover comes first";
+      let relr, invl, g1, c1, s1 = of_dir pd in
+      let pre, post = upto_args () in
+      app
+        (c "mebi.du.cert_weak_sim_upto")
+        (Array.concat [ pre; [| relr; invl; g1; c1; s1 |]; post ])
+    | [ pa; pb ] when upto_on ->
+      let pr, pl = if pa.mv.right then pa, pb else pb, pa in
+      let relr, invl, g1, c1, s1 = of_dir pr
+      and rell, invr, g2, c2, s2 = of_dir pl in
+      let pre, post = upto_args () in
+      app
+        (c "mebi.du.cert_weak_bisim_upto")
+        (Array.concat
+           [ pre; [| relr; invl; rell; invr; g1; c1; s1; g2; c2; s2 |]; post ])
     | [ pd ] ->
       if Bool.not pd.mv.right
       then failf "lts proof: a simulation whose mover comes first";
@@ -5958,5 +7260,5 @@ let qed_term
              (Hashtbl.fold (fun k v acc -> (k, v) :: acc) kernel_time []))));
   (* the constraints the constants declared are the proof's already *)
   univs := Univ.ContextSet.diff !univs st.upushed;
-  r, st.effs
+  r, if global then None else st.effs
 ;;

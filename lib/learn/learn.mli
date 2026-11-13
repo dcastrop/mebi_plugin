@@ -175,6 +175,19 @@ module Plan : sig
     ; cover : psum list
     }
 
+  (** a normalisation tuple (doc/upto.md, route B): a vector, its
+      representative, and the item that gives it: the item's shape, its
+      slot map (slot [j] of the item's shape holds the vector's slot
+      [nmap.(j)]), its path (each step's source shape and reordering
+      summand, by index in [Skeleton.summands_of]) *)
+  type pnorm =
+    { nfrom : int array
+    ; nto : int array
+    ; nshape : Skeleton.shape
+    ; nmap : int array
+    ; npath : (Skeleton.shape * int) list
+    }
+
   (** a system, for its encoding: its width (positions after the shape),
       its shapes (number, shape, each slot's position), its start *)
   type psys =
@@ -182,6 +195,11 @@ module Plan : sig
     ; pshapes : (int * Skeleton.shape * int array) list
     ; pstart : Constr.t
     ; plts : Names.inductive
+    ; pstart_v : int array
+      (** the start's vector, not normalised (up to reordering) *)
+    ; pnorm : pnorm list
+      (** up to reordering: each vector met that is not its own
+          representative *)
     }
 
   type t =
@@ -197,10 +215,10 @@ module Plan : sig
     ; sys_b : psys
     ; rinfo :
         ((int * int * int) * (int * string * Ldd.t * int * string list)) list
-      (** each relation of the check by (label, meta, node): its label, its codes (its
-          system's, as [codes] letters: X read-write, O read, W write, C
-          copy), its diagram (the answerer's backwards), its summand's
-          source shape and rule chain *)
+      (** each answerer's relation of the check, backwards, by (label,
+          meta, node): its label, its codes (its system's, as [codes]
+          letters: X read-write, O read, W write, C copy), its diagram, its
+          summand's source shape and rule chain *)
     }
 end
 
@@ -245,3 +263,16 @@ val derive_chain
   -> Constr.t
   -> string list
   -> deriv list
+
+(** {1 Up to reordering (doc/upto.md, route B)} *)
+
+(** [is_reordering cong sm]: the summand [sm]'s innermost rule is one of
+    the congruence rules [cong], and its target only moves slots *)
+val is_reordering : string list -> Skeleton.summand -> bool
+
+(** [upto_off]: no decision up to reordering while it is set (the
+    plugin's retry when a proof up to reordering cannot be built). Up to
+    reordering is on by default, for weak goals of an LTS whose rules
+    hold reorderings and whose summands are not dynamic; [MEBI_UPTO=off]
+    turns it off. *)
+val upto_off : bool ref

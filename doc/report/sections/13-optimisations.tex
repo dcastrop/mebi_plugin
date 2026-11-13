@@ -35,14 +35,10 @@ lemma, proved once, that composition over the stated shared state
 preserves weak simulation, its side conditions read off the summands'
 codes.
 
-\paragraph{Up to structural congruence.} States equal up to reorderings
-(commutation, associativity, a swap: detected in the rules,
-\cref{sec:containers:upto}) are one state for the game. The engine's
-classes are a relation diagram from states to representatives; Sylvan logs
-its construction and the game on classes; Rocq typechecks each member's
-silent reordering path to its representative and the game, with one
-theorem: a weak simulation up to a congruence of silent reversible steps
-is contained in weak similarity.
+\paragraph{Up to structural congruence (built).} States equal up to
+reorderings (commutation, associativity, a swap: detected in the rules,
+\cref{sec:containers:upto}) are one state for the game, once the rules are
+shown to commute with the reorderings: \cref{sec:upto}.
 
 \paragraph{Large certificates in pieces.} The facts are declared a chunk
 at a time, each chunk a constant the kernel checks when declared, the

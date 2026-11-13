@@ -211,150 +211,281 @@ let verdict ~(weak : bool) (kind : kind) (r : Learn.report) : unit =
            (if weak then "weakly" else "strongly"))
 ;;
 
-(* the tactic: the engine decides the goal, Sylvan logs the decision's
-   certificate, and the goal is closed by the proof built from it
-   (doc/certificate.md, "The theorem from the certificate"); the kernel
-   checks that proof at [Qed] *)
 (* the GC's setting a large proof lowered for its [Qed] (and the compiled
    file's writing), restored at the next tactic *)
 let gc_saved : int option ref = ref None
 
+(* [certify ~weak ~global ~lemma kind env sigma concl]: the goal [concl]
+   decided, its certificate logged, and the proof built from it (the
+   term, the side effects that hold its pieces unless [global], the
+   report, the time it started); the pieces named after [lemma], declared
+   as global constants with [global] (a command's way: Rocq keeps each
+   once), else as side effects of the proof (a tactic's way) *)
+exception Upto_failed of string
+
+let certify
+      ?(debug : bool = false)
+      ~(weak : bool)
+      ~(global : bool)
+      ~(lemma : string)
+      (kind : kind)
+      env
+      sigma
+      (concl : EConstr.t)
+  : Constr.t * Evd.side_effects option * Learn.report * float
+  =
+  (match !gc_saved with
+   | Some so ->
+     Gc.set { (Gc.get ()) with Gc.space_overhead = so };
+     gc_saved := None
+   | None -> ());
+  let decide = read_goal ~weak kind env sigma concl in
+  (* the decision logs its certificate, which the proof is built from
+     (doc/certificate.md): in memory, or with [Set MeBi Log Mode "keep"]
+     into the file kept *)
+  let keep = log_mode.get () = Log_keep in
+  let src =
+    if keep
+    then Proof_log.File (Filename.concat (files_dir ()) (lemma ^ ".log"))
+    else Proof_log.Memory
+  in
+  (* a log in memory freed (collection back on), once *)
+  let dropped = ref false in
+  let drop () =
+    if Bool.not !dropped
+    then (
+      dropped := true;
+      if Bool.not keep then Ldd.log_free ())
+  in
+  Learn.proof_log := Some src;
+  let r =
+    Fun.protect
+      ~finally:(fun () -> Learn.proof_log := None)
+      (fun () ->
+        try decide () with
+        | e ->
+          drop ();
+          raise e)
+  in
+  if debug
+  then
+    Feedback.msg_notice
+      Pp.(
+        str ("debug " ^ name ~weak kind ^ ": ")
+        ++ Learn.pr
+             ~strong:(Bool.not weak)
+             (match kind with Bisim -> Learn.Bisim | Sim -> Learn.Sim)
+             r);
+  (* MEBI_CERT_STOP=decided: stop here (measuring the decision alone) *)
+  if Sys.getenv_opt "MEBI_CERT_STOP" = Some "decided"
+  then (
+    Printf.eprintf "[mebi] decided; stopping (MEBI_CERT_STOP)\n%!";
+    Stdlib.exit 3);
+  (try verdict ~weak kind r with
+   | e ->
+     drop ();
+     raise e);
+  match !Learn.last_plan with
+  | None ->
+    drop ();
+    fail ~weak kind "the decision's certificate could not be logged."
+  | Some plan ->
+    if Sys.getenv_opt "MEBI_PLAN_DUMP" <> None
+    then Lts_proof.dump env sigma plan;
+    let t0 = Unix.gettimeofday () in
+    let term, effs =
+      try
+        if Sys.getenv_opt "MEBI_CERT_STATS" <> None
+        then Printexc.record_backtrace true;
+        try
+          (* building the proof makes much short-lived garbage: the heap
+             kept closer to what is live meanwhile *)
+          let gc0 = Gc.get () in
+          (* a command's pieces are kept once declared: what is left is
+             garbage, so tighter still *)
+          Gc.set
+            { gc0 with
+              Gc.space_overhead =
+                min gc0.Gc.space_overhead (if global then 40 else 80)
+            };
+          Fun.protect
+            ~finally:(fun () ->
+              drop ();
+              Gc.set gc0;
+              (* before [Qed]: the decision's sets and tables given back
+                 (the plan dropped, OCaml's dead values finalised, then
+                 Sylvan's collection, which shrinks its table to fit),
+                 and the proof's garbage *)
+              Learn.last_plan := None;
+              (* for a large decision only: the collections and the
+                 compaction cost a fraction of a second each *)
+              if r.Learn.pairs > 1e6
+              then (
+                Gc.full_major ();
+                Ldd.gc ();
+                Gc.compact ();
+                (* the kernel's check at [Qed] makes much short-lived
+                   garbage over a large live term: the heap kept closer
+                   to it until the next tactic *)
+                gc_saved := Some (Gc.get ()).Gc.space_overhead;
+                Gc.set { (Gc.get ()) with Gc.space_overhead = 60 });
+              Dd_cert.log_mark "[qed] before Qed")
+            (fun () ->
+              Lts_proof.qed_term
+                env
+                ~name:lemma
+                ~log:src
+                ~global
+                plan
+                ~strong:(Bool.not weak))
+        with
+        | Not_found ->
+          failwith ("an internal lookup failed: " ^ Printexc.get_backtrace ())
+      with
+      | (Dd_cert.Fails msg | Failure msg)
+        when plan.Learn.Plan.sys_a.Learn.Plan.pnorm <> []
+             || plan.Learn.Plan.sys_b.Learn.Plan.pnorm <> [] ->
+        raise (Upto_failed msg)
+      | Dd_cert.Fails msg | Failure msg ->
+        fail ~weak kind ("the proof from the certificate: " ^ msg)
+    in
+    term, effs, r, t0
+;;
+
+(* the proof up to reordering could not be built (rules that do not
+   commute with the reorderings, say): decided and proved again without
+   it *)
+let certify ?debug ~weak ~global ~lemma kind env sigma concl =
+  try certify ?debug ~weak ~global ~lemma kind env sigma concl with
+  | Upto_failed msg ->
+    Feedback.msg_info
+      Pp.(
+        str
+          (name ~weak kind
+           ^ ": no proof up to reordering ("
+           ^ msg
+           ^ "); proved without it."));
+    Learn.upto_off := true;
+    Fun.protect
+      ~finally:(fun () -> Learn.upto_off := false)
+      (fun () -> certify ?debug ~weak ~global ~lemma kind env sigma concl)
+;;
+
+(* the tactic: the engine decides the goal, Sylvan logs the decision's
+   certificate, and the goal is closed by the proof built from it
+   (doc/certificate.md, "The theorem from the certificate"); the kernel
+   checks that proof at [Qed] *)
 let prove ?(debug : bool = false) ~(weak : bool) (kind : kind)
   : unit Proofview.tactic
   =
   Proofview.Goal.enter (fun gl ->
-    (match !gc_saved with
-     | Some so ->
-       Gc.set { (Gc.get ()) with Gc.space_overhead = so };
-       gc_saved := None
-     | None -> ());
     let env = Proofview.Goal.env gl in
     let sigma = Proofview.Goal.sigma gl in
-    let decide = read_goal ~weak kind env sigma (Proofview.Goal.concl gl) in
-    (* the decision logs its certificate, which the proof is built from
-       (doc/certificate.md): in memory, or with [Set MeBi Log Mode "keep"]
-       into the file kept *)
-    let keep = log_mode.get () = Log_keep in
-    let src =
-      if keep
-      then
-        Proof_log.File
-          (Filename.concat (files_dir ()) (current_lemma () ^ ".log"))
-      else Proof_log.Memory
+    let term, effs, r, t0 =
+      certify
+        ~debug
+        ~weak
+        ~global:false
+        ~lemma:(current_lemma ())
+        kind
+        env
+        sigma
+        (Proofview.Goal.concl gl)
     in
-    (* a log in memory freed (collection back on), once *)
-    let dropped = ref false in
-    let drop () =
-      if Bool.not !dropped
-      then (
-        dropped := true;
-        if Bool.not keep then Ldd.log_free ())
+    Feedback.msg_notice
+      Pp.(
+        str
+          (Printf.sprintf
+             "%s: decided (%.0f pairs); the proof from Sylvan's certificate \
+              built in %.2fs (the kernel checks it at Qed)."
+             (name ~weak kind)
+             r.Learn.pairs
+             (Unix.gettimeofday () -. t0)));
+    let term = EConstr.of_constr term in
+    (* the proof's constants, each checked by the kernel when declared,
+       exported with the proof at [Qed] (as [abstract]'s sub-proofs) *)
+    let sigma =
+      match effs with Some e -> Evd.emit_side_effects e sigma | None -> sigma
     in
-    Learn.proof_log := Some src;
-    let r =
-      Fun.protect
-        ~finally:(fun () -> Learn.proof_log := None)
-        (fun () ->
-          try decide () with
-          | e ->
-            drop ();
-            raise e)
+    (* the universe constraints the proof needs (Lts_proof.univs) *)
+    let sigma =
+      Evd.merge_universe_context_set Evd.univ_rigid sigma !Lts_proof.univs
     in
-    if debug
-    then
-      Feedback.msg_notice
+    Proofview.tclTHEN
+      (Proofview.Unsafe.tclEVARS sigma)
+      (Tactics.exact_no_check term))
+;;
+
+(* which of the four relations a goal is *)
+let relation_of ~(cmd : string) env sigma (concl : EConstr.t) : bool * kind =
+  let h, _ = EConstr.decompose_app sigma concl in
+  match
+    List.find_opt
+      (fun (w, k) -> EConstr.eq_constr sigma h (relation env ~weak:w k))
+      [ true, Bisim; true, Sim; false, Bisim; false, Sim ]
+  with
+  | Some x -> x
+  | None ->
+    CErrors.user_err
+      Pp.(
+        str
+          (cmd
+           ^ ": the goal is not [weak_sim], [weak_bisimilar], [strong_sim] or \
+              [strong_bisimilar] between two states."))
+;;
+
+(* [MeBi Prove id : goal]: the goal decided and proved from its
+   certificate as the tactics do, but each piece of the proof a global
+   constant, as a command can declare (Rocq keeps each once, checked when
+   declared; a tactic's pieces are side effects, kept in their typed form
+   until [Qed]), then the lemma [id], its proof naming them *)
+let prove_command (id : Names.Id.t) (c : Constrexpr.constr_expr) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let sigma, ty =
+    try Constrintern.interp_type_evars env sigma c with
+    | e when CErrors.noncritical e ->
+      CErrors.user_err
         Pp.(
-          str ("debug " ^ name ~weak kind ^ ": ")
-          ++ Learn.pr
-               ~strong:(Bool.not weak)
-               (match kind with Bisim -> Learn.Bisim | Sim -> Learn.Sim)
-               r);
-    (* MEBI_CERT_STOP=decided: stop here (measuring the decision alone) *)
-    if Sys.getenv_opt "MEBI_CERT_STOP" = Some "decided"
-    then (
-      Printf.eprintf "[mebi] decided; stopping (MEBI_CERT_STOP)\n%!";
-      Stdlib.exit 3);
-    (try verdict ~weak kind r with
-     | e ->
-       drop ();
-       raise e);
-    match !Learn.last_plan with
-    | None ->
-      drop ();
-      fail ~weak kind "the decision's certificate could not be logged."
-    | Some plan ->
-      if Sys.getenv_opt "MEBI_PLAN_DUMP" <> None
-      then Lts_proof.dump env sigma plan;
-      let t0 = Unix.gettimeofday () in
-      let term, effs =
-        try
-          if Sys.getenv_opt "MEBI_CERT_STATS" <> None
-          then Printexc.record_backtrace true;
-          try
-            (* building the proof makes much short-lived garbage: the heap
-               kept closer to what is live meanwhile *)
-            let gc0 = Gc.get () in
-            Gc.set { gc0 with Gc.space_overhead = min gc0.Gc.space_overhead 80 };
-            Fun.protect
-              ~finally:(fun () ->
-                drop ();
-                Gc.set gc0;
-                (* before [Qed]: the decision's sets and tables given back
-                   (the plan dropped, OCaml's dead values finalised, then
-                   Sylvan's collection, which shrinks its table to fit),
-                   and the proof's garbage *)
-                Learn.last_plan := None;
-                (* for a large decision only: the collections and the
-                   compaction cost a fraction of a second each *)
-                if r.Learn.pairs > 1e6
-                then (
-                  Gc.full_major ();
-                  Ldd.gc ();
-                  Gc.compact ();
-                  (* the kernel's check at [Qed] makes much short-lived
-                     garbage over a large live term: the heap kept closer
-                     to it until the next tactic *)
-                  gc_saved := Some (Gc.get ()).Gc.space_overhead;
-                  Gc.set { (Gc.get ()) with Gc.space_overhead = 60 });
-                Dd_cert.log_mark "[qed] before Qed")
-              (fun () ->
-                Lts_proof.qed_term
-                  env
-                  ~name:(current_lemma ())
-                  ~log:src
-                  plan
-                  ~strong:(Bool.not weak))
-          with
-          | Not_found ->
-            failwith ("an internal lookup failed: " ^ Printexc.get_backtrace ())
-        with
-        | Dd_cert.Fails msg | Failure msg ->
-          fail ~weak kind ("the proof from the certificate: " ^ msg)
-      in
-      Feedback.msg_notice
-        Pp.(
-          str
-            (Printf.sprintf
-               "%s: decided (%.0f pairs); the proof from Sylvan's certificate \
-                built in %.2fs (the kernel checks it at Qed)."
-               (name ~weak kind)
-               r.Learn.pairs
-               (Unix.gettimeofday () -. t0)));
-      let term = EConstr.of_constr term in
-      (* the proof's constants, each checked by the kernel when declared,
-         exported with the proof at [Qed] (as [abstract]'s sub-proofs) *)
-      let sigma =
-        match effs with
-        | Some e -> Evd.emit_side_effects e sigma
-        | None -> sigma
-      in
-      (* the universe constraints the proof needs (Lts_proof.univs) *)
-      let sigma =
-        Evd.merge_universe_context_set Evd.univ_rigid sigma !Lts_proof.univs
-      in
-      Proofview.tclTHEN
-        (Proofview.Unsafe.tclEVARS sigma)
-        (Tactics.exact_no_check term))
+          str "MeBi Prove: the statement does not typecheck: "
+          ++ CErrors.print e)
+  in
+  let sigma =
+    Pretyping.solve_remaining_evars
+      (Pretyping.default_inference_flags true)
+      env
+      sigma
+  in
+  let weak, kind = relation_of ~cmd:"MeBi Prove" env sigma ty in
+  let term, _, r, t0 =
+    certify ~weak ~global:true ~lemma:(Names.Id.to_string id) kind env sigma ty
+  in
+  let sigma = Evd.minimize_universes sigma in
+  let univs =
+    Univ.ContextSet.union (Evd.universe_context_set sigma) !Lts_proof.univs
+  in
+  let t1 = Unix.gettimeofday () in
+  ignore
+    (Declare.declare_constant
+       ~name:id
+       ~kind:Decls.(IsProof Lemma)
+       (Declare.DefinitionEntry
+          (Declare.definition_entry
+             ~opaque:true
+             ~types:(EConstr.to_constr sigma ty)
+             ~univs:(UState.Monomorphic_entry univs, UnivNames.empty_binders)
+             term)));
+  Feedback.msg_notice
+    Pp.(
+      str
+        (Printf.sprintf
+           "%s is defined: decided (%.0f pairs); the proof from Sylvan's \
+            certificate built in %.2fs, checked by the kernel piece by piece; \
+            the lemma checked in %.2fs."
+           (Names.Id.to_string id)
+           r.Learn.pairs
+           (t1 -. t0)
+           (Unix.gettimeofday () -. t1)))
 ;;
 
 (* {1 [MeBi Check Log]: facts from Sylvan's proof log}

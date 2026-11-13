@@ -1,0 +1,153 @@
+\section{Proofs up to reordering}\label{sec:upto}
+
+\paragraph{The problem.} Proc's composition (\file{examples/Proc.v},
+\code{compLTS}) writes its structural congruence as silent rules:
+\code{do_comm} ($l \mid r \to r \mid l$), \code{do_assocl},
+\code{do_assocr} (\cref{sec:containers:upto}). Four processes, each with
+three local states, reach $3^4 = 81$ combinations of local states, each
+in $120$ arrangements: 5 bracketings of the four components times their
+24 orders. That is 9,720 states (\file{examples/Bisimilarity/Proc/Test4}),
+and a certificate over states pays 120 times for each combination: over
+2.3 million facts, beyond what the proof could hold. Every state of one
+combination reaches every other silently, so the 120 are weakly
+bisimilar: one of them should stand for all.
+
+\paragraph{Terms.} Write $s \equiv s'$ when $s$ reaches $s'$ by
+reorderings; it is an equivalence (each reordering has an inverse). Its
+equivalence classes are the \emph{classes}; one state of each, chosen by
+the engine, is its \emph{representative}. A shape (\cref{sec:containers})
+is the part of a state made of the structural constructors (here
+\code{cpar} and \code{cprc}), its \emph{slots} the places where values sit
+(here the four processes' terms). A reordering never inspects a value: it
+moves the values from slot to slot and may change the shape. So an
+\emph{item} of a shape is a shape and a \emph{slot map} (slot $j$ of the
+item's shape holds the value of the original's slot $\mathit{map}(j)$),
+and its \emph{path} is the reorderings that lead to it.
+
+\paragraph{Why representatives alone are not enough.} Take a state $b$
+with one step, silent, to $a$; and $a$ with a silent step back to $b$ and
+an $x$-step to $0$. $a$ and $b$ reach each other silently, but $b$ cannot
+do $x$ without first moving. A game played on $b$ alone would let an
+inert state match the class $\{a, b\}$, which is wrong. What is needed is
+that $\equiv$ be a \emph{strong bisimulation}: if $s \equiv s'$ and $s$
+steps to $t$, then $s'$ steps, by one step with the same label, to some
+$t' \equiv t$. Then weak bisimulation \emph{up to} $\equiv$ is sound
+\citep{milner89,pous-sangiorgi11,sangiorgi11}: a game played on
+representatives, where every answer may land on any state $\equiv$ to one
+in the relation, proves the goal for every member of every class. In the
+example the requirement fails ($a \to 0$ by $x$, $b$ has no $x$-step), so
+the example is refused.
+
+\paragraph{The engine} (\file{lib/learn/learn.ml}, ``Up to reordering'').
+\begin{enumerate}
+\item A \emph{reordering summand} is a summand (\cref{sec:containers})
+  whose innermost rule is a reordering; its target only moves slots.
+\item \emph{Saturation}: from a shape, every reordering summand is fired
+  at every place where it applies, to a fixpoint (a state met again stops
+  the search, so no orientation of the rules is needed, and
+  $l \mid r \to r \mid l$, its own inverse, is no problem). This is done
+  once per shape, with no values: the result is the shape's items, each
+  with its path. Test4's four-leaf shapes form one class of 120 items.
+  A bound (\code{MEBI_UPTO_BOUND}, 50,000 items) stops it.
+\item A vector's \emph{representative} is the least, in lexicographic
+  order, of its shape's items applied to its values; every member of a
+  class chooses the same one.
+\item Exploration runs from representatives: every new state is replaced
+  by its representative. The game runs on pairs of representatives. A
+  move's target is not replaced (the mover's own relations take it
+  there), so an answer may bring a state back to its representative at
+  any point: \emph{normalisation steps}, one relation per side, are among
+  the answer's silent steps. The relations are learned from
+  representatives only, which is why an answer goes back to
+  representatives as it goes.
+\item It applies to weak goals of an LTS whose rules hold reorderings
+  and whose summands are not dynamic (a computed value never has
+  structure). It is on by default; \code{MEBI_UPTO=off} turns it off.
+\end{enumerate}
+
+\emph{Example.} Two processes, \code{cpar (cprc a1) (cprc a2)} against
+\code{cpar (cprc a2) (cprc a1)}. The shape \code{cpar (cprc P0) (cprc
+P1)} has one reordering summand, \code{do_comm} at the top, so two items:
+itself, and itself with the two slots swapped. Each side has 18 states
+(9 combinations of local states, each in both orders); up to reordering,
+9. The second system's start is not its class's representative: a
+normalisation step takes it there.
+
+\paragraph{The theorem} (\file{theories/DdUpto.v}, proved once, closed
+under the global context). \code{cert_weak_sim_upto} and
+\code{cert_weak_bisim_upto} conclude \code{weak_sim} or
+\code{weak_bisimilar} from:
+\begin{itemize}
+\item each side's equivalence \code{Eq} an equivalence and a strong
+  simulation (\code{Equiv});
+\item the game on vectors, \code{VWSimN}: every move from a pair of $z$
+  answered into $z$, the answer's silent steps the answerer's or
+  normalisation steps;
+\item the mover's completeness and the answerer's soundness, as in
+  \cref{sec:qed};
+\item each normalisation step sound: a state, and one \code{Eq} to it
+  (\code{SoundNL}, \code{SoundNR});
+\item the start normalised into $z$ (\code{NormZ}).
+\end{itemize}
+Inside, a real answer is carried along \code{Eq} at each normalisation:
+if $x \equiv x_0$ and $x_0$ answers by a silent step, so does $x$, to a
+state $\equiv$ to $x_0$'s (\code{taus_left_upto}).
+
+\paragraph{The proof} (\file{src/lts_proof.ml}, ``Up to reordering'').
+\begin{itemize}
+\item \code{Ro}, the one-step reorderings: a disjunction with one case
+  per reordering summand of each shape met, over the slots' numbers. A
+  slot holds a value of its type's table, \code{T_v u}
+  (\cref{sec:qed:parts}). For the example, one case: \code{Ro x y} if
+  for some numbers $u_0, u_1$, $x$ is \code{cpar (cprc (T_v $u_0$)) (cprc
+  (T_v $u_1$))} and $y$ is the same with $u_0$ and $u_1$ swapped. The
+  equivalence is \code{Cong Ro}, its reflexive-transitive closure.
+\item Inverse paths: each case's inverse, one step back.
+\item \emph{Commutation}, one lemma per case, by the small-inversion
+  engine of \cref{sec:qed:parts}: every step of the case's source is one
+  of the source's summands. A slot's own step keeps its premise as a
+  hypothesis; the reordered state takes the same step at the slot's new
+  place, and the targets are again one \code{Ro} step apart; a closure
+  lemma (\code{Vn}: each value of the table steps only to values of the
+  table) keeps the new value a table value. A reordering of the source is
+  answered by the inverse reordering, back to the source. A rule that
+  needs a slot to start with a constructor no value of its table starts
+  with is refuted by the existing lemma for that (Test4's
+  \code{do_par_end}, which needs \code{cprc tend}: no process of Test4 ever
+  ends). Then \code{cong_equiv} gives \code{Equiv}.
+\item Each item a lemma: the state and the item's are \code{Cong Ro},
+  for all numbers, by the item's path.
+\item Each normalisation tuple sound: the answerer's soundness of
+  \cref{sec:qed:parts} with \code{fun x _ y => Cong Ro x y} in the place
+  of the LTS, each tuple's proof its item's lemma at its numbers.
+\item The start: one normalisation step per side whose start is not its
+  representative (\code{normz_l}, \code{normz_r}).
+\end{itemize}
+Rocq computes nothing new: the reorderings' targets and the shapes'
+templates by conversion, as for the other parts, and the closure and
+items by their lemmas' terms. If the proof up to reordering cannot be
+built (a rule that does not commute with a reordering, or one with two
+premises, which the commutation proofs do not follow), the tactic
+decides and proves the goal again without it, with a notice
+(\code{Learn.upto_off}).
+
+\paragraph{Cost} (13 November 2026).
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+goal & states & up to & proof \\
+\midrule
+Proc, two processes & 18 & 9 & 1.3\,s, 0.5\,GB \\
+Proc, three processes & 324 & 27 & 6.2\,s, 1.1\,GB \\
+Test4, one goal, tactic & 9,720 & 81 & 52\,s, 3.9\,GB \\
+Test4, three goals, \code{MeBi Prove} & 9,720 & 81 & 493\,s, 3.3\,GB \\
+\bottomrule
+\end{tabular}
+\end{center}
+Proc Test3's 14 goals are proved up to reordering in the default build.
+Test4's 593K facts are mostly the images of the answer's closure
+through the normalisation relations, which read and write every
+position: narrowing them to the positions a shape's slots use would cut
+them. For classes past the bound, sorting (neighbouring values compared
+and swapped, each swap an item) is designed but not built; larger systems
+are meant to come from compositional proofs (\cref{sec:optimisations}).

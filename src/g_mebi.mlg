@@ -69,6 +69,14 @@ VERNAC COMMAND EXTEND MeBi_Check_Log CLASSIFIED AS SIDEFF
 | [ "MeBi" "Check" "Log" string(file) ] -> { User_tactics.check_log file }
 END
 
+(* [MeBi Prove id : goal.]: the lemma [id], proved from the certificate as
+   the tactics prove a goal, each piece of the proof a global constant
+   checked when declared (doc/certificate.md, "Large goals"): for
+   large goals, in less memory than [Proof. weak_sim. Qed.]. *)
+VERNAC COMMAND EXTEND MeBi_Prove CLASSIFIED AS SIDEFF
+| [ "MeBi" "Prove" ident(id) ":" lconstr(c) ] -> { User_tactics.prove_command id c }
+END
+
 (* Structural congruence by hand (doc/upto.md): the silent rules of an
    LTS to take as its structural congruence, instead of the reorderings
    found in its rules ([Print MeBi Skeleton] shows which); for proofs up

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Proofs of the CADP examples (doc/certificate.md): each file copied into
 `_certify/log/` and compiled, each goal decided, proved from Sylvan's
-certificate and checked at `Qed` (`Time Qed`, in the copy). One job at a
+certificate and checked at `Qed` (`Time Qed`, in the copy), or by `MeBi
+Prove` (its pieces checked as declared). One job at a
 time, each memory-capped, with the time to build each proof, the time of
 its `Qed`, and the job's time and peak memory; the phases
 (`MEBI_CERT_STATS`) are in `_certify/log/*.out`.
@@ -12,8 +13,8 @@ each job, at most --cap, is what is available when it starts less 4GB
 (CLAUDE.md: never push the machine into swap; the margin leaves room for
 a program started meanwhile); a job that would get less than 600MB is
 skipped. Run `dune build` first. Two processes: the file in about 6s,
-0.83GB at most; three processes: the proof built in 124s, `Qed` 144s,
-6.6GB at most, so it needs about 11GB available (11 November 2026).
+0.83GB at most; three processes, by `MeBi Prove`: about 280s, 2.6GB at
+most, so it needs about 7GB available (12 November 2026).
 """
 import argparse
 import glob
@@ -94,6 +95,12 @@ def main():
         print(f"{f}: proved ({what})")
         for (pairs, b), q in zip(built, qeds):
             print(f"  {pairs} pairs: proof built in {b}s, Qed in {q}s")
+        # [MeBi Prove]: its pieces checked as declared, then the lemma
+        for lemma, pairs, b, l in re.findall(
+            r"(\S+) is defined: decided \(([\d.]+) pairs\); the proof from Sylvan's certificate built in ([\d.]+)s,.*?the lemma checked in ([\d.]+)s",
+            out,
+        ):
+            print(f"  {lemma}: {pairs} pairs, MeBi Prove: proof built (pieces checked) in {b}s, lemma checked in {l}s")
         for ext in (".vo", ".vos", ".vok", ".glob"):
             p = os.path.join(work, name + ext)
             if os.path.exists(p):
